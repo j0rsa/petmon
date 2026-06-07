@@ -4,14 +4,17 @@ use crate::repo::cats;
 use crate::repo::entries;
 use sqlx::SqlitePool;
 
+#[tracing::instrument(skip(pool))]
 pub async fn list(pool: &SqlitePool, filters: EntryFilters) -> AppResult<Vec<Entry>> {
     entries::list_entries(pool, &filters).await
 }
 
+#[tracing::instrument(skip(pool))]
 pub async fn get(pool: &SqlitePool, id: &str) -> AppResult<Entry> {
     entries::get_entry(pool, id).await
 }
 
+#[tracing::instrument(skip(pool))]
 pub async fn create(pool: &SqlitePool, req: CreateEntry) -> AppResult<Entry> {
     if req.amount < 0.0 {
         return Err(AppError::Validation {
@@ -30,6 +33,7 @@ pub async fn create(pool: &SqlitePool, req: CreateEntry) -> AppResult<Entry> {
     entries::create_entry(pool, entry).await
 }
 
+#[tracing::instrument(skip(pool))]
 pub async fn update(pool: &SqlitePool, id: &str, req: UpdateEntry) -> AppResult<Entry> {
     if let Some(amount) = req.amount {
         if amount < 0.0 {
@@ -42,6 +46,7 @@ pub async fn update(pool: &SqlitePool, id: &str, req: UpdateEntry) -> AppResult<
     entries::update_entry(pool, id, req).await
 }
 
+#[tracing::instrument(skip(pool))]
 pub async fn delete(pool: &SqlitePool, id: &str) -> AppResult<()> {
     entries::delete_entry(pool, id).await
 }

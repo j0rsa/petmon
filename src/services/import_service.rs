@@ -131,6 +131,7 @@ pub fn preview_text(req: &ImportPreviewRequest) -> ImportPreviewResponse {
     }
 }
 
+#[tracing::instrument(skip(pool, req), fields(cat_id = %req.cat_id, source = %req.source_name))]
 pub async fn commit_import(pool: &SqlitePool, req: ImportCommitRequest) -> AppResult<ImportBatch> {
     cats::get_cat(pool, &req.cat_id).await?;
 

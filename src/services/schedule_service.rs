@@ -3,14 +3,17 @@ use crate::error::{AppError, AppResult};
 use crate::repo::{cats, schedules};
 use sqlx::SqlitePool;
 
+#[tracing::instrument(skip(pool))]
 pub async fn list(pool: &SqlitePool, cat_id: Option<&str>) -> AppResult<Vec<Schedule>> {
     schedules::list_schedules(pool, cat_id).await
 }
 
+#[tracing::instrument(skip(pool))]
 pub async fn get(pool: &SqlitePool, id: &str) -> AppResult<Schedule> {
     schedules::get_schedule(pool, id).await
 }
 
+#[tracing::instrument(skip(pool))]
 pub async fn create(pool: &SqlitePool, req: CreateSchedule) -> AppResult<Schedule> {
     if req.name.trim().is_empty() {
         return Err(AppError::Validation {
@@ -23,10 +26,12 @@ pub async fn create(pool: &SqlitePool, req: CreateSchedule) -> AppResult<Schedul
     schedules::create_schedule(pool, schedule).await
 }
 
+#[tracing::instrument(skip(pool))]
 pub async fn update(pool: &SqlitePool, id: &str, req: UpdateSchedule) -> AppResult<Schedule> {
     schedules::update_schedule(pool, id, req).await
 }
 
+#[tracing::instrument(skip(pool))]
 pub async fn delete(pool: &SqlitePool, id: &str) -> AppResult<()> {
     schedules::delete_schedule(pool, id).await
 }

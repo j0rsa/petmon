@@ -53,9 +53,12 @@ impl McpResponse {
 }
 
 #[post("/mcp")]
+#[tracing::instrument(name = "mcp_request", skip(pool, body), fields(method = tracing::field::Empty))]
 pub async fn mcp_handler(pool: web::Data<SqlitePool>, body: web::Json<McpRequest>) -> HttpResponse {
     let req = body.into_inner();
     let id = req.id.clone();
+
+    tracing::Span::current().record("method", &req.method.as_str());
 
     if req.jsonrpc != "2.0" {
         return HttpResponse::Ok().json(McpResponse::err(id, -32600, "Invalid JSON-RPC version"));

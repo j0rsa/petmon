@@ -7,6 +7,10 @@ pub struct Config {
     pub database_url: String,
     pub timezone: String,
     pub import_max_bytes: usize,
+    /// OTLP/HTTP endpoint for trace export (e.g. `http://localhost:4318`).
+    /// When absent, tracing spans are emitted to stdout only.
+    pub otlp_endpoint: Option<String>,
+    pub service_name: String,
 }
 
 impl Config {
@@ -25,6 +29,9 @@ impl Config {
                 .unwrap_or_else(|_| "1048576".to_string())
                 .parse()
                 .unwrap_or(1_048_576),
+            otlp_endpoint: env::var("OTEL_EXPORTER_OTLP_ENDPOINT").ok(),
+            service_name: env::var("OTEL_SERVICE_NAME")
+                .unwrap_or_else(|_| "catmon".to_string()),
         }
     }
 }

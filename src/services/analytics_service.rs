@@ -4,6 +4,7 @@ use crate::repo::analytics;
 use sqlx::SqlitePool;
 use std::collections::HashMap;
 
+#[tracing::instrument(skip(pool))]
 pub async fn daily_totals(
     pool: &SqlitePool,
     date_from: &str,
@@ -14,6 +15,7 @@ pub async fn daily_totals(
     analytics::daily_totals(pool, date_from, date_to, cat_id, category).await
 }
 
+#[tracing::instrument(skip(pool))]
 pub async fn range_summary(
     pool: &SqlitePool,
     date_from: &str,

@@ -5,6 +5,7 @@ use crate::repo::{day_notes, entries};
 use sqlx::SqlitePool;
 use std::collections::HashMap;
 
+#[tracing::instrument(skip(pool))]
 pub async fn get_day_summary(pool: &SqlitePool, date: &str, cat_id: Option<&str>) -> AppResult<DaySummary> {
     let filters = EntryFilters {
         cat_id: cat_id.map(ToOwned::to_owned),
@@ -30,6 +31,7 @@ pub async fn get_day_summary(pool: &SqlitePool, date: &str, cat_id: Option<&str>
     })
 }
 
+#[tracing::instrument(skip(pool))]
 pub async fn update_day_note(pool: &SqlitePool, date: &str, cat_id: Option<&str>, note: &str) -> AppResult<()> {
     day_notes::upsert_day_note(pool, date, cat_id, note).await?;
     Ok(())

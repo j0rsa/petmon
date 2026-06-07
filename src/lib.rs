@@ -7,3 +7,4 @@ pub mod error;
 pub mod mcp;
 pub mod repo;
 pub mod services;
+pub mod telemetry;
