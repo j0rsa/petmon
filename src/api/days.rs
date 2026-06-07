@@ -1,0 +1,40 @@
+use crate::error::AppResult;
+use crate::services::day_service;
+use actix_web::{get, patch, web, HttpResponse};
+use serde::Deserialize;
+use sqlx::SqlitePool;
+
+#[derive(Deserialize)]
+pub struct DayQuery {
+    pub cat_id: Option<String>,
+}
+
+#[derive(Deserialize)]
+pub struct UpdateNoteBody {
+    pub note: String,
+    pub cat_id: Option<String>,
+}
+
+#[get("/{date}")]
+pub async fn get_day(
+    pool: web::Data<SqlitePool>,
+    date: web::Path<String>,
+    query: web::Query<DayQuery>,
+) -> AppResult<HttpResponse> {
+    let summary = day_service::get_day_summary(pool.get_ref(), &date, query.cat_id.as_deref()).await?;
+    Ok(HttpResponse::Ok().json(summary))
+}
+
+#[patch("/{date}/note")]
+pub async fn update_day_note(
+    pool: web::Data<SqlitePool>,
+    date: web::Path<String>,
+    body: web::Json<UpdateNoteBody>,
+) -> AppResult<HttpResponse> {
+    day_service::update_day_note(pool.get_ref(), &date, body.cat_id.as_deref(), &body.note).await?;
+    Ok(HttpResponse::Ok().finish())
+}
+
+pub fn configure(cfg: &mut web::ServiceConfig) {
+    cfg.service(web::scope("/days").service(get_day).service(update_day_note));
+}
