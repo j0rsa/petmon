@@ -1,7 +1,7 @@
 import { api } from './client';
-import type { DaySummary } from '../types';
+import type { NutritionDaySummary } from '../types';
 
 export const daysApi = {
-  getSummary: (date: string, catId?: string) => api.get<DaySummary>(`/days/${date}${catId ? `?cat_id=${catId}` : ''}`),
-  updateNote: (date: string, note: string, catId?: string) => api.patch<void>(`/days/${date}/note`, { note, cat_id: catId }),
+  getSummary: (date: string, petId?: string) => api.get<NutritionDaySummary>(`/days/${date}${petId ? `?pet_id=${petId}` : ''}`),
+  updateNote: (date: string, note: string, petId?: string) => api.patch<void>(`/days/${date}/note`, { note, pet_id: petId }),
 };

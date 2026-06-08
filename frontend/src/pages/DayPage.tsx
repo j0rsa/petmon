@@ -1,14 +1,14 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useParams } from 'react-router-dom';
-import { catsApi } from '../api/cats';
+import { petsApi } from '../api/pets';
 import { daysApi } from '../api/days';
-import { entriesApi } from '../api/entries';
+import { nutritionRecordsApi } from '../api/nutritionRecords';
 import { CategoryBadge } from '../components/CategoryBadge';
 import { DateNavigator } from '../components/DateNavigator';
-import { EntryForm } from '../components/EntryForm';
+import { NutritionRecordForm } from '../components/NutritionRecordForm';
 import { CATEGORIES, CATEGORY_LABELS } from '../types';
-import type { CreateEntry, Entry, UpdateEntry } from '../types';
+import type { CreateNutritionRecord, NutritionRecord, UpdateNutritionRecord } from '../types';
 
 function formatTime(value: string) {
   return new Date(value).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
@@ -26,21 +26,21 @@ function formatDateHeading(value: string) {
 function invalidateDayData(queryClient: ReturnType<typeof useQueryClient>) {
   return Promise.all([
     queryClient.invalidateQueries({ queryKey: ['day-summary'] }),
-    queryClient.invalidateQueries({ queryKey: ['analytics'] }),
+    queryClient.invalidateQueries({ queryKey: ['nutrition-analytics'] }),
   ]);
 }
 
 export function DayView({ date, title }: { date: string; title: string }) {
   const queryClient = useQueryClient();
-  const [selectedCatId, setSelectedCatId] = useState('');
-  const [editingEntry, setEditingEntry] = useState<Entry | null>(null);
+  const [selectedPetId, setSelectedPetId] = useState('');
+  const [editingRecord, setEditingRecord] = useState<NutritionRecord | null>(null);
   const [noteDraft, setNoteDraft] = useState('');
   const [formResetKey, setFormResetKey] = useState(0);
 
-  const catsQuery = useQuery({ queryKey: ['cats'], queryFn: catsApi.list });
+  const petsQuery = useQuery({ queryKey: ['pets'], queryFn: petsApi.list });
   const summaryQuery = useQuery({
-    queryKey: ['day-summary', date, selectedCatId],
-    queryFn: () => daysApi.getSummary(date, selectedCatId || undefined),
+    queryKey: ['day-summary', date, selectedPetId],
+    queryFn: () => daysApi.getSummary(date, selectedPetId || undefined),
   });
 
   useEffect(() => {
@@ -48,11 +48,11 @@ export function DayView({ date, title }: { date: string; title: string }) {
   }, [summaryQuery.data?.note]);
 
   useEffect(() => {
-    setEditingEntry(null);
-  }, [date, selectedCatId]);
+    setEditingRecord(null);
+  }, [date, selectedPetId]);
 
   const createMutation = useMutation({
-    mutationFn: (payload: CreateEntry | UpdateEntry) => entriesApi.create(payload as CreateEntry),
+    mutationFn: (payload: CreateNutritionRecord | UpdateNutritionRecord) => nutritionRecordsApi.create(payload as CreateNutritionRecord),
     onSuccess: async () => {
       setFormResetKey((value) => value + 1);
       await invalidateDayData(queryClient);
@@ -60,34 +60,35 @@ export function DayView({ date, title }: { date: string; title: string }) {
   });
 
   const updateMutation = useMutation({
-    mutationFn: ({ id, payload }: { id: string; payload: CreateEntry | UpdateEntry }) => entriesApi.update(id, payload as UpdateEntry),
+    mutationFn: ({ id, payload }: { id: string; payload: CreateNutritionRecord | UpdateNutritionRecord }) =>
+      nutritionRecordsApi.update(id, payload as UpdateNutritionRecord),
     onSuccess: async () => {
-      setEditingEntry(null);
+      setEditingRecord(null);
       await invalidateDayData(queryClient);
     },
   });
 
   const deleteMutation = useMutation({
-    mutationFn: (id: string) => entriesApi.delete(id),
+    mutationFn: (id: string) => nutritionRecordsApi.delete(id),
     onSuccess: async () => {
       await invalidateDayData(queryClient);
     },
   });
 
   const noteMutation = useMutation({
-    mutationFn: () => daysApi.updateNote(date, noteDraft, selectedCatId || undefined),
+    mutationFn: () => daysApi.updateNote(date, noteDraft, selectedPetId || undefined),
     onSuccess: async () => {
-      await queryClient.invalidateQueries({ queryKey: ['day-summary', date, selectedCatId] });
+      await queryClient.invalidateQueries({ queryKey: ['day-summary', date, selectedPetId] });
     },
   });
 
-  const catNames = useMemo(() => new Map((catsQuery.data ?? []).map((cat) => [cat.id, cat.name])), [catsQuery.data]);
-  const groupedEntries = useMemo(() => {
-    const groups = new Map<string, Entry[]>();
+  const petNames = useMemo(() => new Map((petsQuery.data ?? []).map((pet) => [pet.id, pet.name])), [petsQuery.data]);
+  const groupedRecords = useMemo(() => {
+    const groups = new Map<string, NutritionRecord[]>();
 
-    for (const entry of summaryQuery.data?.entries ?? []) {
-      const key = formatTime(entry.occurred_at);
-      groups.set(key, [...(groups.get(key) ?? []), entry]);
+    for (const record of summaryQuery.data?.records ?? []) {
+      const key = formatTime(record.occurred_at);
+      groups.set(key, [...(groups.get(key) ?? []), record]);
     }
 
     return [...groups.entries()].sort((left, right) => {
@@ -95,19 +96,19 @@ export function DayView({ date, title }: { date: string; title: string }) {
       const rightTime = right[1][0]?.occurred_at ?? '';
       return rightTime.localeCompare(leftTime);
     });
-  }, [summaryQuery.data?.entries]);
+  }, [summaryQuery.data?.records]);
 
   const totalCards = CATEGORIES.map((category) => ({
     category,
     total: summaryQuery.data?.totals_by_category[category] ?? 0,
   }));
 
-  if (catsQuery.isLoading || summaryQuery.isLoading) {
+  if (petsQuery.isLoading || summaryQuery.isLoading) {
     return <div className="loading-state">Loading {title.toLowerCase()}…</div>;
   }
 
-  if (catsQuery.isError || summaryQuery.isError) {
-    const message = catsQuery.error instanceof Error ? catsQuery.error.message : summaryQuery.error instanceof Error ? summaryQuery.error.message : 'Unable to load day summary.';
+  if (petsQuery.isError || summaryQuery.isError) {
+    const message = petsQuery.error instanceof Error ? petsQuery.error.message : summaryQuery.error instanceof Error ? summaryQuery.error.message : 'Unable to load day summary.';
     return <div className="error-state">{message}</div>;
   }
 
@@ -119,12 +120,12 @@ export function DayView({ date, title }: { date: string; title: string }) {
           <h2>{formatDateHeading(date)}</h2>
         </div>
         <div className="filter-row">
-          <label htmlFor="day-cat-filter">Cat filter</label>
-          <select id="day-cat-filter" value={selectedCatId} onChange={(event) => setSelectedCatId(event.target.value)}>
-            <option value="">All cats</option>
-            {(catsQuery.data ?? []).map((cat) => (
-              <option key={cat.id} value={cat.id}>
-                {cat.name}
+          <label htmlFor="day-pet-filter">Pet filter</label>
+          <select id="day-pet-filter" value={selectedPetId} onChange={(event) => setSelectedPetId(event.target.value)}>
+            <option value="">All pets</option>
+            {(petsQuery.data ?? []).map((pet) => (
+              <option key={pet.id} value={pet.id}>
+                {pet.name}
               </option>
             ))}
           </select>
@@ -147,55 +148,55 @@ export function DayView({ date, title }: { date: string; title: string }) {
         <div className="stack-panel">
           <div className="section-heading">
             <div>
-              <p className="eyebrow">Entries</p>
-              <h3>{summaryQuery.data?.entries.length ?? 0} logged items</h3>
+              <p className="eyebrow">Nutrition</p>
+              <h3>{summaryQuery.data?.records.length ?? 0} logged items</h3>
             </div>
           </div>
 
-          <EntryForm
+          <NutritionRecordForm
             key={formResetKey}
-            cats={catsQuery.data ?? []}
-            initialCatId={selectedCatId || catsQuery.data?.[0]?.id}
+            pets={petsQuery.data ?? []}
+            initialPetId={selectedPetId || petsQuery.data?.[0]?.id}
             initialDate={date}
             loading={createMutation.isPending}
             onSubmit={async (payload) => {
               await createMutation.mutateAsync(payload);
             }}
-            submitLabel="Add entry"
+            submitLabel="Add record"
           />
 
-          {groupedEntries.length === 0 ? (
-            <div className="empty-state">No entries logged for this day yet.</div>
+          {groupedRecords.length === 0 ? (
+            <div className="empty-state">No nutrition records logged for this day yet.</div>
           ) : (
-            groupedEntries.map(([time, entries]) => (
+            groupedRecords.map(([time, records]) => (
               <section key={time} className="panel">
                 <div className="entry-time-heading">{time}</div>
                 <div className="entry-list">
-                  {entries.map((entry) => (
-                    <div key={entry.id} className="entry-card">
+                  {records.map((record) => (
+                    <div key={record.id} className="entry-card">
                       <div className="entry-card-main">
                         <div className="entry-card-header">
-                          <CategoryBadge category={entry.category} />
+                          <CategoryBadge category={record.category} />
                           <strong>
-                            {entry.amount} {entry.unit ?? ''}
+                            {record.amount} {record.unit ?? ''}
                           </strong>
-                          {!selectedCatId && <span className="muted-text">{catNames.get(entry.cat_id) ?? 'Unknown cat'}</span>}
+                          {!selectedPetId && <span className="muted-text">{petNames.get(record.pet_id) ?? 'Unknown pet'}</span>}
                         </div>
                         <div className="entry-meta">
-                          <span>{entry.source_type}</span>
-                          {entry.note && <span>• {entry.note}</span>}
+                          <span>{record.source_type}</span>
+                          {record.note && <span>• {record.note}</span>}
                         </div>
                       </div>
                       <div className="button-row">
-                        <button className="button button-secondary" type="button" onClick={() => setEditingEntry(entry)}>
+                        <button className="button button-secondary" type="button" onClick={() => setEditingRecord(record)}>
                           Edit
                         </button>
                         <button
                           className="button button-danger"
                           type="button"
                           onClick={() => {
-                            if (window.confirm('Delete this entry?')) {
-                              deleteMutation.mutate(entry.id);
+                            if (window.confirm('Delete this record?')) {
+                              deleteMutation.mutate(record.id);
                             }
                           }}
                           disabled={deleteMutation.isPending}
@@ -227,23 +228,23 @@ export function DayView({ date, title }: { date: string; title: string }) {
             </div>
           </section>
 
-          {editingEntry && (
+          {editingRecord && (
             <section className="panel">
               <div className="section-heading">
                 <div>
-                  <p className="eyebrow">Editing entry</p>
-                  <h3>{formatTime(editingEntry.occurred_at)}</h3>
+                  <p className="eyebrow">Editing record</p>
+                  <h3>{formatTime(editingRecord.occurred_at)}</h3>
                 </div>
               </div>
-              <EntryForm
-                cats={catsQuery.data ?? []}
-                initialEntry={editingEntry}
+              <NutritionRecordForm
+                pets={petsQuery.data ?? []}
+                initialRecord={editingRecord}
                 loading={updateMutation.isPending}
-                onCancel={() => setEditingEntry(null)}
+                onCancel={() => setEditingRecord(null)}
                 onSubmit={async (payload) => {
-                  await updateMutation.mutateAsync({ id: editingEntry.id, payload });
+                  await updateMutation.mutateAsync({ id: editingRecord.id, payload });
                 }}
-                submitLabel="Update entry"
+                submitLabel="Update record"
               />
             </section>
           )}

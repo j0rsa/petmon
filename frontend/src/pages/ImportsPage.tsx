@@ -1,77 +1,100 @@
 import { useMemo, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { catsApi } from '../api/cats';
-import { importsApi } from '../api/imports';
+import { petsApi } from '../api/pets';
+import { nutritionRecordsApi } from '../api/nutritionRecords';
+import { dedupeCreateRecords, parseTelegramNutritionLog, toCreateNutritionRecords } from '../lib/parseTelegramNutritionLog';
 import { CATEGORY_LABELS } from '../types';
-import type { ImportPreview } from '../types';
+import type { CreateNutritionRecord } from '../types';
 
 export default function ImportsPage() {
   const queryClient = useQueryClient();
-  const [sourceName, setSourceName] = useState('manual-import');
-  const [catId, setCatId] = useState('');
+  const [petId, setPetId] = useState('');
   const [rawText, setRawText] = useState('');
-  const [preview, setPreview] = useState<ImportPreview | null>(null);
+  const [previewRecords, setPreviewRecords] = useState<CreateNutritionRecord[] | null>(null);
 
-  const catsQuery = useQuery({ queryKey: ['cats'], queryFn: catsApi.list });
-  const importsQuery = useQuery({ queryKey: ['imports'], queryFn: importsApi.list });
-  const catNames = useMemo(() => new Map((catsQuery.data ?? []).map((cat) => [cat.id, cat.name])), [catsQuery.data]);
+  const petsQuery = useQuery({ queryKey: ['pets'], queryFn: petsApi.list });
 
-  const previewMutation = useMutation({
-    mutationFn: () => importsApi.preview({ source_name: sourceName, raw_text: rawText, cat_id: catId }),
-    onSuccess: (data) => setPreview(data),
-  });
+  const preview = useMemo(() => {
+    if (!previewRecords) return null;
+    const byDate = new Map<string, CreateNutritionRecord[]>();
+    for (const record of previewRecords) {
+      const date = record.local_date ?? record.occurred_at.slice(0, 10);
+      byDate.set(date, [...(byDate.get(date) ?? []), record]);
+    }
+    return {
+      total: previewRecords.length,
+      days: [...byDate.entries()].sort(([left], [right]) => left.localeCompare(right)),
+    };
+  }, [previewRecords]);
 
   const commitMutation = useMutation({
-    mutationFn: () => importsApi.commit({ source_name: sourceName, raw_text: rawText, cat_id: catId }),
+    mutationFn: (records: CreateNutritionRecord[]) => nutritionRecordsApi.batchCreate(records),
     onSuccess: async () => {
-      setPreview(null);
+      setPreviewRecords(null);
       setRawText('');
-      await queryClient.invalidateQueries({ queryKey: ['imports'] });
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ['day-summary'] }),
+        queryClient.invalidateQueries({ queryKey: ['nutrition-analytics'] }),
+      ]);
     },
   });
+
+  function handlePreview() {
+    const parsed = parseTelegramNutritionLog(rawText);
+    const records = dedupeCreateRecords(toCreateNutritionRecords(parsed, petId));
+    setPreviewRecords(records);
+  }
 
   return (
     <div className="page-stack">
       <section className="page-header">
         <div>
-          <p className="eyebrow">Imports</p>
-          <h2>Preview and commit raw intake logs</h2>
-          <p className="muted-text">Paste text from notes, preview the parser output, then commit the batch.</p>
+          <p className="eyebrow">Import</p>
+          <h2>Paste a Telegram nutrition log</h2>
+          <p className="muted-text">Parsing happens in the browser. Commit sends a batch of nutrition records to the API.</p>
         </div>
       </section>
 
       <section className="panel">
         <div className="form-grid">
           <div className="form-row">
-            <label htmlFor="import-source">Source name</label>
-            <input id="import-source" value={sourceName} onChange={(event) => setSourceName(event.target.value)} />
-          </div>
-          <div className="form-row">
-            <label htmlFor="import-cat">Cat</label>
-            <select id="import-cat" value={catId} onChange={(event) => setCatId(event.target.value)} required>
-              <option value="">Select a cat</option>
-              {(catsQuery.data ?? []).map((cat) => (
-                <option key={cat.id} value={cat.id}>
-                  {cat.name}
+            <label htmlFor="import-pet">Pet</label>
+            <select id="import-pet" value={petId} onChange={(event) => setPetId(event.target.value)} required>
+              <option value="">Select a pet</option>
+              {(petsQuery.data ?? []).map((pet) => (
+                <option key={pet.id} value={pet.id}>
+                  {pet.name}
                 </option>
               ))}
             </select>
           </div>
           <div className="form-row form-row-full">
-            <label htmlFor="import-text">Raw text</label>
-            <textarea id="import-text" rows={10} value={rawText} onChange={(event) => setRawText(event.target.value)} placeholder="08:00 wet_food 85 g\n13:00 water 50 ml" />
+            <label htmlFor="import-text">Telegram log</label>
+            <textarea
+              id="import-text"
+              rows={12}
+              value={rawText}
+              onChange={(event) => setRawText(event.target.value)}
+              placeholder={'Staging Bot, [31. May 2026 at 06:15:15]:\n#cat_ate #wet_food 15\n#cat_ate #liquids 16'}
+            />
           </div>
           <div className="button-row form-row-full">
-            <button className="button" type="button" disabled={!catId || !rawText.trim() || previewMutation.isPending} onClick={() => previewMutation.mutate()}>
-              {previewMutation.isPending ? 'Previewing…' : 'Preview import'}
+            <button className="button" type="button" disabled={!petId || !rawText.trim()} onClick={handlePreview}>
+              Preview
             </button>
-            <button className="button button-secondary" type="button" disabled={!preview || commitMutation.isPending} onClick={() => commitMutation.mutate()}>
-              {commitMutation.isPending ? 'Committing…' : 'Commit import'}
+            <button
+              className="button button-secondary"
+              type="button"
+              disabled={!preview || preview.total === 0 || commitMutation.isPending}
+              onClick={() => previewRecords && commitMutation.mutate(previewRecords)}
+            >
+              {commitMutation.isPending ? 'Importing…' : 'Import records'}
             </button>
           </div>
         </div>
-        {previewMutation.isError && <div className="error-state">{previewMutation.error instanceof Error ? previewMutation.error.message : 'Unable to preview import.'}</div>}
-        {commitMutation.isError && <div className="error-state">{commitMutation.error instanceof Error ? commitMutation.error.message : 'Unable to commit import.'}</div>}
+        {commitMutation.isError && (
+          <div className="error-state">{commitMutation.error instanceof Error ? commitMutation.error.message : 'Unable to import records.'}</div>
+        )}
       </section>
 
       {preview && (
@@ -80,62 +103,30 @@ export default function ImportsPage() {
             <div>
               <p className="eyebrow">Preview</p>
               <h3>
-                {preview.parsed_count} parsed • {preview.warning_count} warnings • {preview.error_count} errors
+                {preview.total} record{preview.total === 1 ? '' : 's'} across {preview.days.length} day{preview.days.length === 1 ? '' : 's'}
               </h3>
             </div>
           </div>
-          <div className="preview-list">
-            {preview.lines.map((line) => (
-              <article
-                key={line.line_number}
-                className={`preview-line${line.error ? ' preview-line-error' : line.warning ? ' preview-line-warning' : ' preview-line-success'}`}
-              >
-                <strong>Line {line.line_number}</strong>
-                <code>{line.raw}</code>
-                {line.parsed && (
-                  <span>
-                    Parsed as {CATEGORY_LABELS[line.parsed.category] ?? line.parsed.category} • {line.parsed.amount} {line.parsed.unit ?? ''}
-                  </span>
-                )}
-                {line.warning && <span>{line.warning}</span>}
-                {line.error && <span>{line.error}</span>}
-              </article>
-            ))}
-          </div>
+          {preview.total === 0 ? (
+            <div className="empty-state">No nutrition records found in the pasted log.</div>
+          ) : (
+            <div className="preview-list">
+              {preview.days.map(([date, records]) => (
+                <article key={date} className="panel">
+                  <h4>{date}</h4>
+                  <ul>
+                    {records.map((record, index) => (
+                      <li key={`${date}-${index}`}>
+                        {record.occurred_at.slice(11, 16)} — {CATEGORY_LABELS[record.category] ?? record.category} — {record.amount} {record.unit ?? ''}
+                      </li>
+                    ))}
+                  </ul>
+                </article>
+              ))}
+            </div>
+          )}
         </section>
       )}
-
-      <section className="panel">
-        <div className="section-heading">
-          <div>
-            <p className="eyebrow">History</p>
-            <h3>Past import batches</h3>
-          </div>
-        </div>
-        {importsQuery.isLoading ? (
-          <div className="loading-state">Loading imports…</div>
-        ) : importsQuery.isError ? (
-          <div className="error-state">{importsQuery.error instanceof Error ? importsQuery.error.message : 'Unable to load imports.'}</div>
-        ) : (importsQuery.data ?? []).length === 0 ? (
-          <div className="empty-state">No import batches yet.</div>
-        ) : (
-          <div className="card-grid">
-            {(importsQuery.data ?? []).map((batch) => (
-              <article key={batch.id} className="panel import-card">
-                <div className="entry-card-header">
-                  <div>
-                    <h3>{batch.source_name}</h3>
-                    <p className="muted-text">Created {new Date(batch.created_at).toLocaleString()}</p>
-                  </div>
-                  <span className={`status-pill${batch.committed_at ? ' active' : ''}`}>{batch.committed_at ? 'Committed' : 'Preview only'}</span>
-                </div>
-                <p className="muted-text">{catNames.get(catId) ?? 'Cat from batch context not provided by API response'}</p>
-                <pre className="code-block">{batch.parse_summary_json}</pre>
-              </article>
-            ))}
-          </div>
-        )}
-      </section>
     </div>
   );
 }

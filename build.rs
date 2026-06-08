@@ -13,7 +13,7 @@ fn main() {
     if !index_path.exists() {
         fs::write(
             &index_path,
-            r#"<!doctype html><html><head><meta charset="utf-8"><title>catmon</title></head><body><div id="root">Frontend not built yet.</div></body></html>"#,
+            r#"<!doctype html><html><head><meta charset="utf-8"><title>petmon</title></head><body><div id="root">Frontend not built yet.</div></body></html>"#,
         )
         .expect("failed to write placeholder index.html");
     }

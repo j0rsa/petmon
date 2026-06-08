@@ -1,7 +1,7 @@
 import { Navigate, Route, Routes } from 'react-router-dom';
 import { Layout } from './components/Layout';
 import AnalyticsPage from './pages/AnalyticsPage';
-import CatsPage from './pages/CatsPage';
+import PetsPage from './pages/PetsPage';
 import DashboardPage from './pages/DashboardPage';
 import DayPage from './pages/DayPage';
 import ImportsPage from './pages/ImportsPage';
@@ -14,7 +14,7 @@ export default function App() {
         <Route path="/" element={<DashboardPage />} />
         <Route path="/days/:date" element={<DayPage />} />
         <Route path="/analytics" element={<AnalyticsPage />} />
-        <Route path="/cats" element={<CatsPage />} />
+        <Route path="/pets" element={<PetsPage />} />
         <Route path="/schedules" element={<SchedulesPage />} />
         <Route path="/imports" element={<ImportsPage />} />
         <Route path="*" element={<Navigate to="/" replace />} />

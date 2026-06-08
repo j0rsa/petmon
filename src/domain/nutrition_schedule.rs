@@ -3,9 +3,9 @@ use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
 #[derive(Debug, Clone, Serialize, Deserialize, sqlx::FromRow)]
-pub struct Schedule {
+pub struct NutritionSchedule {
     pub id: String,
-    pub cat_id: String,
+    pub pet_id: Uuid,
     pub name: String,
     pub active: bool,
     pub rules_json: String,
@@ -14,22 +14,22 @@ pub struct Schedule {
 }
 
 #[derive(Debug, Deserialize)]
-pub struct CreateSchedule {
-    pub cat_id: String,
+pub struct CreateNutritionSchedule {
+    pub pet_id: Uuid,
     pub name: String,
     pub active: Option<bool>,
     pub rules: Option<serde_json::Value>,
 }
 
 #[derive(Debug, Deserialize)]
-pub struct UpdateSchedule {
+pub struct UpdateNutritionSchedule {
     pub name: Option<String>,
     pub active: Option<bool>,
     pub rules: Option<serde_json::Value>,
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
-pub struct ScheduleRule {
+pub struct NutritionScheduleRule {
     pub category: String,
     pub target_amount: f64,
     pub unit: Option<String>,
@@ -37,12 +37,12 @@ pub struct ScheduleRule {
     pub notes: Option<String>,
 }
 
-impl Schedule {
-    pub fn new(req: CreateSchedule) -> Self {
+impl NutritionSchedule {
+    pub fn new(req: CreateNutritionSchedule) -> Self {
         let now = Utc::now().to_rfc3339();
-        Schedule {
+        NutritionSchedule {
             id: Uuid::new_v4().to_string(),
-            cat_id: req.cat_id,
+            pet_id: req.pet_id,
             name: req.name,
             active: req.active.unwrap_or(true),
             rules_json: req.rules.map(|r| r.to_string()).unwrap_or_else(|| "[]".to_string()),
@@ -51,7 +51,7 @@ impl Schedule {
         }
     }
 
-    pub fn rules(&self) -> Vec<ScheduleRule> {
+    pub fn rules(&self) -> Vec<NutritionScheduleRule> {
         serde_json::from_str(&self.rules_json).unwrap_or_default()
     }
 }

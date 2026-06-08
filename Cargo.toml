@@ -1,10 +1,10 @@
 [package]
-name = "catmon"
+name = "petmon"
 version = "0.1.0"
 edition = "2021"
 
 [[bin]]
-name = "catmon"
+name = "petmon"
 path = "src/main.rs"
 
 [dependencies]
@@ -28,7 +28,6 @@ anyhow = "1"
 dotenvy = "0.15"
 rust-embed = { version = "8", features = ["actix-web"] }
 mime_guess = "2"
-regex = "1"
 
 [dev-dependencies]
 actix-web = { version = "4", features = ["macros"] }

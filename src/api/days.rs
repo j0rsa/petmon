@@ -3,16 +3,17 @@ use crate::services::day_service;
 use actix_web::{get, patch, web, HttpResponse};
 use serde::Deserialize;
 use sqlx::SqlitePool;
+use uuid::Uuid;
 
 #[derive(Deserialize)]
 pub struct DayQuery {
-    pub cat_id: Option<String>,
+    pub pet_id: Option<Uuid>,
 }
 
 #[derive(Deserialize)]
 pub struct UpdateNoteBody {
     pub note: String,
-    pub cat_id: Option<String>,
+    pub pet_id: Option<Uuid>,
 }
 
 #[get("/{date}")]
@@ -21,7 +22,7 @@ pub async fn get_day(
     date: web::Path<String>,
     query: web::Query<DayQuery>,
 ) -> AppResult<HttpResponse> {
-    let summary = day_service::get_day_summary(pool.get_ref(), &date, query.cat_id.as_deref()).await?;
+    let summary = day_service::get_day_summary(pool.get_ref(), &date, query.pet_id).await?;
     Ok(HttpResponse::Ok().json(summary))
 }
 
@@ -31,7 +32,7 @@ pub async fn update_day_note(
     date: web::Path<String>,
     body: web::Json<UpdateNoteBody>,
 ) -> AppResult<HttpResponse> {
-    day_service::update_day_note(pool.get_ref(), &date, body.cat_id.as_deref(), &body.note).await?;
+    day_service::update_day_note(pool.get_ref(), &date, body.pet_id, &body.note).await?;
     Ok(HttpResponse::Ok().finish())
 }
 

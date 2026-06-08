@@ -1,12 +1,13 @@
 use crate::error::AppResult;
-use crate::services::analytics_service;
+use crate::services::nutrition_analytics_service;
 use actix_web::{get, web, HttpResponse};
 use serde::Deserialize;
 use sqlx::SqlitePool;
+use uuid::Uuid;
 
 #[derive(Deserialize)]
 pub struct AnalyticsQuery {
-    pub cat_id: Option<String>,
+    pub pet_id: Option<Uuid>,
     pub date_from: String,
     pub date_to: String,
     pub category: Option<String>,
@@ -17,11 +18,11 @@ pub async fn daily_totals(
     pool: web::Data<SqlitePool>,
     query: web::Query<AnalyticsQuery>,
 ) -> AppResult<HttpResponse> {
-    let totals = analytics_service::daily_totals(
+    let totals = nutrition_analytics_service::daily_totals(
         pool.get_ref(),
         &query.date_from,
         &query.date_to,
-        query.cat_id.as_deref(),
+        query.pet_id,
         query.category.as_deref(),
     )
     .await?;
@@ -33,11 +34,11 @@ pub async fn range_summary(
     pool: web::Data<SqlitePool>,
     query: web::Query<AnalyticsQuery>,
 ) -> AppResult<HttpResponse> {
-    let summary = analytics_service::range_summary(
+    let summary = nutrition_analytics_service::range_summary(
         pool.get_ref(),
         &query.date_from,
         &query.date_to,
-        query.cat_id.as_deref(),
+        query.pet_id,
         query.category.as_deref(),
     )
     .await?;

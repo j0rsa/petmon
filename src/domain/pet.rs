@@ -2,11 +2,15 @@ use chrono::Utc;
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
+use super::pet_status::PetStatus;
+use super::species::PetSpecies;
+
 #[derive(Debug, Clone, Serialize, Deserialize, sqlx::FromRow)]
-pub struct Cat {
-    pub id: String,
+pub struct Pet {
+    pub id: Uuid,
     pub name: String,
-    pub status: String,
+    pub species: PetSpecies,
+    pub status: PetStatus,
     pub weight_kg: Option<f64>,
     pub feeding_notes: Option<String>,
     pub created_at: String,
@@ -14,28 +18,33 @@ pub struct Cat {
 }
 
 #[derive(Debug, Deserialize)]
-pub struct CreateCat {
+pub struct CreatePet {
     pub name: String,
-    pub status: Option<String>,
+    #[serde(default)]
+    pub species: PetSpecies,
+    #[serde(default)]
+    pub status: PetStatus,
     pub weight_kg: Option<f64>,
     pub feeding_notes: Option<String>,
 }
 
 #[derive(Debug, Deserialize)]
-pub struct UpdateCat {
+pub struct UpdatePet {
     pub name: Option<String>,
-    pub status: Option<String>,
+    pub species: Option<PetSpecies>,
+    pub status: Option<PetStatus>,
     pub weight_kg: Option<f64>,
     pub feeding_notes: Option<String>,
 }
 
-impl Cat {
-    pub fn new(req: CreateCat) -> Self {
+impl Pet {
+    pub fn new(req: CreatePet) -> Self {
         let now = Utc::now().to_rfc3339();
-        Cat {
-            id: Uuid::new_v4().to_string(),
+        Pet {
+            id: Uuid::new_v4(),
             name: req.name,
-            status: req.status.unwrap_or_else(|| "active".to_string()),
+            species: req.species,
+            status: req.status,
             weight_kg: req.weight_kg,
             feeding_notes: req.feeding_notes,
             created_at: now.clone(),

@@ -1,28 +1,19 @@
--- cats table
-CREATE TABLE IF NOT EXISTS cats (
+-- pets table
+CREATE TABLE IF NOT EXISTS pets (
     id TEXT PRIMARY KEY,
     name TEXT NOT NULL,
-    status TEXT NOT NULL DEFAULT 'active',
+    species TEXT NOT NULL DEFAULT 'other',
+    status TEXT NOT NULL DEFAULT 'alive',
     weight_kg REAL,
     feeding_notes TEXT,
     created_at TEXT NOT NULL,
     updated_at TEXT NOT NULL
 );
 
--- import_batches table
-CREATE TABLE IF NOT EXISTS import_batches (
+-- nutrition pillar records
+CREATE TABLE IF NOT EXISTS nutrition_records (
     id TEXT PRIMARY KEY,
-    source_name TEXT NOT NULL,
-    raw_text TEXT NOT NULL,
-    parse_summary_json TEXT NOT NULL DEFAULT '{}',
-    created_at TEXT NOT NULL,
-    committed_at TEXT
-);
-
--- entries table
-CREATE TABLE IF NOT EXISTS entries (
-    id TEXT PRIMARY KEY,
-    cat_id TEXT NOT NULL REFERENCES cats(id) ON DELETE CASCADE,
+    pet_id TEXT NOT NULL REFERENCES pets(id) ON DELETE CASCADE,
     occurred_at TEXT NOT NULL,
     local_date TEXT NOT NULL,
     category TEXT NOT NULL,
@@ -30,7 +21,33 @@ CREATE TABLE IF NOT EXISTS entries (
     unit TEXT,
     note TEXT,
     source_type TEXT NOT NULL DEFAULT 'manual',
-    import_batch_id TEXT REFERENCES import_batches(id) ON DELETE SET NULL,
+    created_at TEXT NOT NULL,
+    updated_at TEXT NOT NULL
+);
+
+-- elimination pillar records (schema will evolve with the feature)
+CREATE TABLE IF NOT EXISTS elimination_records (
+    id TEXT PRIMARY KEY,
+    pet_id TEXT NOT NULL REFERENCES pets(id) ON DELETE CASCADE,
+    occurred_at TEXT NOT NULL,
+    local_date TEXT NOT NULL,
+    event_type TEXT NOT NULL,
+    note TEXT,
+    source_type TEXT NOT NULL DEFAULT 'manual',
+    created_at TEXT NOT NULL,
+    updated_at TEXT NOT NULL
+);
+
+-- health pillar records (schema will evolve with the feature)
+CREATE TABLE IF NOT EXISTS health_records (
+    id TEXT PRIMARY KEY,
+    pet_id TEXT NOT NULL REFERENCES pets(id) ON DELETE CASCADE,
+    occurred_at TEXT NOT NULL,
+    local_date TEXT NOT NULL,
+    record_type TEXT NOT NULL,
+    note TEXT,
+    payload_json TEXT NOT NULL DEFAULT '{}',
+    source_type TEXT NOT NULL DEFAULT 'manual',
     created_at TEXT NOT NULL,
     updated_at TEXT NOT NULL
 );
@@ -38,18 +55,18 @@ CREATE TABLE IF NOT EXISTS entries (
 -- day_notes table
 CREATE TABLE IF NOT EXISTS day_notes (
     id TEXT PRIMARY KEY,
-    cat_id TEXT REFERENCES cats(id) ON DELETE CASCADE,
+    pet_id TEXT REFERENCES pets(id) ON DELETE CASCADE,
     local_date TEXT NOT NULL,
     note TEXT NOT NULL,
     created_at TEXT NOT NULL,
     updated_at TEXT NOT NULL,
-    UNIQUE(cat_id, local_date)
+    UNIQUE(pet_id, local_date)
 );
 
--- schedules table
-CREATE TABLE IF NOT EXISTS schedules (
+-- nutrition feeding schedules
+CREATE TABLE IF NOT EXISTS nutrition_schedules (
     id TEXT PRIMARY KEY,
-    cat_id TEXT NOT NULL REFERENCES cats(id) ON DELETE CASCADE,
+    pet_id TEXT NOT NULL REFERENCES pets(id) ON DELETE CASCADE,
     name TEXT NOT NULL,
     active INTEGER NOT NULL DEFAULT 1,
     rules_json TEXT NOT NULL DEFAULT '[]',
@@ -57,7 +74,8 @@ CREATE TABLE IF NOT EXISTS schedules (
     updated_at TEXT NOT NULL
 );
 
-CREATE INDEX IF NOT EXISTS idx_entries_cat_date ON entries(cat_id, local_date);
-CREATE INDEX IF NOT EXISTS idx_entries_local_date ON entries(local_date);
-CREATE INDEX IF NOT EXISTS idx_entries_import_batch ON entries(import_batch_id);
-CREATE INDEX IF NOT EXISTS idx_schedules_cat ON schedules(cat_id);
+CREATE INDEX IF NOT EXISTS idx_nutrition_records_pet_date ON nutrition_records(pet_id, local_date);
+CREATE INDEX IF NOT EXISTS idx_nutrition_records_local_date ON nutrition_records(local_date);
+CREATE INDEX IF NOT EXISTS idx_elimination_records_pet_date ON elimination_records(pet_id, local_date);
+CREATE INDEX IF NOT EXISTS idx_health_records_pet_date ON health_records(pet_id, local_date);
+CREATE INDEX IF NOT EXISTS idx_nutrition_schedules_pet ON nutrition_schedules(pet_id);

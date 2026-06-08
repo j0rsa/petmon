@@ -3,10 +3,11 @@ use crate::repo::day_notes;
 use actix_web::{get, patch, web, HttpResponse};
 use serde::Deserialize;
 use sqlx::SqlitePool;
+use uuid::Uuid;
 
 #[derive(Deserialize)]
 pub struct NoteQuery {
-    pub cat_id: Option<String>,
+    pub pet_id: Option<Uuid>,
 }
 
 #[derive(Deserialize)]
@@ -20,7 +21,7 @@ pub async fn get_note(
     date: web::Path<String>,
     query: web::Query<NoteQuery>,
 ) -> AppResult<HttpResponse> {
-    let note = day_notes::get_day_note(pool.get_ref(), &date, query.cat_id.as_deref()).await?;
+    let note = day_notes::get_day_note(pool.get_ref(), &date, query.pet_id).await?;
     Ok(HttpResponse::Ok().json(note))
 }
 
@@ -31,7 +32,7 @@ pub async fn update_note(
     query: web::Query<NoteQuery>,
     body: web::Json<UpdateNoteBody>,
 ) -> AppResult<HttpResponse> {
-    let note = day_notes::upsert_day_note(pool.get_ref(), &date, query.cat_id.as_deref(), &body.note).await?;
+    let note = day_notes::upsert_day_note(pool.get_ref(), &date, query.pet_id, &body.note).await?;
     Ok(HttpResponse::Ok().json(note))
 }
 

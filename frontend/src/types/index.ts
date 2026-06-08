@@ -1,16 +1,38 @@
-export interface Cat {
+export const PET_SPECIES = ['cat', 'dog', 'bunny', 'parrot', 'other'] as const;
+export type PetSpecies = (typeof PET_SPECIES)[number];
+
+export const PET_STATUSES = ['alive', 'deceased', 'archived', 'rehomed'] as const;
+export type PetStatus = (typeof PET_STATUSES)[number];
+
+export const PET_STATUS_LABELS: Record<PetStatus, string> = {
+  alive: 'Alive',
+  deceased: 'Deceased',
+  archived: 'Archived',
+  rehomed: 'Rehomed',
+};
+
+export const PET_SPECIES_LABELS: Record<PetSpecies, string> = {
+  cat: 'Cat',
+  dog: 'Dog',
+  bunny: 'Bunny',
+  parrot: 'Parrot',
+  other: 'Other',
+};
+
+export interface Pet {
   id: string;
   name: string;
-  status: string;
+  species: PetSpecies;
+  status: PetStatus;
   weight_kg?: number;
   feeding_notes?: string;
   created_at: string;
   updated_at: string;
 }
 
-export interface Entry {
+export interface NutritionRecord {
   id: string;
-  cat_id: string;
+  pet_id: string;
   occurred_at: string;
   local_date: string;
   category: string;
@@ -18,13 +40,12 @@ export interface Entry {
   unit?: string;
   note?: string;
   source_type: string;
-  import_batch_id?: string;
   created_at: string;
   updated_at: string;
 }
 
-export interface CreateEntry {
-  cat_id: string;
+export interface CreateNutritionRecord {
+  pet_id: string;
   occurred_at: string;
   local_date?: string;
   category: string;
@@ -33,7 +54,7 @@ export interface CreateEntry {
   note?: string;
 }
 
-export interface UpdateEntry {
+export interface UpdateNutritionRecord {
   occurred_at?: string;
   local_date?: string;
   category?: string;
@@ -42,63 +63,38 @@ export interface UpdateEntry {
   note?: string;
 }
 
-export interface DaySummary {
+export interface NutritionDaySummary {
   local_date: string;
-  cat_id?: string;
-  entries: Entry[];
+  pet_id?: string;
+  records: NutritionRecord[];
   totals_by_category: Record<string, number>;
   note?: string;
 }
 
-export interface DailyTotal {
+export interface NutritionDailyTotal {
   local_date: string;
-  cat_id: string;
+  pet_id: string;
   category: string;
   total_amount: number;
-  entry_count: number;
+  record_count: number;
 }
 
-export interface RangeSummary {
+export interface NutritionRangeSummary {
   date_from: string;
   date_to: string;
-  cat_id?: string;
-  daily_totals: DailyTotal[];
+  pet_id?: string;
+  daily_totals: NutritionDailyTotal[];
   category_averages: Record<string, number>;
 }
 
-export interface Schedule {
+export interface NutritionSchedule {
   id: string;
-  cat_id: string;
+  pet_id: string;
   name: string;
   active: boolean;
   rules_json: string;
   created_at: string;
   updated_at: string;
-}
-
-export interface ImportBatch {
-  id: string;
-  source_name: string;
-  raw_text: string;
-  parse_summary_json: string;
-  created_at: string;
-  committed_at?: string;
-}
-
-export interface ParsedLine {
-  line_number: number;
-  raw: string;
-  parsed?: CreateEntry;
-  error?: string;
-  warning?: string;
-}
-
-export interface ImportPreview {
-  total_lines: number;
-  parsed_count: number;
-  error_count: number;
-  warning_count: number;
-  lines: ParsedLine[];
 }
 
 export const CATEGORIES = ['wet_food', 'dry_food', 'water', 'treats', 'medication', 'custom'] as const;

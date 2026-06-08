@@ -1,8 +1,8 @@
 import { useMemo, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { Bar, BarChart, CartesianGrid, Legend, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
-import { analyticsApi } from '../api/analytics';
-import { catsApi } from '../api/cats';
+import { nutritionAnalyticsApi } from '../api/analytics';
+import { petsApi } from '../api/pets';
 import { CATEGORIES, CATEGORY_COLORS, CATEGORY_LABELS } from '../types';
 
 function localDate(daysOffset = 0) {
@@ -15,12 +15,12 @@ function localDate(daysOffset = 0) {
 export default function AnalyticsPage() {
   const [dateFrom, setDateFrom] = useState(localDate(-6));
   const [dateTo, setDateTo] = useState(localDate());
-  const [catId, setCatId] = useState('');
+  const [petId, setPetId] = useState('');
 
-  const catsQuery = useQuery({ queryKey: ['cats'], queryFn: catsApi.list });
+  const petsQuery = useQuery({ queryKey: ['pets'], queryFn: petsApi.list });
   const analyticsQuery = useQuery({
-    queryKey: ['analytics', dateFrom, dateTo, catId],
-    queryFn: () => analyticsApi.rangeSummary(dateFrom, dateTo, catId || undefined),
+    queryKey: ['nutrition-analytics', dateFrom, dateTo, petId],
+    queryFn: () => nutritionAnalyticsApi.rangeSummary(dateFrom, dateTo, petId || undefined),
   });
 
   const chartData = useMemo(() => {
@@ -40,7 +40,7 @@ export default function AnalyticsPage() {
       <section className="page-header">
         <div>
           <p className="eyebrow">Analytics</p>
-          <h2>Daily intake trends</h2>
+          <h2>Daily nutrition trends</h2>
           <p className="muted-text">Review totals and category averages across a date range.</p>
         </div>
       </section>
@@ -55,12 +55,12 @@ export default function AnalyticsPage() {
           <input id="analytics-to" type="date" value={dateTo} onChange={(event) => setDateTo(event.target.value)} />
         </div>
         <div className="form-row">
-          <label htmlFor="analytics-cat">Cat</label>
-          <select id="analytics-cat" value={catId} onChange={(event) => setCatId(event.target.value)}>
-            <option value="">All cats</option>
-            {(catsQuery.data ?? []).map((cat) => (
-              <option key={cat.id} value={cat.id}>
-                {cat.name}
+          <label htmlFor="analytics-pet">Pet</label>
+          <select id="analytics-pet" value={petId} onChange={(event) => setPetId(event.target.value)}>
+            <option value="">All pets</option>
+            {(petsQuery.data ?? []).map((pet) => (
+              <option key={pet.id} value={pet.id}>
+                {pet.name}
               </option>
             ))}
           </select>

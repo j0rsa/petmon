@@ -1,6 +1,5 @@
-pub mod analytics;
-pub mod cats;
+pub mod nutrition_analytics;
+pub mod pets;
 pub mod day_notes;
-pub mod entries;
-pub mod imports;
-pub mod schedules;
+pub mod nutrition_records;
+pub mod nutrition_schedules;

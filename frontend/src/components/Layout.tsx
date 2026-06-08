@@ -6,9 +6,9 @@ export function Layout() {
     <div className="app-shell">
       <aside className="sidebar">
         <div>
-          <p className="eyebrow">catmon</p>
-          <h1 className="app-title">Cat intake tracking</h1>
-          <p className="muted-text">Monitor meals, water, medication, imports, and daily trends.</p>
+          <p className="eyebrow">petmon</p>
+          <h1 className="app-title">Pet intake tracking</h1>
+          <p className="muted-text">Monitor nutrition, schedules, and daily trends for your pets.</p>
         </div>
         <NavBar />
       </aside>

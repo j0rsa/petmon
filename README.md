@@ -1,6 +1,6 @@
-# catmon
+# petmon
 
-Cat intake tracking system — a single deployable service with a React SPA frontend and a Rust/Actix Web backend backed by SQLite.
+Pet monitoring system — a single deployable service with a React SPA frontend and a Rust/Actix Web backend backed by SQLite. Track nutrition (meals, water, treats), with separate record tables planned per monitoring pillar (nutrition, elimination, health).
 
 ## Features
 
@@ -16,35 +16,31 @@ Cat intake tracking system — a single deployable service with a React SPA fron
 
 | Page | Route | Description |
 |------|-------|-------------|
-| Dashboard | `/` | Today's intake entries, totals, and quick add form |
-| Day View | `/days/:date` | Browse any date's entries with navigation |
-| Analytics | `/analytics` | Charts and range summaries (7 / 30 / custom days) |
-| Cats | `/cats` | Manage cat profiles |
-| Schedules | `/schedules` | Create and manage feeding schedules |
-| Imports | `/imports` | Preview and commit Telegram-style text logs |
+| Dashboard | `/` | Today's nutrition records, totals, and quick add form |
+| Day View | `/days/:date` | Browse any date's nutrition records with navigation |
+| Analytics | `/analytics` | Nutrition charts and range summaries (7 / 30 / custom days) |
+| Pets | `/pets` | Manage pet profiles |
+| Feeding schedules | `/schedules` | Create and manage nutrition feeding schedules |
+| Import | `/imports` | Paste Telegram nutrition logs (parsed in the browser) |
 
 ## API Overview
 
 ```
-GET/POST    /api/v1/cats
-GET/PATCH/DELETE /api/v1/cats/:id
+GET/POST    /api/v1/pets
+GET/PATCH/DELETE /api/v1/pets/:id
 
-GET/POST    /api/v1/entries          # filters: cat_id, date, date_from, date_to, category
-GET/PATCH/DELETE /api/v1/entries/:id
+GET/POST    /api/v1/nutrition/records          # filters: pet_id, date, date_from, date_to, category
+POST        /api/v1/nutrition/records/batch    # { records: CreateNutritionRecord[] }
+GET/PATCH/DELETE /api/v1/nutrition/records/:id
 
-GET         /api/v1/days/:date       # day summary + entries; ?cat_id=
+GET         /api/v1/days/:date       # nutrition day summary + records; ?pet_id=
 PATCH       /api/v1/days/:date/note
 
-GET         /api/v1/analytics/daily-totals   # ?date_from=&date_to=&cat_id=
-GET         /api/v1/analytics/range-summary
+GET         /api/v1/nutrition/analytics/daily-totals   # ?date_from=&date_to=&pet_id=
+GET         /api/v1/nutrition/analytics/range-summary
 
-GET/POST    /api/v1/schedules        # ?cat_id=
-GET/PATCH/DELETE /api/v1/schedules/:id
-
-POST        /api/v1/imports/preview
-POST        /api/v1/imports/commit
-GET         /api/v1/imports
-GET         /api/v1/imports/:id
+GET/POST    /api/v1/nutrition/schedules        # ?pet_id=
+GET/PATCH/DELETE /api/v1/nutrition/schedules/:id
 
 GET         /api/v1/health
 POST        /mcp                     # JSON-RPC 2.0
@@ -54,11 +50,10 @@ POST        /mcp                     # JSON-RPC 2.0
 
 The `/mcp` endpoint accepts JSON-RPC 2.0 requests. Available methods:
 
-`cats/list`, `cats/get`, `cats/create`, `cats/update`, `cats/delete`,
-`entries/list`, `entries/get`, `entries/create`, `entries/update`, `entries/delete`,
-`days/summary`, `analytics/daily-totals`, `analytics/range-summary`,
-`schedules/list`, `schedules/get`, `schedules/create`, `schedules/update`, `schedules/delete`,
-`imports/preview`, `imports/commit`
+`pets/list`, `pets/get`, `pets/create`, `pets/update`, `pets/delete`,
+`nutrition/records/list`, `nutrition/records/get`, `nutrition/records/create`, `nutrition/records/batch-create`, `nutrition/records/update`, `nutrition/records/delete`,
+`days/summary`, `nutrition/analytics/daily-totals`, `nutrition/analytics/range-summary`,
+`nutrition/schedules/list`, `nutrition/schedules/get`, `nutrition/schedules/create`, `nutrition/schedules/update`, `nutrition/schedules/delete`
 
 ## Configuration
 
@@ -66,9 +61,9 @@ The `/mcp` endpoint accepts JSON-RPC 2.0 requests. Available methods:
 |----------|---------|-------------|
 | `HOST` | `0.0.0.0` | Bind address |
 | `PORT` | `8080` | Bind port |
-| `DATABASE_URL` | `sqlite:catmon.db` | SQLite path |
+| `DATABASE_URL` | `sqlite:petmon.db` | SQLite path |
 | `TIMEZONE` | `UTC` | Local timezone for day bucketing |
-| `IMPORT_MAX_BYTES` | `1048576` | Max import payload size |
+| `IMPORT_MAX_BYTES` | `1048576` | Max JSON request body size |
 
 Create a `.env` file at the project root to override defaults.
 
@@ -107,20 +102,17 @@ npm run build
 # Then rebuild the backend: cd .. && cargo build
 ```
 
-### Import Format
+### Telegram nutrition import
 
-The import parser understands Telegram-style text logs:
+The `/imports` page parses Telegram bot logs in the browser (same format as the original `cat-intake-tracker` prototype), then commits via `POST /api/v1/nutrition/records/batch`:
 
 ```
-# optional comment
-08:30 wet 85g tuna pâté
-12:00 dry 30g
-18:00 water 50ml
-2024-01-15 20:00 treats 5g
-
-# Supported categories: wet/wetfood, dry/dryfood, water/liquid, treat/treats, med/meds
-# Amount units: g, ml, kg, oz, pcs, tbsp, tsp
+Staging Bot, [31. May 2026 at 06:15:15]:
+#cat_ate #wet_food 15
+#cat_ate #liquids 16
 ```
+
+Each pillar will get its own parser on the frontend; the backend only accepts structured record payloads.
 
 ## Deployment
 
@@ -128,5 +120,5 @@ The release binary is self-contained — it embeds all frontend assets and auto-
 
 ```bash
 cargo build --release
-DATABASE_URL=sqlite:/data/catmon.db ./target/release/catmon
+DATABASE_URL=sqlite:/data/petmon.db ./target/release/petmon
 ```

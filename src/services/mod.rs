@@ -1,6 +1,5 @@
-pub mod analytics_service;
-pub mod cat_service;
+pub mod nutrition_analytics_service;
+pub mod pet_service;
 pub mod day_service;
-pub mod entry_service;
-pub mod import_service;
-pub mod schedule_service;
+pub mod nutrition_record_service;
+pub mod nutrition_schedule_service;

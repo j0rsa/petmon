@@ -1,5 +1,5 @@
 use actix_web::{web, App, HttpServer};
-use catmon::{api, assets, config, db, mcp, telemetry};
+use petmon::{api, assets, config, db, mcp, telemetry};
 use tracing_actix_web::TracingLogger;
 use tracing_subscriber::EnvFilter;
 
@@ -8,7 +8,7 @@ async fn main() -> anyhow::Result<()> {
     let config = config::Config::from_env();
 
     let env_filter = EnvFilter::from_default_env()
-        .add_directive("catmon=info".parse()?);
+        .add_directive("petmon=info".parse()?);
 
     let otel_provider = telemetry::init(
         &config.service_name,
@@ -21,7 +21,7 @@ async fn main() -> anyhow::Result<()> {
         port = config.port,
         timezone = %config.timezone,
         otlp = ?config.otlp_endpoint,
-        "starting catmon",
+        "starting petmon",
     );
 
     let pool = db::create_pool(&config).await?;

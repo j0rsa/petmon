@@ -1,11 +1,11 @@
 import { useMemo, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { catsApi } from '../api/cats';
-import { schedulesApi } from '../api/schedules';
-import type { Schedule } from '../types';
+import { petsApi } from '../api/pets';
+import { nutritionSchedulesApi } from '../api/nutritionSchedules';
+import type { NutritionSchedule } from '../types';
 
-interface ScheduleFormState {
-  cat_id: string;
+interface NutritionScheduleFormState {
+  pet_id: string;
   name: string;
   active: boolean;
   rules: string;
@@ -21,39 +21,42 @@ function parseRules(text: string) {
 
 export default function SchedulesPage() {
   const queryClient = useQueryClient();
-  const [filterCatId, setFilterCatId] = useState('');
+  const [filterPetId, setFilterPetId] = useState('');
   const [formError, setFormError] = useState('');
   const [editingId, setEditingId] = useState<string | null>(null);
-  const [createForm, setCreateForm] = useState<ScheduleFormState>({ cat_id: '', name: '', active: true, rules: createDefaultRules() });
-  const [editingForm, setEditingForm] = useState<ScheduleFormState>({ cat_id: '', name: '', active: true, rules: createDefaultRules() });
+  const [createForm, setCreateForm] = useState<NutritionScheduleFormState>({ pet_id: '', name: '', active: true, rules: createDefaultRules() });
+  const [editingForm, setEditingForm] = useState<NutritionScheduleFormState>({ pet_id: '', name: '', active: true, rules: createDefaultRules() });
 
-  const catsQuery = useQuery({ queryKey: ['cats'], queryFn: catsApi.list });
-  const schedulesQuery = useQuery({ queryKey: ['schedules', filterCatId], queryFn: () => schedulesApi.list(filterCatId || undefined) });
-  const catNames = useMemo(() => new Map((catsQuery.data ?? []).map((cat) => [cat.id, cat.name])), [catsQuery.data]);
+  const petsQuery = useQuery({ queryKey: ['pets'], queryFn: petsApi.list });
+  const schedulesQuery = useQuery({
+    queryKey: ['nutrition-schedules', filterPetId],
+    queryFn: () => nutritionSchedulesApi.list(filterPetId || undefined),
+  });
+  const petNames = useMemo(() => new Map((petsQuery.data ?? []).map((pet) => [pet.id, pet.name])), [petsQuery.data]);
 
   const createMutation = useMutation({
     mutationFn: async () => {
       setFormError('');
-      return schedulesApi.create({
-        cat_id: createForm.cat_id,
+      return nutritionSchedulesApi.create({
+        pet_id: createForm.pet_id,
         name: createForm.name,
         active: createForm.active,
         rules: parseRules(createForm.rules),
       });
     },
     onSuccess: async () => {
-      setCreateForm({ cat_id: createForm.cat_id, name: '', active: true, rules: createDefaultRules() });
-      await queryClient.invalidateQueries({ queryKey: ['schedules'] });
+      setCreateForm({ pet_id: createForm.pet_id, name: '', active: true, rules: createDefaultRules() });
+      await queryClient.invalidateQueries({ queryKey: ['nutrition-schedules'] });
     },
     onError: (error) => {
-      setFormError(error instanceof Error ? error.message : 'Unable to create schedule.');
+      setFormError(error instanceof Error ? error.message : 'Unable to create nutrition schedule.');
     },
   });
 
   const updateMutation = useMutation({
-    mutationFn: async ({ id, form }: { id: string; form: ScheduleFormState }) => {
+    mutationFn: async ({ id, form }: { id: string; form: NutritionScheduleFormState }) => {
       setFormError('');
-      return schedulesApi.update(id, {
+      return nutritionSchedulesApi.update(id, {
         name: form.name,
         active: form.active,
         rules: parseRules(form.rules),
@@ -61,17 +64,17 @@ export default function SchedulesPage() {
     },
     onSuccess: async () => {
       setEditingId(null);
-      await queryClient.invalidateQueries({ queryKey: ['schedules'] });
+      await queryClient.invalidateQueries({ queryKey: ['nutrition-schedules'] });
     },
     onError: (error) => {
-      setFormError(error instanceof Error ? error.message : 'Unable to update schedule.');
+      setFormError(error instanceof Error ? error.message : 'Unable to update nutrition schedule.');
     },
   });
 
   const deleteMutation = useMutation({
-    mutationFn: (id: string) => schedulesApi.delete(id),
+    mutationFn: (id: string) => nutritionSchedulesApi.delete(id),
     onSuccess: async () => {
-      await queryClient.invalidateQueries({ queryKey: ['schedules'] });
+      await queryClient.invalidateQueries({ queryKey: ['nutrition-schedules'] });
     },
   });
 
@@ -79,17 +82,17 @@ export default function SchedulesPage() {
     <div className="page-stack">
       <section className="page-header">
         <div>
-          <p className="eyebrow">Schedules</p>
-          <h2>Manage intake routines</h2>
-          <p className="muted-text">Store recurring reminders and automation rules per cat.</p>
+          <p className="eyebrow">Nutrition</p>
+          <h2>Feeding schedules</h2>
+          <p className="muted-text">Store recurring feeding reminders and rules per pet.</p>
         </div>
         <div className="filter-row">
           <label htmlFor="schedule-filter">Filter</label>
-          <select id="schedule-filter" value={filterCatId} onChange={(event) => setFilterCatId(event.target.value)}>
-            <option value="">All cats</option>
-            {(catsQuery.data ?? []).map((cat) => (
-              <option key={cat.id} value={cat.id}>
-                {cat.name}
+          <select id="schedule-filter" value={filterPetId} onChange={(event) => setFilterPetId(event.target.value)}>
+            <option value="">All pets</option>
+            {(petsQuery.data ?? []).map((pet) => (
+              <option key={pet.id} value={pet.id}>
+                {pet.name}
               </option>
             ))}
           </select>
@@ -103,8 +106,8 @@ export default function SchedulesPage() {
             <h3>Create a recurring plan</h3>
           </div>
         </div>
-        <ScheduleForm
-          cats={catsQuery.data ?? []}
+        <NutritionScheduleForm
+          pets={petsQuery.data ?? []}
           form={createForm}
           setForm={setCreateForm}
           submitLabel={createMutation.isPending ? 'Saving…' : 'Create schedule'}
@@ -114,31 +117,31 @@ export default function SchedulesPage() {
       </section>
 
       {schedulesQuery.isLoading ? (
-        <div className="loading-state">Loading schedules…</div>
+        <div className="loading-state">Loading nutrition schedules…</div>
       ) : schedulesQuery.isError ? (
-        <div className="error-state">{schedulesQuery.error instanceof Error ? schedulesQuery.error.message : 'Unable to load schedules.'}</div>
+        <div className="error-state">{schedulesQuery.error instanceof Error ? schedulesQuery.error.message : 'Unable to load nutrition schedules.'}</div>
       ) : (schedulesQuery.data ?? []).length === 0 ? (
-        <div className="empty-state">No schedules found for the current filter.</div>
+        <div className="empty-state">No nutrition schedules found for the current filter.</div>
       ) : (
         <div className="card-grid">
           {(schedulesQuery.data ?? []).map((schedule) => (
             <article key={schedule.id} className="panel">
               {editingId === schedule.id ? (
-                <ScheduleForm
-                  cats={catsQuery.data ?? []}
+                <NutritionScheduleForm
+                  pets={petsQuery.data ?? []}
                   form={editingForm}
                   setForm={setEditingForm}
                   submitLabel={updateMutation.isPending ? 'Saving…' : 'Update schedule'}
                   onSubmit={() => updateMutation.mutate({ id: schedule.id, form: editingForm })}
                   onCancel={() => setEditingId(null)}
-                  disableCatSelection
+                  disablePetSelection
                 />
               ) : (
                 <>
                   <div className="entry-card-header">
                     <div>
                       <h3>{schedule.name}</h3>
-                      <p className="muted-text">{catNames.get(schedule.cat_id) ?? 'Unknown cat'}</p>
+                      <p className="muted-text">{petNames.get(schedule.pet_id) ?? 'Unknown pet'}</p>
                     </div>
                     <span className={`status-pill${schedule.active ? ' active' : ''}`}>{schedule.active ? 'Active' : 'Paused'}</span>
                   </div>
@@ -150,7 +153,7 @@ export default function SchedulesPage() {
                       onClick={() => {
                         setEditingId(schedule.id);
                         setEditingForm({
-                          cat_id: schedule.cat_id,
+                          pet_id: schedule.pet_id,
                           name: schedule.name,
                           active: schedule.active,
                           rules: formatRules(schedule),
@@ -182,7 +185,7 @@ export default function SchedulesPage() {
   );
 }
 
-function formatRules(schedule: Schedule) {
+function formatRules(schedule: NutritionSchedule) {
   try {
     return JSON.stringify(JSON.parse(schedule.rules_json), null, 2);
   } catch {
@@ -190,22 +193,22 @@ function formatRules(schedule: Schedule) {
   }
 }
 
-function ScheduleForm({
-  cats,
+function NutritionScheduleForm({
+  pets,
   form,
   setForm,
   onSubmit,
   submitLabel,
   onCancel,
-  disableCatSelection = false,
+  disablePetSelection = false,
 }: {
-  cats: { id: string; name: string }[];
-  form: ScheduleFormState;
-  setForm: React.Dispatch<React.SetStateAction<ScheduleFormState>>;
+  pets: { id: string; name: string }[];
+  form: NutritionScheduleFormState;
+  setForm: React.Dispatch<React.SetStateAction<NutritionScheduleFormState>>;
   onSubmit: () => void;
   submitLabel: string;
   onCancel?: () => void;
-  disableCatSelection?: boolean;
+  disablePetSelection?: boolean;
 }) {
   return (
     <form
@@ -216,18 +219,18 @@ function ScheduleForm({
       }}
     >
       <div className="form-row">
-        <label htmlFor="schedule-cat">Cat</label>
+        <label htmlFor="schedule-pet">Pet</label>
         <select
-          id="schedule-cat"
-          value={form.cat_id}
-          onChange={(event) => setForm((current) => ({ ...current, cat_id: event.target.value }))}
-          disabled={disableCatSelection}
+          id="schedule-pet"
+          value={form.pet_id}
+          onChange={(event) => setForm((current) => ({ ...current, pet_id: event.target.value }))}
+          disabled={disablePetSelection}
           required
         >
-          <option value="">Select a cat</option>
-          {cats.map((cat) => (
-            <option key={cat.id} value={cat.id}>
-              {cat.name}
+          <option value="">Select a pet</option>
+          {pets.map((pet) => (
+            <option key={pet.id} value={pet.id}>
+              {pet.name}
             </option>
           ))}
         </select>
