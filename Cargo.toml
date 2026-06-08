@@ -1,0 +1,38 @@
+[package]
+name = "catmon"
+version = "0.1.0"
+edition = "2021"
+
+[[bin]]
+name = "catmon"
+path = "src/main.rs"
+
+[dependencies]
+actix-web = "4"
+actix-files = "0.6"
+tokio = { version = "1", features = ["full"] }
+sqlx = { version = "0.7", features = ["sqlite", "runtime-tokio-rustls", "migrate", "chrono", "uuid"] }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+chrono = { version = "0.4", features = ["serde"] }
+uuid = { version = "1", features = ["v4", "serde"] }
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter", "fmt", "json"] }
+opentelemetry = { version = "0.31.0", features = ["trace"] }
+opentelemetry_sdk = { version = "0.31.0", features = ["trace", "rt-tokio"] }
+opentelemetry-otlp = { version = "0.31.0", features = ["http-proto", "trace", "reqwest-client", "tls-roots"] }
+tracing-opentelemetry = "0.32"
+tracing-actix-web = "0.7"
+thiserror = "1"
+anyhow = "1"
+dotenvy = "0.15"
+rust-embed = { version = "8", features = ["actix-web"] }
+mime_guess = "2"
+regex = "1"
+
+[dev-dependencies]
+actix-web = { version = "4", features = ["macros"] }
+
+[profile.release]
+opt-level = 3
+lto = true
