@@ -11,6 +11,9 @@ pub struct Config {
     /// When absent, tracing spans are emitted to stdout only.
     pub otlp_endpoint: Option<String>,
     pub service_name: String,
+    /// If set, serve frontend files from this directory instead of embedded assets.
+    /// Useful for development or when shipping the FE separately alongside the binary.
+    pub static_dir: Option<String>,
 }
 
 impl Config {
@@ -32,6 +35,7 @@ impl Config {
             otlp_endpoint: env::var("OTEL_EXPORTER_OTLP_ENDPOINT").ok(),
             service_name: env::var("OTEL_SERVICE_NAME")
                 .unwrap_or_else(|_| "petmon".to_string()),
+            static_dir: env::var("STATIC_DIR").ok(),
         }
     }
 }

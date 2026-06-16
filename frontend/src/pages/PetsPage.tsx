@@ -1,6 +1,9 @@
 import { useMemo, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { Link } from 'react-router-dom';
 import { petsApi } from '../api/pets';
+import { PetAvatar } from '../components/pet/PetAvatar';
+import { getPetPhoto } from '../lib/petPhotoStorage';
 import { PET_SPECIES, PET_SPECIES_LABELS, PET_STATUSES, PET_STATUS_LABELS, type PetSpecies, type PetStatus } from '../types';
 
 interface PetFormState {
@@ -14,7 +17,7 @@ interface PetFormState {
 const emptyForm: PetFormState = {
   name: '',
   species: 'cat',
-  status: 'alive',
+  status: 'active',
   weight_kg: '',
   feeding_notes: '',
 };
@@ -78,7 +81,7 @@ export default function PetsPage() {
             <h3>Create a new profile</h3>
           </div>
         </div>
-        <PetForm form={createForm} setForm={setCreateForm} onSubmit={() => createMutation.mutate()} submitLabel={createMutation.isPending ? 'Saving…' : 'Create pet'} />
+        <PetForm form={createForm} setForm={setCreateForm} onSubmit={() => createMutation.mutate()} submitLabel={createMutation.isPending ? 'Saving…' : 'Add a pet'} />
       </section>
 
       {petsQuery.isLoading ? (
@@ -109,16 +112,25 @@ export default function PetsPage() {
                 </>
               ) : (
                 <>
-                  <div className="entry-card-header">
-                    <h3>{pet.name}</h3>
-                    <div className="button-row">
-                      <span className="status-pill">{PET_SPECIES_LABELS[pet.species]}</span>
-                      <span className="status-pill">{PET_STATUS_LABELS[pet.status]}</span>
+                  <div className="pet-list-card-header">
+                    <PetAvatar species={pet.species} name={pet.name} color={pet.color} photoUrl={getPetPhoto(pet.id)} size={72} />
+                    <div>
+                      <div className="entry-card-header">
+                        <h3>{pet.name}</h3>
+                        <div className="button-row">
+                          <span className="status-pill">{PET_SPECIES_LABELS[pet.species]}</span>
+                          <span className="status-pill">{PET_STATUS_LABELS[pet.status]}</span>
+                        </div>
+                      </div>
+                      <p className="muted-text">{pet.breed || 'Breed not set'}</p>
                     </div>
                   </div>
                   <p className="muted-text">Weight: {pet.weight_kg ?? '—'} kg</p>
                   <p>{pet.feeding_notes || 'No feeding notes yet.'}</p>
                   <div className="button-row">
+                    <Link className="button" to={`/pets/${pet.id}`}>
+                      Profile
+                    </Link>
                     <button
                       className="button button-secondary"
                       type="button"
@@ -133,7 +145,7 @@ export default function PetsPage() {
                         });
                       }}
                     >
-                      Edit
+                      Quick edit
                     </button>
                     <button
                       className="button button-danger"

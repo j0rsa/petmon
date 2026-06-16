@@ -3,6 +3,7 @@ use crate::domain::nutrition_record::{
 };
 use crate::error::{AppError, AppResult};
 use crate::repo::{nutrition_records, pets};
+use crate::services::telegram;
 use sqlx::SqlitePool;
 use std::collections::HashSet;
 
@@ -13,12 +14,6 @@ fn validate_create(req: &CreateNutritionRecord) -> AppResult<()> {
         return Err(AppError::Validation {
             field: "amount".to_string(),
             message: "Amount must be non-negative".to_string(),
-        });
-    }
-    if req.category.trim().is_empty() {
-        return Err(AppError::Validation {
-            field: "category".to_string(),
-            message: "Category is required".to_string(),
         });
     }
     Ok(())
@@ -39,7 +34,13 @@ pub async fn create(pool: &SqlitePool, req: CreateNutritionRecord) -> AppResult<
     validate_create(&req)?;
     pets::get_pet(pool, req.pet_id).await?;
     let record = NutritionRecord::new(req);
-    nutrition_records::create_record(pool, record).await
+    let record = nutrition_records::create_record(pool, record).await?;
+
+    let pool2 = pool.clone();
+    let record2 = record.clone();
+    tokio::spawn(async move { telegram::notify_record(&pool2, &record2).await });
+
+    Ok(record)
 }
 
 #[tracing::instrument(skip(pool, records))]

@@ -1,0 +1,1146 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>cat intake tracker</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=DM+Mono:ital,wght@0,300;0,400;0,500;1,300&family=DM+Sans:wght@300;400;500&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
+<style>
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+:root {
+  --bg: #f5f3ee; --surface: #ffffff; --surface2: #eeece7;
+  --border: rgba(0,0,0,0.1); --border2: rgba(0,0,0,0.06);
+  --text: #1a1917; --text2: #6b6860; --text3: #a09d96;
+  --blue: #2a7fc1; --blue-bg: #e8f2fb;
+  --green: #1a8f69; --green-bg: #e2f5ee;
+  --accent: #c25a2a; --accent-bg: #faf0eb;
+  --danger: #c0392b; --danger-bg: #fdf0ef;
+  --radius: 10px;
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #141312; --surface: #1e1d1b; --surface2: #262421;
+    --border: rgba(255,255,255,0.1); --border2: rgba(255,255,255,0.05);
+    --text: #f0ede8; --text2: #908e87; --text3: #5a5852;
+    --blue: #5ba3d9; --blue-bg: #0d2235;
+    --green: #3ab88a; --green-bg: #0b2a1f;
+    --accent: #e07040; --accent-bg: #2a1a10;
+    --danger: #e05548; --danger-bg: #2a1210;
+  }
+}
+html, body { height: 100%; background: var(--bg); color: var(--text); font-family: 'DM Sans', sans-serif; font-size: 15px; line-height: 1.6; }
+body { min-height: 100vh; padding: 2.5rem 1.5rem 5rem; }
+.wrap { max-width: 760px; margin: 0 auto; }
+
+header { margin-bottom: 2rem; display: flex; align-items: baseline; gap: 12px; flex-wrap: wrap; }
+header h1 { font-family: 'DM Mono', monospace; font-weight: 400; font-size: 1.05rem; letter-spacing: -0.01em; }
+header .sub { font-size: 0.78rem; color: var(--text3); font-family: 'DM Mono', monospace; }
+
+.tab-bar { display: flex; gap: 0; border-bottom: 1px solid var(--border2); margin-bottom: 1.5rem; overflow-x: auto; }
+.tab { font-family: 'DM Mono', monospace; font-size: 0.75rem; padding: 0.5rem 1rem; color: var(--text3); cursor: pointer; border-bottom: 2px solid transparent; white-space: nowrap; transition: color 0.15s, border-color 0.15s; background: none; border-top: none; border-left: none; border-right: none; margin-bottom: -1px; }
+.tab:hover { color: var(--text2); }
+.tab.active { color: var(--accent); border-bottom-color: var(--accent); }
+.tab.add-tab { color: var(--accent); opacity: 0.7; }
+.tab.add-tab:hover { opacity: 1; }
+
+.panel { display: none; }
+.panel.active { display: block; }
+
+.drop-area { border: 1.5px dashed var(--border); border-radius: var(--radius); background: var(--surface); transition: border-color 0.15s; }
+.drop-area.hover { border-color: var(--accent); }
+textarea { display: block; width: 100%; min-height: 160px; padding: 1rem 1.25rem; background: transparent; border: none; outline: none; resize: vertical; font-family: 'DM Mono', monospace; font-size: 0.76rem; line-height: 1.75; color: var(--text2); border-radius: var(--radius); }
+textarea::placeholder { color: var(--text3); font-style: italic; }
+.drop-footer { display: flex; align-items: center; justify-content: space-between; padding: 0.6rem 1.25rem; border-top: 1px solid var(--border2); gap: 8px; flex-wrap: wrap; }
+.drop-hint { font-size: 0.72rem; color: var(--text3); font-family: 'DM Mono', monospace; }
+
+.btn { background: var(--text); color: var(--bg); border: none; border-radius: 7px; padding: 0.45rem 1rem; font-family: 'DM Mono', monospace; font-size: 0.75rem; cursor: pointer; transition: opacity 0.15s, transform 0.1s; white-space: nowrap; }
+.btn:hover { opacity: 0.8; }
+.btn:active { transform: scale(0.97); }
+.btn.secondary { background: var(--surface2); color: var(--text2); border: 1px solid var(--border2); }
+.btn.danger { background: var(--danger-bg); color: var(--danger); border: 1px solid rgba(192,57,43,0.3); }
+.btn.ghost { background: transparent; color: var(--text2); border: 1px solid var(--border); }
+.btn.ghost:hover { background: var(--surface2); }
+
+.cards { display: grid; grid-template-columns: repeat(3,1fr); gap: 10px; margin-bottom: 1rem; }
+@media (max-width: 480px) { .cards { grid-template-columns: 1fr; } }
+.card { background: var(--surface); border: 1px solid var(--border2); border-radius: var(--radius); padding: 0.85rem 1.1rem; }
+.card-label { font-size: 0.7rem; color: var(--text3); font-family: 'DM Mono', monospace; margin-bottom: 4px; }
+.card-value { font-size: 1.6rem; font-weight: 300; font-family: 'DM Mono', monospace; letter-spacing: -0.03em; line-height: 1; }
+.card-value span { font-size: 0.85rem; color: var(--text2); margin-left: 2px; }
+.card.blue .card-value { color: var(--blue); }
+.card.green .card-value { color: var(--green); }
+
+.fluid-summary { background: var(--surface); border: 1px solid var(--border2); border-left: 3px solid var(--accent); border-radius: 0 var(--radius) var(--radius) 0; padding: 0.75rem 1.1rem; font-family: 'DM Mono', monospace; font-size: 0.8rem; color: var(--text2); margin-bottom: 1.5rem; }
+.fluid-summary strong { color: var(--text); font-weight: 500; }
+
+.chart-section { background: var(--surface); border: 1px solid var(--border2); border-radius: var(--radius); padding: 1.1rem 1.25rem 0.9rem; margin-bottom: 1.5rem; }
+.chart-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 0.9rem; flex-wrap: wrap; gap: 8px; }
+.chart-title { font-family: 'DM Mono', monospace; font-size: 0.72rem; color: var(--text3); }
+.legend { display: flex; gap: 14px; }
+.legend-item { display: flex; align-items: center; gap: 5px; font-size: 0.7rem; color: var(--text2); font-family: 'DM Mono', monospace; }
+.legend-dot { width: 8px; height: 8px; border-radius: 2px; flex-shrink: 0; }
+.chart-wrap { position: relative; width: 100%; height: 240px; }
+
+.entries-section { background: var(--surface); border: 1px solid var(--border2); border-radius: var(--radius); overflow: hidden; margin-bottom: 1.5rem; }
+.entries-header { display: flex; align-items: center; justify-content: space-between; padding: 0.75rem 1.1rem; border-bottom: 1px solid var(--border2); }
+.entries-title { font-family: 'DM Mono', monospace; font-size: 0.72rem; color: var(--text3); }
+.entry-row { display: flex; align-items: center; gap: 8px; padding: 0.5rem 1.1rem; border-bottom: 1px solid var(--border2); }
+.entry-row:last-child { border-bottom: none; }
+.entry-time { font-family: 'DM Mono', monospace; font-size: 0.75rem; color: var(--text3); min-width: 44px; }
+.entry-type { font-size: 0.72rem; padding: 2px 8px; border-radius: 20px; font-family: 'DM Mono', monospace; white-space: nowrap; }
+.entry-type.liquids { background: var(--blue-bg); color: var(--blue); }
+.entry-type.wet_food { background: var(--green-bg); color: var(--green); }
+.entry-amt { font-family: 'DM Mono', monospace; font-size: 0.82rem; font-weight: 500; color: var(--text); flex: 1; }
+.entry-edit-input { font-family: 'DM Mono', monospace; font-size: 0.82rem; background: var(--surface2); border: 1px solid var(--accent); border-radius: 5px; padding: 2px 8px; color: var(--text); width: 70px; outline: none; }
+.icon-btn { background: none; border: none; cursor: pointer; color: var(--text3); padding: 3px 6px; border-radius: 5px; font-size: 0.8rem; transition: color 0.12s, background 0.12s; line-height: 1; }
+.icon-btn:hover { background: var(--surface2); color: var(--text); }
+.icon-btn.del:hover { color: var(--danger); background: var(--danger-bg); }
+.add-entry-row { display: flex; gap: 8px; padding: 0.6rem 1.1rem; border-top: 1px solid var(--border2); flex-wrap: wrap; align-items: center; }
+.add-entry-row select, .add-entry-row input[type=number], .add-entry-row input[type=time] { font-family: 'DM Mono', monospace; font-size: 0.76rem; background: var(--surface2); border: 1px solid var(--border2); border-radius: 6px; padding: 4px 8px; color: var(--text); outline: none; }
+.add-entry-row select:focus, .add-entry-row input:focus { border-color: var(--accent); }
+
+.day-actions { display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem; flex-wrap: wrap; gap: 8px; }
+.day-actions-right { display: flex; gap: 8px; flex-wrap: wrap; }
+
+.empty { padding: 2rem; text-align: center; font-family: 'DM Mono', monospace; font-size: 0.8rem; color: var(--text3); }
+
+/* raw log view */
+.raw-section { background: var(--surface); border: 1px solid var(--border2); border-radius: var(--radius); overflow: hidden; margin-bottom: 1.5rem; }
+.raw-header { display: flex; align-items: center; justify-content: space-between; padding: 0.75rem 1.1rem; border-bottom: 1px solid var(--border2); }
+.raw-title { font-family: 'DM Mono', monospace; font-size: 0.72rem; color: var(--text3); }
+.raw-ta { min-height: 120px; color: var(--text2); }
+.raw-footer { display: flex; align-items: center; justify-content: space-between; padding: 0.5rem 1.1rem; border-top: 1px solid var(--border2); flex-wrap: wrap; gap: 8px; }
+.raw-hint { font-size: 0.7rem; color: var(--text3); font-family: 'DM Mono', monospace; }
+
+/* modal */
+.modal-overlay { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.45); z-index: 100; align-items: center; justify-content: center; padding: 1rem; }
+.modal-box { background: var(--surface); border-radius: 14px; border: 1px solid var(--border2); padding: 1.5rem; max-width: 480px; width: 100%; }
+.modal-head { display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 1.25rem; }
+.modal-title { font-family: 'DM Mono', monospace; font-size: 0.85rem; color: var(--text); }
+.modal-body { margin-bottom: 1.25rem; }
+.modal-body label { display: block; font-size: 0.75rem; color: var(--text3); font-family: 'DM Mono', monospace; margin-bottom: 6px; }
+.modal-body select, .modal-body input[type=date] { width: 100%; font-family: 'DM Mono', monospace; font-size: 0.82rem; background: var(--surface2); border: 1px solid var(--border2); border-radius: 7px; padding: 8px 12px; color: var(--text); outline: none; }
+.modal-body select:focus, .modal-body input:focus { border-color: var(--accent); }
+.modal-body .merge-note { font-size: 0.72rem; color: var(--text3); font-family: 'DM Mono', monospace; margin-top: 8px; }
+.modal-foot { display: flex; justify-content: flex-end; gap: 8px; }
+
+/* stats panel */
+.stats-section { background: var(--surface); border: 1px solid var(--border2); border-radius: var(--radius); padding: 1.1rem 1.25rem 0.9rem; margin-bottom: 1.5rem; }
+.stats-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 1rem; flex-wrap: wrap; gap: 8px; }
+.stats-title { font-family: 'DM Mono', monospace; font-size: 0.72rem; color: var(--text3); }
+.stats-controls { display: flex; gap: 6px; }
+.range-btn { font-family: 'DM Mono', monospace; font-size: 0.7rem; padding: 3px 10px; border-radius: 20px; border: 1px solid var(--border2); background: transparent; color: var(--text3); cursor: pointer; transition: all 0.12s; }
+.range-btn:hover { background: var(--surface2); color: var(--text2); }
+.range-btn.active { background: var(--accent-bg); color: var(--accent); border-color: var(--accent); }
+.stats-grid { display: grid; grid-template-columns: repeat(4,1fr); gap: 10px; margin-bottom: 1.5rem; }
+@media (max-width: 560px) { .stats-grid { grid-template-columns: repeat(2,1fr); } }
+.stat-card { background: var(--surface2); border-radius: 8px; padding: 0.75rem 1rem; }
+.stat-card-label { font-size: 0.68rem; color: var(--text3); font-family: 'DM Mono', monospace; margin-bottom: 3px; }
+.stat-card-value { font-size: 1.3rem; font-weight: 300; font-family: 'DM Mono', monospace; letter-spacing: -0.02em; line-height: 1.1; }
+.stat-card-value span { font-size: 0.75rem; color: var(--text2); margin-left: 2px; }
+.stat-card.blue .stat-card-value { color: var(--blue); }
+.stat-card.green .stat-card-value { color: var(--green); }
+.stat-card.accent .stat-card-value { color: var(--accent); }
+.chart-wrap-tall { position: relative; width: 100%; height: 280px; }
+
+/* schedule panel */
+.sched-row { display: flex; align-items: center; gap: 8px; padding: 0.5rem 1.1rem; border-bottom: 1px solid var(--border2); flex-wrap: wrap; }
+.sched-row:last-child { border-bottom: none; }
+.sched-window { font-family: 'DM Mono', monospace; font-size: 0.76rem; color: var(--text2); min-width: 120px; }
+.sched-target { font-family: 'DM Mono', monospace; font-size: 0.82rem; font-weight: 500; color: var(--text); flex: 1; }
+.sched-note { font-size: 0.72rem; color: var(--text3); flex: 2; font-family: 'DM Sans', sans-serif; }
+.sched-edit-wrap { display: flex; gap: 6px; align-items: center; flex-wrap: wrap; width: 100%; padding: 4px 0; }
+.sched-edit-wrap input, .sched-edit-wrap select { font-family: 'DM Mono', monospace; font-size: 0.76rem; background: var(--surface2); border: 1px solid var(--border2); border-radius: 6px; padding: 3px 7px; color: var(--text); outline: none; }
+.sched-edit-wrap input:focus, .sched-edit-wrap select:focus { border-color: var(--accent); }
+.sched-add-row { display: flex; gap: 8px; padding: 0.6rem 1.1rem; border-top: 1px solid var(--border2); flex-wrap: wrap; align-items: center; }
+.sched-add-row input, .sched-add-row select { font-family: 'DM Mono', monospace; font-size: 0.76rem; background: var(--surface2); border: 1px solid var(--border2); border-radius: 6px; padding: 4px 8px; color: var(--text); outline: none; }
+.sched-add-row input:focus { border-color: var(--accent); }
+.sched-tag { font-size: 0.68rem; padding: 1px 7px; border-radius: 20px; font-family: 'DM Mono', monospace; white-space: nowrap; background: rgba(22,160,133,0.12); color: #16a085; }
+
+/* toggle pills for cumulative chart */
+.chart-toggles { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 0.6rem; }
+.toggle-pill { font-family: 'DM Mono', monospace; font-size: 0.68rem; padding: 3px 10px; border-radius: 20px; border: 1.5px solid; cursor: pointer; transition: opacity 0.15s, background 0.15s; user-select: none; }
+.toggle-pill.off { opacity: 0.35; }
+
+/* toast */
+.toast { position: fixed; bottom: 2rem; left: 50%; transform: translateX(-50%) translateY(10px); background: var(--text); color: var(--bg); font-family: 'DM Mono', monospace; font-size: 0.78rem; padding: 0.5rem 1.25rem; border-radius: 20px; opacity: 0; transition: opacity 0.2s, transform 0.2s; pointer-events: none; z-index: 200; white-space: nowrap; }
+.toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <h1>cat intake tracker</h1>
+    <span class="sub">// data saved locally in your browser</span>
+  </header>
+  <div class="tab-bar" id="tabBar"></div>
+  <div id="panels"></div>
+</div>
+
+<!-- Import modal -->
+<div class="modal-overlay" id="importModal">
+  <div class="modal-box" style="max-width:560px;">
+    <div class="modal-head">
+      <span class="modal-title">import log</span>
+      <button class="icon-btn" onclick="closeImport()">✕</button>
+    </div>
+    <div class="drop-area">
+      <textarea id="importTA" class="raw-ta" placeholder="Staging Bot, [31. May 2026 at 06:15:15]:&#10;#cat_ate #wet_food 15&#10;#cat_ate #liquids 16&#10;…"></textarea>
+      <div class="drop-footer">
+        <span class="drop-hint">paste telegram bot log · multiple days ok</span>
+        <div style="display:flex;gap:8px;">
+          <button class="btn secondary" onclick="closeImport()">cancel</button>
+          <button class="btn" onclick="doImport()">import →</button>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Copy/move modal -->
+<div class="modal-overlay" id="copyModal">
+  <div class="modal-box">
+    <div class="modal-head">
+      <span class="modal-title" id="copyModalTitle">copy day</span>
+      <button class="icon-btn" onclick="closeCopyModal()">✕</button>
+    </div>
+    <div class="modal-body">
+      <label>target date</label>
+      <input type="date" id="copyTarget">
+      <div id="copyMergeNote" class="merge-note"></div>
+    </div>
+    <div class="modal-foot">
+      <button class="btn secondary" onclick="closeCopyModal()">cancel</button>
+      <button class="btn" id="copyConfirmBtn">copy →</button>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+const STORE_KEY = 'cat_intake_days';
+function loadDays() { try { return JSON.parse(localStorage.getItem(STORE_KEY)) || {}; } catch { return {}; } }
+function saveDays(d) { localStorage.setItem(STORE_KEY, JSON.stringify(d)); }
+
+let days = loadDays();
+let activeDay = null;
+const charts = {};
+
+const MONTH_MAP = {jan:0,feb:1,mar:2,apr:3,may:4,jun:5,jul:6,aug:7,sep:8,oct:9,nov:10,dec:11};
+
+// ── Toast ─────────────────────────────────────────────────────────────────────
+let toastTimer;
+function toast(msg) {
+  const el = document.getElementById('toast');
+  el.textContent = msg;
+  el.classList.add('show');
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => el.classList.remove('show'), 2200);
+}
+
+// ── Parse raw log ─────────────────────────────────────────────────────────────
+function parseLog(raw) {
+  const timeRe = /\[(\d+)\.\s*(\w+)\s+(\d+)\s+at\s+(\d+):(\d+):(\d+)\]/;
+  const entryRe = /#cat_ate\s+#(\w+)\s+(\d+)/g;
+  const blocks = raw.split(/(?=Staging Bot,)/g).filter(b => b.trim());
+  const result = {};
+  for (const block of blocks) {
+    const tm = block.match(timeRe);
+    if (!tm) continue;
+    const mon = MONTH_MAP[tm[2].toLowerCase().slice(0,3)] ?? 0;
+    const year = parseInt(tm[3]), day = parseInt(tm[1]);
+    const hh = tm[4].padStart(2,'0'), mm = tm[5].padStart(2,'0');
+    const dateKey = `${year}-${String(mon+1).padStart(2,'0')}-${String(day).padStart(2,'0')}`;
+    if (!result[dateKey]) result[dateKey] = [];
+    entryRe.lastIndex = 0;
+    let match;
+    while ((match = entryRe.exec(block)) !== null) {
+      const type = match[1].toLowerCase(), amt = parseInt(match[2]);
+      if (type === 'liquids' || type === 'wet_food')
+        result[dateKey].push({ time: `${hh}:${mm}`, type, amt });
+    }
+  }
+  return result;
+}
+
+// ── Serialize day back to bot-log format ──────────────────────────────────────
+function serializeDay(key) {
+  const entries = days[key];
+  if (!entries || entries.length === 0) return '';
+  const [y, m, d] = key.split('-').map(Number);
+  const monthNames = ['January','February','March','April','May','June','July','August','September','October','November','December'];
+  const groups = {};
+  for (const e of entries) {
+    const k = e.time;
+    if (!groups[k]) groups[k] = [];
+    groups[k].push(e);
+  }
+  const times = Object.keys(groups).sort();
+  return times.map(t => {
+    const [hh, mm] = t.split(':');
+    const header = `Staging Bot, [${d}. ${monthNames[m-1]} ${y} at ${hh}:${mm}:00]:`;
+    const lines = groups[t].map(e => `#cat_ate #${e.type} ${e.amt}`).join('\n\n\n');
+    return header + '\n' + lines;
+  }).join('\n\n\n');
+}
+
+function dateLabel(key) {
+  const [y,m,d] = key.split('-');
+  return new Date(+y,+m-1,+d).toLocaleDateString('en-GB', {day:'numeric',month:'short',year:'numeric'});
+}
+
+// ── Render ────────────────────────────────────────────────────────────────────
+function render() {
+  const tabBar = document.getElementById('tabBar');
+  const panels = document.getElementById('panels');
+  const sorted = Object.keys(days).sort();
+  if (!activeDay || (activeDay !== '__stats__' && activeDay !== '__schedule__' && !days[activeDay])) activeDay = sorted[sorted.length-1] || null;
+
+  tabBar.innerHTML = '';
+  panels.innerHTML = '';
+
+  if (sorted.length === 0) panels.innerHTML = `<div class="empty">no data yet — import a log to get started</div>`;
+
+  sorted.forEach(key => {
+    const tab = document.createElement('button');
+    tab.className = 'tab' + (key === activeDay ? ' active' : '');
+    tab.textContent = dateLabel(key);
+    tab.onclick = () => { activeDay = key; render(); };
+    tabBar.appendChild(tab);
+  });
+
+  // schedule tab (pinned right)
+  const schedTab = document.createElement('button');
+  schedTab.className = 'tab' + (activeDay === '__schedule__' ? ' active' : '');
+  schedTab.textContent = 'schedule';
+  schedTab.style.cssText = 'border-left:1px solid var(--border2); margin-left:auto;';
+  schedTab.onclick = () => { activeDay = '__schedule__'; render(); };
+  tabBar.appendChild(schedTab);
+
+  // stats tab
+  const statsTab = document.createElement('button');
+  statsTab.className = 'tab' + (activeDay === '__stats__' ? ' active' : '');
+  statsTab.textContent = 'statistics';
+  statsTab.style.cssText = '';
+  statsTab.onclick = () => { activeDay = '__stats__'; render(); };
+  tabBar.appendChild(statsTab);
+
+  const addTab = document.createElement('button');
+  addTab.className = 'tab add-tab';
+  addTab.textContent = '+ new day';
+  addTab.onclick = openImport;
+  tabBar.appendChild(addTab);
+
+  sorted.forEach(key => {
+    const panel = document.createElement('div');
+    panel.className = 'panel' + (key === activeDay ? ' active' : '');
+    panel.innerHTML = buildPanel(key);
+    panels.appendChild(panel);
+  });
+
+  // schedule panel
+  const schedPanel = document.createElement('div');
+  schedPanel.className = 'panel' + (activeDay === '__schedule__' ? ' active' : '');
+  schedPanel.id = 'panel-schedule';
+  schedPanel.innerHTML = buildSchedulePanel();
+  panels.appendChild(schedPanel);
+
+  // stats panel
+  const statsPanel = document.createElement('div');
+  statsPanel.className = 'panel' + (activeDay === '__stats__' ? ' active' : '');
+  statsPanel.id = 'panel-stats';
+  statsPanel.innerHTML = buildStatsPanel();
+  panels.appendChild(statsPanel);
+
+  if (activeDay && activeDay !== '__stats__' && activeDay !== '__schedule__' && days[activeDay]) {
+    drawChart(activeDay);
+    drawCumulChart(activeDay);
+  }
+  if (activeDay === '__stats__') drawStatsCharts();
+}
+
+function buildPanel(key) {
+  const entries = days[key];
+  const totalLiquids = entries.filter(e=>e.type==='liquids').reduce((s,e)=>s+e.amt,0);
+  const totalWetFood = entries.filter(e=>e.type==='wet_food').reduce((s,e)=>s+e.amt,0);
+  const fluidFromFood = Math.round(totalWetFood * 0.77);
+  const totalFluid = totalLiquids + fluidFromFood;
+
+  const entriesHTML = entries.length === 0
+    ? '<div class="empty">no entries</div>'
+    : [...entries].map((e,i) => ({ e, i }))
+        .sort((a, b) => b.e.time.localeCompare(a.e.time))
+        .map(({ e, i }) => `
+      <div class="entry-row" id="erow-${key}-${i}">
+        <span class="entry-time">${e.time}</span>
+        <span class="entry-type ${e.type}">${e.type==='wet_food'?'wet food':'liquids'}</span>
+        <span class="entry-amt" id="eamt-${key}-${i}">${e.amt} ${e.type==='wet_food'?'g':'ml'}</span>
+        <button class="icon-btn" onclick="editEntry('${key}',${i})" title="edit">✎</button>
+        <button class="icon-btn del" onclick="deleteEntry('${key}',${i})" title="delete">✕</button>
+      </div>`).join('');
+
+  return `
+    <div class="day-actions">
+      <div class="day-actions-right">
+        <button class="btn ghost" onclick="openCopyModal('${key}')">copy to another day</button>
+        <button class="btn ghost" onclick="openRawEdit('${key}')">edit raw log</button>
+        <button class="btn danger" onclick="deleteDay('${key}')">delete day</button>
+      </div>
+    </div>
+
+    <div class="cards">
+      <div class="card blue"><div class="card-label">liquids drunk</div><div class="card-value">${totalLiquids}<span>ml</span></div></div>
+      <div class="card green"><div class="card-label">wet food eaten</div><div class="card-value">${totalWetFood}<span>g</span></div></div>
+      <div class="card"><div class="card-label">total known fluid</div><div class="card-value">~${totalFluid}<span>ml</span></div></div>
+    </div>
+
+    <div class="fluid-summary">
+      <strong>${fluidFromFood} ml</strong> from wet food (77% × ${totalWetFood} g)&nbsp; +&nbsp; <strong>${totalLiquids} ml</strong> added&nbsp; =&nbsp; <strong>~${totalFluid} ml</strong> total known fluid
+    </div>
+
+    <div class="chart-section">
+      <div class="chart-header">
+        <span class="chart-title">fluid intake over time</span>
+        <div class="legend">
+          <div class="legend-item"><div class="legend-dot" style="background:#2a7fc1"></div>liquids</div>
+          <div class="legend-item"><div class="legend-dot" style="background:#1a8f69"></div>wet food</div>
+        </div>
+      </div>
+      <div class="chart-wrap"><canvas id="chart-${key}" role="img" aria-label="Timeline of cat fluid intake for ${dateLabel(key)}"></canvas></div>
+    </div>
+
+    <div class="chart-section">
+      <div class="chart-header">
+        <span class="chart-title">cumulative fluid by time of day</span>
+      </div>
+      <div class="chart-toggles" id="ctoggle-${key}">
+        <span class="toggle-pill" data-key="${key}" data-ds="0" style="background:rgba(42,127,193,0.15);border-color:#2a7fc1;color:#2a7fc1;">liquids</span>
+        <span class="toggle-pill" data-key="${key}" data-ds="1" style="background:rgba(26,143,105,0.15);border-color:#1a8f69;color:#1a8f69;">food fluid</span>
+        <span class="toggle-pill" data-key="${key}" data-ds="2" style="background:rgba(194,90,42,0.15);border-color:#c25a2a;color:#c25a2a;">total</span>
+        <span class="toggle-pill" data-key="${key}" data-ds="3" style="background:rgba(155,89,182,0.15);border-color:#9b59b6;color:#9b59b6;">best day</span>
+        <span class="toggle-pill" data-key="${key}" data-ds="4" style="background:rgba(22,160,133,0.15);border-color:#16a085;color:#16a085;">schedule</span>
+      </div>
+      <div class="chart-wrap"><canvas id="chart-cumul-${key}" role="img" aria-label="Cumulative fluid intake by time of day for ${dateLabel(key)}"></canvas></div>
+    </div>
+
+    <div class="entries-section">
+      <div class="entries-header"><span class="entries-title">entries</span></div>
+      ${entriesHTML}
+      <div class="add-entry-row">
+        <input type="time" id="new-time-${key}" value="12:00">
+        <select id="new-type-${key}">
+          <option value="liquids">liquids</option>
+          <option value="wet_food">wet food</option>
+        </select>
+        <input type="number" id="new-amt-${key}" placeholder="amount" min="0" style="width:90px">
+        <button class="btn secondary" onclick="addEntry('${key}')">+ add</button>
+      </div>
+    </div>
+
+    <!-- raw log inline editor (hidden by default) -->
+    <div class="raw-section" id="raw-section-${key}" style="display:none;">
+      <div class="raw-header">
+        <span class="raw-title">raw log editor — edit and save to update entries</span>
+        <button class="icon-btn" onclick="closeRawEdit('${key}')">✕</button>
+      </div>
+      <textarea class="raw-ta" id="raw-ta-${key}" spellcheck="false"></textarea>
+      <div class="raw-footer">
+        <span class="raw-hint">edit the staging bot log directly · changes replace all entries for this day</span>
+        <div style="display:flex;gap:8px;">
+          <button class="btn secondary" onclick="closeRawEdit('${key}')">cancel</button>
+          <button class="btn" onclick="saveRawEdit('${key}')">save →</button>
+        </div>
+      </div>
+    </div>
+  `;
+}
+
+function drawChart(key) {
+  const canvas = document.getElementById('chart-' + key);
+  if (!canvas) return;
+  if (charts[key]) { charts[key].destroy(); delete charts[key]; }
+  const entries = days[key];
+  const [y,m,d] = key.split('-').map(Number);
+  const toMs = t => { const [hh,mm] = t.split(':').map(Number); return new Date(y,m-1,d,hh,mm).getTime(); };
+  const liq = entries.filter(e=>e.type==='liquids').map(e=>({x:toMs(e.time),y:e.amt}));
+  const food = entries.filter(e=>e.type==='wet_food').map(e=>({x:toMs(e.time),y:e.amt}));
+  const all = entries.map(e=>toMs(e.time));
+  if (!all.length) return;
+  const minT = Math.min(...all)-25*60*1000, maxT = Math.max(...all)+25*60*1000;
+  const isDark = matchMedia('(prefers-color-scheme: dark)').matches;
+  const gc = isDark?'rgba(255,255,255,0.05)':'rgba(0,0,0,0.06)';
+  const tc = isDark?'#5a5852':'#a09d96';
+  const fmtT = ms => { const dt=new Date(ms); return dt.getHours().toString().padStart(2,'0')+':'+dt.getMinutes().toString().padStart(2,'0'); };
+  charts[key] = new Chart(canvas, {
+    type:'bar',
+    data:{ datasets:[
+      {label:'Liquids (ml)',data:liq,backgroundColor:'#2a7fc1cc',borderColor:'#2a7fc1',borderWidth:1,barThickness:16,borderRadius:3},
+      {label:'Wet food (g)',data:food,backgroundColor:'#1a8f69cc',borderColor:'#1a8f69',borderWidth:1,barThickness:16,borderRadius:3}
+    ]},
+    options:{ responsive:true, maintainAspectRatio:false,
+      plugins:{ legend:{display:false}, tooltip:{
+        backgroundColor:isDark?'#1e1d1b':'#fff', titleColor:isDark?'#f0ede8':'#1a1917',
+        bodyColor:isDark?'#908e87':'#6b6860', borderColor:isDark?'rgba(255,255,255,0.1)':'rgba(0,0,0,0.1)',
+        borderWidth:1, padding:10,
+        callbacks:{ title:i=>fmtT(i[0].parsed.x), label:i=>`  ${i.dataset.label}: ${i.parsed.y}` }
+      }},
+      scales:{
+        x:{type:'linear',min:minT,max:maxT, ticks:{stepSize:3600000,callback:v=>fmtT(v),maxRotation:0,autoSkip:true,maxTicksLimit:12,color:tc,font:{family:"'DM Mono',monospace",size:11}},grid:{color:gc}},
+        y:{beginAtZero:true, ticks:{callback:v=>v+' ml',color:tc,font:{family:"'DM Mono',monospace",size:11}},grid:{color:gc}}
+      }
+    }
+  });
+}
+
+// ── Schedule ──────────────────────────────────────────────────────────────────
+const SCHED_KEY = 'cat_intake_schedule';
+const DEFAULT_SCHEDULE = [
+  { start:'06:00', end:'07:00', minAmt:12, maxAmt:15, note:'First morning liquid, gentle start' },
+  { start:'08:30', end:'09:30', minAmt:12, maxAmt:15, note:'Good second portion' },
+  { start:'11:00', end:'12:00', minAmt:10, maxAmt:13, note:'Midday support' },
+  { start:'13:30', end:'14:30', minAmt:10, maxAmt:13, note:'Keep it steady' },
+  { start:'15:30', end:'16:30', minAmt:12, maxAmt:15, note:'Important afternoon portion' },
+  { start:'17:30', end:'18:30', minAmt:10, maxAmt:13, note:'Before the fasting window' },
+  { start:'18:45', end:'19:10', minAmt:5,  maxAmt:10, note:'Optional last small portion before cutoff' },
+  { start:'19:15', end:'22:00', minAmt:0,  maxAmt:0,  note:'No food/liquids during this window' },
+  { start:'22:00', end:'23:59', minAmt:8,  maxAmt:15, note:'With/after food + prednisolone, if she accepts' },
+];
+
+function loadSchedule() { try { return JSON.parse(localStorage.getItem(SCHED_KEY)) || [...DEFAULT_SCHEDULE.map(r=>({...r}))]; } catch { return [...DEFAULT_SCHEDULE.map(r=>({...r}))]; } }
+function saveSchedule() { localStorage.setItem(SCHED_KEY, JSON.stringify(schedule)); }
+let schedule = loadSchedule();
+
+// Cumulative schedule curve: at each window start, add the midpoint target
+function getScheduleCurve() {
+  const sorted = schedule.filter(s => s.minAmt > 0 || s.maxAmt > 0).sort((a,b) => a.start.localeCompare(b.start));
+  if (!sorted.length) return [];
+  let cum = 0;
+  const pts = [];
+  const firstMs = timeToRefMs(sorted[0].start) - 20*60*1000;
+  pts.push({ x: firstMs, y: 0 });
+  for (const slot of sorted) {
+    const mid = Math.round((slot.minAmt + slot.maxAmt) / 2);
+    cum += mid;
+    pts.push({ x: timeToRefMs(slot.start), y: cum });
+    // flat until window end
+    pts.push({ x: timeToRefMs(slot.end), y: cum });
+  }
+  return pts;
+}
+
+function buildSchedulePanel() {
+  const rows = schedule.map((s, i) => {
+    const target = s.minAmt === 0 && s.maxAmt === 0 ? '0 ml' : `${s.minAmt}–${s.maxAmt} ml`;
+    return `
+    <div class="sched-row" id="srow-${i}">
+      <span class="sched-window">${s.start}–${s.end}</span>
+      <span class="sched-target" id="samt-${i}">${target}</span>
+      <span class="sched-note">${s.note}</span>
+      <button class="icon-btn" onclick="editSchedRow(${i})" title="edit">✎</button>
+      <button class="icon-btn del" onclick="deleteSchedRow(${i})" title="delete">✕</button>
+    </div>`;
+  }).join('');
+
+  const totalMin = schedule.reduce((s,r) => s+r.minAmt, 0);
+  const totalMax = schedule.reduce((s,r) => s+r.maxAmt, 0);
+
+  return `
+    <div class="stats-section">
+      <div class="stats-header">
+        <span class="stats-title">daily hydration schedule</span>
+        <div style="display:flex;gap:8px;align-items:center;">
+          <span style="font-family:'DM Mono',monospace;font-size:0.72rem;color:var(--text3);">target: ${totalMin}–${totalMax} ml / day</span>
+          <button class="btn secondary" onclick="resetSchedule()">reset to default</button>
+        </div>
+      </div>
+      <div class="entries-section" style="margin-bottom:0;">
+        <div class="entries-header"><span class="entries-title">time windows</span></div>
+        ${rows}
+        <div class="sched-add-row">
+          <span style="font-family:'DM Mono',monospace;font-size:0.72rem;color:var(--text3);">add:</span>
+          <input type="time" id="sched-new-start" value="08:00">
+          <span style="font-family:'DM Mono',monospace;font-size:0.72rem;color:var(--text3);">–</span>
+          <input type="time" id="sched-new-end" value="09:00">
+          <input type="number" id="sched-new-min" placeholder="min ml" min="0" style="width:75px">
+          <input type="number" id="sched-new-max" placeholder="max ml" min="0" style="width:75px">
+          <input type="text" id="sched-new-note" placeholder="note (optional)" style="flex:1;min-width:120px;">
+          <button class="btn secondary" onclick="addSchedRow()">+ add</button>
+        </div>
+      </div>
+    </div>
+  `;
+}
+
+function editSchedRow(i) {
+  const row = document.getElementById(`srow-${i}`);
+  if (!row || row.querySelector('.sched-edit-wrap')) return;
+  const s = schedule[i];
+  row.innerHTML = `
+    <div class="sched-edit-wrap">
+      <input type="time" id="sedit-start-${i}" value="${s.start}">
+      <span style="font-family:'DM Mono',monospace;font-size:0.72rem;color:var(--text3);">–</span>
+      <input type="time" id="sedit-end-${i}" value="${s.end}">
+      <input type="number" id="sedit-min-${i}" value="${s.minAmt}" min="0" style="width:60px;" placeholder="min">
+      <input type="number" id="sedit-max-${i}" value="${s.maxAmt}" min="0" style="width:60px;" placeholder="max">
+      <input type="text" id="sedit-note-${i}" value="${s.note}" style="flex:1;min-width:100px;">
+      <button class="icon-btn" onclick="saveSchedRow(${i})" title="save">✓</button>
+      <button class="icon-btn" onclick="renderSchedPanel()">✕</button>
+    </div>`;
+}
+
+function saveSchedRow(i) {
+  const start = document.getElementById(`sedit-start-${i}`)?.value;
+  const end   = document.getElementById(`sedit-end-${i}`)?.value;
+  const min   = parseInt(document.getElementById(`sedit-min-${i}`)?.value) || 0;
+  const max   = parseInt(document.getElementById(`sedit-max-${i}`)?.value) || 0;
+  const note  = document.getElementById(`sedit-note-${i}`)?.value || '';
+  if (!start || !end) return;
+  schedule[i] = { start, end, minAmt: min, maxAmt: max, note };
+  schedule.sort((a,b) => a.start.localeCompare(b.start));
+  saveSchedule();
+  renderSchedPanel();
+  toast('schedule saved');
+}
+
+function deleteSchedRow(i) {
+  schedule.splice(i, 1);
+  saveSchedule();
+  renderSchedPanel();
+}
+
+function addSchedRow() {
+  const start = document.getElementById('sched-new-start')?.value;
+  const end   = document.getElementById('sched-new-end')?.value;
+  const min   = parseInt(document.getElementById('sched-new-min')?.value) || 0;
+  const max   = parseInt(document.getElementById('sched-new-max')?.value) || 0;
+  const note  = document.getElementById('sched-new-note')?.value || '';
+  if (!start || !end) return;
+  schedule.push({ start, end, minAmt: min, maxAmt: max, note });
+  schedule.sort((a,b) => a.start.localeCompare(b.start));
+  saveSchedule();
+  renderSchedPanel();
+  toast('row added');
+}
+
+function resetSchedule() {
+  if (!confirm('Reset schedule to default?')) return;
+  schedule = DEFAULT_SCHEDULE.map(r => ({...r}));
+  saveSchedule();
+  renderSchedPanel();
+  toast('schedule reset');
+}
+
+function renderSchedPanel() {
+  const panel = document.getElementById('panel-schedule');
+  if (panel) panel.innerHTML = buildSchedulePanel();
+}
+
+// ── Cumul chart toggle state ──────────────────────────────────────────────────
+// per dayKey: [bool, bool, bool, bool, bool] = [liquids, food, total, best, sched]
+const cumulToggles = {}; // key -> [true,true,true,true,true]
+function getToggles(key) {
+  if (!cumulToggles[key]) cumulToggles[key] = [true, true, true, true, true];
+  return cumulToggles[key];
+}
+
+function toggleCumulDs(key, dsIdx) {
+  const t = getToggles(key);
+  t[dsIdx] = !t[dsIdx];
+  // update pill UI
+  const pill = document.querySelector(`.toggle-pill[data-key="${key}"][data-ds="${dsIdx}"]`);
+  if (pill) pill.classList.toggle('off', !t[dsIdx]);
+  // update chart visibility
+  const ch = charts['cumul-'+key];
+  if (ch && ch.data.datasets[dsIdx]) {
+    ch.data.datasets[dsIdx].hidden = !t[dsIdx];
+    ch.update();
+  }
+}
+
+// Wire up toggle pills after render (called once per render via event delegation)
+document.addEventListener('click', e => {
+  const pill = e.target.closest('.toggle-pill');
+  if (!pill) return;
+  const key = pill.dataset.key;
+  const ds  = parseInt(pill.dataset.ds);
+  if (key && !isNaN(ds)) toggleCumulDs(key, ds);
+});
+
+// ── Stats ─────────────────────────────────────────────────────────────────────
+let statsRange = 7; // days to show, 0 = all
+
+function buildStatsPanel() {
+  return `
+    <div class="stats-section">
+      <div class="stats-header">
+        <span class="stats-title">daily totals</span>
+        <div style="display:flex;align-items:center;gap:16px;">
+          <div class="legend" style="margin-right:8px;">
+            <div class="legend-item"><div class="legend-dot" style="background:#2a7fc1"></div>liquids</div>
+            <div class="legend-item"><div class="legend-dot" style="background:#1a8f69"></div>wet food</div>
+          </div>
+          <div class="stats-controls">
+          <button class="range-btn ${statsRange===7?'active':''}" onclick="setStatsRange(7)">7d</button>
+          <button class="range-btn ${statsRange===14?'active':''}" onclick="setStatsRange(14)">14d</button>
+          <button class="range-btn ${statsRange===30?'active':''}" onclick="setStatsRange(30)">30d</button>
+          <button class="range-btn ${statsRange===0?'active':''}" onclick="setStatsRange(0)">all</button>
+        </div>
+        </div>
+      </div>
+      <div class="stats-grid" id="stats-cards"></div>
+      <div class="chart-wrap-tall"><canvas id="chart-stats-daily" role="img" aria-label="Daily total fluid intake bar chart"></canvas></div>
+    </div>
+
+    <div class="stats-section">
+      <div class="stats-header">
+        <span class="stats-title">total fluid per day (liquids + 77% wet food)</span>
+      </div>
+      <div class="chart-wrap-tall"><canvas id="chart-stats-total" role="img" aria-label="Total known fluid per day line chart"></canvas></div>
+    </div>
+
+    <div class="stats-section">
+      <div class="stats-header">
+        <span class="stats-title">liquids vs wet food ratio</span>
+      </div>
+      <div class="chart-wrap-tall" style="height:220px;"><canvas id="chart-stats-ratio" role="img" aria-label="Stacked bar chart showing proportion of liquids vs wet food per day"></canvas></div>
+    </div>
+  `;
+}
+
+function setStatsRange(n) {
+  statsRange = n;
+  const panel = document.getElementById('panel-stats');
+  if (panel) { panel.innerHTML = buildStatsPanel(); drawStatsCharts(); }
+}
+
+function getStatsKeys() {
+  const sorted = Object.keys(days).sort();
+  if (statsRange === 0 || sorted.length <= statsRange) return sorted;
+  return sorted.slice(-statsRange);
+}
+
+function drawStatsCharts() {
+  const keys = getStatsKeys();
+  const isDark = matchMedia('(prefers-color-scheme: dark)').matches;
+  const gc = isDark ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.06)';
+  const tc = isDark ? '#5a5852' : '#a09d96';
+  const tooltipDefaults = {
+    backgroundColor: isDark?'#1e1d1b':'#fff',
+    titleColor: isDark?'#f0ede8':'#1a1917',
+    bodyColor: isDark?'#908e87':'#6b6860',
+    borderColor: isDark?'rgba(255,255,255,0.1)':'rgba(0,0,0,0.1)',
+    borderWidth: 1, padding: 10
+  };
+  const monoFont = { family: "'DM Mono', monospace", size: 11 };
+  const axisDefaults = (unit='') => ({
+    grid: { color: gc },
+    ticks: { color: tc, font: monoFont, callback: v => v + (unit?' '+unit:'') }
+  });
+
+  // compute per-day data
+  const labels = keys.map(k => {
+    const [y,m,d] = k.split('-');
+    return new Date(+y,+m-1,+d).toLocaleDateString('en-GB',{day:'numeric',month:'short'});
+  });
+  const liquidsData = keys.map(k => days[k].filter(e=>e.type==='liquids').reduce((s,e)=>s+e.amt,0));
+  const foodData    = keys.map(k => days[k].filter(e=>e.type==='wet_food').reduce((s,e)=>s+e.amt,0));
+  const fluidData   = keys.map((k,i) => liquidsData[i] + Math.round(foodData[i]*0.77));
+
+  // summary cards
+  const totalDays = keys.length;
+  const avgFluid  = totalDays ? Math.round(fluidData.reduce((a,b)=>a+b,0)/totalDays) : 0;
+  const maxFluid  = totalDays ? Math.max(...fluidData) : 0;
+  const avgLiq    = totalDays ? Math.round(liquidsData.reduce((a,b)=>a+b,0)/totalDays) : 0;
+  const avgFood   = totalDays ? Math.round(foodData.reduce((a,b)=>a+b,0)/totalDays) : 0;
+
+  const cards = document.getElementById('stats-cards');
+  if (cards) cards.innerHTML = `
+    <div class="stat-card accent"><div class="stat-card-label">avg total fluid / day</div><div class="stat-card-value">~${avgFluid}<span>ml</span></div></div>
+    <div class="stat-card accent"><div class="stat-card-label">peak total fluid</div><div class="stat-card-value">~${maxFluid}<span>ml</span></div></div>
+    <div class="stat-card blue"><div class="stat-card-label">avg liquids / day</div><div class="stat-card-value">${avgLiq}<span>ml</span></div></div>
+    <div class="stat-card green"><div class="stat-card-label">avg wet food / day</div><div class="stat-card-value">${avgFood}<span>g</span></div></div>
+  `;
+
+  // chart 1: grouped bar — liquids + wet food daily
+  const c1 = document.getElementById('chart-stats-daily');
+  if (c1) new Chart(c1, {
+    type: 'bar',
+    data: {
+      labels,
+      datasets: [
+        { label:'liquids (ml)', data:liquidsData, backgroundColor:'#2a7fc1bb', borderColor:'#2a7fc1', borderWidth:1, borderRadius:3 },
+        { label:'wet food (g)', data:foodData, backgroundColor:'#1a8f69bb', borderColor:'#1a8f69', borderWidth:1, borderRadius:3 }
+      ]
+    },
+    options: {
+      responsive:true, maintainAspectRatio:false,
+      plugins: { legend:{display:false}, tooltip:{ ...tooltipDefaults, mode:'index', intersect:false } },
+      scales: {
+        x: { ...axisDefaults(), ticks:{ color:tc, font:monoFont, maxRotation:45, autoSkip:true, maxTicksLimit:14 } },
+        y: axisDefaults('ml')
+      }
+    }
+  });
+
+  // chart 2: line — total known fluid per day
+  const c2 = document.getElementById('chart-stats-total');
+  if (c2) new Chart(c2, {
+    type: 'line',
+    data: {
+      labels,
+      datasets: [{
+        label:'total fluid (ml)', data:fluidData,
+        borderColor:'#c25a2a', backgroundColor:'rgba(194,90,42,0.08)',
+        borderWidth:2, pointRadius:4, pointBackgroundColor:'#c25a2a',
+        tension:0.3, fill:true
+      }]
+    },
+    options: {
+      responsive:true, maintainAspectRatio:false,
+      plugins: { legend:{display:false}, tooltip:{ ...tooltipDefaults, callbacks:{ label:i=>`  ~${i.parsed.y} ml total fluid` } } },
+      scales: {
+        x: { ...axisDefaults(), ticks:{ color:tc, font:monoFont, maxRotation:45, autoSkip:true, maxTicksLimit:14 } },
+        y: { beginAtZero:true, ...axisDefaults('ml') }
+      }
+    }
+  });
+
+  // chart 3: stacked 100% bar — liquids vs wet food fluid ratio
+  const totalEach = keys.map((k,i) => (liquidsData[i] + Math.round(foodData[i]*0.77)) || 1);
+  const liqPct  = keys.map((k,i) => Math.round(liquidsData[i]/totalEach[i]*100));
+  const foodPct = keys.map((k,i) => Math.round(Math.round(foodData[i]*0.77)/totalEach[i]*100));
+
+  const c3 = document.getElementById('chart-stats-ratio');
+  if (c3) new Chart(c3, {
+    type:'bar',
+    data:{
+      labels,
+      datasets:[
+        { label:'liquids %', data:liqPct, backgroundColor:'#2a7fc1bb', borderColor:'#2a7fc1', borderWidth:1, borderRadius:0 },
+        { label:'wet food fluid %', data:foodPct, backgroundColor:'#1a8f69bb', borderColor:'#1a8f69', borderWidth:1, borderRadius:0 }
+      ]
+    },
+    options:{
+      responsive:true, maintainAspectRatio:false,
+      plugins:{ legend:{display:false}, tooltip:{ ...tooltipDefaults, mode:'index', intersect:false, callbacks:{ label:i=>`  ${i.dataset.label}: ${i.parsed.y}%` } } },
+      scales:{
+        x:{ stacked:true, ...axisDefaults(), ticks:{ color:tc, font:monoFont, maxRotation:45, autoSkip:true, maxTicksLimit:14 } },
+        y:{ stacked:true, beginAtZero:true, max:100, ...axisDefaults('%') }
+      }
+    }
+  });
+}
+
+// ── Best hydration day helpers ────────────────────────────────────────────────
+// Returns { key, totalLiq, curve } where curve is [{x: ms-on-a-shared-epoch, y: cumLiq}, ...]
+// We normalise all times to a single reference date (2000-01-01) so curves from
+// different calendar days sit on the same x-axis.
+const REF_DATE = { y:2000, m:0, d:1 }; // month is 0-indexed
+function timeToRefMs(timeStr) {
+  const [hh, mm] = timeStr.split(':').map(Number);
+  return new Date(REF_DATE.y, REF_DATE.m, REF_DATE.d, hh, mm).getTime();
+}
+
+function buildLiqCurve(dayKey) {
+  const entries = [...days[dayKey]].sort((a,b) => a.time.localeCompare(b.time));
+  const liqEntries = entries.filter(e => e.type === 'liquids');
+  if (!liqEntries.length) return { total: 0, pts: [] };
+  const times = [...new Set(liqEntries.map(e => e.time))].sort();
+  let cum = 0;
+  const pts = [];
+  const firstMs = timeToRefMs(times[0]);
+  pts.push({ x: firstMs - 20*60*1000, y: 0 }); // lead-in zero
+  for (const t of times) {
+    cum += liqEntries.filter(e => e.time === t).reduce((s, e) => s + e.amt, 0);
+    pts.push({ x: timeToRefMs(t), y: cum });
+  }
+  return { total: cum, pts };
+}
+
+function getBestLiqDay(excludeKey) {
+  const keys = Object.keys(days).filter(k => k !== excludeKey);
+  if (!keys.length) return null;
+  let best = null, bestTotal = -1;
+  for (const k of keys) {
+    const { total, pts } = buildLiqCurve(k);
+    if (total > bestTotal) { bestTotal = total; best = { key: k, total, pts }; }
+  }
+  return best;
+}
+
+function drawCumulChart(key) {
+  const canvas = document.getElementById('chart-cumul-' + key);
+  if (!canvas) return;
+  if (charts['cumul-'+key]) { charts['cumul-'+key].destroy(); delete charts['cumul-'+key]; }
+  const entries = [...days[key]].sort((a,b) => a.time.localeCompare(b.time));
+  if (!entries.length) return;
+
+  // Build today's curves on the reference epoch so x-axis = time-of-day
+  let cumLiq = 0, cumFood = 0;
+  const liqPts = [], foodPts = [], totalPts = [];
+  const allTimes = [...new Set(entries.map(e => e.time))].sort();
+  const firstMs = timeToRefMs(allTimes[0]);
+  liqPts.push({ x: firstMs - 20*60*1000, y: 0 });
+  foodPts.push({ x: firstMs - 20*60*1000, y: 0 });
+  totalPts.push({ x: firstMs - 20*60*1000, y: 0 });
+  for (const t of allTimes) {
+    const ms = timeToRefMs(t);
+    entries.filter(e => e.time === t).forEach(e => {
+      if (e.type === 'liquids') cumLiq += e.amt;
+      else cumFood += Math.round(e.amt * 0.77);
+    });
+    liqPts.push({ x: ms, y: cumLiq });
+    foodPts.push({ x: ms, y: cumFood });
+    totalPts.push({ x: ms, y: cumLiq + cumFood });
+  }
+
+  // Best hydration day reference curve
+  const best = getBestLiqDay(key);
+  const bestPts = best ? best.pts : [];
+  const bestLabel = best ? `best day — ${dateLabel(best.key)} (${best.total} ml)` : 'best day liquids';
+
+  // Schedule reference curve
+  const schedPts = getScheduleCurve();
+
+  const toggles = getToggles(key);
+
+  const isDark = matchMedia('(prefers-color-scheme: dark)').matches;
+  const gc = isDark ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.06)';
+  const tc = isDark ? '#5a5852' : '#a09d96';
+  const fmtT = ms => { const dt = new Date(ms); return dt.getHours().toString().padStart(2,'0') + ':' + dt.getMinutes().toString().padStart(2,'0'); };
+
+  // Build a shared sorted x-axis from all unique timestamps across all datasets,
+  // then project each curve onto it (carry-forward for stepped lines).
+  function projectToAxis(pts, allX) {
+    if (!pts.length) return allX.map(x => ({ x, y: null }));
+    let last = 0;
+    return allX.map(x => {
+      // find the last point with x <= current x
+      for (let i = pts.length - 1; i >= 0; i--) {
+        if (pts[i].x <= x) { last = pts[i].y; break; }
+      }
+      return { x, y: last };
+    });
+  }
+
+  const allX = [...new Set([
+    ...liqPts.map(p=>p.x),
+    ...foodPts.map(p=>p.x),
+    ...totalPts.map(p=>p.x),
+    ...bestPts.map(p=>p.x),
+    ...schedPts.map(p=>p.x),
+  ])].sort((a,b)=>a-b);
+
+  const liqProj   = projectToAxis(liqPts,   allX);
+  const foodProj  = projectToAxis(foodPts,  allX);
+  const totalProj = projectToAxis(totalPts, allX);
+  const bestProj  = projectToAxis(bestPts,  allX);
+  const schedProj = projectToAxis(schedPts, allX);
+
+  const datasets = [
+    { label:'liquids (ml)',        data: liqProj,   borderColor:'#2a7fc1', backgroundColor:'rgba(42,127,193,0.07)', borderWidth:2, pointRadius:0, pointHitRadius:0, stepped:'after', fill:true,  tension:0, hidden: !toggles[0] },
+    { label:'fluid from food (ml)',data: foodProj,  borderColor:'#1a8f69', backgroundColor:'rgba(26,143,105,0.07)', borderWidth:2, pointRadius:0, pointHitRadius:0, stepped:'after', fill:true,  tension:0, hidden: !toggles[1] },
+    { label:'total fluid (ml)',    data: totalProj, borderColor:'#c25a2a', backgroundColor:'transparent',           borderWidth:2.5,pointRadius:0, pointHitRadius:0, stepped:'after', fill:false, tension:0, hidden: !toggles[2] },
+    { label: bestLabel,            data: bestProj,  borderColor:'#9b59b6', backgroundColor:'transparent',           borderWidth:2, borderDash:[6,4], pointRadius:0, pointHitRadius:0, stepped:'after', fill:false, tension:0, hidden: !toggles[3] },
+    { label:'schedule target',     data: schedProj, borderColor:'#16a085', backgroundColor:'rgba(22,160,133,0.06)', borderWidth:2, borderDash:[4,3], pointRadius:0, pointHitRadius:0, stepped:false, fill:true, tension:0, hidden: !toggles[4] },
+  ];
+
+  charts['cumul-'+key] = new Chart(canvas, {
+    type: 'line',
+    data: { datasets },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      plugins: {
+        legend: { display: false },
+        tooltip: {
+          backgroundColor: isDark?'#1e1d1b':'#fff',
+          titleColor: isDark?'#f0ede8':'#1a1917',
+          bodyColor: isDark?'#908e87':'#6b6860',
+          borderColor: isDark?'rgba(255,255,255,0.1)':'rgba(0,0,0,0.1)',
+          borderWidth: 1, padding: 10,
+          mode: 'index', intersect: false,
+          callbacks: {
+            title: items => items.length ? fmtT(items[0].parsed.x) : '',
+            label: item => {
+              if (item.chart.getDatasetMeta(item.datasetIndex).hidden) return null;
+              if (item.parsed.y === null) return null;
+              return `  ${item.dataset.label}: ${item.parsed.y} ml`;
+            }
+          }
+        }
+      },
+      scales: {
+        x: { type:'linear', ticks:{ stepSize:3600000, callback:v=>fmtT(v), maxRotation:0, autoSkip:true, maxTicksLimit:12, color:tc, font:{family:"'DM Mono',monospace",size:11} }, grid:{ color:gc } },
+        y: { beginAtZero:true, ticks:{ callback:v=>v+' ml', color:tc, font:{family:"'DM Mono',monospace",size:11} }, grid:{ color:gc } }
+      }
+    }
+  });
+  // sync pill off-state
+  toggles.forEach((on, idx) => {
+    const pill = document.querySelector(`.toggle-pill[data-key="${key}"][data-ds="${idx}"]`);
+    if (pill) pill.classList.toggle('off', !on);
+  });
+}
+function deleteEntry(key, i) { days[key].splice(i,1); saveDays(days); render(); }
+
+function editEntry(key, i) {
+  const span = document.getElementById(`eamt-${key}-${i}`);
+  if (!span) return;
+  span.innerHTML = `<input class="entry-edit-input" id="einput-${key}-${i}" type="number" value="${days[key][i].amt}" min="0">
+    <button class="icon-btn" onclick="saveEntry('${key}',${i})">✓</button>`;
+  document.getElementById(`einput-${key}-${i}`)?.focus();
+}
+
+function saveEntry(key, i) {
+  const v = parseInt(document.getElementById(`einput-${key}-${i}`)?.value);
+  if (!isNaN(v) && v >= 0) { days[key][i].amt = v; saveDays(days); render(); }
+}
+
+function addEntry(key) {
+  const time = document.getElementById(`new-time-${key}`)?.value || '12:00';
+  const type = document.getElementById(`new-type-${key}`)?.value || 'liquids';
+  const amt = parseInt(document.getElementById(`new-amt-${key}`)?.value);
+  if (isNaN(amt) || amt < 0) return;
+  days[key].push({time,type,amt});
+  days[key].sort((a,b)=>a.time.localeCompare(b.time));
+  saveDays(days); render();
+}
+
+function deleteDay(key) {
+  if (!confirm(`Delete all data for ${dateLabel(key)}?`)) return;
+  delete days[key];
+  const s = Object.keys(days).sort();
+  activeDay = s[s.length-1] || null;
+  saveDays(days); render();
+}
+
+// ── Raw log editor ────────────────────────────────────────────────────────────
+function openRawEdit(key) {
+  const sec = document.getElementById(`raw-section-${key}`);
+  const ta = document.getElementById(`raw-ta-${key}`);
+  if (!sec || !ta) return;
+  ta.value = serializeDay(key);
+  sec.style.display = 'block';
+  ta.focus();
+  sec.scrollIntoView({behavior:'smooth', block:'nearest'});
+}
+
+function closeRawEdit(key) {
+  const sec = document.getElementById(`raw-section-${key}`);
+  if (sec) sec.style.display = 'none';
+}
+
+function saveRawEdit(key) {
+  const ta = document.getElementById(`raw-ta-${key}`);
+  if (!ta) return;
+  const parsed = parseLog(ta.value);
+  // keep only entries for this key (ignore if user typed a different date)
+  if (parsed[key]) {
+    days[key] = parsed[key];
+    days[key].sort((a,b)=>a.time.localeCompare(b.time));
+  } else {
+    // try to find any key and remap to this day
+    const vals = Object.values(parsed);
+    if (vals.length > 0) {
+      days[key] = vals.flat().sort((a,b)=>a.time.localeCompare(b.time));
+    }
+  }
+  saveDays(days);
+  closeRawEdit(key);
+  render();
+  toast('log updated');
+}
+
+// ── Copy modal ────────────────────────────────────────────────────────────────
+let copySourceKey = null;
+
+function openCopyModal(key) {
+  copySourceKey = key;
+  document.getElementById('copyModalTitle').textContent = `copy ${dateLabel(key)} →`;
+  const today = new Date().toISOString().slice(0,10);
+  document.getElementById('copyTarget').value = today;
+  updateCopyNote();
+  document.getElementById('copyModal').style.display = 'flex';
+  document.getElementById('copyConfirmBtn').onclick = doCopy;
+}
+
+function closeCopyModal() {
+  document.getElementById('copyModal').style.display = 'none';
+  copySourceKey = null;
+}
+
+function updateCopyNote() {
+  const target = document.getElementById('copyTarget').value;
+  const note = document.getElementById('copyMergeNote');
+  if (target && days[target]) {
+    note.textContent = `⚠ ${dateLabel(target)} already has data — entries will be merged`;
+  } else {
+    note.textContent = '';
+  }
+}
+
+document.addEventListener('DOMContentLoaded', () => {
+  document.getElementById('copyTarget')?.addEventListener('input', updateCopyNote);
+});
+
+function doCopy() {
+  const target = document.getElementById('copyTarget').value;
+  if (!target || !copySourceKey) return;
+  const src = JSON.parse(JSON.stringify(days[copySourceKey]));
+  if (!days[target]) days[target] = [];
+  for (const e of src) {
+    const dup = days[target].some(x => x.time===e.time && x.type===e.type && x.amt===e.amt);
+    if (!dup) days[target].push(e);
+  }
+  days[target].sort((a,b)=>a.time.localeCompare(b.time));
+  activeDay = target;
+  saveDays(days);
+  closeCopyModal();
+  render();
+  toast(`copied to ${dateLabel(target)}`);
+}
+
+// ── Import modal ──────────────────────────────────────────────────────────────
+function openImport() {
+  document.getElementById('importModal').style.display = 'flex';
+  document.getElementById('importTA').value = '';
+  document.getElementById('importTA').focus();
+}
+function closeImport() { document.getElementById('importModal').style.display = 'none'; }
+
+function doImport() {
+  const raw = document.getElementById('importTA').value;
+  if (!raw.trim()) return;
+  const parsed = parseLog(raw);
+  for (const [k, entries] of Object.entries(parsed)) {
+    if (!days[k]) days[k] = [];
+    for (const e of entries) {
+      const dup = days[k].some(x => x.time===e.time && x.type===e.type && x.amt===e.amt);
+      if (!dup) days[k].push(e);
+    }
+    days[k].sort((a,b)=>a.time.localeCompare(b.time));
+  }
+  const keys = Object.keys(parsed).sort();
+  if (keys.length) activeDay = keys[keys.length-1];
+  saveDays(days);
+  closeImport();
+  render();
+  toast(`imported ${keys.length} day${keys.length!==1?'s':''}`);
+}
+
+// ── Modal close on backdrop ───────────────────────────────────────────────────
+document.getElementById('importModal').addEventListener('click', e => { if (e.target===e.currentTarget) closeImport(); });
+document.getElementById('copyModal').addEventListener('click', e => { if (e.target===e.currentTarget) closeCopyModal(); });
+document.addEventListener('keydown', e => { if (e.key==='Escape') { closeImport(); closeCopyModal(); } });
+document.getElementById('copyTarget').addEventListener('input', updateCopyNote);
+
+// ── Init ──────────────────────────────────────────────────────────────────────
+render();
+if (Object.keys(days).length === 0) openImport();
+</script>
+</body>
+</html>

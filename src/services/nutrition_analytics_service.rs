@@ -1,4 +1,4 @@
-use crate::domain::analytics::{NutritionDailyTotal, NutritionRangeSummary};
+use crate::domain::analytics::{BestFluidDay, NutritionDailyTotal, NutritionRangeSummary};
 use crate::error::AppResult;
 use crate::repo::nutrition_analytics;
 use sqlx::SqlitePool;
@@ -42,4 +42,13 @@ pub async fn range_summary(
         daily_totals,
         category_averages,
     })
+}
+
+#[tracing::instrument(skip(pool))]
+pub async fn best_fluid_day(
+    pool: &SqlitePool,
+    pet_id: Option<Uuid>,
+    exclude_date: &str,
+) -> AppResult<Option<BestFluidDay>> {
+    nutrition_analytics::best_fluid_day(pool, pet_id, exclude_date).await
 }

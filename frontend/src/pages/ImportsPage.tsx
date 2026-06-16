@@ -1,18 +1,17 @@
 import { useMemo, useState } from 'react';
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { petsApi } from '../api/pets';
+import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { nutritionRecordsApi } from '../api/nutritionRecords';
+import { NoPetSelected } from '../components/NoPetSelected';
+import { useSelectedPet } from '../context/SelectedPetContext';
 import { dedupeCreateRecords, parseTelegramNutritionLog, toCreateNutritionRecords } from '../lib/parseTelegramNutritionLog';
 import { CATEGORY_LABELS } from '../types';
 import type { CreateNutritionRecord } from '../types';
 
 export default function ImportsPage() {
   const queryClient = useQueryClient();
-  const [petId, setPetId] = useState('');
+  const { selectedPetId, selectedPet, petsLoading } = useSelectedPet();
   const [rawText, setRawText] = useState('');
   const [previewRecords, setPreviewRecords] = useState<CreateNutritionRecord[] | null>(null);
-
-  const petsQuery = useQuery({ queryKey: ['pets'], queryFn: petsApi.list });
 
   const preview = useMemo(() => {
     if (!previewRecords) return null;
@@ -40,34 +39,25 @@ export default function ImportsPage() {
   });
 
   function handlePreview() {
+    if (!selectedPetId) return;
     const parsed = parseTelegramNutritionLog(rawText);
-    const records = dedupeCreateRecords(toCreateNutritionRecords(parsed, petId));
+    const records = dedupeCreateRecords(toCreateNutritionRecords(parsed, selectedPetId));
     setPreviewRecords(records);
+  }
+
+  if (petsLoading) {
+    return <div className="loading-state">Loading…</div>;
+  }
+
+  if (!selectedPetId) {
+    return <NoPetSelected />;
   }
 
   return (
     <div className="page-stack">
-      <section className="page-header">
-        <div>
-          <p className="eyebrow">Import</p>
-          <h2>Paste a Telegram nutrition log</h2>
-          <p className="muted-text">Parsing happens in the browser. Commit sends a batch of nutrition records to the API.</p>
-        </div>
-      </section>
-
       <section className="panel">
+        <p className="muted-text">Importing for {selectedPet?.name ?? 'selected pet'}.</p>
         <div className="form-grid">
-          <div className="form-row">
-            <label htmlFor="import-pet">Pet</label>
-            <select id="import-pet" value={petId} onChange={(event) => setPetId(event.target.value)} required>
-              <option value="">Select a pet</option>
-              {(petsQuery.data ?? []).map((pet) => (
-                <option key={pet.id} value={pet.id}>
-                  {pet.name}
-                </option>
-              ))}
-            </select>
-          </div>
           <div className="form-row form-row-full">
             <label htmlFor="import-text">Telegram log</label>
             <textarea
@@ -79,7 +69,7 @@ export default function ImportsPage() {
             />
           </div>
           <div className="button-row form-row-full">
-            <button className="button" type="button" disabled={!petId || !rawText.trim()} onClick={handlePreview}>
+            <button className="button" type="button" disabled={!rawText.trim()} onClick={handlePreview}>
               Preview
             </button>
             <button

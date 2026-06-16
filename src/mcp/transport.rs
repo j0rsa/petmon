@@ -1,6 +1,7 @@
 use actix_web::{post, web, HttpResponse};
 use serde::{Deserialize, Serialize};
-use sqlx::SqlitePool;
+
+use crate::auth::AppState;
 
 #[derive(Debug, Deserialize)]
 pub struct McpRequest {
@@ -53,8 +54,8 @@ impl McpResponse {
 }
 
 #[post("/mcp")]
-#[tracing::instrument(name = "mcp_request", skip(pool, body), fields(method = tracing::field::Empty))]
-pub async fn mcp_handler(pool: web::Data<SqlitePool>, body: web::Json<McpRequest>) -> HttpResponse {
+#[tracing::instrument(name = "mcp_request", skip(state, body), fields(method = tracing::field::Empty))]
+pub async fn mcp_handler(state: web::Data<AppState>, body: web::Json<McpRequest>) -> HttpResponse {
     let req = body.into_inner();
     let id = req.id.clone();
 
@@ -64,7 +65,7 @@ pub async fn mcp_handler(pool: web::Data<SqlitePool>, body: web::Json<McpRequest
         return HttpResponse::Ok().json(McpResponse::err(id, -32600, "Invalid JSON-RPC version"));
     }
 
-    match super::tools::dispatch(pool.get_ref(), &req.method, req.params).await {
+    match super::tools::dispatch(&state.pool, &req.method, req.params).await {
         Ok(result) => HttpResponse::Ok().json(McpResponse::ok(id, result)),
         Err(e) => {
             let (code, msg) = match e {

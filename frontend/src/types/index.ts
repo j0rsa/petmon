@@ -1,14 +1,12 @@
 export const PET_SPECIES = ['cat', 'dog', 'bunny', 'parrot', 'other'] as const;
 export type PetSpecies = (typeof PET_SPECIES)[number];
 
-export const PET_STATUSES = ['alive', 'deceased', 'archived', 'rehomed'] as const;
+export const PET_STATUSES = ['active', 'archived'] as const;
 export type PetStatus = (typeof PET_STATUSES)[number];
 
 export const PET_STATUS_LABELS: Record<PetStatus, string> = {
-  alive: 'Alive',
-  deceased: 'Deceased',
+  active: 'Active',
   archived: 'Archived',
-  rehomed: 'Rehomed',
 };
 
 export const PET_SPECIES_LABELS: Record<PetSpecies, string> = {
@@ -24,8 +22,14 @@ export interface Pet {
   name: string;
   species: PetSpecies;
   status: PetStatus;
+  breed?: string;
+  birth_date?: string;
+  blood_type?: string;
+  color?: string;
   weight_kg?: number;
   feeding_notes?: string;
+  telegram_chat_id?: string;
+  telegram_thread_id?: string;
   created_at: string;
   updated_at: string;
 }
@@ -38,7 +42,6 @@ export interface NutritionRecord {
   category: string;
   amount: number;
   unit?: string;
-  note?: string;
   source_type: string;
   created_at: string;
   updated_at: string;
@@ -51,7 +54,6 @@ export interface CreateNutritionRecord {
   category: string;
   amount: number;
   unit?: string;
-  note?: string;
 }
 
 export interface UpdateNutritionRecord {
@@ -60,7 +62,6 @@ export interface UpdateNutritionRecord {
   category?: string;
   amount?: number;
   unit?: string;
-  note?: string;
 }
 
 export interface NutritionDaySummary {
@@ -77,6 +78,17 @@ export interface NutritionDailyTotal {
   category: string;
   total_amount: number;
   record_count: number;
+}
+
+export interface FluidCurvePoint {
+  time: string;
+  cumulative_fluid_ml: number;
+}
+
+export interface BestFluidDay {
+  local_date: string;
+  total_fluid_ml: number;
+  curve: FluidCurvePoint[];
 }
 
 export interface NutritionRangeSummary {
@@ -97,23 +109,23 @@ export interface NutritionSchedule {
   updated_at: string;
 }
 
-export const CATEGORIES = ['wet_food', 'dry_food', 'water', 'treats', 'medication', 'custom'] as const;
+export const CATEGORIES = ['wet_food', 'dry_food', 'water', 'liquids'] as const;
 export type Category = (typeof CATEGORIES)[number];
+
+/** Categories shown on analytics charts and summary tables. */
+export const ANALYTICS_CATEGORIES = ['wet_food', 'dry_food', 'water', 'liquids'] as const;
+export type AnalyticsCategory = (typeof ANALYTICS_CATEGORIES)[number];
 
 export const CATEGORY_LABELS: Record<string, string> = {
   wet_food: 'Wet Food',
   dry_food: 'Dry Food',
   water: 'Water',
-  treats: 'Treats',
-  medication: 'Medication',
-  custom: 'Custom',
+  liquids: 'Liquids',
 };
 
 export const CATEGORY_COLORS: Record<string, string> = {
-  wet_food: '#4f9cf9',
-  dry_food: '#f9a74f',
-  water: '#4fd9f9',
-  treats: '#f94f9c',
-  medication: '#9c4ff9',
-  custom: '#4ff9a7',
+  wet_food: '#4fc8a0',
+  dry_food: '#d9612a',
+  water: '#a0e8f8',
+  liquids: '#4fd8f8',
 };

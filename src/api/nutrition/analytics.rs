@@ -1,8 +1,8 @@
+use crate::auth::AppState;
 use crate::error::AppResult;
 use crate::services::nutrition_analytics_service;
 use actix_web::{get, web, HttpResponse};
 use serde::Deserialize;
-use sqlx::SqlitePool;
 use uuid::Uuid;
 
 #[derive(Deserialize)]
@@ -15,11 +15,11 @@ pub struct AnalyticsQuery {
 
 #[get("/daily-totals")]
 pub async fn daily_totals(
-    pool: web::Data<SqlitePool>,
+    state: web::Data<AppState>,
     query: web::Query<AnalyticsQuery>,
 ) -> AppResult<HttpResponse> {
     let totals = nutrition_analytics_service::daily_totals(
-        pool.get_ref(),
+        &state.pool,
         &query.date_from,
         &query.date_to,
         query.pet_id,
@@ -31,11 +31,11 @@ pub async fn daily_totals(
 
 #[get("/range-summary")]
 pub async fn range_summary(
-    pool: web::Data<SqlitePool>,
+    state: web::Data<AppState>,
     query: web::Query<AnalyticsQuery>,
 ) -> AppResult<HttpResponse> {
     let summary = nutrition_analytics_service::range_summary(
-        pool.get_ref(),
+        &state.pool,
         &query.date_from,
         &query.date_to,
         query.pet_id,
@@ -45,6 +45,31 @@ pub async fn range_summary(
     Ok(HttpResponse::Ok().json(summary))
 }
 
+#[derive(Deserialize)]
+pub struct BestFluidDayQuery {
+    pub pet_id: Option<Uuid>,
+    pub exclude_date: String,
+}
+
+#[get("/best-fluid-day")]
+pub async fn best_fluid_day(
+    state: web::Data<AppState>,
+    query: web::Query<BestFluidDayQuery>,
+) -> AppResult<HttpResponse> {
+    let result = nutrition_analytics_service::best_fluid_day(
+        &state.pool,
+        query.pet_id,
+        &query.exclude_date,
+    )
+    .await?;
+    Ok(HttpResponse::Ok().json(result))
+}
+
 pub fn configure(cfg: &mut web::ServiceConfig) {
-    cfg.service(web::scope("/analytics").service(daily_totals).service(range_summary));
+    cfg.service(
+        web::scope("/analytics")
+            .service(daily_totals)
+            .service(range_summary)
+            .service(best_fluid_day),
+    );
 }

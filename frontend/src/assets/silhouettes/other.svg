@@ -1,0 +1,8 @@
+<svg viewBox="0 0 32 32" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Generic pet silhouette">
+  <g id="other-silhouette" fill="currentColor">
+    <path
+      id="body"
+      d="M16 6 C22 6 27 11 27 17 C27 23 22 28 16 28 C10 28 5 23 5 17 C5 11 10 6 16 6 Z"
+    />
+  </g>
+</svg>

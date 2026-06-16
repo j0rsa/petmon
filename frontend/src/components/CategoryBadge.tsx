@@ -5,8 +5,13 @@ interface CategoryBadgeProps {
 }
 
 export function CategoryBadge({ category }: CategoryBadgeProps) {
+  const accent = CATEGORY_COLORS[category];
+
   return (
-    <span className="badge" style={{ backgroundColor: `${CATEGORY_COLORS[category] ?? '#94a3b8'}22`, color: CATEGORY_COLORS[category] ?? '#334155' }}>
+    <span
+      className={`badge${accent ? '' : ' badge-muted'}`}
+      style={accent ? { backgroundColor: `${accent}22`, color: accent } : undefined}
+    >
       {CATEGORY_LABELS[category] ?? category}
     </span>
   );

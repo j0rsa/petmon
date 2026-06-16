@@ -5,7 +5,7 @@ use sqlx::SqlitePool;
 
 pub async fn list_records(pool: &SqlitePool, filters: &NutritionRecordFilters) -> AppResult<Vec<NutritionRecord>> {
     let mut query = String::from(
-        "SELECT id, pet_id, occurred_at, local_date, category, amount, unit, note, source_type, created_at, updated_at FROM nutrition_records WHERE 1=1",
+        "SELECT id, pet_id, occurred_at, local_date, category, amount, unit, source_type, created_at, updated_at FROM nutrition_records WHERE 1=1",
     );
 
     if filters.pet_id.is_some() {
@@ -53,7 +53,7 @@ pub async fn list_records(pool: &SqlitePool, filters: &NutritionRecordFilters) -
 
 pub async fn get_record(pool: &SqlitePool, id: &str) -> AppResult<NutritionRecord> {
     sqlx::query_as::<_, NutritionRecord>(
-        "SELECT id, pet_id, occurred_at, local_date, category, amount, unit, note, source_type, created_at, updated_at FROM nutrition_records WHERE id = ?",
+        "SELECT id, pet_id, occurred_at, local_date, category, amount, unit, source_type, created_at, updated_at FROM nutrition_records WHERE id = ?",
     )
     .bind(id)
     .fetch_optional(pool)
@@ -63,7 +63,7 @@ pub async fn get_record(pool: &SqlitePool, id: &str) -> AppResult<NutritionRecor
 
 pub async fn create_record(pool: &SqlitePool, record: NutritionRecord) -> AppResult<NutritionRecord> {
     sqlx::query(
-        "INSERT INTO nutrition_records (id, pet_id, occurred_at, local_date, category, amount, unit, note, source_type, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+        "INSERT INTO nutrition_records (id, pet_id, occurred_at, local_date, category, amount, unit, source_type, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
     )
     .bind(&record.id)
     .bind(record.pet_id)
@@ -72,7 +72,6 @@ pub async fn create_record(pool: &SqlitePool, record: NutritionRecord) -> AppRes
     .bind(&record.category)
     .bind(record.amount)
     .bind(&record.unit)
-    .bind(&record.note)
     .bind(&record.source_type)
     .bind(&record.created_at)
     .bind(&record.updated_at)
@@ -99,19 +98,15 @@ pub async fn update_record(pool: &SqlitePool, id: &str, req: UpdateNutritionReco
     if req.unit.is_some() {
         record.unit = req.unit;
     }
-    if req.note.is_some() {
-        record.note = req.note;
-    }
     record.updated_at = now;
     sqlx::query(
-        "UPDATE nutrition_records SET occurred_at=?, local_date=?, category=?, amount=?, unit=?, note=?, updated_at=? WHERE id=?",
+        "UPDATE nutrition_records SET occurred_at=?, local_date=?, category=?, amount=?, unit=?, updated_at=? WHERE id=?",
     )
     .bind(&record.occurred_at)
     .bind(&record.local_date)
     .bind(&record.category)
     .bind(record.amount)
     .bind(&record.unit)
-    .bind(&record.note)
     .bind(&record.updated_at)
     .bind(id)
     .execute(pool)
@@ -135,7 +130,7 @@ pub async fn create_records_batch(pool: &SqlitePool, records: Vec<NutritionRecor
     let mut tx = pool.begin().await?;
     for record in &records {
         sqlx::query(
-            "INSERT INTO nutrition_records (id, pet_id, occurred_at, local_date, category, amount, unit, note, source_type, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+            "INSERT INTO nutrition_records (id, pet_id, occurred_at, local_date, category, amount, unit, source_type, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
         )
         .bind(&record.id)
         .bind(record.pet_id)
@@ -144,7 +139,6 @@ pub async fn create_records_batch(pool: &SqlitePool, records: Vec<NutritionRecor
         .bind(&record.category)
         .bind(record.amount)
         .bind(&record.unit)
-        .bind(&record.note)
         .bind(&record.source_type)
         .bind(&record.created_at)
         .bind(&record.updated_at)

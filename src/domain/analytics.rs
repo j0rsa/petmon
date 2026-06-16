@@ -30,6 +30,23 @@ pub struct NutritionAnalyticsQuery {
     pub category: Option<String>,
 }
 
+/// One point on the best-day cumulative fluid curve.
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct FluidCurvePoint {
+    /// HH:MM of the event (time-of-day, date-independent)
+    pub time: String,
+    pub cumulative_fluid_ml: f64,
+}
+
+/// The best historic fluid day, with a precomputed cumulative curve
+/// the FE can render directly (time-of-day axis, no date involved).
+#[derive(Debug, Serialize)]
+pub struct BestFluidDay {
+    pub local_date: String,
+    pub total_fluid_ml: f64,
+    pub curve: Vec<FluidCurvePoint>,
+}
+
 #[derive(Debug, Serialize)]
 pub struct NutritionRangeSummary {
     pub date_from: String,

@@ -2,10 +2,15 @@
 name = "petmon"
 version = "0.1.0"
 edition = "2021"
+default-run = "petmon"
 
 [[bin]]
 name = "petmon"
 path = "src/main.rs"
+
+[[bin]]
+name = "seed-demo"
+path = "src/bin/seed_demo.rs"
 
 [dependencies]
 actix-web = "4"
@@ -26,7 +31,16 @@ tracing-actix-web = "0.7"
 thiserror = "1"
 anyhow = "1"
 dotenvy = "0.15"
-rust-embed = { version = "8", features = ["actix-web"] }
+sha2 = "0.10"
+rand = "0.8"
+hex = "0.4"
+reqwest = { version = "0.12", features = ["json", "rustls-tls"], default-features = false }
+openidconnect = "3"
+jsonwebtoken = "9"
+arc-swap = "1"
+futures = "0.3"
+urlencoding = "2"
+rust-embed = { version = "8", features = ["actix-web", "include-exclude"] }
 mime_guess = "2"
 
 [dev-dependencies]

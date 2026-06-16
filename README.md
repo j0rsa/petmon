@@ -16,12 +16,13 @@ Pet monitoring system — a single deployable service with a React SPA frontend 
 
 | Page | Route | Description |
 |------|-------|-------------|
-| Dashboard | `/` | Today's nutrition records, totals, and quick add form |
-| Day View | `/days/:date` | Browse any date's nutrition records with navigation |
-| Analytics | `/analytics` | Nutrition charts and range summaries (7 / 30 / custom days) |
+| Overview | `/` | Cross-pillar highlights (nutrition live; elimination/health planned) |
+| Nutrition journal | `/nutrition` | Month calendar with per-day hints + selected day log |
+| Nutrition analytics | `/nutrition/analytics` | Charts and range summaries |
+| Feeding schedules | `/nutrition/schedules` | Nutrition feeding schedules |
+| Import | `/nutrition/import` | Paste Telegram nutrition logs (parsed in the browser) |
 | Pets | `/pets` | Manage pet profiles |
-| Feeding schedules | `/schedules` | Create and manage nutrition feeding schedules |
-| Import | `/imports` | Paste Telegram nutrition logs (parsed in the browser) |
+| Settings | `/settings` | OIDC/SSO, Telegram notifications, API token management |
 
 ## API Overview
 
@@ -44,6 +45,15 @@ GET/PATCH/DELETE /api/v1/nutrition/schedules/:id
 
 GET         /api/v1/health
 POST        /mcp                     # JSON-RPC 2.0
+
+GET         /api/v1/settings/oidc         # public view (no secret)
+POST        /api/v1/settings/oidc         # merge-update (omit secret to keep existing)
+GET         /api/v1/settings/telegram     # public view (no bot token)
+POST        /api/v1/settings/telegram     # merge-update (omit bot_token to keep existing)
+
+GET         /api/v1/api-tokens            # list all tokens (hash never returned)
+POST        /api/v1/api-tokens            # create — raw token returned once
+DELETE      /api/v1/api-tokens/:id        # deactivate
 ```
 
 ## MCP Operations
@@ -64,12 +74,42 @@ The `/mcp` endpoint accepts JSON-RPC 2.0 requests. Available methods:
 | `DATABASE_URL` | `sqlite:petmon.db` | SQLite path |
 | `TIMEZONE` | `UTC` | Local timezone for day bucketing |
 | `IMPORT_MAX_BYTES` | `1048576` | Max JSON request body size |
+| `STATIC_DIR` | *(unset)* | Serve frontend from this directory instead of embedded assets |
 
 Create a `.env` file at the project root to override defaults.
+
+### OIDC environment override
+
+If any of the following vars are present at startup, they are merged over the OIDC config stored in the database. Fields that are absent in the environment are left unchanged — so you can update only the secret without re-supplying the issuer URL, for example.
+
+| Variable | Description |
+|----------|-------------|
+| `OIDC_ISSUER_URL` | Issuer URL for autodiscovery (`/.well-known/openid-configuration`) |
+| `OIDC_CLIENT_ID` | OAuth2 client ID |
+| `OIDC_CLIENT_SECRET` | OAuth2 client secret |
+| `OIDC_ENABLED` | `1` / `true` / `yes` to enable, any other value to disable |
+
+If none of the four vars are set, no database write occurs.  This is useful for container deployments where secrets are injected via the environment but UI-driven changes (e.g. toggling enabled) should persist across restarts.
+
+## Demo data
+
+Load a ready-to-explore dataset (4 pets, ~45 days of nutrition logs, day notes, schedules):
+
+```bash
+make seed-demo
+# or: cargo run --bin seed-demo
+```
+
+This clears existing rows by default, then seeds the database. Use `make seed-demo ARGS="--append"` only on an empty database.
+
+Demo pets **Mittens** and **Rex** use the same IDs as the frontend Storybook fixtures.
 
 ## Quick Start
 
 ```bash
+# Optional: populate demo data
+make seed-demo
+
 # Run the server (migrations applied automatically)
 cargo run
 
@@ -102,15 +142,26 @@ npm run build
 # Then rebuild the backend: cd .. && cargo build
 ```
 
-### Telegram nutrition import
+### Storybook
 
-The `/imports` page parses Telegram bot logs in the browser (same format as the original `cat-intake-tracker` prototype), then commits via `POST /api/v1/nutrition/records/batch`:
+Component stories live next to each component (`*.stories.tsx`). Run the catalog with:
+
+```bash
+make story
+# or: cd frontend && npm run storybook
+```
+
+### Telegram
+
+**Import** — the `/imports` page parses Telegram bot logs in the browser (same format as the original `cat-intake-tracker` prototype), then commits via `POST /api/v1/nutrition/records/batch`:
 
 ```
 Staging Bot, [31. May 2026 at 06:15:15]:
 #cat_ate #wet_food 15
 #cat_ate #liquids 16
 ```
+
+**Forwarding** — when Telegram is enabled in Settings (`/settings`), every new nutrition record is forwarded to the configured chat in the same format (`#cat_ate #<category> <amount>`). Configure the bot token and chat/group ID through the UI; the bot token is stored in the database and never returned by GET endpoints.
 
 Each pillar will get its own parser on the frontend; the backend only accepts structured record payloads.
 

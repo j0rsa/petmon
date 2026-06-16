@@ -1,3 +1,5 @@
+import { clearToken, fetchAuthInfo, getStoredToken, redirectToLogin, storeRedirectPath } from '../lib/auth';
+
 const BASE = '/api/v1';
 
 export class ApiError extends Error {
@@ -12,9 +14,12 @@ export class ApiError extends Error {
 }
 
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
+  const token = getStoredToken();
+
   const res = await fetch(`${BASE}${path}`, {
     headers: {
       'Content-Type': 'application/json',
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
       ...init?.headers,
     },
     ...init,
@@ -25,10 +30,26 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
     if (contentType.includes('application/json')) {
       return res.json().catch(() => ({}));
     }
-
     const text = await res.text().catch(() => '');
     return text || {};
   };
+
+  if (res.status === 401) {
+    // Token missing or expired — fetch auth info and redirect to login
+    clearToken();
+    try {
+      const authInfo = await fetchAuthInfo();
+      if (authInfo.mode === 'oidc') {
+        storeRedirectPath(window.location.pathname + window.location.search);
+        await redirectToLogin(authInfo);
+        // redirectToLogin navigates away; this promise never resolves
+        return new Promise(() => {});
+      }
+    } catch {
+      // If auth info fetch itself fails, fall through and throw the original error
+    }
+    throw new ApiError(res.status, await parseBody());
+  }
 
   if (!res.ok) {
     throw new ApiError(res.status, await parseBody());

@@ -4,23 +4,16 @@ use serde::{Deserialize, Serialize};
 #[serde(rename_all = "snake_case")]
 #[sqlx(rename_all = "snake_case")]
 pub enum PetStatus {
-    Alive,
-    Deceased,
+    Active,
     Archived,
-    Rehomed,
 }
 
 impl Default for PetStatus {
     fn default() -> Self {
-        PetStatus::Alive
+        PetStatus::Active
     }
 }
 
 impl PetStatus {
-    pub const ALL: [PetStatus; 4] = [
-        PetStatus::Alive,
-        PetStatus::Deceased,
-        PetStatus::Archived,
-        PetStatus::Rehomed,
-    ];
+    pub const ALL: [PetStatus; 2] = [PetStatus::Active, PetStatus::Archived];
 }

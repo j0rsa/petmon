@@ -28,14 +28,25 @@ async fn test_pets_crud() {
 
     let req = test::TestRequest::post()
         .uri("/api/v1/pets")
-        .set_json(serde_json::json!({ "name": "Whiskers", "species": "cat" }))
+        .set_json(serde_json::json!({
+            "name": "Whiskers",
+            "species": "cat",
+            "breed": "Siamese",
+            "birth_date": "2021-05-10",
+            "blood_type": "B",
+            "color": "cream"
+        }))
         .to_request();
     let resp = test::call_service(&app, req).await;
     assert_eq!(resp.status(), 201);
     let body: serde_json::Value = test::read_body_json(resp).await;
     let pet_id = body["id"].as_str().unwrap().to_string();
     assert_eq!(body["species"].as_str(), Some("cat"));
-    assert_eq!(body["status"].as_str(), Some("alive"));
+    assert_eq!(body["status"].as_str(), Some("active"));
+    assert_eq!(body["breed"].as_str(), Some("Siamese"));
+    assert_eq!(body["birth_date"].as_str(), Some("2021-05-10"));
+    assert_eq!(body["blood_type"].as_str(), Some("B"));
+    assert_eq!(body["color"].as_str(), Some("cream"));
 
     let req = test::TestRequest::get()
         .uri(&format!("/api/v1/pets/{pet_id}"))

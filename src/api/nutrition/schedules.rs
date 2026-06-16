@@ -1,9 +1,9 @@
+use crate::auth::AppState;
 use crate::domain::nutrition_schedule::{CreateNutritionSchedule, UpdateNutritionSchedule};
 use crate::error::AppResult;
 use crate::services::nutrition_schedule_service;
 use actix_web::{delete, get, patch, post, web, HttpResponse};
 use serde::Deserialize;
-use sqlx::SqlitePool;
 use uuid::Uuid;
 
 #[derive(Deserialize)]
@@ -13,41 +13,41 @@ pub struct ScheduleQuery {
 
 #[get("")]
 pub async fn list_schedules(
-    pool: web::Data<SqlitePool>,
+    state: web::Data<AppState>,
     query: web::Query<ScheduleQuery>,
 ) -> AppResult<HttpResponse> {
-    let schedules = nutrition_schedule_service::list(pool.get_ref(), query.pet_id).await?;
+    let schedules = nutrition_schedule_service::list(&state.pool, query.pet_id).await?;
     Ok(HttpResponse::Ok().json(schedules))
 }
 
 #[post("")]
 pub async fn create_schedule(
-    pool: web::Data<SqlitePool>,
+    state: web::Data<AppState>,
     body: web::Json<CreateNutritionSchedule>,
 ) -> AppResult<HttpResponse> {
-    let schedule = nutrition_schedule_service::create(pool.get_ref(), body.into_inner()).await?;
+    let schedule = nutrition_schedule_service::create(&state.pool, body.into_inner()).await?;
     Ok(HttpResponse::Created().json(schedule))
 }
 
 #[get("/{id}")]
-pub async fn get_schedule(pool: web::Data<SqlitePool>, id: web::Path<String>) -> AppResult<HttpResponse> {
-    let schedule = nutrition_schedule_service::get(pool.get_ref(), &id).await?;
+pub async fn get_schedule(state: web::Data<AppState>, id: web::Path<String>) -> AppResult<HttpResponse> {
+    let schedule = nutrition_schedule_service::get(&state.pool, &id).await?;
     Ok(HttpResponse::Ok().json(schedule))
 }
 
 #[patch("/{id}")]
 pub async fn update_schedule(
-    pool: web::Data<SqlitePool>,
+    state: web::Data<AppState>,
     id: web::Path<String>,
     body: web::Json<UpdateNutritionSchedule>,
 ) -> AppResult<HttpResponse> {
-    let schedule = nutrition_schedule_service::update(pool.get_ref(), &id, body.into_inner()).await?;
+    let schedule = nutrition_schedule_service::update(&state.pool, &id, body.into_inner()).await?;
     Ok(HttpResponse::Ok().json(schedule))
 }
 
 #[delete("/{id}")]
-pub async fn delete_schedule(pool: web::Data<SqlitePool>, id: web::Path<String>) -> AppResult<HttpResponse> {
-    nutrition_schedule_service::delete(pool.get_ref(), &id).await?;
+pub async fn delete_schedule(state: web::Data<AppState>, id: web::Path<String>) -> AppResult<HttpResponse> {
+    nutrition_schedule_service::delete(&state.pool, &id).await?;
     Ok(HttpResponse::NoContent().finish())
 }
 

@@ -1,0 +1,1696 @@
+openapi: 3.1.0
+info:
+  title: PetMon API
+  description: Pet monitoring and nutrition tracking API
+  version: 1.0.0
+  contact:
+    name: PetMon Team
+  license:
+    name: MIT
+
+servers:
+  - url: /api/v1
+    description: Main API server
+
+security:
+  - bearerAuth: []
+
+paths:
+  /health:
+    get:
+      tags:
+        - Health
+      summary: Health check endpoint
+      description: Returns the health status of the API
+      security: []
+      responses:
+        '200':
+          description: Service is healthy
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    example: ok
+
+  /auth/info:
+    get:
+      tags:
+        - Authentication
+      summary: Get authentication configuration
+      description: Returns the current authentication mode and OIDC configuration (if available). No authentication required.
+      security: []
+      responses:
+        '200':
+          description: Authentication information
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AuthInfo'
+
+  /auth/me:
+    get:
+      tags:
+        - Authentication
+      summary: Get current user identity
+      description: Returns information about the authenticated user making the request
+      responses:
+        '200':
+          description: Current user information
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MeResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  /pets:
+    get:
+      tags:
+        - Pets
+      summary: List all pets
+      description: Retrieve a list of all pets in the system
+      responses:
+        '200':
+          description: List of pets
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Pet'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+    post:
+      tags:
+        - Pets
+      summary: Create a new pet
+      description: Create a new pet record with the provided information
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreatePet'
+      responses:
+        '201':
+          description: Pet created successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Pet'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  /pets/{id}:
+    get:
+      tags:
+        - Pets
+      summary: Get a pet by ID
+      description: Retrieve a specific pet by its UUID
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: Pet UUID
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Pet information
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Pet'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+    patch:
+      tags:
+        - Pets
+      summary: Update a pet
+      description: Update one or more fields of an existing pet
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: Pet UUID
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdatePet'
+      responses:
+        '200':
+          description: Pet updated successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Pet'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+    delete:
+      tags:
+        - Pets
+      summary: Delete a pet
+      description: Delete a pet by its UUID
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: Pet UUID
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '204':
+          description: Pet deleted successfully
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /days/{date}:
+    get:
+      tags:
+        - Days
+      summary: Get day summary
+      description: Retrieve nutrition records and summary for a specific date. Optionally filter by pet.
+      parameters:
+        - name: date
+          in: path
+          required: true
+          description: Date in YYYY-MM-DD format
+          schema:
+            type: string
+            format: date
+        - name: pet_id
+          in: query
+          required: false
+          description: Filter by pet UUID
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Day summary with nutrition records and totals
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/NutritionDaySummary'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  /days/{date}/note:
+    patch:
+      tags:
+        - Days
+      summary: Update day note
+      description: Update or create a note for a specific day. Optionally scoped to a pet.
+      parameters:
+        - name: date
+          in: path
+          required: true
+          description: Date in YYYY-MM-DD format
+          schema:
+            type: string
+            format: date
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - note
+              properties:
+                note:
+                  type: string
+                  description: Note text
+                pet_id:
+                  type: string
+                  format: uuid
+                  description: Optional pet UUID to scope the note
+      responses:
+        '200':
+          description: Note updated successfully
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  /notes/{date}:
+    get:
+      tags:
+        - Notes
+      summary: Get day note
+      description: Retrieve the note for a specific date. Optionally filter by pet.
+      parameters:
+        - name: date
+          in: path
+          required: true
+          description: Date in YYYY-MM-DD format
+          schema:
+            type: string
+            format: date
+        - name: pet_id
+          in: query
+          required: false
+          description: Filter by pet UUID
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Day note
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DayNote'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+    patch:
+      tags:
+        - Notes
+      summary: Update or create day note
+      description: Update or create a note for a specific date. Optionally scoped to a pet.
+      parameters:
+        - name: date
+          in: path
+          required: true
+          description: Date in YYYY-MM-DD format
+          schema:
+            type: string
+            format: date
+        - name: pet_id
+          in: query
+          required: false
+          description: Filter by pet UUID
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - note
+              properties:
+                note:
+                  type: string
+                  description: Note text
+      responses:
+        '200':
+          description: Note created or updated successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DayNote'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  /settings/oidc:
+    get:
+      tags:
+        - Settings
+      summary: Get OIDC configuration
+      description: Retrieve the current OIDC configuration (client secret is never exposed)
+      responses:
+        '200':
+          description: OIDC configuration
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OidcConfigPublic'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+    post:
+      tags:
+        - Settings
+      summary: Update OIDC configuration
+      description: Update OIDC settings. Omitting client_secret keeps the existing value.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateOidcConfig'
+      responses:
+        '200':
+          description: OIDC configuration updated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OidcConfigPublic'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  /settings/telegram:
+    get:
+      tags:
+        - Settings
+      summary: Get Telegram configuration
+      description: Retrieve the current Telegram configuration (bot token is never exposed)
+      responses:
+        '200':
+          description: Telegram configuration
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TelegramConfigPublic'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+    post:
+      tags:
+        - Settings
+      summary: Update Telegram configuration
+      description: Update Telegram settings. Omitting bot_token keeps the existing value.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateTelegramConfig'
+      responses:
+        '200':
+          description: Telegram configuration updated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TelegramConfigPublic'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  /api-tokens:
+    get:
+      tags:
+        - API Tokens
+      summary: List API tokens
+      description: List all API tokens (token hashes are never exposed)
+      responses:
+        '200':
+          description: List of API tokens
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/ApiTokenPublic'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+    post:
+      tags:
+        - API Tokens
+      summary: Create API token
+      description: Create a new API token. Can only be created by OIDC-authenticated users, not by other API tokens.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateApiToken'
+      responses:
+        '201':
+          description: API token created (includes raw token, shown only once)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiTokenCreated'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  /api-tokens/{id}:
+    delete:
+      tags:
+        - API Tokens
+      summary: Deactivate API token
+      description: Deactivate an API token by ID
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: API token ID
+          schema:
+            type: string
+      responses:
+        '204':
+          description: API token deactivated
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /nutrition/records:
+    get:
+      tags:
+        - Nutrition Records
+      summary: List nutrition records
+      description: Retrieve nutrition records with optional filtering
+      parameters:
+        - name: pet_id
+          in: query
+          required: false
+          description: Filter by pet UUID
+          schema:
+            type: string
+            format: uuid
+        - name: date
+          in: query
+          required: false
+          description: Filter by specific date (YYYY-MM-DD)
+          schema:
+            type: string
+            format: date
+        - name: date_from
+          in: query
+          required: false
+          description: Filter records from this date (YYYY-MM-DD, inclusive)
+          schema:
+            type: string
+            format: date
+        - name: date_to
+          in: query
+          required: false
+          description: Filter records until this date (YYYY-MM-DD, inclusive)
+          schema:
+            type: string
+            format: date
+        - name: category
+          in: query
+          required: false
+          description: Filter by nutrition category
+          schema:
+            $ref: '#/components/schemas/NutritionCategory'
+        - name: limit
+          in: query
+          required: false
+          description: Maximum number of records to return
+          schema:
+            type: integer
+            format: int64
+            minimum: 1
+        - name: offset
+          in: query
+          required: false
+          description: Pagination offset
+          schema:
+            type: integer
+            format: int64
+            minimum: 0
+      responses:
+        '200':
+          description: List of nutrition records
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/NutritionRecord'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+    post:
+      tags:
+        - Nutrition Records
+      summary: Create nutrition record
+      description: Create a single nutrition record
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateNutritionRecord'
+      responses:
+        '201':
+          description: Nutrition record created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/NutritionRecord'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  /nutrition/records/batch:
+    post:
+      tags:
+        - Nutrition Records
+      summary: Create multiple nutrition records
+      description: Create multiple nutrition records in a single request
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - records
+              properties:
+                records:
+                  type: array
+                  items:
+                    $ref: '#/components/schemas/CreateNutritionRecord'
+      responses:
+        '201':
+          description: Nutrition records created
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/NutritionRecord'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  /nutrition/records/{id}:
+    get:
+      tags:
+        - Nutrition Records
+      summary: Get nutrition record by ID
+      description: Retrieve a specific nutrition record
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: Record ID
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Nutrition record
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/NutritionRecord'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+    patch:
+      tags:
+        - Nutrition Records
+      summary: Update nutrition record
+      description: Update one or more fields of a nutrition record
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: Record ID
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateNutritionRecord'
+      responses:
+        '200':
+          description: Nutrition record updated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/NutritionRecord'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+    delete:
+      tags:
+        - Nutrition Records
+      summary: Delete nutrition record
+      description: Delete a nutrition record
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: Record ID
+          schema:
+            type: string
+      responses:
+        '204':
+          description: Nutrition record deleted
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /nutrition/schedules:
+    get:
+      tags:
+        - Nutrition Schedules
+      summary: List nutrition schedules
+      description: Retrieve nutrition schedules for all pets or a specific pet
+      parameters:
+        - name: pet_id
+          in: query
+          required: false
+          description: Filter by pet UUID
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: List of nutrition schedules
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/NutritionSchedule'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+    post:
+      tags:
+        - Nutrition Schedules
+      summary: Create nutrition schedule
+      description: Create a new nutrition schedule for a pet
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateNutritionSchedule'
+      responses:
+        '201':
+          description: Nutrition schedule created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/NutritionSchedule'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  /nutrition/schedules/{id}:
+    get:
+      tags:
+        - Nutrition Schedules
+      summary: Get nutrition schedule by ID
+      description: Retrieve a specific nutrition schedule
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: Schedule ID
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Nutrition schedule
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/NutritionSchedule'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+    patch:
+      tags:
+        - Nutrition Schedules
+      summary: Update nutrition schedule
+      description: Update one or more fields of a nutrition schedule
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: Schedule ID
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateNutritionSchedule'
+      responses:
+        '200':
+          description: Nutrition schedule updated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/NutritionSchedule'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+    delete:
+      tags:
+        - Nutrition Schedules
+      summary: Delete nutrition schedule
+      description: Delete a nutrition schedule
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: Schedule ID
+          schema:
+            type: string
+      responses:
+        '204':
+          description: Nutrition schedule deleted
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /nutrition/analytics/daily-totals:
+    get:
+      tags:
+        - Nutrition Analytics
+      summary: Get daily totals
+      description: Get nutrition daily totals for a date range, optionally filtered by pet and category
+      parameters:
+        - name: pet_id
+          in: query
+          required: false
+          description: Filter by pet UUID
+          schema:
+            type: string
+            format: uuid
+        - name: date_from
+          in: query
+          required: true
+          description: Start date (YYYY-MM-DD, inclusive)
+          schema:
+            type: string
+            format: date
+        - name: date_to
+          in: query
+          required: true
+          description: End date (YYYY-MM-DD, inclusive)
+          schema:
+            type: string
+            format: date
+        - name: category
+          in: query
+          required: false
+          description: Filter by nutrition category
+          schema:
+            $ref: '#/components/schemas/NutritionCategory'
+      responses:
+        '200':
+          description: Daily totals for the date range
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/NutritionDailyTotal'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  /nutrition/analytics/range-summary:
+    get:
+      tags:
+        - Nutrition Analytics
+      summary: Get range summary
+      description: Get aggregated nutrition summary for a date range with category averages
+      parameters:
+        - name: pet_id
+          in: query
+          required: false
+          description: Filter by pet UUID
+          schema:
+            type: string
+            format: uuid
+        - name: date_from
+          in: query
+          required: true
+          description: Start date (YYYY-MM-DD, inclusive)
+          schema:
+            type: string
+            format: date
+        - name: date_to
+          in: query
+          required: true
+          description: End date (YYYY-MM-DD, inclusive)
+          schema:
+            type: string
+            format: date
+        - name: category
+          in: query
+          required: false
+          description: Filter by nutrition category
+          schema:
+            $ref: '#/components/schemas/NutritionCategory'
+      responses:
+        '200':
+          description: Range summary with aggregated data
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/NutritionRangeSummary'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  /nutrition/analytics/best-fluid-day:
+    get:
+      tags:
+        - Nutrition Analytics
+      summary: Get best fluid day
+      description: Get the best historical day of fluid intake with a cumulative fluid curve for visualization
+      parameters:
+        - name: pet_id
+          in: query
+          required: false
+          description: Filter by pet UUID
+          schema:
+            type: string
+            format: uuid
+        - name: exclude_date
+          in: query
+          required: true
+          description: Date to exclude from analysis (YYYY-MM-DD)
+          schema:
+            type: string
+            format: date
+      responses:
+        '200':
+          description: Best fluid day with cumulative curve
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BestFluidDay'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      description: |
+        Bearer authentication with either:
+        - OIDC JWT token (format: standard JWT)
+        - API token with `pm_api_` prefix (format: pm_api_<token>)
+
+  responses:
+    BadRequest:
+      description: Invalid request parameters or body
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+
+    Unauthorized:
+      description: Authentication required or invalid credentials
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+
+    NotFound:
+      description: Resource not found
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+
+  schemas:
+    ErrorResponse:
+      type: object
+      properties:
+        error:
+          type: string
+          description: Error message
+      required:
+        - error
+
+    AuthMode:
+      type: string
+      enum:
+        - dev
+        - oidc
+        - unconfigured
+      description: Current authentication mode
+
+    AuthInfo:
+      type: object
+      properties:
+        mode:
+          $ref: '#/components/schemas/AuthMode'
+        authorization_endpoint:
+          type: string
+          nullable: true
+          description: OAuth2 authorization endpoint URL
+        client_id:
+          type: string
+          nullable: true
+          description: OAuth2 client ID for the frontend
+        token_endpoint:
+          type: string
+          nullable: true
+          description: OAuth2 token endpoint URL
+      required:
+        - mode
+
+    MeResponse:
+      type: object
+      properties:
+        subject:
+          type: string
+          description: User subject identifier
+        email:
+          type: string
+          nullable: true
+          description: User email address
+        name:
+          type: string
+          nullable: true
+          description: User full name
+        display_name:
+          type: string
+          description: Display name (name or email or subject)
+        kind:
+          type: string
+          enum:
+            - oidc
+            - api_token
+            - dev
+          description: Authentication method used
+      required:
+        - subject
+        - display_name
+        - kind
+
+    PetSpecies:
+      type: string
+      enum:
+        - cat
+        - dog
+        - bunny
+        - parrot
+        - other
+      description: Pet species
+
+    PetStatus:
+      type: string
+      enum:
+        - active
+        - archived
+      description: Pet status
+
+    Pet:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+          description: Pet UUID
+        name:
+          type: string
+          description: Pet name
+        species:
+          $ref: '#/components/schemas/PetSpecies'
+        status:
+          $ref: '#/components/schemas/PetStatus'
+        breed:
+          type: string
+          nullable: true
+          description: Pet breed
+        birth_date:
+          type: string
+          nullable: true
+          description: Pet birth date (YYYY-MM-DD)
+        blood_type:
+          type: string
+          nullable: true
+          description: Pet blood type
+        color:
+          type: string
+          nullable: true
+          description: Pet color/markings
+        weight_kg:
+          type: number
+          format: double
+          nullable: true
+          description: Pet weight in kilograms
+        feeding_notes:
+          type: string
+          nullable: true
+          description: Feeding instructions and notes
+        telegram_chat_id:
+          type: string
+          nullable: true
+          description: Telegram chat ID for notifications
+        telegram_thread_id:
+          type: string
+          nullable: true
+          description: Telegram thread ID for topic replies
+        created_at:
+          type: string
+          format: date-time
+          description: Record creation timestamp (RFC3339)
+        updated_at:
+          type: string
+          format: date-time
+          description: Record last update timestamp (RFC3339)
+      required:
+        - id
+        - name
+        - species
+        - status
+        - created_at
+        - updated_at
+
+    CreatePet:
+      type: object
+      properties:
+        name:
+          type: string
+          description: Pet name
+        species:
+          $ref: '#/components/schemas/PetSpecies'
+        status:
+          $ref: '#/components/schemas/PetStatus'
+        breed:
+          type: string
+          nullable: true
+        birth_date:
+          type: string
+          nullable: true
+          format: date
+        blood_type:
+          type: string
+          nullable: true
+        color:
+          type: string
+          nullable: true
+        weight_kg:
+          type: number
+          format: double
+          nullable: true
+        feeding_notes:
+          type: string
+          nullable: true
+        telegram_chat_id:
+          type: string
+          nullable: true
+        telegram_thread_id:
+          type: string
+          nullable: true
+      required:
+        - name
+
+    UpdatePet:
+      type: object
+      properties:
+        name:
+          type: string
+          nullable: true
+        species:
+          $ref: '#/components/schemas/PetSpecies'
+        status:
+          $ref: '#/components/schemas/PetStatus'
+        breed:
+          type: string
+          nullable: true
+        birth_date:
+          type: string
+          nullable: true
+          format: date
+        blood_type:
+          type: string
+          nullable: true
+        color:
+          type: string
+          nullable: true
+        weight_kg:
+          type: number
+          format: double
+          nullable: true
+        feeding_notes:
+          type: string
+          nullable: true
+        telegram_chat_id:
+          type: string
+          nullable: true
+        telegram_thread_id:
+          type: string
+          nullable: true
+
+    DayNote:
+      type: object
+      properties:
+        date:
+          type: string
+          format: date
+          description: Date of the note
+        pet_id:
+          type: string
+          format: uuid
+          nullable: true
+          description: Associated pet UUID, if any
+        note:
+          type: string
+          description: Note text
+      required:
+        - date
+        - note
+
+    NutritionCategory:
+      type: string
+      enum:
+        - wet_food
+        - dry_food
+        - water
+        - liquids
+      description: Category of nutrition intake
+
+    NutritionRecord:
+      type: object
+      properties:
+        id:
+          type: string
+          description: Record ID
+        pet_id:
+          type: string
+          format: uuid
+          description: Pet UUID
+        occurred_at:
+          type: string
+          format: date-time
+          description: When the intake occurred (RFC3339)
+        local_date:
+          type: string
+          format: date
+          description: Local date of the occurrence
+        category:
+          $ref: '#/components/schemas/NutritionCategory'
+        amount:
+          type: number
+          format: double
+          description: Amount consumed
+        unit:
+          type: string
+          nullable: true
+          description: Unit of measurement (ml, g, etc.)
+        source_type:
+          type: string
+          description: Source of the record (e.g., manual, telegram)
+        created_at:
+          type: string
+          format: date-time
+          description: Record creation timestamp (RFC3339)
+        updated_at:
+          type: string
+          format: date-time
+          description: Record last update timestamp (RFC3339)
+      required:
+        - id
+        - pet_id
+        - occurred_at
+        - local_date
+        - category
+        - amount
+        - source_type
+        - created_at
+        - updated_at
+
+    CreateNutritionRecord:
+      type: object
+      properties:
+        pet_id:
+          type: string
+          format: uuid
+          description: Pet UUID
+        occurred_at:
+          type: string
+          format: date-time
+          description: When the intake occurred (RFC3339)
+        local_date:
+          type: string
+          format: date
+          nullable: true
+          description: Local date (auto-derived if not provided)
+        category:
+          $ref: '#/components/schemas/NutritionCategory'
+        amount:
+          type: number
+          format: double
+          description: Amount consumed
+        unit:
+          type: string
+          nullable: true
+          description: Unit of measurement
+        source_type:
+          type: string
+          nullable: true
+          description: Source of the record (defaults to manual)
+      required:
+        - pet_id
+        - occurred_at
+        - category
+        - amount
+
+    UpdateNutritionRecord:
+      type: object
+      properties:
+        occurred_at:
+          type: string
+          format: date-time
+          nullable: true
+        local_date:
+          type: string
+          format: date
+          nullable: true
+        category:
+          $ref: '#/components/schemas/NutritionCategory'
+        amount:
+          type: number
+          format: double
+          nullable: true
+        unit:
+          type: string
+          nullable: true
+
+    NutritionScheduleRule:
+      type: object
+      properties:
+        category:
+          type: string
+          description: Nutrition category
+        target_amount:
+          type: number
+          format: double
+          description: Target amount
+        unit:
+          type: string
+          nullable: true
+          description: Unit of measurement
+        time_of_day:
+          type: string
+          nullable: true
+          description: Recommended time (e.g., HH:MM)
+        notes:
+          type: string
+          nullable: true
+          description: Additional notes
+
+    NutritionSchedule:
+      type: object
+      properties:
+        id:
+          type: string
+          description: Schedule ID
+        pet_id:
+          type: string
+          format: uuid
+          description: Pet UUID
+        name:
+          type: string
+          description: Schedule name
+        active:
+          type: boolean
+          description: Whether the schedule is active
+        rules_json:
+          type: string
+          description: JSON-serialized array of NutritionScheduleRule objects
+        created_at:
+          type: string
+          format: date-time
+          description: Record creation timestamp (RFC3339)
+        updated_at:
+          type: string
+          format: date-time
+          description: Record last update timestamp (RFC3339)
+      required:
+        - id
+        - pet_id
+        - name
+        - active
+        - rules_json
+        - created_at
+        - updated_at
+
+    CreateNutritionSchedule:
+      type: object
+      properties:
+        pet_id:
+          type: string
+          format: uuid
+          description: Pet UUID
+        name:
+          type: string
+          description: Schedule name
+        active:
+          type: boolean
+          nullable: true
+          description: Active status (defaults to true)
+        rules:
+          type: array
+          nullable: true
+          description: Array of schedule rules
+          items:
+            $ref: '#/components/schemas/NutritionScheduleRule'
+      required:
+        - pet_id
+        - name
+
+    UpdateNutritionSchedule:
+      type: object
+      properties:
+        name:
+          type: string
+          nullable: true
+        active:
+          type: boolean
+          nullable: true
+        rules:
+          type: array
+          nullable: true
+          description: Array of schedule rules
+          items:
+            $ref: '#/components/schemas/NutritionScheduleRule'
+
+    NutritionDailyTotal:
+      type: object
+      properties:
+        local_date:
+          type: string
+          format: date
+          description: Date of the totals
+        pet_id:
+          type: string
+          format: uuid
+          description: Pet UUID
+        category:
+          type: string
+          description: Nutrition category
+        total_amount:
+          type: number
+          format: double
+          description: Total amount for the day
+        record_count:
+          type: integer
+          format: int64
+          description: Number of records contributing to this total
+      required:
+        - local_date
+        - pet_id
+        - category
+        - total_amount
+        - record_count
+
+    NutritionDaySummary:
+      type: object
+      properties:
+        local_date:
+          type: string
+          format: date
+          description: Date of the summary
+        pet_id:
+          type: string
+          format: uuid
+          nullable: true
+          description: Pet UUID (if filtered)
+        records:
+          type: array
+          items:
+            $ref: '#/components/schemas/NutritionRecord'
+          description: Nutrition records for the day
+        totals_by_category:
+          type: object
+          additionalProperties:
+            type: number
+            format: double
+          description: Total amounts by category
+        note:
+          type: string
+          nullable: true
+          description: Optional day note
+      required:
+        - local_date
+        - records
+        - totals_by_category
+
+    FluidCurvePoint:
+      type: object
+      properties:
+        time:
+          type: string
+          description: Time of day (HH:MM format, date-independent)
+        cumulative_fluid_ml:
+          type: number
+          format: double
+          description: Cumulative fluid intake up to this time
+      required:
+        - time
+        - cumulative_fluid_ml
+
+    BestFluidDay:
+      type: object
+      properties:
+        local_date:
+          type: string
+          format: date
+          description: Date of the best fluid day
+        total_fluid_ml:
+          type: number
+          format: double
+          description: Total fluid intake on that day
+        curve:
+          type: array
+          items:
+            $ref: '#/components/schemas/FluidCurvePoint'
+          description: Cumulative fluid curve for visualization
+      required:
+        - local_date
+        - total_fluid_ml
+        - curve
+
+    NutritionRangeSummary:
+      type: object
+      properties:
+        date_from:
+          type: string
+          format: date
+          description: Start date of the range
+        date_to:
+          type: string
+          format: date
+          description: End date of the range
+        pet_id:
+          type: string
+          format: uuid
+          nullable: true
+          description: Pet UUID (if filtered)
+        daily_totals:
+          type: array
+          items:
+            $ref: '#/components/schemas/NutritionDailyTotal'
+          description: Daily totals for the date range
+        category_averages:
+          type: object
+          additionalProperties:
+            type: number
+            format: double
+          description: Average daily amounts by category
+      required:
+        - date_from
+        - date_to
+        - daily_totals
+        - category_averages
+
+    OidcConfigPublic:
+      type: object
+      properties:
+        enabled:
+          type: boolean
+          description: Whether OIDC authentication is enabled
+        issuer_url:
+          type: string
+          nullable: true
+          description: OIDC issuer URL
+        client_id:
+          type: string
+          nullable: true
+          description: OAuth2 client ID
+        has_client_secret:
+          type: boolean
+          description: Whether a client secret is configured
+      required:
+        - enabled
+        - has_client_secret
+
+    UpdateOidcConfig:
+      type: object
+      properties:
+        enabled:
+          type: boolean
+          nullable: true
+        issuer_url:
+          type: string
+          nullable: true
+        client_id:
+          type: string
+          nullable: true
+        client_secret:
+          type: string
+          nullable: true
+          description: If omitted, the stored value is preserved
+
+    TelegramConfigPublic:
+      type: object
+      properties:
+        enabled:
+          type: boolean
+          description: Whether Telegram integration is enabled
+        has_bot_token:
+          type: boolean
+          description: Whether a bot token is configured
+      required:
+        - enabled
+        - has_bot_token
+
+    UpdateTelegramConfig:
+      type: object
+      properties:
+        enabled:
+          type: boolean
+          nullable: true
+        bot_token:
+          type: string
+          nullable: true
+          description: If omitted, the stored value is preserved
+
+    ApiTokenPublic:
+      type: object
+      properties:
+        id:
+          type: string
+          description: Token ID
+        alias:
+          type: string
+          nullable: true
+          description: Human-readable alias for the token
+        active:
+          type: boolean
+          description: Whether the token is active
+        created_by:
+          type: string
+          nullable: true
+          description: User who created the token
+        created_at:
+          type: string
+          format: date-time
+          description: Token creation timestamp (RFC3339)
+        last_used_at:
+          type: string
+          format: date-time
+          nullable: true
+          description: Last usage timestamp (RFC3339)
+      required:
+        - id
+        - active
+        - created_at
+
+    ApiTokenCreated:
+      type: object
+      properties:
+        id:
+          type: string
+          description: Token ID
+        alias:
+          type: string
+          nullable: true
+          description: Token alias
+        token:
+          type: string
+          description: Raw token value (only shown at creation)
+        created_at:
+          type: string
+          format: date-time
+          description: Token creation timestamp (RFC3339)
+      required:
+        - id
+        - token
+        - created_at
+
+    CreateApiToken:
+      type: object
+      properties:
+        alias:
+          type: string
+          nullable: true
+          description: Human-readable alias for the token
+
+tags:
+  - name: Health
+    description: Health check endpoints
+  - name: Authentication
+    description: Authentication and identity endpoints
+  - name: Pets
+    description: Pet management
+  - name: Days
+    description: Daily summary and notes
+  - name: Notes
+    description: Day notes (alternative interface)
+  - name: Settings
+    description: Configuration settings (OIDC, Telegram, API tokens)
+  - name: API Tokens
+    description: API token management
+  - name: Nutrition Records
+    description: Nutrition intake records
+  - name: Nutrition Schedules
+    description: Feeding schedules and targets
+  - name: Nutrition Analytics
+    description: Nutrition analytics and aggregations

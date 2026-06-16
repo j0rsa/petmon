@@ -11,8 +11,14 @@ pub struct Pet {
     pub name: String,
     pub species: PetSpecies,
     pub status: PetStatus,
+    pub breed: Option<String>,
+    pub birth_date: Option<String>,
+    pub blood_type: Option<String>,
+    pub color: Option<String>,
     pub weight_kg: Option<f64>,
     pub feeding_notes: Option<String>,
+    pub telegram_chat_id: Option<String>,
+    pub telegram_thread_id: Option<String>,
     pub created_at: String,
     pub updated_at: String,
 }
@@ -24,8 +30,14 @@ pub struct CreatePet {
     pub species: PetSpecies,
     #[serde(default)]
     pub status: PetStatus,
+    pub breed: Option<String>,
+    pub birth_date: Option<String>,
+    pub blood_type: Option<String>,
+    pub color: Option<String>,
     pub weight_kg: Option<f64>,
     pub feeding_notes: Option<String>,
+    pub telegram_chat_id: Option<String>,
+    pub telegram_thread_id: Option<String>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -33,8 +45,14 @@ pub struct UpdatePet {
     pub name: Option<String>,
     pub species: Option<PetSpecies>,
     pub status: Option<PetStatus>,
+    pub breed: Option<String>,
+    pub birth_date: Option<String>,
+    pub blood_type: Option<String>,
+    pub color: Option<String>,
     pub weight_kg: Option<f64>,
     pub feeding_notes: Option<String>,
+    pub telegram_chat_id: Option<String>,
+    pub telegram_thread_id: Option<String>,
 }
 
 impl Pet {
@@ -45,8 +63,14 @@ impl Pet {
             name: req.name,
             species: req.species,
             status: req.status,
+            breed: req.breed,
+            birth_date: req.birth_date,
+            blood_type: req.blood_type,
+            color: req.color,
             weight_kg: req.weight_kg,
             feeding_notes: req.feeding_notes,
+            telegram_chat_id: req.telegram_chat_id,
+            telegram_thread_id: req.telegram_thread_id,
             created_at: now.clone(),
             updated_at: now,
         }

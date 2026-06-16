@@ -51,7 +51,7 @@ export function parseTelegramNutritionLog(raw: string): ParsedNutritionEntry[] {
       result.push({
         local_date: localDate,
         time: `${hh}:${mm}`,
-        category: type === 'liquids' ? 'water' : 'wet_food',
+        category: type === 'liquids' ? 'liquids' : 'wet_food',
         amount,
         unit: type === 'liquids' ? 'ml' : 'g',
       });

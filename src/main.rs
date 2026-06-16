@@ -1,5 +1,5 @@
 use actix_web::{web, App, HttpServer};
-use petmon::{api, assets, config, db, mcp, telemetry};
+use petmon::{api, assets, auth, config, db, mcp, middleware, services, telemetry};
 use tracing_actix_web::TracingLogger;
 use tracing_subscriber::EnvFilter;
 
@@ -28,13 +28,37 @@ async fn main() -> anyhow::Result<()> {
     db::run_migrations(&pool).await?;
     tracing::info!(database_url = %config.database_url, "database migrations applied");
 
-    let pool = web::Data::new(pool);
+    services::startup::sync_oidc_from_env(&pool).await;
+
+    let dev_mode = std::env::var("DEV_MODE")
+        .map(|v| matches!(v.to_lowercase().as_str(), "1" | "true" | "yes"))
+        .unwrap_or(false);
+
+    // Build OIDC validator from current DB config
+    let oidc_cfg: petmon::domain::settings::OidcConfig =
+        petmon::repo::settings::get(&pool, "oidc").await?;
+    let oidc_validator = auth::oidc::OidcValidator::new(&oidc_cfg);
+
+    if !dev_mode && oidc_validator.is_none() {
+        tracing::error!(
+            "No authentication configured and DEV_MODE is off. \
+             Set DEV_MODE=true for local development, or configure OIDC via \
+             OIDC_ISSUER_URL / OIDC_CLIENT_ID / OIDC_CLIENT_SECRET."
+        );
+        anyhow::bail!("startup aborted: no authentication configured");
+    }
+
+    if dev_mode {
+        tracing::warn!("DEV_MODE is enabled — all requests are unauthenticated. Do not use in production.");
+    }
+
+    let state = web::Data::new(auth::AppState::new(pool, dev_mode, oidc_validator, config.static_dir.clone()));
     let bind_addr = format!("{}:{}", config.host, config.port);
 
     HttpServer::new(move || {
         App::new()
             .wrap(TracingLogger::default())
-            .app_data(pool.clone())
+            .app_data(state.clone())
             .app_data(web::JsonConfig::default().limit(config.import_max_bytes).error_handler(|err, _req| {
                 let response = actix_web::HttpResponse::BadRequest().json(serde_json::json!({
                     "error": "BAD_REQUEST",
@@ -42,7 +66,18 @@ async fn main() -> anyhow::Result<()> {
                 }));
                 actix_web::error::InternalError::from_response(err, response).into()
             }))
-            .configure(api::configure)
+            .service(
+                web::scope("/api/v1")
+                    .wrap(middleware::auth::RequireAuth)
+                    .configure(api::auth::configure_public)
+                    .configure(api::auth::configure_protected)
+                    .configure(api::health::configure)
+                    .configure(api::pets::configure)
+                    .configure(api::nutrition::configure)
+                    .configure(api::days::configure)
+                    .configure(api::notes::configure)
+                    .configure(api::settings::configure),
+            )
             .configure(mcp::transport::configure)
             .configure(assets::configure)
     })
