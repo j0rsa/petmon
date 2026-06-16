@@ -8,12 +8,15 @@ interface MonthCalendarProps {
   highlights: Map<string, DayNutritionHighlight>;
   onMonthChange: (month: string) => void;
   onSelectDate: (date: string) => void;
+  onGoToToday?: () => void;
 }
 
 const WEEKDAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 
-export function MonthCalendar({ month, selectedDate, highlights, onMonthChange, onSelectDate }: MonthCalendarProps) {
+export function MonthCalendar({ month, selectedDate, highlights, onMonthChange, onSelectDate, onGoToToday }: MonthCalendarProps) {
   const cells = calendarCells(month);
+  const today = localToday();
+  const isOnToday = selectedDate === today;
   const displayMonth = new Date(`${month}-01T00:00:00`).toLocaleDateString(undefined, { month: 'long', year: 'numeric' });
 
   return (
@@ -28,11 +31,24 @@ export function MonthCalendar({ month, selectedDate, highlights, onMonthChange, 
           <p className="eyebrow">Journal</p>
           <h3>{displayMonth}</h3>
         </div>
-        <button className="button button-secondary button-compact calendar-nav-btn" type="button" onClick={() => onMonthChange(shiftMonth(month, 1))}>
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-            <polyline points="9 18 15 12 9 6" />
-          </svg>
-        </button>
+        <div style={{ display: 'flex', gap: '0.5rem' }}>
+          {onGoToToday && (
+            <button
+              className={`button button-compact${isOnToday ? '' : ' button-secondary'}`}
+              type="button"
+              disabled={isOnToday}
+              onClick={onGoToToday}
+              style={{ opacity: isOnToday ? 0.45 : 1 }}
+            >
+              Today
+            </button>
+          )}
+          <button className="button button-secondary button-compact calendar-nav-btn" type="button" onClick={() => onMonthChange(shiftMonth(month, 1))}>
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+              <polyline points="9 18 15 12 9 6" />
+            </svg>
+          </button>
+        </div>
       </div>
 
       <div className="calendar-weekdays">

@@ -43,20 +43,14 @@ export default function NutritionJournalPage() {
 
   return (
     <div className="nutrition-journal">
-      <div className="journal-toolbar panel">
-        <button className="button button-secondary button-compact" type="button" onClick={() => selectDate(localToday())}>
-          Today
-        </button>
-      </div>
-
       <MonthCalendar
         month={month}
         selectedDate={selectedDate}
         highlights={highlights}
         onMonthChange={setMonth}
         onSelectDate={selectDate}
+        onGoToToday={() => selectDate(localToday())}
       />
-
       <NutritionDayPanel date={selectedDate} petId={selectedPetId} />
     </div>
   );

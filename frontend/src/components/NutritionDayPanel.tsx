@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
+import { Link } from 'react-router-dom';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { nutritionAnalyticsApi } from '../api/analytics';
 import { daysApi } from '../api/days';
@@ -7,7 +8,7 @@ import { nutritionSchedulesApi } from '../api/nutritionSchedules';
 import { CategoryBadge } from './CategoryBadge';
 import { CumulativeFluidChart } from './CumulativeFluidChart';
 import { IntakeBarsChart } from './IntakeBarsChart';
-import { formatDisplayDate } from '../lib/dates';
+import { formatDisplayDate, localToday } from '../lib/dates';
 import { exportTelegramLog } from '../lib/exportTelegramLog';
 import { LiquidsIcon, WaterIcon, WetFoodIcon, TotalFluidIcon } from '../lib/metricIcons';
 import { highlightFromSummary, totalKnownFluidMl } from '../lib/nutritionMetrics';
@@ -308,6 +309,11 @@ export function NutritionDayPanel({ date, petId }: NutritionDayPanelProps) {
           <p className="eyebrow">Selected day</p>
           <h3>{formatDisplayDate(date)}</h3>
         </div>
+        {date !== localToday() && (
+          <Link to="/nutrition" style={{ fontSize: '0.82rem', color: 'var(--text-subtle)' }}>
+            ← today
+          </Link>
+        )}
       </div>
 
       <div className="metric-cards">

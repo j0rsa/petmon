@@ -15,13 +15,6 @@ export function NutritionLayout() {
 
   return (
     <div className="page-stack pillar-page">
-      <section className="page-header pillar-header">
-        <div>
-          <p className="eyebrow">Nutrition pillar</p>
-          <h2>Meals, water, and feeding routines</h2>
-        </div>
-      </section>
-
       <div className="pillar-tab-bar">
         {tabs.map((tab) => {
           if (tab.to === '/nutrition') {
