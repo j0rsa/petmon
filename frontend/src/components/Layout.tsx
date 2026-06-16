@@ -1,7 +1,6 @@
 import { Outlet } from 'react-router-dom';
 import { SelectedPetProvider } from '../context/SelectedPetContext';
-import { allPillarLabelsList } from '../types/pillars';
-import { NavBar } from './NavBar';
+import { NavBar, SidebarUserChip } from './NavBar';
 import { SidebarPetPicker } from './SidebarPetPicker';
 
 export function Layout() {
@@ -9,13 +8,10 @@ export function Layout() {
     <SelectedPetProvider>
       <div className="app-shell">
         <aside className="sidebar">
-          <div>
-            <p className="eyebrow">petmon</p>
-            <h1 className="app-title">Pet monitoring</h1>
-            <p className="muted-text">{allPillarLabelsList()}—one overview, pillar by pillar.</p>
-          </div>
+          <span className="sidebar-wordmark">petmon</span>
           <SidebarPetPicker />
           <NavBar />
+          <SidebarUserChip />
         </aside>
         <main className="content">
           <Outlet />

@@ -1,4 +1,4 @@
-import { Link, useMatch, useNavigate } from 'react-router-dom';
+import { useMatch, useNavigate } from 'react-router-dom';
 import { useSelectedPet } from '../context/SelectedPetContext';
 import { resolvePetColor } from '../lib/petColors';
 import { PetAvatar } from './pet/PetAvatar';
@@ -31,7 +31,6 @@ export function SidebarPetPicker() {
 
   return (
     <div className="sidebar-pet-picker">
-      <p className="eyebrow">Pet</p>
       <div className="sidebar-pet-avatars" role="listbox" aria-label="Selected pet">
         {pets.map((pet) => {
           const selected = pet.id === selectedPetId;
@@ -61,11 +60,6 @@ export function SidebarPetPicker() {
           );
         })}
       </div>
-      {selectedPetId && (
-        <Link className="text-link sidebar-pet-profile-link" to={`/pets/${selectedPetId}`}>
-          Open profile →
-        </Link>
-      )}
     </div>
   );
 }

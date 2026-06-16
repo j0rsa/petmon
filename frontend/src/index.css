@@ -158,15 +158,23 @@ pre {
 }
 
 .sidebar {
-  padding: 2rem 1.25rem;
+  padding: 1.5rem 1.25rem;
   border-right: 1px solid var(--border-subtle);
   background: var(--surface-sidebar);
   display: flex;
   flex-direction: column;
-  gap: 2rem;
+  gap: 1.25rem;
   position: sticky;
   top: 0;
   height: 100vh;
+}
+
+.sidebar-wordmark {
+  font-size: 0.88rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: lowercase;
+  color: var(--text-muted);
 }
 
 .sidebar-pet-picker {
@@ -230,6 +238,7 @@ pre {
   display: flex;
   flex-direction: column;
   gap: 0.55rem;
+  flex: 1;
 }
 
 .nav-link {
