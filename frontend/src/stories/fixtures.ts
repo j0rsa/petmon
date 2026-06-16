@@ -1,5 +1,5 @@
 import { localToday, shiftDate } from '../lib/dates';
-import type { Category, NutritionDaySummary, NutritionRangeSummary, NutritionRecord, NutritionSchedule, Pet } from '../types';
+import type { BestFluidDay, Category, NutritionDaySummary, NutritionRangeSummary, NutritionRecord, NutritionSchedule, Pet } from '../types';
 import type { DayNutritionHighlight } from '../types/pillars';
 import type { ApiTokenPublic, OidcConfigPublic, TelegramConfigPublic } from '../api/settings';
 
@@ -193,6 +193,24 @@ export function mockCalendarHighlights(month = '2024-06'): Map<string, DayNutrit
   map.set(`${month}-10`, { recordCount: 1, wetFood: 0, water: 30, liquids: 0, dryFood: 0 });
   return map;
 }
+
+// ── Best fluid day fixture ────────────────────────────────────────────────────
+
+export const mockBestFluidDay: BestFluidDay = {
+  local_date: '2024-06-10',
+  total_fluid_ml: 142,
+  curve: [
+    { time: '06:15', cumulative_fluid_ml: 12 },
+    { time: '08:30', cumulative_fluid_ml: 27 },
+    { time: '11:00', cumulative_fluid_ml: 40 },
+    { time: '13:30', cumulative_fluid_ml: 53 },
+    { time: '15:45', cumulative_fluid_ml: 68 },
+    { time: '17:30', cumulative_fluid_ml: 81 },
+    { time: '19:00', cumulative_fluid_ml: 95 },
+    { time: '21:15', cumulative_fluid_ml: 110 },
+    { time: '22:30', cumulative_fluid_ml: 142 },
+  ],
+};
 
 // ── Settings fixtures ─────────────────────────────────────────────────────────
 

@@ -668,6 +668,32 @@ pre {
   opacity: 0.72;
 }
 
+.nav-link-icon {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+}
+
+.nav-link-pillar-icon {
+  flex-shrink: 0;
+  width: 18px;
+  height: 18px;
+  opacity: 0.7;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.nav-link-pillar-icon svg {
+  width: 18px;
+  height: 18px;
+}
+
+.nav-link.active .nav-link-pillar-icon,
+.nav-link:hover .nav-link-pillar-icon {
+  opacity: 1;
+}
+
 .nav-soon {
   margin-left: auto;
   font-size: 0.68rem;
@@ -676,8 +702,31 @@ pre {
   letter-spacing: 0.08em;
 }
 
-.sidebar-user {
+.nav-api-docs-link {
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+  padding: 0.5rem 1rem;
+  border-radius: 14px;
+  color: var(--text-subtle);
+  font-size: 0.82rem;
+  transition: 0.2s ease;
+  text-decoration: none;
   margin-top: auto;
+}
+
+.nav-api-docs-link:hover {
+  background: var(--accent-soft);
+  color: var(--nav-text-active);
+}
+
+.nav-api-docs-external {
+  margin-left: auto;
+  opacity: 0.5;
+}
+
+.sidebar-user {
+  margin-top: 0;
   padding: 0.75rem 0.25rem 0;
   border-top: 1px solid var(--border-subtle);
   display: flex;
