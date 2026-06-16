@@ -19,7 +19,8 @@ pub struct NutritionRecord {
 #[derive(Debug, Deserialize, Serialize)]
 pub struct CreateNutritionRecord {
     pub pet_id: Uuid,
-    pub occurred_at: String,
+    /// RFC3339 timestamp. Omit to use the server's current time.
+    pub occurred_at: Option<String>,
     pub local_date: Option<String>,
     pub category: NutritionCategory,
     pub amount: f64,
@@ -90,13 +91,14 @@ impl std::str::FromStr for NutritionCategory {
 impl NutritionRecord {
     pub fn new(req: CreateNutritionRecord) -> Self {
         let now = Utc::now().to_rfc3339();
+        let occurred_at = req.occurred_at.unwrap_or_else(|| now.clone());
         let local_date = req
             .local_date
-            .unwrap_or_else(|| req.occurred_at.split('T').next().unwrap_or("").to_string());
+            .unwrap_or_else(|| occurred_at.split('T').next().unwrap_or("").to_string());
         NutritionRecord {
             id: Uuid::new_v4().to_string(),
             pet_id: req.pet_id,
-            occurred_at: req.occurred_at,
+            occurred_at,
             local_date,
             category: req.category,
             amount: req.amount,

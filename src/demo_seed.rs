@@ -207,7 +207,7 @@ fn record(
     let occurred_at = format!("{local_date}T{hour:02}:{minute:02}:00Z");
     CreateNutritionRecord {
         pet_id,
-        occurred_at,
+        occurred_at: Some(occurred_at),
         local_date: Some(local_date.to_string()),
         category: category
             .parse()

@@ -151,6 +151,41 @@ make story
 # or: cd frontend && npm run storybook
 ```
 
+### Logging records via API
+
+Create a record for a pet using the current server time (omit `occurred_at`):
+
+```bash
+curl -X POST http://localhost:8080/api/v1/nutrition/records \
+  -H "Authorization: Bearer pm_api_<your-token>" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "pet_id": "550e8400-e29b-41d4-a716-446655440000",
+    "category": "liquids",
+    "amount": 15,
+    "unit": "ml"
+  }'
+```
+
+Supply `occurred_at` (RFC3339) to backfill a specific time:
+
+```bash
+curl -X POST http://localhost:8080/api/v1/nutrition/records \
+  -H "Authorization: Bearer pm_api_<your-token>" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "pet_id": "550e8400-e29b-41d4-a716-446655440000",
+    "category": "wet_food",
+    "amount": 75,
+    "unit": "g",
+    "occurred_at": "2026-06-17T08:30:00Z"
+  }'
+```
+
+Valid categories: `wet_food`, `dry_food`, `water`, `liquids`.
+
+The pet ID is shown on the pet profile page (Settings → Pets → Open profile) or returned by `GET /api/v1/pets`.
+
 ### Telegram
 
 **Import** — the `/imports` page parses Telegram bot logs in the browser (same format as the original `cat-intake-tracker` prototype), then commits via `POST /api/v1/nutrition/records/batch`:
