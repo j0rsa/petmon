@@ -48,5 +48,7 @@ export function formatDayHint(highlight: DayNutritionHighlight | undefined) {
   if (highlight.water > 0) parts.push(`${Math.round(highlight.water)}ml water`);
   if (highlight.dryFood > 0) parts.push(`${Math.round(highlight.dryFood)}g dry`);
   if (parts.length === 0) return `${highlight.recordCount} log${highlight.recordCount === 1 ? '' : 's'}`;
-  return parts.join(' · ');
+  return parts;
 }
+
+export type DayHint = ReturnType<typeof formatDayHint>;

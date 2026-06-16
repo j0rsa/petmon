@@ -9,6 +9,7 @@ import { CumulativeFluidChart } from './CumulativeFluidChart';
 import { IntakeBarsChart } from './IntakeBarsChart';
 import { formatDisplayDate } from '../lib/dates';
 import { exportTelegramLog } from '../lib/exportTelegramLog';
+import { LiquidsIcon, WaterIcon, WetFoodIcon, TotalFluidIcon } from '../lib/metricIcons';
 import { highlightFromSummary, totalKnownFluidMl } from '../lib/nutritionMetrics';
 import { CATEGORIES, CATEGORY_LABELS } from '../types';
 import type { CreateNutritionRecord, NutritionRecord, UpdateNutritionRecord } from '../types';
@@ -310,19 +311,23 @@ export function NutritionDayPanel({ date, petId }: NutritionDayPanelProps) {
       </div>
 
       <div className="metric-cards">
-        <article className="metric-card metric-card-water">
+        <article className="metric-card metric-card-water" style={{ position: 'relative', overflow: 'hidden' }}>
+          <MetricIcon color="var(--metric-water)"><LiquidsIcon /></MetricIcon>
           <span className="metric-label">Liquids</span>
           <strong>{Math.round(highlight?.liquids ?? 0)}<span>ml</span></strong>
         </article>
-        <article className="metric-card metric-card-water">
+        <article className="metric-card metric-card-water" style={{ position: 'relative', overflow: 'hidden' }}>
+          <MetricIcon color="var(--metric-water)"><WaterIcon /></MetricIcon>
           <span className="metric-label">Water</span>
           <strong>{Math.round(highlight?.water ?? 0)}<span>ml</span></strong>
         </article>
-        <article className="metric-card metric-card-wet">
+        <article className="metric-card metric-card-wet" style={{ position: 'relative', overflow: 'hidden' }}>
+          <MetricIcon color="var(--metric-wet)"><WetFoodIcon /></MetricIcon>
           <span className="metric-label">Wet food</span>
           <strong>{Math.round(highlight?.wetFood ?? 0)}<span>g</span></strong>
         </article>
-        <article className="metric-card">
+        <article className="metric-card" style={{ position: 'relative', overflow: 'hidden' }}>
+          <MetricIcon color="var(--fluid-accent)"><TotalFluidIcon /></MetricIcon>
           <span className="metric-label">Total known fluid</span>
           <strong>~{totalFluid}<span>ml</span></strong>
         </article>
@@ -408,6 +413,23 @@ export function NutritionDayPanel({ date, petId }: NutritionDayPanelProps) {
         </button>
       </div>
     </section>
+  );
+}
+
+function MetricIcon({ color, children }: { color: string; children: React.ReactNode }) {
+  return (
+    <div style={{
+      position: 'absolute',
+      right: '0.6rem',
+      bottom: '0.4rem',
+      width: 44,
+      height: 44,
+      color,
+      opacity: 0.1,
+      pointerEvents: 'none',
+    }}>
+      {children}
+    </div>
   );
 }
 
