@@ -170,6 +170,9 @@ pre {
 }
 
 .sidebar-wordmark {
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
   font-size: 0.88rem;
   font-weight: 700;
   letter-spacing: 0.08em;
