@@ -1,177 +1,264 @@
 import { useMemo, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { Bar, BarChart, CartesianGrid, Legend, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
+import {
+  Bar, BarChart, CartesianGrid, Legend, Line, LineChart,
+  ResponsiveContainer, Tooltip, XAxis, YAxis,
+} from 'recharts';
+import { ANALYTICS_CATEGORIES, CATEGORY_COLORS, CATEGORY_LABELS } from '../types';
 import { nutritionAnalyticsApi } from '../api/analytics';
-import { nutritionRecordsApi } from '../api/nutritionRecords';
-import { nutritionSchedulesApi } from '../api/nutritionSchedules';
-import { CategoryBadge } from '../components/CategoryBadge';
-import { CumulativeFluidChart } from '../components/CumulativeFluidChart';
 import { NoPetSelected } from '../components/NoPetSelected';
 import { useSelectedPet } from '../context/SelectedPetContext';
 import { localToday, shiftDate } from '../lib/dates';
-import { ANALYTICS_CATEGORIES, CATEGORY_COLORS, CATEGORY_LABELS } from '../types';
+import { WET_FOOD_FLUID_RATIO } from '../lib/cumulativeFluid';
+
+const PERIODS = [
+  { label: '7d',  days: 7  },
+  { label: '14d', days: 14 },
+  { label: '30d', days: 30 },
+  { label: 'all', days: 90 },
+] as const;
+
+type PeriodLabel = typeof PERIODS[number]['label'];
+
+function formatDate(iso: string) {
+  const d = new Date(`${iso}T00:00:00`);
+  return `${d.getDate()} ${d.toLocaleString('en', { month: 'short' })}`;
+}
+
+function formatTick(iso: string) {
+  const d = new Date(`${iso}T00:00:00`);
+  // show fewer labels on wider ranges
+  return formatDate(iso);
+}
 
 export default function AnalyticsPage() {
-  const { selectedPetId, selectedPet, petsLoading } = useSelectedPet();
-  const [dateFrom, setDateFrom] = useState(shiftDate(localToday(), -6));
-  const [dateTo, setDateTo] = useState(localToday());
+  const { selectedPetId, petsLoading } = useSelectedPet();
+  const [period, setPeriod] = useState<PeriodLabel>('30d');
+
+  const today = localToday();
+  const days = PERIODS.find(p => p.label === period)!.days;
+  const dateFrom = shiftDate(today, -(days - 1));
 
   const analyticsQuery = useQuery({
-    queryKey: ['nutrition-analytics', dateFrom, dateTo, selectedPetId],
-    queryFn: () => nutritionAnalyticsApi.rangeSummary(dateFrom, dateTo, selectedPetId!),
-    enabled: Boolean(selectedPetId),
-  });
-  const recordsQuery = useQuery({
-    queryKey: ['nutrition-records', dateFrom, dateTo, selectedPetId],
-    queryFn: () =>
-      nutritionRecordsApi.list({
-        date_from: dateFrom,
-        date_to: dateTo,
-        pet_id: selectedPetId!,
-      }),
-    enabled: Boolean(selectedPetId),
-  });
-  const schedulesQuery = useQuery({
-    queryKey: ['nutrition-schedules', selectedPetId],
-    queryFn: () => nutritionSchedulesApi.list(selectedPetId!),
-    enabled: Boolean(selectedPetId),
-  });
-  const bestDayQuery = useQuery({
-    queryKey: ['nutrition-best-fluid-day', dateTo, selectedPetId],
-    queryFn: () => nutritionAnalyticsApi.bestFluidDay(dateTo, selectedPetId!),
+    queryKey: ['nutrition-analytics', dateFrom, today, selectedPetId],
+    queryFn: () => nutritionAnalyticsApi.rangeSummary(dateFrom, today, selectedPetId!),
     enabled: Boolean(selectedPetId),
   });
 
-  const chartData = useMemo(() => {
-    const grouped = new Map<string, Record<string, number | string>>();
-
-    for (const total of analyticsQuery.data?.daily_totals ?? []) {
-      if (!ANALYTICS_CATEGORIES.includes(total.category as (typeof ANALYTICS_CATEGORIES)[number])) {
-        continue;
-      }
-      const row = grouped.get(total.local_date) ?? { local_date: total.local_date };
-      row[total.category] = total.total_amount;
-      grouped.set(total.local_date, row);
+  // Per-day totals keyed by date
+  const dailyData = useMemo(() => {
+    const map = new Map<string, { liquids: number; wet_food: number; water: number }>();
+    for (const t of analyticsQuery.data?.daily_totals ?? []) {
+      const row = map.get(t.local_date) ?? { liquids: 0, wet_food: 0, water: 0 };
+      if (t.category === 'liquids') row.liquids = t.total_amount;
+      else if (t.category === 'water') row.water = t.total_amount;
+      else if (t.category === 'wet_food') row.wet_food = t.total_amount;
+      map.set(t.local_date, row);
     }
 
-    return [...grouped.values()].sort((left, right) => String(left.local_date).localeCompare(String(right.local_date)));
-  }, [analyticsQuery.data?.daily_totals]);
+    // Fill every date in range (even empty days)
+    const result = [];
+    for (let i = 0; i < days; i++) {
+      const date = shiftDate(today, -(days - 1 - i));
+      const row = map.get(date) ?? { liquids: 0, wet_food: 0, water: 0 };
+      const liquidTotal = row.liquids + row.water;
+      const foodFluid = Math.round(row.wet_food * WET_FOOD_FLUID_RATIO);
+      const totalFluid = liquidTotal + foodFluid;
+      result.push({ date, liquidTotal, foodFluid, totalFluid, wet_food: row.wet_food });
+    }
+    return result;
+  }, [analyticsQuery.data, days, today]);
 
-  if (petsLoading) {
-    return <div className="loading-state">Loading…</div>;
-  }
+  // Summary stats
+  const stats = useMemo(() => {
+    const filled = dailyData.filter(d => d.totalFluid > 0);
+    if (filled.length === 0) return null;
+    const avgTotal = Math.round(filled.reduce((s, d) => s + d.totalFluid, 0) / filled.length);
+    const peakTotal = Math.max(...filled.map(d => d.totalFluid));
+    const avgLiquids = Math.round(filled.reduce((s, d) => s + d.liquidTotal, 0) / filled.length);
+    const avgWetFood = Math.round(filled.reduce((s, d) => s + d.wet_food, 0) / filled.length);
+    return { avgTotal, peakTotal, avgLiquids, avgWetFood };
+  }, [dailyData]);
 
-  if (!selectedPetId) {
-    return <NoPetSelected />;
-  }
+  // All-category daily totals for the grouped bar chart
+  const categoryChartData = useMemo(() => {
+    const map = new Map<string, Record<string, number>>();
+    for (const t of analyticsQuery.data?.daily_totals ?? []) {
+      const row = map.get(t.local_date) ?? {};
+      row[t.category] = t.total_amount;
+      map.set(t.local_date, row);
+    }
+    const result = [];
+    for (let i = 0; i < days; i++) {
+      const date = shiftDate(today, -(days - 1 - i));
+      result.push({ date, ...(map.get(date) ?? {}) });
+    }
+    return result;
+  }, [analyticsQuery.data, days, today]);
 
-  const isLoading = analyticsQuery.isLoading || recordsQuery.isLoading;
-  const isError = analyticsQuery.isError || recordsQuery.isError;
-  const errorMessage =
-    (analyticsQuery.error instanceof Error && analyticsQuery.error.message) ||
-    (recordsQuery.error instanceof Error && recordsQuery.error.message) ||
-    'Unable to load analytics.';
+  // 100% stacked ratio data
+  const ratioData = useMemo(() => {
+    return dailyData.map(d => {
+      const total = d.liquidTotal + d.foodFluid;
+      if (total === 0) return { date: d.date, liquids: 0, foodFluid: 0 };
+      return {
+        date: d.date,
+        liquids: Math.round((d.liquidTotal / total) * 100),
+        foodFluid: Math.round((d.foodFluid / total) * 100),
+      };
+    });
+  }, [dailyData]);
+
+  if (petsLoading) return <div className="loading-state">Loading…</div>;
+  if (!selectedPetId) return <NoPetSelected />;
 
   return (
     <div className="page-stack">
-      <section className="panel filter-panel">
-        <div className="form-row">
-          <label htmlFor="analytics-from">From</label>
-          <input id="analytics-from" type="date" value={dateFrom} onChange={(event) => setDateFrom(event.target.value)} />
-        </div>
-        <div className="form-row">
-          <label htmlFor="analytics-to">To</label>
-          <input id="analytics-to" type="date" value={dateTo} onChange={(event) => setDateTo(event.target.value)} />
-        </div>
-        <p className="muted-text">Showing data for {selectedPet?.name ?? 'selected pet'}.</p>
-      </section>
+      {/* Period selector */}
+      <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
+        {PERIODS.map(p => (
+          <button
+            key={p.label}
+            type="button"
+            className={`button${period === p.label ? '' : ' button-secondary'}`}
+            style={{ padding: '0.4rem 0.9rem', fontSize: '0.82rem' }}
+            onClick={() => setPeriod(p.label)}
+          >
+            {p.label}
+          </button>
+        ))}
+      </div>
 
-      {isLoading ? (
+      {analyticsQuery.isLoading ? (
         <div className="loading-state">Loading analytics…</div>
-      ) : isError ? (
-        <div className="error-state">{errorMessage}</div>
+      ) : analyticsQuery.isError ? (
+        <div className="error-state">{analyticsQuery.error instanceof Error ? analyticsQuery.error.message : 'Failed to load analytics.'}</div>
       ) : (
         <>
-          <section className="panel chart-panel">
-            <div className="section-heading">
-              <div>
-                <p className="eyebrow">Fluid</p>
-                <h3>Cumulative fluid by time of day</h3>
-                <p className="muted-text">Showing {dateTo} with range context for best-day comparison.</p>
-              </div>
+          {/* Stat cards */}
+          {stats && (
+            <div className="summary-grid">
+              <StatCard label="avg total fluid / day" value={`~${stats.avgTotal}`} unit="ml" color="var(--accent)" />
+              <StatCard label="peak total fluid" value={`~${stats.peakTotal}`} unit="ml" color="var(--accent)" />
+              <StatCard label="avg liquids / day" value={`${stats.avgLiquids}`} unit="ml" color="var(--metric-water)" />
+              <StatCard label="avg wet food / day" value={`${stats.avgWetFood}`} unit="g" color="var(--metric-wet)" />
             </div>
-            <CumulativeFluidChart
-              records={recordsQuery.data?.filter((r) => r.local_date === dateTo) ?? []}
-              focusDate={dateTo}
-              schedules={schedulesQuery.data ?? []}
-              bestDayRecords={bestDayQuery.data?.records}
-              bestDayDate={bestDayQuery.data?.local_date}
-            />
-          </section>
+          )}
 
-          <section className="panel chart-panel">
-            <div className="section-heading">
-              <div>
-                <p className="eyebrow">Chart</p>
-                <h3>Daily totals by category</h3>
-              </div>
-            </div>
-            {chartData.length === 0 ? (
-              <div className="empty-state">No totals found in the selected range.</div>
-            ) : (
-              <div className="chart-wrapper">
-                <ResponsiveContainer width="100%" height="100%">
-                  <BarChart data={chartData}>
-                    <CartesianGrid stroke="var(--chart-grid)" strokeDasharray="3 3" />
-                    <XAxis dataKey="local_date" stroke="var(--chart-axis)" tick={{ fill: 'var(--chart-axis)' }} />
-                    <YAxis stroke="var(--chart-axis)" tick={{ fill: 'var(--chart-axis)' }} />
-                    <Tooltip />
-                    <Legend />
-                    {ANALYTICS_CATEGORIES.map((category) => (
-                      <Bar
-                        key={category}
-                        dataKey={category}
-                        name={CATEGORY_LABELS[category]}
-                        fill={CATEGORY_COLORS[category]}
-                        radius={[6, 6, 0, 0]}
-                      />
-                    ))}
-                  </BarChart>
-                </ResponsiveContainer>
-              </div>
-            )}
-          </section>
-
+          {/* Total fluid per day — line chart */}
           <section className="panel">
-            <div className="section-heading">
-              <div>
-                <p className="eyebrow">Summary</p>
-                <h3>Category averages</h3>
-              </div>
+            <p className="eyebrow" style={{ marginBottom: '0.5rem' }}>total fluid per day (liquids + {Math.round(WET_FOOD_FLUID_RATIO * 100)}% wet food)</p>
+            <div className="chart-wrapper">
+              <ResponsiveContainer width="100%" height="100%">
+                <LineChart data={dailyData} margin={{ top: 8, right: 16, left: 0, bottom: 0 }}>
+                  <CartesianGrid stroke="var(--chart-grid)" strokeDasharray="3 3" />
+                  <XAxis
+                    dataKey="date"
+                    tickFormatter={formatTick}
+                    stroke="var(--chart-axis)"
+                    tick={{ fill: 'var(--chart-axis)', fontFamily: 'monospace', fontSize: 11 }}
+                    interval="preserveStartEnd"
+                  />
+                  <YAxis
+                    stroke="var(--chart-axis)"
+                    tick={{ fill: 'var(--chart-axis)', fontFamily: 'monospace', fontSize: 11 }}
+                    unit=" ml"
+                  />
+                  <Tooltip
+                    formatter={(v: number) => [`${v} ml`, 'total fluid']}
+                    labelFormatter={formatDate}
+                    contentStyle={{ background: 'var(--surface)', border: '1px solid var(--border-subtle)', borderRadius: 8, fontFamily: 'monospace', fontSize: 12 }}
+                  />
+                  <Line
+                    type="monotone"
+                    dataKey="totalFluid"
+                    name="total fluid"
+                    stroke="var(--accent)"
+                    strokeWidth={2}
+                    dot={{ r: 4, fill: 'var(--accent)', strokeWidth: 0 }}
+                    activeDot={{ r: 6 }}
+                    connectNulls
+                  />
+                </LineChart>
+              </ResponsiveContainer>
             </div>
-            <div className="table-wrap">
-              <table>
-                <thead>
-                  <tr>
-                    <th>Category</th>
-                    <th>Average amount</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {ANALYTICS_CATEGORIES.map((category) => (
-                    <tr key={category}>
-                      <td>
-                        <CategoryBadge category={category} />
-                      </td>
-                      <td>{analyticsQuery.data?.category_averages[category] ?? 0}</td>
-                    </tr>
+          </section>
+
+          {/* Daily totals by category — grouped bar */}
+          <section className="panel">
+            <p className="eyebrow" style={{ marginBottom: '0.5rem' }}>daily totals by category</p>
+            <div className="chart-wrapper">
+              <ResponsiveContainer width="100%" height="100%">
+                <BarChart data={categoryChartData} margin={{ top: 8, right: 16, left: 0, bottom: 0 }}>
+                  <CartesianGrid stroke="var(--chart-grid)" strokeDasharray="3 3" />
+                  <XAxis
+                    dataKey="date"
+                    tickFormatter={formatTick}
+                    stroke="var(--chart-axis)"
+                    tick={{ fill: 'var(--chart-axis)', fontFamily: 'monospace', fontSize: 11 }}
+                    interval="preserveStartEnd"
+                  />
+                  <YAxis
+                    stroke="var(--chart-axis)"
+                    tick={{ fill: 'var(--chart-axis)', fontFamily: 'monospace', fontSize: 11 }}
+                  />
+                  <Tooltip
+                    labelFormatter={formatDate}
+                    contentStyle={{ background: 'var(--surface)', border: '1px solid var(--border-subtle)', borderRadius: 8, fontFamily: 'monospace', fontSize: 12 }}
+                  />
+                  <Legend wrapperStyle={{ fontFamily: 'monospace', fontSize: 12 }} />
+                  {ANALYTICS_CATEGORIES.map((cat) => (
+                    <Bar key={cat} dataKey={cat} name={CATEGORY_LABELS[cat]} fill={CATEGORY_COLORS[cat]} radius={[4, 4, 0, 0]} />
                   ))}
-                </tbody>
-              </table>
+                </BarChart>
+              </ResponsiveContainer>
+            </div>
+          </section>
+
+          {/* Liquids vs wet food ratio — 100% stacked bar */}
+          <section className="panel">
+            <p className="eyebrow" style={{ marginBottom: '0.5rem' }}>liquids vs wet food ratio</p>
+            <div className="chart-wrapper">
+              <ResponsiveContainer width="100%" height="100%">
+                <BarChart data={ratioData} margin={{ top: 8, right: 16, left: 0, bottom: 0 }}>
+                  <CartesianGrid stroke="var(--chart-grid)" strokeDasharray="3 3" />
+                  <XAxis
+                    dataKey="date"
+                    tickFormatter={formatTick}
+                    stroke="var(--chart-axis)"
+                    tick={{ fill: 'var(--chart-axis)', fontFamily: 'monospace', fontSize: 11 }}
+                    interval="preserveStartEnd"
+                  />
+                  <YAxis
+                    stroke="var(--chart-axis)"
+                    tick={{ fill: 'var(--chart-axis)', fontFamily: 'monospace', fontSize: 11 }}
+                    unit=" %"
+                    domain={[0, 100]}
+                  />
+                  <Tooltip
+                    formatter={(v: number, name: string) => [`${v}%`, name]}
+                    labelFormatter={formatDate}
+                    contentStyle={{ background: 'var(--surface)', border: '1px solid var(--border-subtle)', borderRadius: 8, fontFamily: 'monospace', fontSize: 12 }}
+                  />
+                  <Bar dataKey="liquids" name="liquids" stackId="ratio" fill="#4fd8f8" radius={[0, 0, 0, 0]} />
+                  <Bar dataKey="foodFluid" name="wet food" stackId="ratio" fill="#4fc8a0" radius={[4, 4, 0, 0]} />
+                </BarChart>
+              </ResponsiveContainer>
             </div>
           </section>
         </>
       )}
+    </div>
+  );
+}
+
+function StatCard({ label, value, unit, color }: { label: string; value: string; unit: string; color: string }) {
+  return (
+    <div className="stat-card">
+      <span className="metric-label">{label}</span>
+      <strong style={{ color, fontFamily: 'monospace', fontSize: '2rem' }}>
+        {value}<span style={{ fontSize: '0.9rem', color: 'var(--text-muted)', marginLeft: '0.2rem' }}>{unit}</span>
+      </strong>
     </div>
   );
 }
