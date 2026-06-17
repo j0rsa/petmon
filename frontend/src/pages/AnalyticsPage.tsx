@@ -185,7 +185,7 @@ export default function AnalyticsPage() {
             <p className="eyebrow" style={{ marginBottom: '0.5rem' }}>daily totals by category</p>
             <div className="chart-wrapper">
               <ResponsiveContainer width="100%" height="100%">
-                <BarChart data={categoryChartData} margin={{ top: 8, right: 16, left: 0, bottom: 0 }}>
+                <BarChart data={categoryChartData} barCategoryGap="20%" margin={{ top: 8, right: 16, left: 0, bottom: 0 }}>
                   <CartesianGrid stroke="var(--chart-grid)" strokeDasharray="3 3" />
                   <XAxis
                     dataKey="date"
@@ -203,8 +203,8 @@ export default function AnalyticsPage() {
                     contentStyle={{ background: 'var(--surface)', border: '1px solid var(--border-subtle)', borderRadius: 8, fontFamily: 'monospace', fontSize: 12 }}
                   />
                   <Legend wrapperStyle={{ fontFamily: 'monospace', fontSize: 12 }} />
-                  {ANALYTICS_CATEGORIES.map((cat) => (
-                    <Bar key={cat} dataKey={cat} name={CATEGORY_LABELS[cat]} fill={CATEGORY_COLORS[cat]} radius={[4, 4, 0, 0]} />
+                  {ANALYTICS_CATEGORIES.map((cat, i) => (
+                    <Bar key={cat} dataKey={cat} name={CATEGORY_LABELS[cat]} fill={CATEGORY_COLORS[cat]} stackId="day" radius={i === ANALYTICS_CATEGORIES.length - 1 ? [4, 4, 0, 0] : [0, 0, 0, 0]} />
                   ))}
                 </BarChart>
               </ResponsiveContainer>

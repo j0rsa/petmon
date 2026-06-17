@@ -1,3 +1,4 @@
+use chrono::Utc;
 use crate::domain::nutrition_record::BatchCreateNutritionRecords;
 use crate::domain::nutrition_record::{
     CreateNutritionRecord, NutritionRecordFilters, UpdateNutritionRecord,
@@ -38,10 +39,327 @@ fn optional_uuid(params: &Value, key: &str) -> AppResult<Option<Uuid>> {
     }
 }
 
+/// All tools available via MCP, used to respond to `tools/list`.
+fn tool_list() -> Value {
+    json!({
+        "tools": [
+            // ── Pets ─────────────────────────────────────────────────────────
+            {
+                "name": "pets/list",
+                "description": "List all pets.",
+                "inputSchema": { "type": "object", "properties": {} }
+            },
+            {
+                "name": "pets/get",
+                "description": "Get a pet by UUID.",
+                "inputSchema": {
+                    "type": "object",
+                    "required": ["id"],
+                    "properties": { "id": { "type": "string", "format": "uuid" } }
+                }
+            },
+            {
+                "name": "pets/create",
+                "description": "Create a new pet.",
+                "inputSchema": {
+                    "type": "object",
+                    "required": ["name"],
+                    "properties": {
+                        "name":            { "type": "string" },
+                        "species":         { "type": "string", "enum": ["cat", "dog", "bunny", "parrot", "other"] },
+                        "status":          { "type": "string", "enum": ["active", "archived"] },
+                        "breed":           { "type": "string" },
+                        "birth_date":      { "type": "string", "format": "date" },
+                        "blood_type":      { "type": "string" },
+                        "color":           { "type": "string" },
+                        "weight_kg":       { "type": "number" },
+                        "feeding_notes":   { "type": "string" },
+                        "telegram_chat_id":   { "type": "string" },
+                        "telegram_thread_id": { "type": "string" }
+                    }
+                }
+            },
+            {
+                "name": "pets/update",
+                "description": "Update fields on an existing pet.",
+                "inputSchema": {
+                    "type": "object",
+                    "required": ["id"],
+                    "properties": {
+                        "id":              { "type": "string", "format": "uuid" },
+                        "name":            { "type": "string" },
+                        "species":         { "type": "string" },
+                        "status":          { "type": "string", "enum": ["active", "archived"] },
+                        "breed":           { "type": "string" },
+                        "birth_date":      { "type": "string", "format": "date" },
+                        "blood_type":      { "type": "string" },
+                        "color":           { "type": "string" },
+                        "weight_kg":       { "type": "number" },
+                        "feeding_notes":   { "type": "string" },
+                        "telegram_chat_id":   { "type": "string" },
+                        "telegram_thread_id": { "type": "string" }
+                    }
+                }
+            },
+            // pets/delete intentionally omitted — use pets/update with status=archived instead.
+
+            // ── Nutrition records ────────────────────────────────────────────
+            {
+                "name": "nutrition/records/list",
+                "description": "List nutrition records with optional filters.",
+                "inputSchema": {
+                    "type": "object",
+                    "properties": {
+                        "pet_id":    { "type": "string", "format": "uuid" },
+                        "date":      { "type": "string", "format": "date", "description": "Exact date filter (YYYY-MM-DD)" },
+                        "date_from": { "type": "string", "format": "date" },
+                        "date_to":   { "type": "string", "format": "date" },
+                        "category":  { "type": "string", "enum": ["wet_food", "dry_food", "water", "liquids"] },
+                        "limit":     { "type": "integer" },
+                        "offset":    { "type": "integer" }
+                    }
+                }
+            },
+            {
+                "name": "nutrition/records/get",
+                "description": "Get a single nutrition record by ID.",
+                "inputSchema": {
+                    "type": "object",
+                    "required": ["id"],
+                    "properties": { "id": { "type": "string" } }
+                }
+            },
+            {
+                "name": "nutrition/records/create",
+                "description": "Create a single nutrition record. Also triggers a Telegram notification if configured.",
+                "inputSchema": {
+                    "type": "object",
+                    "required": ["pet_id", "category", "amount"],
+                    "properties": {
+                        "pet_id":      { "type": "string", "format": "uuid" },
+                        "occurred_at": { "type": "string", "description": "Naive local datetime YYYY-MM-DDTHH:MM:SS. Defaults to now." },
+                        "local_date":  { "type": "string", "format": "date" },
+                        "category":    { "type": "string", "enum": ["wet_food", "dry_food", "water", "liquids"] },
+                        "amount":      { "type": "number" },
+                        "unit":        { "type": "string" },
+                        "source_type": { "type": "string" }
+                    }
+                }
+            },
+            {
+                "name": "nutrition/records/batch-create",
+                "description": "Create multiple nutrition records in one call. Note: does NOT trigger Telegram notifications.",
+                "inputSchema": {
+                    "type": "object",
+                    "required": ["records"],
+                    "properties": {
+                        "records": {
+                            "type": "array",
+                            "items": {
+                                "type": "object",
+                                "required": ["pet_id", "category", "amount"],
+                                "properties": {
+                                    "pet_id":      { "type": "string", "format": "uuid" },
+                                    "occurred_at": { "type": "string" },
+                                    "local_date":  { "type": "string", "format": "date" },
+                                    "category":    { "type": "string" },
+                                    "amount":      { "type": "number" },
+                                    "unit":        { "type": "string" },
+                                    "source_type": { "type": "string" }
+                                }
+                            }
+                        }
+                    }
+                }
+            },
+            {
+                "name": "nutrition/records/update",
+                "description": "Update a nutrition record.",
+                "inputSchema": {
+                    "type": "object",
+                    "required": ["id"],
+                    "properties": {
+                        "id":          { "type": "string" },
+                        "occurred_at": { "type": "string" },
+                        "local_date":  { "type": "string", "format": "date" },
+                        "category":    { "type": "string" },
+                        "amount":      { "type": "number" },
+                        "unit":        { "type": "string" }
+                    }
+                }
+            },
+            {
+                "name": "nutrition/records/delete",
+                "description": "Delete a nutrition record by ID.",
+                "inputSchema": {
+                    "type": "object",
+                    "required": ["id"],
+                    "properties": { "id": { "type": "string" } }
+                }
+            },
+
+            // ── Days & notes ─────────────────────────────────────────────────
+            {
+                "name": "days/summary",
+                "description": "Get a day summary: all nutrition records, totals by category, and the day note.",
+                "inputSchema": {
+                    "type": "object",
+                    "required": ["date"],
+                    "properties": {
+                        "date":   { "type": "string", "format": "date" },
+                        "pet_id": { "type": "string", "format": "uuid" }
+                    }
+                }
+            },
+            {
+                "name": "days/note/get",
+                "description": "Get the note for a specific day.",
+                "inputSchema": {
+                    "type": "object",
+                    "required": ["date"],
+                    "properties": {
+                        "date":   { "type": "string", "format": "date" },
+                        "pet_id": { "type": "string", "format": "uuid" }
+                    }
+                }
+            },
+            {
+                "name": "days/note/set",
+                "description": "Create or update the note for a specific day.",
+                "inputSchema": {
+                    "type": "object",
+                    "required": ["date", "note"],
+                    "properties": {
+                        "date":   { "type": "string", "format": "date" },
+                        "pet_id": { "type": "string", "format": "uuid" },
+                        "note":   { "type": "string" }
+                    }
+                }
+            },
+
+            // ── Nutrition context (high-level summary) ───────────────────────
+            {
+                "name": "pets/nutrition-context",
+                "description": "Returns a complete nutrition context for a single pet in one call: pet profile, today's records and totals, active feeding schedule, and a 7-day trend summary. Use this as the starting point for any question about a pet's nutrition — it gives enough context to answer 'is the pet on track today?', 'what's missing vs the schedule?', and 'how does today compare to the past week?' without additional tool calls.",
+                "inputSchema": {
+                    "type": "object",
+                    "required": ["pet_id"],
+                    "properties": {
+                        "pet_id": { "type": "string", "format": "uuid", "description": "UUID of the pet" },
+                        "today":  { "type": "string", "format": "date", "description": "Override today's date (YYYY-MM-DD). Defaults to server UTC date." }
+                    }
+                }
+            },
+
+            // ── Nutrition analytics ──────────────────────────────────────────
+            {
+                "name": "nutrition/analytics/daily-totals",
+                "description": "Get per-category daily totals for a date range.",
+                "inputSchema": {
+                    "type": "object",
+                    "required": ["date_from", "date_to"],
+                    "properties": {
+                        "date_from": { "type": "string", "format": "date" },
+                        "date_to":   { "type": "string", "format": "date" },
+                        "pet_id":    { "type": "string", "format": "uuid" },
+                        "category":  { "type": "string" }
+                    }
+                }
+            },
+            {
+                "name": "nutrition/analytics/range-summary",
+                "description": "Get aggregated nutrition summary with per-category averages for a date range.",
+                "inputSchema": {
+                    "type": "object",
+                    "required": ["date_from", "date_to"],
+                    "properties": {
+                        "date_from": { "type": "string", "format": "date" },
+                        "date_to":   { "type": "string", "format": "date" },
+                        "pet_id":    { "type": "string", "format": "uuid" },
+                        "category":  { "type": "string" }
+                    }
+                }
+            },
+            {
+                "name": "nutrition/analytics/best-fluid-day",
+                "description": "Get the best historical fluid intake day with a cumulative curve.",
+                "inputSchema": {
+                    "type": "object",
+                    "required": ["exclude_date"],
+                    "properties": {
+                        "exclude_date": { "type": "string", "format": "date", "description": "Exclude this date (usually today)" },
+                        "pet_id":       { "type": "string", "format": "uuid" }
+                    }
+                }
+            },
+
+            // ── Nutrition schedules ──────────────────────────────────────────
+            {
+                "name": "nutrition/schedules/list",
+                "description": "List nutrition schedules.",
+                "inputSchema": {
+                    "type": "object",
+                    "properties": { "pet_id": { "type": "string", "format": "uuid" } }
+                }
+            },
+            {
+                "name": "nutrition/schedules/get",
+                "description": "Get a nutrition schedule by ID.",
+                "inputSchema": {
+                    "type": "object",
+                    "required": ["id"],
+                    "properties": { "id": { "type": "string" } }
+                }
+            },
+            {
+                "name": "nutrition/schedules/create",
+                "description": "Create a nutrition schedule.",
+                "inputSchema": {
+                    "type": "object",
+                    "required": ["pet_id", "name"],
+                    "properties": {
+                        "pet_id": { "type": "string", "format": "uuid" },
+                        "name":   { "type": "string" },
+                        "active": { "type": "boolean" },
+                        "rules":  { "type": "array" }
+                    }
+                }
+            },
+            {
+                "name": "nutrition/schedules/update",
+                "description": "Update a nutrition schedule.",
+                "inputSchema": {
+                    "type": "object",
+                    "required": ["id"],
+                    "properties": {
+                        "id":     { "type": "string" },
+                        "name":   { "type": "string" },
+                        "active": { "type": "boolean" },
+                        "rules":  { "type": "array" }
+                    }
+                }
+            },
+            {
+                "name": "nutrition/schedules/delete",
+                "description": "Delete a nutrition schedule by ID.",
+                "inputSchema": {
+                    "type": "object",
+                    "required": ["id"],
+                    "properties": { "id": { "type": "string" } }
+                }
+            }
+        ]
+    })
+}
+
 pub async fn dispatch(pool: &SqlitePool, method: &str, params: Option<Value>) -> AppResult<Value> {
     let params = params.unwrap_or_else(|| json!({}));
 
     match method {
+        // ── MCP protocol ─────────────────────────────────────────────────────
+        "tools/list" => Ok(tool_list()),
+
+        // ── Pets ─────────────────────────────────────────────────────────────
         "pets/list" => {
             let pets = pet_service::list(pool).await?;
             Ok(json!(pets))
@@ -64,11 +382,9 @@ pub async fn dispatch(pool: &SqlitePool, method: &str, params: Option<Value>) ->
             let pet = pet_service::update(pool, id, req).await?;
             Ok(json!(pet))
         }
-        "pets/delete" => {
-            let id = require_uuid(&params, "id")?;
-            pet_service::delete(pool, id).await?;
-            Ok(json!({ "deleted": true }))
-        }
+        // pets/delete removed — use pets/update with status=archived
+
+        // ── Nutrition records ─────────────────────────────────────────────────
         "nutrition/records/list" => {
             let filters: NutritionRecordFilters =
                 serde_json::from_value(params).map_err(|e| AppError::BadRequest(e.to_string()))?;
@@ -111,6 +427,8 @@ pub async fn dispatch(pool: &SqlitePool, method: &str, params: Option<Value>) ->
             nutrition_record_service::delete(pool, id).await?;
             Ok(json!({ "deleted": true }))
         }
+
+        // ── Days & notes ──────────────────────────────────────────────────────
         "days/summary" => {
             let date = params["date"]
                 .as_str()
@@ -119,6 +437,58 @@ pub async fn dispatch(pool: &SqlitePool, method: &str, params: Option<Value>) ->
             let summary = day_service::get_day_summary(pool, date, pet_id).await?;
             Ok(json!(summary))
         }
+        "days/note/get" => {
+            let date = params["date"]
+                .as_str()
+                .ok_or_else(|| AppError::BadRequest("date required".to_string()))?;
+            let pet_id = optional_uuid(&params, "pet_id")?;
+            let summary = day_service::get_day_summary(pool, date, pet_id).await?;
+            Ok(json!({ "date": date, "note": summary.note }))
+        }
+        "days/note/set" => {
+            let date = params["date"]
+                .as_str()
+                .ok_or_else(|| AppError::BadRequest("date required".to_string()))?;
+            let note = params["note"]
+                .as_str()
+                .ok_or_else(|| AppError::BadRequest("note required".to_string()))?;
+            let pet_id = optional_uuid(&params, "pet_id")?;
+            day_service::update_day_note(pool, date, pet_id, note).await?;
+            Ok(json!({ "date": date, "note": note }))
+        }
+
+        // ── Nutrition context ─────────────────────────────────────────────────
+        "pets/nutrition-context" => {
+            let pet_id = require_uuid(&params, "pet_id")?;
+            let today = params["today"]
+                .as_str()
+                .map(str::to_owned)
+                .unwrap_or_else(|| Utc::now().date_naive().to_string());
+            let week_from = {
+                let d = chrono::NaiveDate::parse_from_str(&today, "%Y-%m-%d")
+                    .map_err(|_| AppError::BadRequest("invalid today date".to_string()))?;
+                (d - chrono::Duration::days(6)).to_string()
+            };
+
+            let (pet, today_summary, schedules, trend) = tokio::try_join!(
+                pet_service::get(pool, pet_id),
+                day_service::get_day_summary(pool, &today, Some(pet_id)),
+                nutrition_schedule_service::list(pool, Some(pet_id)),
+                nutrition_analytics_service::range_summary(pool, &week_from, &today, Some(pet_id), None),
+            )?;
+
+            let active_schedules: Vec<_> = schedules.iter().filter(|s| s.active).collect();
+
+            Ok(json!({
+                "pet": pet,
+                "today": today,
+                "today_summary": today_summary,
+                "active_schedules": active_schedules,
+                "trend_7d": trend
+            }))
+        }
+
+        // ── Nutrition analytics ───────────────────────────────────────────────
         "nutrition/analytics/daily-totals" => {
             let date_from = params["date_from"]
                 .as_str()
@@ -128,10 +498,9 @@ pub async fn dispatch(pool: &SqlitePool, method: &str, params: Option<Value>) ->
                 .ok_or_else(|| AppError::BadRequest("date_to required".to_string()))?;
             let pet_id = optional_uuid(&params, "pet_id")?;
             let category = params["category"].as_str();
-            let totals = nutrition_analytics_service::daily_totals(
-                pool, date_from, date_to, pet_id, category,
-            )
-            .await?;
+            let totals =
+                nutrition_analytics_service::daily_totals(pool, date_from, date_to, pet_id, category)
+                    .await?;
             Ok(json!(totals))
         }
         "nutrition/analytics/range-summary" => {
@@ -149,6 +518,17 @@ pub async fn dispatch(pool: &SqlitePool, method: &str, params: Option<Value>) ->
             .await?;
             Ok(json!(summary))
         }
+        "nutrition/analytics/best-fluid-day" => {
+            let exclude_date = params["exclude_date"]
+                .as_str()
+                .ok_or_else(|| AppError::BadRequest("exclude_date required".to_string()))?;
+            let pet_id = optional_uuid(&params, "pet_id")?;
+            let result =
+                nutrition_analytics_service::best_fluid_day(pool, pet_id, exclude_date).await?;
+            Ok(json!(result))
+        }
+
+        // ── Nutrition schedules ───────────────────────────────────────────────
         "nutrition/schedules/list" => {
             let pet_id = optional_uuid(&params, "pet_id")?;
             let schedules = nutrition_schedule_service::list(pool, pet_id).await?;
@@ -184,6 +564,7 @@ pub async fn dispatch(pool: &SqlitePool, method: &str, params: Option<Value>) ->
             nutrition_schedule_service::delete(pool, id).await?;
             Ok(json!({ "deleted": true }))
         }
+
         _ => Err(AppError::BadRequest(format!("Unknown method: {method}"))),
     }
 }

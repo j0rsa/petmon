@@ -65,7 +65,25 @@ pub async fn mcp_handler(state: web::Data<AppState>, body: web::Json<McpRequest>
         return HttpResponse::Ok().json(McpResponse::err(id, -32600, "Invalid JSON-RPC version"));
     }
 
-    match super::tools::dispatch(&state.pool, &req.method, req.params).await {
+    // Resource methods are handled separately from tool dispatch
+    let result = match req.method.as_str() {
+        "resources/list" => Ok(super::resources::resource_list()),
+        "resources/read" => {
+            let uri = req
+                .params
+                .as_ref()
+                .and_then(|p| p.get("uri"))
+                .and_then(|v| v.as_str())
+                .map(str::to_owned);
+            match uri {
+                Some(uri) => super::resources::read_resource(&state.pool, &uri).await,
+                None => Err(crate::error::AppError::BadRequest("uri required".to_string())),
+            }
+        }
+        _ => super::tools::dispatch(&state.pool, &req.method, req.params).await,
+    };
+
+    match result {
         Ok(result) => HttpResponse::Ok().json(McpResponse::ok(id, result)),
         Err(e) => {
             let (code, msg) = match e {
