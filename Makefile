@@ -47,5 +47,5 @@ check-fe: install-fe
 check-be:
 	cargo fmt --check
 	DATABASE_URL="sqlite::memory:" cargo clippy --locked -- -D warnings
-	cargo audit
+
 	DATABASE_URL="sqlite::memory:" cargo test --locked

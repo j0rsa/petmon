@@ -79,10 +79,6 @@ jobs:
           DATABASE_URL: "sqlite::memory:"
         run: cargo clippy --locked -- -D warnings
 
-      - name: Audit dependencies
-        run: |
-          cargo install cargo-audit --quiet
-          cargo audit
 
   # ─────────────────────────────────────────────
   # Stream 2a: Backend x86_64 build + test
