@@ -3,6 +3,7 @@ import { Calendars } from 'lucide-react';
 import { SelectedPetProvider } from '../context/SelectedPetContext';
 import { NavBar, SidebarUserChip } from './NavBar';
 import { SidebarPetPicker } from './SidebarPetPicker';
+import { BottomNav } from './BottomNav';
 
 export function Layout() {
   return (
@@ -20,6 +21,7 @@ export function Layout() {
         <main className="content">
           <Outlet />
         </main>
+        <BottomNav />
       </div>
     </SelectedPetProvider>
   );
