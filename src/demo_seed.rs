@@ -194,6 +194,7 @@ fn daily_records_for_pet(pet: &Pet, date: NaiveDate, day_offset: i64) -> Vec<Cre
     records
 }
 
+#[allow(clippy::too_many_arguments)]
 fn record(
     pet_id: Uuid,
     local_date: &str,

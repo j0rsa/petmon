@@ -1,12 +1,9 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import type { Decorator } from '@storybook/react';
+import type { Decorator } from '@storybook/react-vite';
 import { MemoryRouter } from 'react-router-dom';
 import { SelectedPetProvider } from '../context/SelectedPetContext';
 import { localToday, shiftDate } from '../lib/dates';
 import {
-  mockAnalyticsDateFrom,
-  mockAnalyticsDateTo,
-  mockAnalyticsRecords,
   mockApiTokens,
   mockBestFluidDay,
   mockDaySummary,

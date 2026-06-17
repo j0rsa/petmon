@@ -31,7 +31,7 @@ interface SelectedPetProviderProps {
 
 export function SelectedPetProvider({ children, initialPetId }: SelectedPetProviderProps) {
   const petsQuery = useQuery({ queryKey: ['pets'], queryFn: petsApi.list });
-  const pets = petsQuery.data ?? [];
+  const pets = useMemo(() => petsQuery.data ?? [], [petsQuery.data]);
 
   const [selectedPetId, setSelectedPetIdState] = useState<string | null>(initialPetId ?? readStoredPetId);
 
@@ -46,6 +46,7 @@ export function SelectedPetProvider({ children, initialPetId }: SelectedPetProvi
 
   useEffect(() => {
     if (pets.length === 0) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setSelectedPetIdState(null);
       return;
     }
@@ -73,6 +74,7 @@ export function SelectedPetProvider({ children, initialPetId }: SelectedPetProvi
   return <SelectedPetContext.Provider value={value}>{children}</SelectedPetContext.Provider>;
 }
 
+// eslint-disable-next-line react-refresh/only-export-components
 export function useSelectedPet() {
   const context = useContext(SelectedPetContext);
   if (!context) {

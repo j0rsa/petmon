@@ -1,4 +1,4 @@
-import type { Meta, StoryObj } from '@storybook/react';
+import type { Meta, StoryObj } from '@storybook/react-vite';
 import { withMemoryRouter } from '../stories/decorators';
 import { NavBar } from './NavBar';
 

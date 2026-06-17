@@ -59,7 +59,7 @@ pub async fn mcp_handler(state: web::Data<AppState>, body: web::Json<McpRequest>
     let req = body.into_inner();
     let id = req.id.clone();
 
-    tracing::Span::current().record("method", &req.method.as_str());
+    tracing::Span::current().record("method", req.method.as_str());
 
     if req.jsonrpc != "2.0" {
         return HttpResponse::Ok().json(McpResponse::err(id, -32600, "Invalid JSON-RPC version"));

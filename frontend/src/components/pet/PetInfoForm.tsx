@@ -28,6 +28,7 @@ interface PetInfoFormProps {
   loading?: boolean;
 }
 
+// eslint-disable-next-line react-refresh/only-export-components
 export function petToFormState(pet: {
   name: string;
   species: PetSpecies;
@@ -56,6 +57,7 @@ export function petToFormState(pet: {
   };
 }
 
+// eslint-disable-next-line react-refresh/only-export-components
 export function formStateToPayload(form: PetInfoFormState) {
   return {
     name: form.name,

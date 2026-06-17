@@ -17,6 +17,7 @@ export default function NutritionJournalPage() {
   const [month, setMonth] = useState(monthKey(selectedDate));
 
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setMonth(monthKey(selectedDate));
   }, [selectedDate]);
 

@@ -260,6 +260,7 @@ export function NutritionDayPanel({ date, petId }: NutritionDayPanelProps) {
   });
 
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setNoteDraft(summaryQuery.data?.note ?? '');
   }, [summaryQuery.data?.note]);
 

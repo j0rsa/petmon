@@ -26,11 +26,6 @@ function formatDate(iso: string) {
   return `${d.getDate()} ${d.toLocaleString('en', { month: 'short' })}`;
 }
 
-function formatTick(iso: string) {
-  const d = new Date(`${iso}T00:00:00`);
-  // show fewer labels on wider ranges
-  return formatDate(iso);
-}
 
 export default function AnalyticsPage() {
   const { selectedPetId, petsLoading } = useSelectedPet();
@@ -155,7 +150,7 @@ export default function AnalyticsPage() {
                   <CartesianGrid stroke="var(--chart-grid)" strokeDasharray="3 3" />
                   <XAxis
                     dataKey="date"
-                    tickFormatter={formatTick}
+                    tickFormatter={formatDate}
                     stroke="var(--chart-axis)"
                     tick={{ fill: 'var(--chart-axis)', fontFamily: 'monospace', fontSize: 11 }}
                     interval="preserveStartEnd"
@@ -194,7 +189,7 @@ export default function AnalyticsPage() {
                   <CartesianGrid stroke="var(--chart-grid)" strokeDasharray="3 3" />
                   <XAxis
                     dataKey="date"
-                    tickFormatter={formatTick}
+                    tickFormatter={formatDate}
                     stroke="var(--chart-axis)"
                     tick={{ fill: 'var(--chart-axis)', fontFamily: 'monospace', fontSize: 11 }}
                     interval="preserveStartEnd"
@@ -225,7 +220,7 @@ export default function AnalyticsPage() {
                   <CartesianGrid stroke="var(--chart-grid)" strokeDasharray="3 3" />
                   <XAxis
                     dataKey="date"
-                    tickFormatter={formatTick}
+                    tickFormatter={formatDate}
                     stroke="var(--chart-axis)"
                     tick={{ fill: 'var(--chart-axis)', fontFamily: 'monospace', fontSize: 11 }}
                     interval="preserveStartEnd"

@@ -1,17 +1,12 @@
 use serde::{Deserialize, Serialize};
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, sqlx::Type)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, sqlx::Type, Default)]
 #[serde(rename_all = "snake_case")]
 #[sqlx(rename_all = "snake_case")]
 pub enum PetStatus {
+    #[default]
     Active,
     Archived,
-}
-
-impl Default for PetStatus {
-    fn default() -> Self {
-        PetStatus::Active
-    }
 }
 
 impl PetStatus {

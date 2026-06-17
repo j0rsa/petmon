@@ -1,4 +1,4 @@
-import type { Meta, StoryObj } from '@storybook/react';
+import type { Meta, StoryObj } from '@storybook/react-vite';
 import { mockPets } from '../../stories/fixtures';
 import { PetInfoFields } from './PetInfoFields';
 

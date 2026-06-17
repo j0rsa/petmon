@@ -1,4 +1,4 @@
-import { calendarCells, formatDisplayDate, localToday, shiftMonth } from '../lib/dates';
+import { calendarCells, localToday, shiftMonth } from '../lib/dates';
 import { formatDayHint } from '../lib/nutritionMetrics';
 import type { DayNutritionHighlight } from '../types/pillars';
 

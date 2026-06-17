@@ -1,6 +1,6 @@
 use serde::{Deserialize, Serialize};
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, sqlx::Type)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, sqlx::Type, Default)]
 #[serde(rename_all = "snake_case")]
 #[sqlx(rename_all = "snake_case")]
 pub enum PetSpecies {
@@ -8,13 +8,8 @@ pub enum PetSpecies {
     Dog,
     Bunny,
     Parrot,
+    #[default]
     Other,
-}
-
-impl Default for PetSpecies {
-    fn default() -> Self {
-        PetSpecies::Other
-    }
 }
 
 impl PetSpecies {

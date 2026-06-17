@@ -31,6 +31,7 @@ export default function PetInfoPage() {
 
   useEffect(() => {
     if (petQuery.data) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setForm(petToFormState(petQuery.data));
       setPhotoUrl(getPetPhoto(petQuery.data.id));
     }

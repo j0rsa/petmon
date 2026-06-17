@@ -1,4 +1,4 @@
-import type { Meta, StoryObj } from '@storybook/react';
+import type { Meta, StoryObj } from '@storybook/react-vite';
 import { mockPetId } from '../stories/fixtures';
 import { withNutritionDayPanel } from '../stories/decorators';
 import { NutritionDayPanel } from './NutritionDayPanel';
