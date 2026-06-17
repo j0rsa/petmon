@@ -1,0 +1,5 @@
+[profile.ci]
+failure-output = "immediate"
+
+[[profile.ci.junit]]
+path = "junit.xml"
