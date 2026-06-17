@@ -17,6 +17,8 @@ jobs:
   frontend:
     name: Frontend (build + test)
     runs-on: ubuntu-latest
+    needs: version-check
+    if: always() && !failure() && !cancelled()
     defaults:
       run:
         working-directory: frontend
@@ -98,6 +100,8 @@ jobs:
   backend-check:
     name: Backend (fmt + clippy + audit)
     runs-on: ubuntu-latest
+    needs: version-check
+    if: always() && !failure() && !cancelled()
     steps:
       - uses: actions/checkout@v4
 
