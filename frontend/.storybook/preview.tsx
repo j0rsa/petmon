@@ -1,6 +1,20 @@
 import type { Preview, Decorator } from '@storybook/react-vite';
+import { INITIAL_VIEWPORTS } from '@storybook/addon-viewport';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import '../src/index.css';
+
+const PWA_VIEWPORTS = {
+  pwaMobile: {
+    name: 'PWA Mobile (390×844)',
+    styles: { width: '390px', height: '844px' },
+    type: 'mobile' as const,
+  },
+  pwaSmall: {
+    name: 'PWA Small (375×667)',
+    styles: { width: '375px', height: '667px' },
+    type: 'mobile' as const,
+  },
+};
 
 // Block all /api/v1/ calls in Storybook — components should use seeded QueryClient data.
 // If a query fires despite seeded data (cache miss, key mismatch, etc.) it gets a clean
@@ -39,6 +53,10 @@ const preview: Preview = {
   decorators: [withQueryClient],
   parameters: {
     backgrounds: { disable: true },
+    viewport: {
+      viewports: { ...PWA_VIEWPORTS, ...INITIAL_VIEWPORTS },
+      defaultViewport: 'responsive',
+    },
     controls: {
       matchers: {
         color: /(background|color)$/i,

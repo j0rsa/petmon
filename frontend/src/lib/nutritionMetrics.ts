@@ -51,4 +51,12 @@ export function formatDayHint(highlight: DayNutritionHighlight | undefined) {
   return parts;
 }
 
+export function formatDayHintCompact(highlight: DayNutritionHighlight | undefined): string {
+  if (!highlight || highlight.recordCount === 0) return '';
+  const ml = totalKnownFluidMl(highlight);
+  if (ml > 0) return `${ml}ml`;
+  if (highlight.dryFood > 0) return `${Math.round(highlight.dryFood)}g`;
+  return `${highlight.recordCount}×`;
+}
+
 export type DayHint = ReturnType<typeof formatDayHint>;

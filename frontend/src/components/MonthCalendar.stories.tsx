@@ -35,3 +35,8 @@ export const SelectedToday: Story = {
     highlights: new Map(),
   },
 };
+
+export const CompactMobile: Story = {
+  args: { compact: true },
+  parameters: { viewport: { defaultViewport: 'pwaMobile' } },
+};

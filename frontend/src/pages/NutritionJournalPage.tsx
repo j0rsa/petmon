@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useState, useSyncExternalStore } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { nutritionAnalyticsApi } from '../api/analytics';
@@ -9,10 +9,17 @@ import { useSelectedPet } from '../context/SelectedPetContext';
 import { localToday, monthBounds, monthKey } from '../lib/dates';
 import { aggregateDailyHighlights } from '../lib/nutritionMetrics';
 
+const mq = window.matchMedia('(max-width: 768px)');
+
 export default function NutritionJournalPage() {
   const navigate = useNavigate();
   const { date: routeDate } = useParams();
   const { selectedPetId, petsLoading } = useSelectedPet();
+  const isMobile = useSyncExternalStore(
+    (cb) => { mq.addEventListener('change', cb); return () => mq.removeEventListener('change', cb); },
+    () => mq.matches,
+    () => false,
+  );
   const selectedDate = routeDate && /^\d{4}-\d{2}-\d{2}$/.test(routeDate) ? routeDate : localToday();
   const [month, setMonth] = useState(monthKey(selectedDate));
 
@@ -51,6 +58,7 @@ export default function NutritionJournalPage() {
         onMonthChange={setMonth}
         onSelectDate={selectDate}
         onGoToToday={() => selectDate(localToday())}
+        compact={isMobile}
       />
       <NutritionDayPanel date={selectedDate} petId={selectedPetId} />
     </div>

@@ -1,5 +1,5 @@
 import { calendarCells, localToday, shiftMonth } from '../lib/dates';
-import { formatDayHint } from '../lib/nutritionMetrics';
+import { formatDayHint, formatDayHintCompact } from '../lib/nutritionMetrics';
 import type { DayNutritionHighlight } from '../types/pillars';
 
 interface MonthCalendarProps {
@@ -9,11 +9,12 @@ interface MonthCalendarProps {
   onMonthChange: (month: string) => void;
   onSelectDate: (date: string) => void;
   onGoToToday?: () => void;
+  compact?: boolean;
 }
 
 const WEEKDAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 
-export function MonthCalendar({ month, selectedDate, highlights, onMonthChange, onSelectDate, onGoToToday }: MonthCalendarProps) {
+export function MonthCalendar({ month, selectedDate, highlights, onMonthChange, onSelectDate, onGoToToday, compact = false }: MonthCalendarProps) {
   const cells = calendarCells(month);
   const today = localToday();
   const isOnToday = selectedDate === today;
@@ -63,7 +64,10 @@ export function MonthCalendar({ month, selectedDate, highlights, onMonthChange, 
             return <div key={`empty-${index}`} className="calendar-cell calendar-cell-empty" />;
           }
 
-          const hint = formatDayHint(highlights.get(cell.date));
+          const highlight = highlights.get(cell.date);
+          const hint = compact
+            ? formatDayHintCompact(highlight)
+            : formatDayHint(highlight);
           const hintLines = Array.isArray(hint) ? hint : hint ? [hint] : [];
           const hasData = hintLines.length > 0;
           const isSelected = cell.date === selectedDate;
