@@ -1,6 +1,7 @@
 /// <reference types="vitest/config" />
 import { defineConfig } from 'vite';
 import react from '@vitejs/plugin-react';
+import { VitePWA } from 'vite-plugin-pwa';
 
 // https://vite.dev/config/
 import path from 'node:path';
@@ -11,7 +12,36 @@ const dirname = typeof __dirname !== 'undefined' ? __dirname : path.dirname(file
 
 // More info at: https://storybook.js.org/docs/next/writing-tests/integrations/vitest-addon
 export default defineConfig({
-  plugins: [react()],
+  plugins: [
+    react(),
+    VitePWA({
+      registerType: 'autoUpdate',
+      includeAssets: ['favicon.svg', 'icons/*.png'],
+      manifest: {
+        name: 'Petmon',
+        short_name: 'Petmon',
+        description: 'Pet monitoring app',
+        theme_color: '#1e1e1c',
+        background_color: '#1c1c1a',
+        display: 'standalone',
+        orientation: 'portrait',
+        scope: '/',
+        start_url: '/',
+        icons: [
+          { src: 'icons/72x72.png',   sizes: '72x72',   type: 'image/png' },
+          { src: 'icons/96x96.png',   sizes: '96x96',   type: 'image/png' },
+          { src: 'icons/128x128.png', sizes: '128x128', type: 'image/png' },
+          { src: 'icons/144x144.png', sizes: '144x144', type: 'image/png' },
+          { src: 'icons/152x152.png', sizes: '152x152', type: 'image/png' },
+          { src: 'icons/180x180.png', sizes: '180x180', type: 'image/png' },
+          { src: 'icons/192x192.png', sizes: '192x192', type: 'image/png' },
+          { src: 'icons/384x384.png', sizes: '384x384', type: 'image/png' },
+          { src: 'icons/512x512.png', sizes: '512x512', type: 'image/png' },
+          { src: 'icons/maskable-512x512.png', sizes: '512x512', type: 'image/png', purpose: 'maskable' },
+        ],
+      },
+    }),
+  ],
   server: {
     proxy: {
       '/api': 'http://localhost:8080',
