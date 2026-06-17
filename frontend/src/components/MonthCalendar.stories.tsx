@@ -4,7 +4,7 @@ import { mockCalendarHighlights } from '../stories/fixtures';
 import { MonthCalendar } from './MonthCalendar';
 
 const meta = {
-  title: 'Components/MonthCalendar',
+  title: 'Calendar/MonthCalendar',
   component: MonthCalendar,
   tags: ['autodocs'],
   args: {

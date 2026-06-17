@@ -1,3 +1,7 @@
+<p align="center">
+  <img src="frontend/public/icons/192x192.png" width="96" alt="Petmon logo" />
+</p>
+
 # petmon
 
 Pet monitoring system — a single deployable service with a React SPA frontend and a Rust/Actix Web backend backed by SQLite. Track nutrition (meals, water, treats), with separate record tables planned per monitoring pillar (nutrition, elimination, health).

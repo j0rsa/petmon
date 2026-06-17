@@ -88,11 +88,13 @@ function AddRow({ date, petId, onSave, saving }: AddRowProps) {
       <input
         className="entry-inline-input entry-inline-time"
         type="time"
+        aria-label="Time"
         value={time}
         onChange={(e) => setTime(e.target.value)}
       />
       <select
         className="entry-inline-input entry-inline-select"
+        aria-label="Category"
         value={category}
         onChange={(e) => setCategory(e.target.value)}
       >
@@ -106,6 +108,7 @@ function AddRow({ date, petId, onSave, saving }: AddRowProps) {
         type="number"
         min="0"
         step="0.1"
+        aria-label="Amount"
         placeholder="amount"
         value={amount}
         onChange={(e) => setAmount(e.target.value)}
@@ -165,12 +168,14 @@ function RecordRow({ record, onSave, onDelete, saving, deleting }: RecordRowProp
           <input
             className="entry-inline-input entry-inline-time"
             type="time"
+            aria-label="Time"
             value={time}
             onChange={(e) => setTime(e.target.value)}
             autoFocus
           />
           <select
             className="entry-inline-input entry-inline-select"
+            aria-label="Category"
             value={category}
             onChange={(e) => setCategory(e.target.value)}
           >
@@ -183,16 +188,17 @@ function RecordRow({ record, onSave, onDelete, saving, deleting }: RecordRowProp
             type="number"
             min="0"
             step="0.1"
+            aria-label="Amount"
             value={amount}
             onChange={(e) => setAmount(e.target.value)}
             onKeyDown={(e) => { if (e.key === 'Enter') commitEdit(); if (e.key === 'Escape') setEditing(false); }}
           />
           <span className="entry-unit-hint">{unitFor(category)}</span>
           <div className="entry-row-actions">
-            <button className="icon-button" type="button" title="Save" disabled={saving} onClick={commitEdit}>
+            <button className="icon-button" type="button" title="Save" aria-label="Save" disabled={saving} onClick={commitEdit}>
               {saving ? '…' : '✓'}
             </button>
-            <button className="icon-button" type="button" title="Cancel" onClick={() => setEditing(false)}>
+            <button className="icon-button" type="button" title="Cancel" aria-label="Cancel" onClick={() => setEditing(false)}>
               ✕
             </button>
           </div>
@@ -208,11 +214,12 @@ function RecordRow({ record, onSave, onDelete, saving, deleting }: RecordRowProp
         <CategoryBadge category={record.category} />
         <span className="entry-amount">{record.amount} {record.unit ?? ''}</span>
         <div className="entry-row-actions">
-          <button className="icon-button" type="button" title="Edit" onClick={startEdit}>✎</button>
+          <button className="icon-button" type="button" title="Edit" aria-label="Edit" onClick={startEdit}>✎</button>
           <button
             className="icon-button icon-button-danger"
             type="button"
             title="Delete"
+            aria-label="Delete"
             disabled={deleting}
             onClick={() => { if (window.confirm('Delete this record?')) onDelete(record.id); }}
           >

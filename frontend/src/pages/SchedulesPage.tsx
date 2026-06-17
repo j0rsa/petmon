@@ -122,6 +122,7 @@ export default function SchedulesPage() {
             {/* Name */}
             <input
               style={{ flex: '1 1 200px', maxWidth: 280 }}
+              aria-label="Schedule name"
               placeholder="Schedule name"
               value={createForm.name}
               onChange={(e) => setCreateForm((f) => ({ ...f, name: e.target.value }))}
@@ -148,6 +149,7 @@ export default function SchedulesPage() {
               <span style={{ fontSize: '0.82rem', color: 'var(--text-muted)', whiteSpace: 'nowrap' }}>target:</span>
               <input
                 type="number"
+                aria-label={`Minimum target in ${unit}`}
                 placeholder={`min ${unit}`}
                 value={createForm.target_min}
                 onChange={(e) => setCreateForm((f) => ({ ...f, target_min: e.target.value }))}
@@ -156,6 +158,7 @@ export default function SchedulesPage() {
               <span style={{ color: 'var(--text-subtle)' }}>–</span>
               <input
                 type="number"
+                aria-label={`Maximum target in ${unit}`}
                 placeholder={`max ${unit}`}
                 value={createForm.target_max}
                 onChange={(e) => setCreateForm((f) => ({ ...f, target_max: e.target.value }))}
@@ -311,12 +314,12 @@ function ScheduleCard({ schedule }: { schedule: NutritionSchedule }) {
         {rules.windows.map((win, index) =>
           editingIndex === index && editRow ? (
             <div key={index} style={{ display: 'flex', gap: '0.5rem', padding: '0.6rem 1rem', alignItems: 'center', borderBottom: '1px solid var(--border-subtle)', flexWrap: 'wrap' }}>
-              <input type="time" value={editRow.from} onChange={(e) => setEditRow({ ...editRow, from: e.target.value })} style={{ width: 120 }} />
+              <input type="time" aria-label="From" value={editRow.from} onChange={(e) => setEditRow({ ...editRow, from: e.target.value })} style={{ width: 120 }} />
               <span style={{ color: 'var(--text-subtle)' }}>–</span>
-              <input type="time" value={editRow.to} onChange={(e) => setEditRow({ ...editRow, to: e.target.value })} style={{ width: 120 }} />
-              <input type="number" placeholder={`min ${unit}`} value={editRow.min || ''} onChange={(e) => setEditRow({ ...editRow, min: Number(e.target.value) })} style={{ width: 90 }} />
-              <input type="number" placeholder={`max ${unit}`} value={editRow.max || ''} onChange={(e) => setEditRow({ ...editRow, max: Number(e.target.value) })} style={{ width: 90 }} />
-              <input placeholder="note" value={editRow.note} onChange={(e) => setEditRow({ ...editRow, note: e.target.value })} style={{ flex: 1, minWidth: 120 }} />
+              <input type="time" aria-label="To" value={editRow.to} onChange={(e) => setEditRow({ ...editRow, to: e.target.value })} style={{ width: 120 }} />
+              <input type="number" aria-label={`Minimum ${unit}`} placeholder={`min ${unit}`} value={editRow.min || ''} onChange={(e) => setEditRow({ ...editRow, min: Number(e.target.value) })} style={{ width: 90 }} />
+              <input type="number" aria-label={`Maximum ${unit}`} placeholder={`max ${unit}`} value={editRow.max || ''} onChange={(e) => setEditRow({ ...editRow, max: Number(e.target.value) })} style={{ width: 90 }} />
+              <input aria-label="Note" placeholder="note" value={editRow.note} onChange={(e) => setEditRow({ ...editRow, note: e.target.value })} style={{ flex: 1, minWidth: 120 }} />
               <button className="button" type="button" style={{ padding: '0.4rem 0.8rem', fontSize: '0.82rem' }} onClick={saveEdit}>save</button>
               <button className="button button-secondary" type="button" style={{ padding: '0.4rem 0.8rem', fontSize: '0.82rem' }} onClick={() => { setEditingIndex(null); setEditRow(null); }}>cancel</button>
             </div>
@@ -328,12 +331,12 @@ function ScheduleCard({ schedule }: { schedule: NutritionSchedule }) {
         {/* Add row */}
         <div style={{ display: 'flex', gap: '0.5rem', padding: '0.75rem 1rem', alignItems: 'center', borderTop: rules.windows.length > 0 ? '1px solid var(--border-subtle)' : undefined, flexWrap: 'wrap' }}>
           <span style={{ fontSize: '0.82rem', color: 'var(--text-muted)', marginRight: '0.25rem' }}>add:</span>
-          <input type="time" value={addRow.from ?? '08:00'} onChange={(e) => setAddRow({ ...addRow, from: e.target.value })} style={{ width: 120 }} />
+          <input type="time" aria-label="From" value={addRow.from ?? '08:00'} onChange={(e) => setAddRow({ ...addRow, from: e.target.value })} style={{ width: 120 }} />
           <span style={{ color: 'var(--text-subtle)' }}>–</span>
-          <input type="time" value={addRow.to ?? '09:00'} onChange={(e) => setAddRow({ ...addRow, to: e.target.value })} style={{ width: 120 }} />
-          <input type="number" placeholder={`min ${unit}`} value={addRow.min ?? ''} onChange={(e) => setAddRow({ ...addRow, min: Number(e.target.value) })} style={{ width: 90 }} />
-          <input type="number" placeholder={`max ${unit}`} value={addRow.max ?? ''} onChange={(e) => setAddRow({ ...addRow, max: Number(e.target.value) })} style={{ width: 90 }} />
-          <input placeholder="note (optional)" value={addRow.note ?? ''} onChange={(e) => setAddRow({ ...addRow, note: e.target.value })} style={{ flex: 1, minWidth: 160 }} />
+          <input type="time" aria-label="To" value={addRow.to ?? '09:00'} onChange={(e) => setAddRow({ ...addRow, to: e.target.value })} style={{ width: 120 }} />
+          <input type="number" aria-label={`Minimum ${unit}`} placeholder={`min ${unit}`} value={addRow.min ?? ''} onChange={(e) => setAddRow({ ...addRow, min: Number(e.target.value) })} style={{ width: 90 }} />
+          <input type="number" aria-label={`Maximum ${unit}`} placeholder={`max ${unit}`} value={addRow.max ?? ''} onChange={(e) => setAddRow({ ...addRow, max: Number(e.target.value) })} style={{ width: 90 }} />
+          <input aria-label="Note" placeholder="note (optional)" value={addRow.note ?? ''} onChange={(e) => setAddRow({ ...addRow, note: e.target.value })} style={{ flex: 1, minWidth: 160 }} />
           <button className="button" type="button" style={{ whiteSpace: 'nowrap' }} onClick={addWindow} disabled={saveMutation.isPending}>
             + add
           </button>

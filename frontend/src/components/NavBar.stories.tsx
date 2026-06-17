@@ -3,7 +3,7 @@ import { withMemoryRouter } from '../stories/decorators';
 import { NavBar } from './NavBar';
 
 const meta = {
-  title: 'Components/NavBar',
+  title: 'Navigation/NavBar',
   component: NavBar,
   tags: ['autodocs'],
   decorators: [

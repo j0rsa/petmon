@@ -4,7 +4,7 @@ import { withNutritionDayPanel } from '../stories/decorators';
 import { NutritionDayPanel } from './NutritionDayPanel';
 
 const meta = {
-  title: 'Components/NutritionDayPanel',
+  title: 'Nutrition/NutritionDayPanel',
   component: NutritionDayPanel,
   tags: ['autodocs'],
   args: {

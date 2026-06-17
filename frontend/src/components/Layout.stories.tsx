@@ -3,7 +3,7 @@ import { MemoryRouter, Route, Routes } from 'react-router-dom';
 import { Layout } from './Layout';
 
 const meta = {
-  title: 'Components/Layout',
+  title: 'Layouts/Layout',
   component: Layout,
   tags: ['autodocs'],
   parameters: {

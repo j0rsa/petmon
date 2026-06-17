@@ -2,7 +2,7 @@ import type { Meta, StoryObj } from '@storybook/react-vite';
 import { CategoryBadge } from './CategoryBadge';
 
 const meta = {
-  title: 'Components/CategoryBadge',
+  title: 'UI/CategoryBadge',
   component: CategoryBadge,
   tags: ['autodocs'],
 } satisfies Meta<typeof CategoryBadge>;

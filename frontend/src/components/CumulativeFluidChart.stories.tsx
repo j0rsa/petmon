@@ -3,7 +3,7 @@ import { mockAnalyticsDateTo, mockAnalyticsRecords, mockNutritionSchedules } fro
 import { CumulativeFluidChart } from './CumulativeFluidChart';
 
 const meta = {
-  title: 'Components/CumulativeFluidChart',
+  title: 'Charts/CumulativeFluidChart',
   component: CumulativeFluidChart,
   tags: ['autodocs'],
   parameters: {

@@ -14,7 +14,7 @@ function BrokenChild(): never {
 }
 
 const meta = {
-  title: 'Components/ErrorBoundary',
+  title: 'UI/ErrorBoundary',
   component: ErrorBoundary,
   tags: ['autodocs'],
 } satisfies Meta<typeof ErrorBoundary>;
