@@ -3,8 +3,42 @@ name: CI/CD
 on:
   push:
     branches: [main]
+    paths:
+      - 'src/**'
+      - 'tests/**'
+      - 'migrations/**'
+      - 'build.rs'
+      - 'Cargo.toml'
+      - 'Cargo.lock'
+      - 'frontend/src/**'
+      - 'frontend/public/**'
+      - 'frontend/package.json'
+      - 'frontend/package-lock.json'
+      - 'frontend/vite.config.ts'
+      - 'frontend/tsconfig*.json'
+      - 'frontend/eslint.config.js'
+      - 'frontend/.storybook/**'
+      - 'Dockerfile'
+      - '.github/workflows/**'
   pull_request:
     branches: [main]
+    paths:
+      - 'src/**'
+      - 'tests/**'
+      - 'migrations/**'
+      - 'build.rs'
+      - 'Cargo.toml'
+      - 'Cargo.lock'
+      - 'frontend/src/**'
+      - 'frontend/public/**'
+      - 'frontend/package.json'
+      - 'frontend/package-lock.json'
+      - 'frontend/vite.config.ts'
+      - 'frontend/tsconfig*.json'
+      - 'frontend/eslint.config.js'
+      - 'frontend/.storybook/**'
+      - 'Dockerfile'
+      - '.github/workflows/**'
 
 env:
   REGISTRY: ghcr.io

@@ -204,6 +204,29 @@ Staging Bot, [31. May 2026 at 06:15:15]:
 
 Each pillar will get its own parser on the frontend; the backend only accepts structured record payloads.
 
+## CI/CD
+
+The pipeline only runs when source files change (README, icons, and other non-code files are ignored).
+
+```
+version-check ──► frontend ──────────────────────────────────┐
+              └──► backend-check ──► backend-amd64 ───────────┤──► docker
+                               └──► backend-arm64 ───────────┘
+```
+
+| Job | What it does |
+|-----|--------------|
+| `version-check` | Reads `version` from `Cargo.toml`, fails if that tag already exists in GHCR (main push only) |
+| `frontend` | tsc, lint, Vitest/Storybook tests, Vite build → uploads `frontend/dist` artifact |
+| `backend-check` | `cargo fmt`, `cargo clippy` (platform-agnostic, runs once) |
+| `backend-amd64` | Tests + musl release build for `x86_64` → uploads binary artifact |
+| `backend-arm64` | Tests + musl release build for `aarch64` on a native ARM runner → uploads binary artifact |
+| `docker` | Assembles both binaries + frontend dist, builds and pushes multiarch image to GHCR |
+
+On **main push** the Docker image is tagged `v<version>`, `sha-<short>`, and `latest`.  
+On **pull requests** all jobs run but nothing is pushed to the registry.  
+To release a new version, bump `version` in `Cargo.toml` and push.
+
 ## Deployment
 
 The release binary is self-contained — it embeds all frontend assets and auto-runs SQLite migrations:
