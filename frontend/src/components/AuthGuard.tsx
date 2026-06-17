@@ -5,29 +5,25 @@ import { fetchAuthInfo, getStoredToken, redirectToLogin, storeRedirectPath } fro
 type State = 'checking' | 'authenticated' | 'redirecting';
 
 export function AuthGuard() {
-  const [state, setState] = useState<State>('checking');
+  const [state, setState] = useState<State>(() =>
+    getStoredToken() ? 'authenticated' : 'checking'
+  );
 
   useEffect(() => {
-    if (getStoredToken()) {
-      setState('authenticated');
-      return;
-    }
+    if (state !== 'checking') return;
 
     fetchAuthInfo().then((info) => {
-      if (info.mode === 'dev') {
-        setState('authenticated');
-      } else if (info.mode === 'oidc') {
+      if (info.mode === 'oidc') {
         storeRedirectPath(window.location.pathname + window.location.search);
         setState('redirecting');
         redirectToLogin(info);
       } else {
-        // unconfigured — let the app load and show whatever error state it has
         setState('authenticated');
       }
     }).catch(() => {
       setState('authenticated');
     });
-  }, []);
+  }, [state]);
 
   if (state === 'checking' || state === 'redirecting') {
     return null;
