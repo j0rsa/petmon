@@ -76,7 +76,7 @@ jobs:
 
       - name: Clippy
         env:
-          DATABASE_URL: sqlite::memory:
+          DATABASE_URL: "sqlite::memory:"
         run: cargo clippy --locked -- -D warnings
 
       - name: Audit dependencies
@@ -107,12 +107,12 @@ jobs:
 
       - name: Run tests
         env:
-          DATABASE_URL: sqlite::memory:
+          DATABASE_URL: "sqlite::memory:"
         run: cargo test --locked
 
       - name: Build release binary
         env:
-          DATABASE_URL: sqlite::memory:
+          DATABASE_URL: "sqlite::memory:"
         run: cargo build --release --locked --target x86_64-unknown-linux-musl
 
       - name: Upload binary artifact
@@ -145,12 +145,12 @@ jobs:
 
       - name: Run tests
         env:
-          DATABASE_URL: sqlite::memory:
+          DATABASE_URL: "sqlite::memory:"
         run: cargo test --locked
 
       - name: Build release binary
         env:
-          DATABASE_URL: sqlite::memory:
+          DATABASE_URL: "sqlite::memory:"
         run: cargo build --release --locked --target aarch64-unknown-linux-musl
 
       - name: Upload binary artifact
