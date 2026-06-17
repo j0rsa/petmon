@@ -2,6 +2,7 @@ import type { Meta, StoryObj } from '@storybook/react-vite';
 import { MemoryRouter } from 'react-router-dom';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { NoPetSelected } from './NoPetSelected';
+import { SelectedPetProvider } from '../context/SelectedPetContext';
 
 function withEmptyPets(Story: React.ComponentType) {
   const client = new QueryClient({ defaultOptions: { queries: { retry: false, staleTime: Infinity } } });
@@ -10,7 +11,9 @@ function withEmptyPets(Story: React.ComponentType) {
   return (
     <MemoryRouter>
       <QueryClientProvider client={client}>
-        <Story />
+        <SelectedPetProvider>
+          <Story />
+        </SelectedPetProvider>
       </QueryClientProvider>
     </MemoryRouter>
   );
