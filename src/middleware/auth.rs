@@ -49,7 +49,8 @@ where
 
         Box::pin(async move {
             // Public paths that bypass auth entirely
-            if req.path() == "/api/v1/auth/info" {
+            let public = matches!(req.path(), "/api/v1/auth/info" | "/api/v1/health");
+            if public {
                 let res = service.call(req).await?;
                 return Ok(res.map_into_left_body());
             }
