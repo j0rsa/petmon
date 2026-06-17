@@ -9,7 +9,7 @@ function HealthyChild() {
   );
 }
 
-function BrokenChild() {
+function BrokenChild(): never {
   throw new Error('Storybook demo error');
 }
 
@@ -23,6 +23,7 @@ export default meta;
 type Story = StoryObj<typeof meta>;
 
 export const Healthy: Story = {
+  args: { children: null },
   render: () => (
     <ErrorBoundary>
       <HealthyChild />
@@ -32,6 +33,7 @@ export const Healthy: Story = {
 
 export const WithError: Story = {
   tags: ['skip-test'],
+  args: { children: null },
   render: () => (
     <ErrorBoundary>
       <BrokenChild />

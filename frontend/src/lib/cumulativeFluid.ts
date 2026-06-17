@@ -199,7 +199,7 @@ function projectTotalSeries(points: Array<{ x: number; total: number }>, allX: n
 
 export function buildCumulativeFluidChart(
   records: NutritionRecord[],
-  focusDate: string,
+  _focusDate: string,
   schedules: NutritionSchedule[],
   bestDayCurvePoints?: FluidCurvePoint[],
   bestDayDate?: string,

@@ -161,8 +161,8 @@ export default function AnalyticsPage() {
                     unit=" ml"
                   />
                   <Tooltip
-                    formatter={(v: number) => [`${v} ml`, 'total fluid']}
-                    labelFormatter={formatDate}
+                    formatter={(v) => [`${v ?? 0} ml`, 'total fluid']}
+                    labelFormatter={(label) => formatDate(String(label))}
                     contentStyle={{ background: 'var(--surface)', border: '1px solid var(--border-subtle)', borderRadius: 8, fontFamily: 'monospace', fontSize: 12 }}
                   />
                   <Line
@@ -199,7 +199,7 @@ export default function AnalyticsPage() {
                     tick={{ fill: 'var(--chart-axis)', fontFamily: 'monospace', fontSize: 11 }}
                   />
                   <Tooltip
-                    labelFormatter={formatDate}
+                    labelFormatter={(label) => formatDate(String(label))}
                     contentStyle={{ background: 'var(--surface)', border: '1px solid var(--border-subtle)', borderRadius: 8, fontFamily: 'monospace', fontSize: 12 }}
                   />
                   <Legend wrapperStyle={{ fontFamily: 'monospace', fontSize: 12 }} />
@@ -232,8 +232,8 @@ export default function AnalyticsPage() {
                     domain={[0, 100]}
                   />
                   <Tooltip
-                    formatter={(v: number, name: string) => [`${v}%`, name]}
-                    labelFormatter={formatDate}
+                    formatter={(v, name) => [`${v ?? 0}%`, String(name)]}
+                    labelFormatter={(label) => formatDate(String(label))}
                     contentStyle={{ background: 'var(--surface)', border: '1px solid var(--border-subtle)', borderRadius: 8, fontFamily: 'monospace', fontSize: 12 }}
                   />
                   <Bar dataKey="liquids" name="liquids" stackId="ratio" fill="#4fd8f8" radius={[0, 0, 0, 0]} />

@@ -230,13 +230,11 @@ export const mockOidcConfigured: OidcConfigPublic = {
 
 export const mockTelegramEmpty: TelegramConfigPublic = {
   enabled: false,
-  chat_id: null,
   has_bot_token: false,
 };
 
 export const mockTelegramConfigured: TelegramConfigPublic = {
   enabled: true,
-  chat_id: '-1001234567890',
   has_bot_token: true,
 };
 
