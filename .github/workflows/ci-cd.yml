@@ -20,6 +20,7 @@ on:
       - 'frontend/.storybook/**'
       - 'Dockerfile'
       - '.github/workflows/**'
+      - '.config/**'
   pull_request:
     branches: [main]
     paths:
@@ -39,6 +40,7 @@ on:
       - 'frontend/.storybook/**'
       - 'Dockerfile'
       - '.github/workflows/**'
+      - '.config/**'
 
 env:
   REGISTRY: ghcr.io
