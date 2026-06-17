@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Outlet } from 'react-router-dom';
 import { fetchAuthInfo, getStoredToken, redirectToLogin, storeRedirectPath } from '../lib/auth';
 
@@ -8,9 +8,12 @@ export function AuthGuard() {
   const [state, setState] = useState<State>(() =>
     getStoredToken() ? 'authenticated' : 'checking'
   );
+  const ran = useRef(false);
 
   useEffect(() => {
     if (state !== 'checking') return;
+    if (ran.current) return;
+    ran.current = true;
 
     fetchAuthInfo().then((info) => {
       if (info.mode === 'oidc') {

@@ -1,3 +1,4 @@
+import { useEffect } from 'react';
 import { Navigate, Route, Routes, useParams } from 'react-router-dom';
 import { AuthGuard } from './components/AuthGuard';
 import { Layout } from './components/Layout';
@@ -53,6 +54,8 @@ function DayRedirect() {
 }
 
 function HardRedirect({ to }: { to: string }) {
-  window.location.replace(to);
+  useEffect(() => {
+    window.location.replace(to);
+  }, [to]);
   return null;
 }
