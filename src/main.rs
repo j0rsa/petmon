@@ -78,7 +78,11 @@ async fn main() -> anyhow::Result<()> {
                     .configure(api::notes::configure)
                     .configure(api::settings::configure),
             )
-            .configure(mcp::transport::configure)
+            .service(
+                web::scope("")
+                    .wrap(middleware::auth::RequireAuth)
+                    .configure(mcp::transport::configure),
+            )
             .configure(assets::configure)
     })
     .bind(&bind_addr)?
