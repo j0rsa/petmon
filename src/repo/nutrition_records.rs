@@ -37,7 +37,7 @@ pub async fn list_records(
         query.push_str(&format!(" OFFSET {}", offset.max(0)));
     }
 
-    let mut q = sqlx::query_as::<_, NutritionRecord>(&query);
+    let mut q = sqlx::query_as::<_, NutritionRecord>(sqlx::AssertSqlSafe(query));
     if let Some(pet_id) = filters.pet_id {
         q = q.bind(pet_id);
     }

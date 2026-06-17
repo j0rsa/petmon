@@ -16,7 +16,7 @@ pub async fn list_schedules(
     }
     query.push_str(" ORDER BY created_at DESC");
 
-    let mut q = sqlx::query_as::<_, NutritionSchedule>(&query);
+    let mut q = sqlx::query_as::<_, NutritionSchedule>(sqlx::AssertSqlSafe(query));
     if let Some(pet_id) = pet_id {
         q = q.bind(pet_id);
     }

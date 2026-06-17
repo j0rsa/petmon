@@ -7,7 +7,10 @@ use tracing_subscriber::EnvFilter;
 async fn main() -> anyhow::Result<()> {
     let config = config::Config::from_env();
 
-    let env_filter = EnvFilter::from_default_env().add_directive("petmon=info".parse()?);
+    let env_filter = EnvFilter::from_default_env()
+        .add_directive("petmon=info".parse()?)
+        .add_directive("tracing_actix_web=info".parse()?)
+        .add_directive("sqlx=info".parse()?);
 
     let otel_provider = telemetry::init(
         &config.service_name,

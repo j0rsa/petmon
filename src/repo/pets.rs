@@ -9,12 +9,14 @@ const PET_COLUMNS: &str =
 
 pub async fn list_pets(pool: &SqlitePool) -> AppResult<Vec<Pet>> {
     let query = format!("SELECT {PET_COLUMNS} FROM pets ORDER BY name");
-    Ok(sqlx::query_as::<_, Pet>(&query).fetch_all(pool).await?)
+    Ok(sqlx::query_as::<_, Pet>(sqlx::AssertSqlSafe(query))
+        .fetch_all(pool)
+        .await?)
 }
 
 pub async fn get_pet(pool: &SqlitePool, id: Uuid) -> AppResult<Pet> {
     let query = format!("SELECT {PET_COLUMNS} FROM pets WHERE id = ?");
-    sqlx::query_as::<_, Pet>(&query)
+    sqlx::query_as::<_, Pet>(sqlx::AssertSqlSafe(query))
         .bind(id)
         .fetch_optional(pool)
         .await?

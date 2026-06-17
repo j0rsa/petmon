@@ -1,14 +1,13 @@
 use crate::config::Config;
 use crate::error::AppError;
-use sqlx::{sqlite::SqliteConnectOptions, sqlite::SqlitePoolOptions, ConnectOptions, SqlitePool};
+use sqlx::{sqlite::SqliteConnectOptions, sqlite::SqlitePoolOptions, SqlitePool};
 use std::str::FromStr;
 
 pub async fn create_pool(config: &Config) -> Result<SqlitePool, AppError> {
     let options = SqliteConnectOptions::from_str(&config.database_url)
         .map_err(|e| AppError::Internal(format!("Invalid database URL: {e}")))?
         .create_if_missing(true)
-        .foreign_keys(true)
-        .disable_statement_logging();
+        .foreign_keys(true);
 
     let pool = SqlitePoolOptions::new()
         .max_connections(5)

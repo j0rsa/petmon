@@ -24,7 +24,7 @@ pub async fn daily_totals(
     }
     query.push_str(" GROUP BY local_date, pet_id, category ORDER BY local_date, category");
 
-    let mut q = sqlx::query_as::<_, NutritionDailyTotal>(&query)
+    let mut q = sqlx::query_as::<_, NutritionDailyTotal>(sqlx::AssertSqlSafe(query))
         .bind(date_from)
         .bind(date_to);
     if let Some(pet_id) = pet_id {
@@ -55,7 +55,7 @@ pub async fn best_fluid_day(
     }
     query.push_str(" GROUP BY local_date ORDER BY total_fluid_ml DESC LIMIT 1");
 
-    let mut q = sqlx::query_as::<_, BestDayRow>(&query).bind(exclude_date);
+    let mut q = sqlx::query_as::<_, BestDayRow>(sqlx::AssertSqlSafe(query)).bind(exclude_date);
     if let Some(id) = pet_id {
         q = q.bind(id);
     }

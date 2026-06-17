@@ -92,7 +92,7 @@ export async function fetchAuthInfo(): Promise<AuthInfo> {
 }
 
 /** Build the PKCE authorization URL and navigate to it. */
-export async function redirectToLogin(authInfo: AuthInfo): Promise<void> {
+export async function redirectToLogin(authInfo: AuthInfo, redirectTo?: string): Promise<void> {
   if (!authInfo.authorization_endpoint || !authInfo.client_id) return;
 
   const verifier = await generateCodeVerifier();
@@ -101,7 +101,7 @@ export async function redirectToLogin(authInfo: AuthInfo): Promise<void> {
 
   storeVerifier(verifier);
   storeState(state);
-  storeRedirectPath(window.location.pathname + window.location.search);
+  storeRedirectPath(redirectTo ?? window.location.pathname + window.location.search);
 
   const redirectUri = `${window.location.origin}/auth/callback`;
 

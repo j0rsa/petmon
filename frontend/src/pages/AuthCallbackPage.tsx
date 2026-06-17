@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import {
   consumeRedirectPath,
   consumeState,
@@ -10,8 +10,12 @@ import {
 
 export default function AuthCallbackPage() {
   const [error, setError] = useState<string | null>(null);
+  const ran = useRef(false);
 
   useEffect(() => {
+    if (ran.current) return;
+    ran.current = true;
+
     async function exchange() {
       const params = new URLSearchParams(window.location.search);
       const code = params.get('code');
@@ -103,7 +107,7 @@ export default function AuthCallbackPage() {
           type="button"
           onClick={async () => {
             const authInfo = await fetchAuthInfo().catch(() => null);
-            if (authInfo?.mode === 'oidc') redirectToLogin(authInfo);
+            if (authInfo?.mode === 'oidc') redirectToLogin(authInfo, '/');
           }}
         >
           Try again
