@@ -118,6 +118,17 @@ cargo run
 
 Then open the Jaeger UI at `http://localhost:16686`.
 
+### OIDC provider setup
+
+petmon uses the **PKCE (Proof Key for Code Exchange)** flow — the browser exchanges the authorization code directly with the provider, without a client secret. When registering your OIDC application:
+
+- Set the client type to **public** (not confidential).
+- Enable **PKCE** / **Authorization Code with PKCE** on the client.
+- Do **not** require a client secret for token requests.
+- Add `https://<your-domain>/auth/callback` as an allowed redirect URI.
+
+No client secret is needed or stored — petmon uses PKCE exclusively.
+
 ### OIDC environment override
 
 If any of the following vars are present at startup, they are merged over the OIDC config stored in the database. Fields that are absent in the environment are left unchanged — so you can update only the secret without re-supplying the issuer URL, for example.
@@ -126,7 +137,6 @@ If any of the following vars are present at startup, they are merged over the OI
 |----------|-------------|
 | `OIDC_ISSUER_URL` | Issuer URL for autodiscovery (`/.well-known/openid-configuration`) |
 | `OIDC_CLIENT_ID` | OAuth2 client ID |
-| `OIDC_CLIENT_SECRET` | OAuth2 client secret |
 | `OIDC_ENABLED` | `1` / `true` / `yes` to enable, any other value to disable |
 
 If none of the four vars are set, no database write occurs.  This is useful for container deployments where secrets are injected via the environment but UI-driven changes (e.g. toggling enabled) should persist across restarts.

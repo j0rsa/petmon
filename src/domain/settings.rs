@@ -11,17 +11,14 @@ pub struct OidcConfig {
     /// OIDC issuer URL used for autodiscovery (/.well-known/openid-configuration)
     pub issuer_url: Option<String>,
     pub client_id: Option<String>,
-    /// Stored but never returned via GET
-    pub client_secret: Option<String>,
 }
 
-/// What GET /settings/oidc returns — no client_secret
+/// What GET /settings/oidc returns.
 #[derive(Debug, Serialize)]
 pub struct OidcConfigPublic {
     pub enabled: bool,
     pub issuer_url: Option<String>,
     pub client_id: Option<String>,
-    pub has_client_secret: bool,
 }
 
 impl From<OidcConfig> for OidcConfigPublic {
@@ -30,18 +27,15 @@ impl From<OidcConfig> for OidcConfigPublic {
             enabled: c.enabled,
             issuer_url: c.issuer_url,
             client_id: c.client_id,
-            has_client_secret: c.client_secret.is_some(),
         }
     }
 }
 
-/// PATCH body — omitting client_secret keeps the stored value.
 #[derive(Debug, Deserialize)]
 pub struct UpdateOidcConfig {
     pub enabled: Option<bool>,
     pub issuer_url: Option<String>,
     pub client_id: Option<String>,
-    pub client_secret: Option<String>,
 }
 
 impl UpdateOidcConfig {
@@ -50,7 +44,6 @@ impl UpdateOidcConfig {
             enabled: self.enabled.unwrap_or(existing.enabled),
             issuer_url: self.issuer_url.or(existing.issuer_url),
             client_id: self.client_id.or(existing.client_id),
-            client_secret: self.client_secret.or(existing.client_secret),
         }
     }
 }

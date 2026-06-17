@@ -4,14 +4,12 @@ export interface OidcConfigPublic {
   enabled: boolean;
   issuer_url: string | null;
   client_id: string | null;
-  has_client_secret: boolean;
 }
 
 export interface UpdateOidcConfig {
   enabled?: boolean;
   issuer_url?: string | null;
   client_id?: string | null;
-  client_secret?: string | null;
 }
 
 export interface TelegramConfigPublic {

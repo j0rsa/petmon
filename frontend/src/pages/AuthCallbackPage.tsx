@@ -1,5 +1,4 @@
 import { useEffect, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
 import {
   consumeRedirectPath,
   consumeState,
@@ -10,7 +9,6 @@ import {
 } from '../lib/auth';
 
 export default function AuthCallbackPage() {
-  const navigate = useNavigate();
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
@@ -82,11 +80,11 @@ export default function AuthCallbackPage() {
       }
 
       storeToken(idToken);
-      navigate(consumeRedirectPath(), { replace: true });
+      window.location.replace(consumeRedirectPath());
     }
 
     exchange().catch((err) => setError(err instanceof Error ? err.message : String(err)));
-  }, [navigate]);
+  }, []);
 
   if (error) {
     return (

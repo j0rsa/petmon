@@ -9,12 +9,11 @@ use crate::repo::settings;
 pub async fn sync_oidc_from_env(pool: &SqlitePool) {
     let issuer_url = std::env::var("OIDC_ISSUER_URL").ok();
     let client_id = std::env::var("OIDC_CLIENT_ID").ok();
-    let client_secret = std::env::var("OIDC_CLIENT_SECRET").ok();
     let enabled = std::env::var("OIDC_ENABLED")
         .ok()
         .map(|v| matches!(v.to_lowercase().as_str(), "1" | "true" | "yes"));
 
-    if issuer_url.is_none() && client_id.is_none() && client_secret.is_none() && enabled.is_none() {
+    if issuer_url.is_none() && client_id.is_none() && enabled.is_none() {
         return;
     }
 
@@ -30,7 +29,6 @@ pub async fn sync_oidc_from_env(pool: &SqlitePool) {
         enabled: enabled.unwrap_or(existing.enabled),
         issuer_url: issuer_url.or(existing.issuer_url),
         client_id: client_id.or(existing.client_id),
-        client_secret: client_secret.or(existing.client_secret),
     };
 
     match settings::upsert(pool, "oidc", &merged).await {

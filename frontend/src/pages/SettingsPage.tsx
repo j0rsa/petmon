@@ -22,9 +22,8 @@ function OidcSection() {
   const [enabled, setEnabled] = useState<boolean | null>(null);
   const [issuerUrl, setIssuerUrl] = useState('');
   const [clientId, setClientId] = useState('');
-  const [clientSecret, setClientSecret] = useState('');
 
-  const current = data ?? ({ enabled: false, issuer_url: null, client_id: null, has_client_secret: false } as OidcConfigPublic);
+  const current = data ?? ({ enabled: false, issuer_url: null, client_id: null } as OidcConfigPublic);
   const effectiveEnabled = enabled ?? current.enabled;
 
   const mutation = useMutation({
@@ -32,13 +31,11 @@ function OidcSection() {
       enabled: effectiveEnabled,
       ...(issuerUrl ? { issuer_url: issuerUrl } : {}),
       ...(clientId ? { client_id: clientId } : {}),
-      ...(clientSecret ? { client_secret: clientSecret } : {}),
     }),
     onSuccess: (updated) => {
       queryClient.setQueryData(['settings-oidc'], updated);
       setIssuerUrl('');
       setClientId('');
-      setClientSecret('');
       setEnabled(null);
     },
   });
@@ -80,17 +77,6 @@ function OidcSection() {
             <span style={{ fontSize: '0.78rem', color: 'var(--text-subtle)' }}>current: {current.client_id}</span>
           )}
         </div>
-        <div className="form-row">
-          <label>Client secret</label>
-          <input
-            type="password"
-            placeholder={current.has_client_secret ? '••••••••  (set — leave blank to keep)' : 'Enter client secret'}
-            value={clientSecret}
-            onChange={(e) => setClientSecret(e.target.value)}
-            autoComplete="new-password"
-          />
-        </div>
-
         <div className="form-row" style={{ justifyContent: 'flex-end', flexDirection: 'row', alignItems: 'center', gap: '1rem', gridColumn: '1 / -1' }}>
           <label className="checkbox-row" style={{ paddingTop: 0 }}>
             <input
