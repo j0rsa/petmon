@@ -64,7 +64,7 @@ export function parseTelegramNutritionLog(raw: string): ParsedNutritionEntry[] {
 export function toCreateNutritionRecords(entries: ParsedNutritionEntry[], petId: string): CreateNutritionRecord[] {
   return entries.map((entry) => ({
     pet_id: petId,
-    occurred_at: `${entry.local_date}T${entry.time}:00Z`,
+    occurred_at: `${entry.local_date}T${entry.time}:00`,
     local_date: entry.local_date,
     category: entry.category,
     amount: entry.amount,

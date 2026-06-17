@@ -335,6 +335,45 @@ paths:
         '401':
           $ref: '#/components/responses/Unauthorized'
 
+  /settings/display:
+    get:
+      tags:
+        - Settings
+      summary: Get display settings
+      description: Retrieve display preferences (time format, date format, water card visibility)
+      responses:
+        '200':
+          description: Display settings
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DisplaySettings'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+    post:
+      tags:
+        - Settings
+      summary: Update display settings
+      description: Update display preferences. Omitted fields keep their existing values.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateDisplaySettings'
+      responses:
+        '200':
+          description: Display settings updated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DisplaySettings'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
   /settings/oidc:
     get:
       tags:
@@ -474,6 +513,27 @@ paths:
           $ref: '#/components/responses/Unauthorized'
         '404':
           $ref: '#/components/responses/NotFound'
+
+  /api-tokens/{id}/permanent:
+    delete:
+      tags:
+        - API Tokens
+      summary: Permanently delete API token
+      description: Permanently delete an inactive API token. The token must be deactivated first.
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: API token ID
+          schema:
+            type: string
+      responses:
+        '204':
+          description: API token permanently deleted
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
 
   /nutrition/records:
     get:
@@ -1491,10 +1551,15 @@ components:
         cumulative_fluid_ml:
           type: number
           format: double
-          description: Cumulative fluid intake up to this time
+          description: Cumulative total fluid (liquids + wet food moisture) up to this time
+        cumulative_liquids_ml:
+          type: number
+          format: double
+          description: Cumulative direct liquid intake (water + liquids categories only) up to this time
       required:
         - time
         - cumulative_fluid_ml
+        - cumulative_liquids_ml
 
     BestFluidDay:
       type: object
@@ -1550,6 +1615,46 @@ components:
         - daily_totals
         - category_averages
 
+    TimeFormat:
+      type: string
+      enum:
+        - h24
+        - h12
+      description: Time display format
+
+    DateFormat:
+      type: string
+      enum:
+        - dmy
+        - mmm_dd_yyyy
+      description: "Date display format: DD.MM.YYYY or MMM DD, YYYY"
+
+    DisplaySettings:
+      type: object
+      properties:
+        time_format:
+          $ref: '#/components/schemas/TimeFormat'
+        date_format:
+          $ref: '#/components/schemas/DateFormat'
+        show_water_card:
+          type: boolean
+          description: Whether to show the water metric card on the day panel
+      required:
+        - time_format
+        - date_format
+        - show_water_card
+
+    UpdateDisplaySettings:
+      type: object
+      properties:
+        time_format:
+          $ref: '#/components/schemas/TimeFormat'
+        date_format:
+          $ref: '#/components/schemas/DateFormat'
+        show_water_card:
+          type: boolean
+          nullable: true
+
     OidcConfigPublic:
       type: object
       properties:
@@ -1563,13 +1668,9 @@ components:
         client_id:
           type: string
           nullable: true
-          description: OAuth2 client ID
-        has_client_secret:
-          type: boolean
-          description: Whether a client secret is configured
+          description: OAuth2 client ID (used by the frontend for PKCE flow)
       required:
         - enabled
-        - has_client_secret
 
     UpdateOidcConfig:
       type: object
@@ -1583,10 +1684,6 @@ components:
         client_id:
           type: string
           nullable: true
-        client_secret:
-          type: string
-          nullable: true
-          description: If omitted, the stored value is preserved
 
     TelegramConfigPublic:
       type: object
@@ -1685,7 +1782,7 @@ tags:
   - name: Notes
     description: Day notes (alternative interface)
   - name: Settings
-    description: Configuration settings (OIDC, Telegram, API tokens)
+    description: Configuration settings (display preferences, OIDC, Telegram, API tokens)
   - name: API Tokens
     description: API token management
   - name: Nutrition Records

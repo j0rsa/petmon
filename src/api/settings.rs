@@ -2,8 +2,8 @@ use actix_web::{delete, get, post, web, HttpMessage, HttpRequest, HttpResponse};
 
 use crate::auth::{identity::IdentityKind, AppState};
 use crate::domain::settings::{
-    ApiTokenPublic, CreateApiToken, OidcConfig, OidcConfigPublic, TelegramConfig,
-    TelegramConfigPublic, UpdateOidcConfig, UpdateTelegramConfig,
+    ApiTokenPublic, CreateApiToken, DisplaySettings, OidcConfig, OidcConfigPublic, TelegramConfig,
+    TelegramConfigPublic, UpdateDisplaySettings, UpdateOidcConfig, UpdateTelegramConfig,
 };
 use crate::error::{AppError, AppResult};
 use crate::repo::{api_tokens, settings};
@@ -29,6 +29,25 @@ pub async fn update_oidc(
         oidc.invalidate();
     }
     Ok(HttpResponse::Ok().json(OidcConfigPublic::from(merged)))
+}
+
+// ── Display settings ─────────────────────────────────────────────────────────
+
+#[get("/display")]
+pub async fn get_display(state: web::Data<AppState>) -> AppResult<HttpResponse> {
+    let cfg: DisplaySettings = settings::get(&state.pool, "display").await?;
+    Ok(HttpResponse::Ok().json(cfg))
+}
+
+#[post("/display")]
+pub async fn update_display(
+    state: web::Data<AppState>,
+    body: web::Json<UpdateDisplaySettings>,
+) -> AppResult<HttpResponse> {
+    let existing: DisplaySettings = settings::get(&state.pool, "display").await?;
+    let merged = body.into_inner().apply(existing);
+    settings::upsert(&state.pool, "display", &merged).await?;
+    Ok(HttpResponse::Ok().json(merged))
 }
 
 // ── Telegram ──────────────────────────────────────────────────────────────────
@@ -105,11 +124,22 @@ pub async fn deactivate_token(
     Ok(HttpResponse::NoContent().finish())
 }
 
+#[delete("/{id}/permanent")]
+pub async fn delete_token(
+    state: web::Data<AppState>,
+    path: web::Path<String>,
+) -> AppResult<HttpResponse> {
+    api_tokens::delete(&state.pool, &path.into_inner()).await?;
+    Ok(HttpResponse::NoContent().finish())
+}
+
 pub fn configure(cfg: &mut web::ServiceConfig) {
     cfg.service(
         web::scope("/settings")
             .service(get_oidc)
             .service(update_oidc)
+            .service(get_display)
+            .service(update_display)
             .service(get_telegram)
             .service(update_telegram),
     )
@@ -117,6 +147,7 @@ pub fn configure(cfg: &mut web::ServiceConfig) {
         web::scope("/api-tokens")
             .service(list_tokens)
             .service(create_token)
-            .service(deactivate_token),
+            .service(deactivate_token)
+            .service(delete_token),
     );
 }

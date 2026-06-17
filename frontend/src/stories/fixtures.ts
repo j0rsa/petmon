@@ -1,7 +1,7 @@
 import { localToday, shiftDate } from '../lib/dates';
 import type { BestFluidDay, Category, NutritionDaySummary, NutritionRangeSummary, NutritionRecord, NutritionSchedule, Pet } from '../types';
 import type { DayNutritionHighlight } from '../types/pillars';
-import type { ApiTokenPublic, OidcConfigPublic, TelegramConfigPublic } from '../api/settings';
+import type { ApiTokenCreated, ApiTokenPublic, DisplaySettings, OidcConfigPublic, TelegramConfigPublic } from '../api/settings';
 
 export const mockPetId = '550e8400-e29b-41d4-a716-446655440000';
 
@@ -200,16 +200,24 @@ export const mockBestFluidDay: BestFluidDay = {
   local_date: '2024-06-10',
   total_fluid_ml: 142,
   curve: [
-    { time: '06:15', cumulative_fluid_ml: 12 },
-    { time: '08:30', cumulative_fluid_ml: 27 },
-    { time: '11:00', cumulative_fluid_ml: 40 },
-    { time: '13:30', cumulative_fluid_ml: 53 },
-    { time: '15:45', cumulative_fluid_ml: 68 },
-    { time: '17:30', cumulative_fluid_ml: 81 },
-    { time: '19:00', cumulative_fluid_ml: 95 },
-    { time: '21:15', cumulative_fluid_ml: 110 },
-    { time: '22:30', cumulative_fluid_ml: 142 },
+    { time: '06:15', cumulative_fluid_ml: 12,  cumulative_liquids_ml: 12  },
+    { time: '08:30', cumulative_fluid_ml: 27,  cumulative_liquids_ml: 22  },
+    { time: '11:00', cumulative_fluid_ml: 40,  cumulative_liquids_ml: 32  },
+    { time: '13:30', cumulative_fluid_ml: 53,  cumulative_liquids_ml: 42  },
+    { time: '15:45', cumulative_fluid_ml: 68,  cumulative_liquids_ml: 52  },
+    { time: '17:30', cumulative_fluid_ml: 81,  cumulative_liquids_ml: 62  },
+    { time: '19:00', cumulative_fluid_ml: 95,  cumulative_liquids_ml: 70  },
+    { time: '21:15', cumulative_fluid_ml: 110, cumulative_liquids_ml: 80  },
+    { time: '22:30', cumulative_fluid_ml: 142, cumulative_liquids_ml: 95  },
   ],
+};
+
+// ── Display settings fixtures ─────────────────────────────────────────────────
+
+export const mockDisplaySettings: DisplaySettings = {
+  time_format: 'h24',
+  date_format: 'dmy',
+  show_water_card: true,
 };
 
 // ── Settings fixtures ─────────────────────────────────────────────────────────
@@ -262,3 +270,10 @@ export const mockApiTokens: ApiTokenPublic[] = [
     last_used_at: '2024-12-20T10:00:00Z',
   },
 ];
+
+export const mockCreatedToken: ApiTokenCreated = {
+  id: 'tok-new',
+  alias: 'my-device',
+  token: 'pm_api_a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2',
+  created_at: '2026-06-17T12:00:00Z',
+};

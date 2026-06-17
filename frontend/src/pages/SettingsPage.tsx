@@ -1,15 +1,101 @@
 import { useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { settingsApi } from '../api/settings';
-import type { ApiTokenCreated, ApiTokenPublic, OidcConfigPublic, TelegramConfigPublic } from '../api/settings';
+import type { ApiTokenCreated, ApiTokenPublic, DisplaySettings, OidcConfigPublic, TelegramConfigPublic } from '../api/settings';
 
 export default function SettingsPage() {
   return (
     <div className="page-stack">
+      <DisplaySection />
       <OidcSection />
       <TelegramSection />
       <ApiTokensSection />
     </div>
+  );
+}
+
+// ── Display ───────────────────────────────────────────────────────────────────
+
+function DisplaySection() {
+  const queryClient = useQueryClient();
+  const { data, isLoading } = useQuery({ queryKey: ['settings-display'], queryFn: settingsApi.getDisplay });
+
+  const current: DisplaySettings = data ?? { time_format: 'h24', date_format: 'dmy', show_water_card: true };
+
+  const mutation = useMutation({
+    mutationFn: settingsApi.updateDisplay,
+    onSuccess: (updated) => {
+      queryClient.setQueryData(['settings-display'], updated);
+    },
+  });
+
+  if (isLoading) return <div className="loading-state">Loading display settings…</div>;
+
+  return (
+    <section className="panel">
+      <div className="section-heading">
+        <div>
+          <p className="eyebrow">Preferences</p>
+          <h3>Display</h3>
+        </div>
+      </div>
+
+      <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
+        <div className="display-option-row">
+          <span className="display-option-label">Time format</span>
+          <div className="display-option-choices">
+            {(['h24', 'h12'] as const).map((v) => (
+              <label key={v} className="checkbox-row" style={{ paddingTop: 0 }}>
+                <input
+                  type="radio"
+                  name="time_format"
+                  checked={current.time_format === v}
+                  onChange={() => mutation.mutate({ time_format: v })}
+                />
+                {v === 'h24' ? '24h' : '12h'}
+              </label>
+            ))}
+          </div>
+        </div>
+
+        <div className="display-option-row">
+          <span className="display-option-label">Date format</span>
+          <div className="display-option-choices">
+            {(['dmy', 'mmm_dd_yyyy'] as const).map((v) => (
+              <label key={v} className="checkbox-row" style={{ paddingTop: 0 }}>
+                <input
+                  type="radio"
+                  name="date_format"
+                  checked={current.date_format === v}
+                  onChange={() => mutation.mutate({ date_format: v })}
+                />
+                {v === 'dmy' ? 'DD.MM.YYYY' : 'MMM DD, YYYY'}
+              </label>
+            ))}
+          </div>
+        </div>
+
+        <div className="display-option-row">
+          <span className="display-option-label">Water card</span>
+          <div className="display-option-choices">
+            <label className="checkbox-row" style={{ paddingTop: 0 }}>
+              <input
+                type="checkbox"
+                checked={current.show_water_card}
+                onChange={(e) => mutation.mutate({ show_water_card: e.target.checked })}
+              />
+              Show water metric card
+            </label>
+          </div>
+        </div>
+      </div>
+
+      {mutation.isError && (
+        <div className="error-state">
+          {mutation.error instanceof Error ? mutation.error.message : 'Failed to save display settings.'}
+        </div>
+      )}
+    </section>
   );
 }
 
@@ -216,6 +302,11 @@ function ApiTokensSection() {
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ['api-tokens'] }),
   });
 
+  const deleteMutation = useMutation({
+    mutationFn: (id: string) => settingsApi.deleteToken(id),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['api-tokens'] }),
+  });
+
   function handleCopy() {
     if (!justCreated) return;
     navigator.clipboard.writeText(justCreated.token).then(() => {
@@ -235,17 +326,17 @@ function ApiTokensSection() {
 
       {/* One-time token reveal */}
       {justCreated && (
-        <div style={{ background: 'var(--success-bg)', border: '1px solid var(--success-border)', borderRadius: 12, padding: '1rem', display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+        <div style={{ background: 'var(--success-bg)', border: '1px solid var(--success-border)', borderRadius: 12, padding: '1rem', display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
           <p style={{ fontSize: '0.88rem', fontWeight: 600 }}>Token created — copy it now, it won't be shown again.</p>
-          <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
-            <input
-              readOnly
-              value={justCreated.token}
-              onFocus={(e) => e.target.select()}
-              style={{ fontFamily: 'monospace', fontSize: '0.82rem', flex: 1 }}
-            />
-            <button className="button button-secondary" type="button" style={{ whiteSpace: 'nowrap' }} onClick={handleCopy}>
-              {copied ? 'Copied!' : 'Copy'}
+          <input
+            readOnly
+            value={justCreated.token}
+            onFocus={(e) => e.target.select()}
+            style={{ fontFamily: 'monospace', fontSize: '0.82rem', width: '100%', boxSizing: 'border-box' }}
+          />
+          <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
+            <button className="button button-secondary" type="button" onClick={handleCopy}>
+              {copied ? 'Copied!' : 'Copy token'}
             </button>
             <button className="button button-secondary" type="button" onClick={() => setJustCreated(null)}>
               Dismiss
@@ -305,6 +396,8 @@ function ApiTokensSection() {
                 token={token}
                 onDeactivate={() => deactivateMutation.mutate(token.id)}
                 deactivating={deactivateMutation.isPending && deactivateMutation.variables === token.id}
+                onDelete={() => deleteMutation.mutate(token.id)}
+                deleting={deleteMutation.isPending && deleteMutation.variables === token.id}
               />
             ))}
           </tbody>
@@ -314,7 +407,13 @@ function ApiTokensSection() {
   );
 }
 
-function TokenRow({ token, onDeactivate, deactivating }: { token: ApiTokenPublic; onDeactivate: () => void; deactivating: boolean }) {
+function TokenRow({ token, onDeactivate, deactivating, onDelete, deleting }: {
+  token: ApiTokenPublic;
+  onDeactivate: () => void;
+  deactivating: boolean;
+  onDelete: () => void;
+  deleting: boolean;
+}) {
   return (
     <tr style={{ opacity: token.active ? 1 : 0.5 }}>
       <td style={{ fontFamily: 'monospace', fontSize: '0.88rem' }}>{token.alias ?? <span style={{ color: 'var(--text-subtle)' }}>—</span>}</td>
@@ -322,7 +421,7 @@ function TokenRow({ token, onDeactivate, deactivating }: { token: ApiTokenPublic
       <td style={{ fontSize: '0.82rem', color: 'var(--text-muted)' }}>{token.created_at.slice(0, 10)}</td>
       <td style={{ fontSize: '0.82rem', color: 'var(--text-muted)' }}>{token.last_used_at ? token.last_used_at.slice(0, 10) : <span style={{ color: 'var(--text-subtle)' }}>never</span>}</td>
       <td><span className={`status-pill${token.active ? ' active' : ''}`}>{token.active ? 'Active' : 'Inactive'}</span></td>
-      <td>
+      <td style={{ display: 'flex', gap: '0.4rem' }}>
         {token.active && (
           <button
             className="button button-danger"
@@ -332,6 +431,17 @@ function TokenRow({ token, onDeactivate, deactivating }: { token: ApiTokenPublic
             onClick={() => { if (window.confirm(`Deactivate token "${token.alias ?? token.id}"?`)) onDeactivate(); }}
           >
             {deactivating ? '…' : 'Deactivate'}
+          </button>
+        )}
+        {!token.active && (
+          <button
+            className="button button-danger"
+            type="button"
+            style={{ padding: '0.3rem 0.75rem', fontSize: '0.82rem' }}
+            disabled={deleting}
+            onClick={() => { if (window.confirm(`Permanently delete token "${token.alias ?? token.id}"? This cannot be undone.`)) onDelete(); }}
+          >
+            {deleting ? '…' : 'Delete'}
           </button>
         )}
       </td>

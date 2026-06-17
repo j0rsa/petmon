@@ -4,7 +4,8 @@ import { nutritionAnalyticsApi } from '../api/analytics';
 import { daysApi } from '../api/days';
 import { NoPetSelected } from '../components/NoPetSelected';
 import { useSelectedPet } from '../context/SelectedPetContext';
-import { localToday, shiftDate, formatDisplayDate } from '../lib/dates';
+import { localToday, shiftDate } from '../lib/dates';
+import { useFormatDate } from '../context/useDisplaySettings';
 import { highlightFromSummary, totalKnownFluidMl } from '../lib/nutritionMetrics';
 import { WET_FOOD_FLUID_RATIO } from '../lib/cumulativeFluid';
 
@@ -13,6 +14,7 @@ const WEEK_DAYS = 7;
 
 export default function OverviewPage() {
   const today = localToday();
+  const formatDate = useFormatDate();
   const { selectedPetId, selectedPet, petsLoading } = useSelectedPet();
 
   const streakFrom = shiftDate(today, -(STREAK_DAYS - 1));
@@ -91,7 +93,7 @@ export default function OverviewPage() {
         <div>
           <p className="eyebrow">Overview</p>
           <h2>{selectedPet?.name ?? 'Pet'}</h2>
-          <p className="muted-text">{formatDisplayDate(today)}</p>
+          <p className="muted-text">{formatDate(today)}</p>
         </div>
         <Link className="button button-secondary button-compact" to="/nutrition">
           Open journal →

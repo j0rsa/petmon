@@ -2,11 +2,14 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import type { Decorator } from '@storybook/react-vite';
 import { MemoryRouter } from 'react-router-dom';
 import { SelectedPetProvider } from '../context/SelectedPetContext';
+import { DisplaySettingsProvider } from '../context/DisplaySettingsProvider';
 import { localToday, shiftDate } from '../lib/dates';
 import {
   mockApiTokens,
   mockBestFluidDay,
+  mockCreatedToken,
   mockDaySummary,
+  mockDisplaySettings,
   mockEmptyDaySummary,
   mockEmptyRangeSummary,
   mockNutritionRecords,
@@ -65,6 +68,7 @@ export function withNutritionDayPanel(date: string, petId: string, empty = false
     const client = makeMockClient();
     client.setQueryData(['pets'], mockPets);
     client.setQueryData(['me'], { subject: 'dev', email: null, name: 'Dev', display_name: 'Dev', kind: 'dev' });
+    client.setQueryData(['settings-display'], mockDisplaySettings);
     client.setQueryData(['day-summary', date, petId], empty ? { ...mockEmptyDaySummary, local_date: date } : { ...mockDaySummary, local_date: date });
     client.setQueryData(['nutrition-records-day', date, petId], empty ? [] : mockNutritionRecords);
     client.setQueryData(['nutrition-schedules', petId], mockNutritionSchedules);
@@ -73,9 +77,11 @@ export function withNutritionDayPanel(date: string, petId: string, empty = false
     return (
       <MemoryRouter>
         <QueryClientProvider client={client}>
-          <SelectedPetProvider initialPetId={petId}>
-            <Story />
-          </SelectedPetProvider>
+          <DisplaySettingsProvider>
+            <SelectedPetProvider initialPetId={petId}>
+              <Story />
+            </SelectedPetProvider>
+          </DisplaySettingsProvider>
         </QueryClientProvider>
       </MemoryRouter>
     );
@@ -143,6 +149,7 @@ interface WithSettingsOptions {
   telegram?: 'empty' | 'configured';
   tokens?: 'empty' | 'populated';
   loading?: boolean;
+  newToken?: boolean;
 }
 
 export function withSettings({
@@ -150,16 +157,22 @@ export function withSettings({
   telegram = 'configured',
   tokens = 'populated',
   loading = false,
+  newToken = false,
 }: WithSettingsOptions = {}): Decorator {
   return function SettingsDecorator(Story) {
     const client = makeMockClient();
+    if (newToken) {
+      client.setQueryDefaults(['create-token-mock'], { queryFn: () => Promise.resolve(mockCreatedToken) });
+    }
 
     if (loading) {
       const pending = () => new Promise(() => {});
+      client.setQueryDefaults(['settings-display'], { queryFn: pending });
       client.setQueryDefaults(['settings-oidc'], { queryFn: pending });
       client.setQueryDefaults(['settings-telegram'], { queryFn: pending });
       client.setQueryDefaults(['api-tokens'], { queryFn: pending });
     } else {
+      client.setQueryData(['settings-display'], mockDisplaySettings);
       client.setQueryData(['settings-oidc'], oidc === 'configured' ? mockOidcConfigured : mockOidcEmpty);
       client.setQueryData(['settings-telegram'], telegram === 'configured' ? mockTelegramConfigured : mockTelegramEmpty);
       client.setQueryData(['api-tokens'], tokens === 'populated' ? mockApiTokens : []);

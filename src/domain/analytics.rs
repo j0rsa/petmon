@@ -36,6 +36,7 @@ pub struct FluidCurvePoint {
     /// HH:MM of the event (time-of-day, date-independent)
     pub time: String,
     pub cumulative_fluid_ml: f64,
+    pub cumulative_liquids_ml: f64,
 }
 
 /// The best historic fluid day, with a precomputed cumulative curve

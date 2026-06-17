@@ -5,6 +5,7 @@ use crate::error::{AppError, AppResult};
 use chrono::Utc;
 use sqlx::SqlitePool;
 
+#[tracing::instrument(skip(pool, filters))]
 pub async fn list_records(
     pool: &SqlitePool,
     filters: &NutritionRecordFilters,
@@ -56,6 +57,7 @@ pub async fn list_records(
     Ok(q.fetch_all(pool).await?)
 }
 
+#[tracing::instrument(skip(pool))]
 pub async fn get_record(pool: &SqlitePool, id: &str) -> AppResult<NutritionRecord> {
     sqlx::query_as::<_, NutritionRecord>(
         "SELECT id, pet_id, occurred_at, local_date, category, amount, unit, source_type, created_at, updated_at FROM nutrition_records WHERE id = ?",
@@ -66,6 +68,7 @@ pub async fn get_record(pool: &SqlitePool, id: &str) -> AppResult<NutritionRecor
     .ok_or_else(|| AppError::NotFound(format!("Nutrition record {id} not found")))
 }
 
+#[tracing::instrument(skip(pool, record), fields(id = %record.id, pet_id = %record.pet_id, category = %record.category))]
 pub async fn create_record(
     pool: &SqlitePool,
     record: NutritionRecord,
@@ -88,6 +91,7 @@ pub async fn create_record(
     get_record(pool, &record.id).await
 }
 
+#[tracing::instrument(skip(pool, req))]
 pub async fn update_record(
     pool: &SqlitePool,
     id: &str,
@@ -126,6 +130,7 @@ pub async fn update_record(
     Ok(record)
 }
 
+#[tracing::instrument(skip(pool))]
 pub async fn delete_record(pool: &SqlitePool, id: &str) -> AppResult<()> {
     let rows = sqlx::query("DELETE FROM nutrition_records WHERE id=?")
         .bind(id)
@@ -140,6 +145,7 @@ pub async fn delete_record(pool: &SqlitePool, id: &str) -> AppResult<()> {
     Ok(())
 }
 
+#[tracing::instrument(skip(pool, records), fields(count = records.len()))]
 pub async fn create_records_batch(
     pool: &SqlitePool,
     records: Vec<NutritionRecord>,

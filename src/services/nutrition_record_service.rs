@@ -6,6 +6,7 @@ use crate::repo::{nutrition_records, pets};
 use crate::services::telegram;
 use sqlx::SqlitePool;
 use std::collections::HashSet;
+use tracing::Instrument;
 
 const MAX_BATCH_SIZE: usize = 2000;
 
@@ -41,7 +42,10 @@ pub async fn create(pool: &SqlitePool, req: CreateNutritionRecord) -> AppResult<
 
     let pool2 = pool.clone();
     let record2 = record.clone();
-    tokio::spawn(async move { telegram::notify_record(&pool2, &record2).await });
+    tokio::spawn(
+        async move { telegram::notify_record(&pool2, &record2).await }
+            .instrument(tracing::Span::current()),
+    );
 
     Ok(record)
 }

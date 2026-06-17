@@ -18,12 +18,10 @@ export function exportTelegramLog(records: NutritionRecord[]): string {
 
   const blocks: string[] = [];
   for (const [key, recs] of groups) {
-    const d = new Date(`${key}:00Z`);
-    const day = d.getUTCDate();
-    const month = MONTH_NAMES[d.getUTCMonth()];
-    const year = d.getUTCFullYear();
-    const hh = String(d.getUTCHours()).padStart(2, '0');
-    const mm = String(d.getUTCMinutes()).padStart(2, '0');
+    const [datePart, timePart] = key.split('T');
+    const [year, mon, day] = datePart.split('-').map(Number);
+    const [hh, mm] = timePart.split(':');
+    const month = MONTH_NAMES[mon - 1];
 
     const header = `Staging Bot, [${day}. ${month} ${year} at ${hh}:${mm}:00]:`;
     const entries = recs.map((r) => `#cat_ate #${r.category} ${Math.round(r.amount)}`);

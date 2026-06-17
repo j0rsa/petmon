@@ -1,5 +1,8 @@
+import { useState } from 'react';
 import type { Meta, StoryObj } from '@storybook/react-vite';
 import { withSettings } from '../stories/decorators';
+import { mockCreatedToken } from '../stories/fixtures';
+import type { ApiTokenCreated } from '../api/settings';
 import SettingsPage from './SettingsPage';
 
 const meta = {
@@ -42,3 +45,41 @@ export const TelegramOnlyConfigured: Story = {
 export const Loading: Story = {
   decorators: [withSettings({ loading: true })],
 };
+
+/** Token just created — shows the one-time reveal banner. */
+export const TokenJustCreated: StoryObj<{ token: ApiTokenCreated }> = {
+  render: () => <TokenRevealBannerPreview />,
+};
+
+function TokenRevealBannerPreview() {
+  const [copied, setCopied] = useState(false);
+
+  function handleCopy() {
+    navigator.clipboard.writeText(mockCreatedToken.token).then(() => {
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    });
+  }
+
+  return (
+    <div className="content" style={{ maxWidth: 820, padding: '2rem' }}>
+      <div style={{ background: 'var(--success-bg)', border: '1px solid var(--success-border)', borderRadius: 12, padding: '1rem', display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+        <p style={{ fontSize: '0.88rem', fontWeight: 600 }}>Token created — copy it now, it won't be shown again.</p>
+        <input
+          readOnly
+          value={mockCreatedToken.token}
+          onFocus={(e) => e.target.select()}
+          style={{ fontFamily: 'monospace', fontSize: '0.82rem', width: '100%', boxSizing: 'border-box' }}
+        />
+        <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
+          <button className="button button-secondary" type="button" onClick={handleCopy}>
+            {copied ? 'Copied!' : 'Copy token'}
+          </button>
+          <button className="button button-secondary" type="button">
+            Dismiss
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}

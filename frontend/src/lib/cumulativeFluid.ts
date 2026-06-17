@@ -56,8 +56,7 @@ function pad(value: number) {
 }
 
 export function timeLabelFromOccurredAt(occurredAt: string) {
-  const date = new Date(occurredAt);
-  return `${pad(date.getHours())}:${pad(date.getMinutes())}`;
+  return occurredAt.slice(11, 16);
 }
 
 export function timeToRefMs(time: string) {
@@ -119,7 +118,7 @@ export function bestDayCurveFromApi(points: FluidCurvePoint[]): Array<{ x: numbe
   const leadIn = timeToRefMs(points[0].time) - 20 * 60 * 1000;
   result.push({ x: leadIn, total: 0 });
   for (const p of points) {
-    result.push({ x: timeToRefMs(p.time), total: p.cumulative_fluid_ml });
+    result.push({ x: timeToRefMs(p.time), total: p.cumulative_liquids_ml });
   }
   return result;
 }
@@ -240,8 +239,8 @@ export function buildCumulativeFluidChart(
     schedule: schedule[index].value,
   }));
 
-  const bestDayTotalMl = bestDayCurve.at(-1)?.total ?? 0;
-  const bestDayLabel = bestDayDate ? `best day — ${bestDayDate} (~${Math.round(bestDayTotalMl)} ml)` : null;
+  const bestDayLiquidsMl = bestDayCurve.at(-1)?.total ?? 0;
+  const bestDayLabel = bestDayDate ? `best day — ${bestDayDate} (~${Math.round(bestDayLiquidsMl)} ml liquids)` : null;
 
   return { points, bestDayLabel };
 }

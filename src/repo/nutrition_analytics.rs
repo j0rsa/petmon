@@ -77,29 +77,36 @@ pub async fn best_fluid_day(
 
             // Build a cumulative fluid curve keyed by HH:MM (sorted).
             // Only fluid-contributing categories: water, liquids (direct), wet_food (× 0.77).
-            let mut by_time: BTreeMap<String, f64> = BTreeMap::new();
+            let mut by_time: BTreeMap<String, (f64, f64)> = BTreeMap::new();
             for rec in &records {
                 use crate::domain::nutrition_record::NutritionCategory;
-                let fluid = match rec.category {
-                    NutritionCategory::Water | NutritionCategory::Liquids => rec.amount,
-                    NutritionCategory::WetFood => rec.amount * 0.77,
-                    NutritionCategory::DryFood => 0.0,
+                let (fluid, liquid) = match rec.category {
+                    NutritionCategory::Water | NutritionCategory::Liquids => {
+                        (rec.amount, rec.amount)
+                    }
+                    NutritionCategory::WetFood => (rec.amount * 0.77, 0.0),
+                    NutritionCategory::DryFood => (0.0, 0.0),
                 };
                 if fluid == 0.0 {
                     continue;
                 }
                 // Extract HH:MM from the occurred_at timestamp
                 let time = rec.occurred_at.chars().skip(11).take(5).collect::<String>();
-                *by_time.entry(time).or_insert(0.0) += fluid;
+                let entry = by_time.entry(time).or_insert((0.0, 0.0));
+                entry.0 += fluid;
+                entry.1 += liquid;
             }
 
             let mut cumulative = 0.0;
+            let mut cum_liquids = 0.0;
             let mut curve: Vec<FluidCurvePoint> = Vec::with_capacity(by_time.len() + 1);
-            for (time, fluid) in by_time {
+            for (time, (fluid, liquid)) in by_time {
                 cumulative += fluid;
+                cum_liquids += liquid;
                 curve.push(FluidCurvePoint {
                     time,
                     cumulative_fluid_ml: (cumulative * 10.0).round() / 10.0,
+                    cumulative_liquids_ml: (cum_liquids * 10.0).round() / 10.0,
                 });
             }
 

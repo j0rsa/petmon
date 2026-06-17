@@ -49,7 +49,7 @@ export function IntakeBarsChart({ records }: IntakeBarsChartProps) {
   return (
     <div className="chart-wrapper chart-wrapper-intake">
       <ResponsiveContainer width="100%" height="100%">
-        <BarChart data={chartData} barCategoryGap="35%">
+        <BarChart data={chartData} barCategoryGap="15%">
           <CartesianGrid stroke="var(--chart-grid)" strokeDasharray="3 3" />
           <XAxis
             dataKey="label"

@@ -1,6 +1,6 @@
 [package]
 name = "petmon"
-version = "0.1.5"
+version = "0.1.6"
 edition = "2021"
 default-run = "petmon"
 
@@ -27,7 +27,7 @@ opentelemetry = { version = "0.31.0", features = ["trace"] }
 opentelemetry_sdk = { version = "0.31.0", features = ["trace", "rt-tokio"] }
 opentelemetry-otlp = { version = "0.31.0", features = ["grpc-tonic", "trace", "tls-roots"] }
 tracing-opentelemetry = "0.32"
-tracing-actix-web = "0.7"
+tracing-actix-web = { version = "0.7", features = ["opentelemetry_0_31"] }
 thiserror = "1"
 anyhow = "1"
 dotenvy = "0.15"

@@ -83,6 +83,7 @@ export interface NutritionDailyTotal {
 export interface FluidCurvePoint {
   time: string;
   cumulative_fluid_ml: number;
+  cumulative_liquids_ml: number;
 }
 
 export interface BestFluidDay {

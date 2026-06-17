@@ -12,6 +12,18 @@ export interface UpdateOidcConfig {
   client_id?: string | null;
 }
 
+export interface DisplaySettings {
+  time_format: 'h24' | 'h12';
+  date_format: 'dmy' | 'mmm_dd_yyyy';
+  show_water_card: boolean;
+}
+
+export interface UpdateDisplaySettings {
+  time_format?: 'h24' | 'h12';
+  date_format?: 'dmy' | 'mmm_dd_yyyy';
+  show_water_card?: boolean;
+}
+
 export interface TelegramConfigPublic {
   enabled: boolean;
   has_bot_token: boolean;
@@ -45,9 +57,12 @@ export interface CreateApiToken {
 export const settingsApi = {
   getOidc: () => api.get<OidcConfigPublic>('/settings/oidc'),
   updateOidc: (body: UpdateOidcConfig) => api.post<OidcConfigPublic>('/settings/oidc', body),
+  getDisplay: () => api.get<DisplaySettings>('/settings/display'),
+  updateDisplay: (body: UpdateDisplaySettings) => api.post<DisplaySettings>('/settings/display', body),
   getTelegram: () => api.get<TelegramConfigPublic>('/settings/telegram'),
   updateTelegram: (body: UpdateTelegramConfig) => api.post<TelegramConfigPublic>('/settings/telegram', body),
   listTokens: () => api.get<ApiTokenPublic[]>('/api-tokens'),
   createToken: (body: CreateApiToken) => api.post<ApiTokenCreated>('/api-tokens', body),
   deactivateToken: (id: string) => api.delete(`/api-tokens/${id}`),
+  deleteToken: (id: string) => api.delete(`/api-tokens/${id}/permanent`),
 };

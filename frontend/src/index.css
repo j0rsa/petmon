@@ -361,12 +361,31 @@ pre {
 .filter-panel,
 .form-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
   gap: 1rem;
 }
 
 .form-row-full {
   grid-column: 1 / -1;
+}
+
+.display-option-row {
+  display: flex;
+  align-items: center;
+  gap: 1.5rem;
+}
+
+.display-option-label {
+  width: 8rem;
+  flex-shrink: 0;
+  font-size: 0.88rem;
+  color: var(--text-muted);
+}
+
+.display-option-choices {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 1.25rem;
 }
 
 .checkbox-row {
@@ -1269,7 +1288,7 @@ pre {
 
 .metric-cards {
   display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(0, 1fr));
   gap: 0.75rem;
 }
 

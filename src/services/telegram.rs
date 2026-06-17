@@ -18,6 +18,7 @@ fn format_record_line(record: &NutritionRecord) -> String {
 /// Fire-and-forget: send a record to the pet's configured Telegram chat.
 /// Bot token comes from the global app settings; chat_id and thread_id are per-pet.
 /// Errors are logged but never propagated — a Telegram outage must not break record creation.
+#[tracing::instrument(skip(pool, record), fields(pet_id = %record.pet_id, category = %record.category, amount = record.amount))]
 pub async fn notify_record(pool: &SqlitePool, record: &NutritionRecord) {
     // Load global config for the bot token and enabled flag
     let cfg: TelegramConfig = match settings::get(pool, "telegram").await {
@@ -29,13 +30,14 @@ pub async fn notify_record(pool: &SqlitePool, record: &NutritionRecord) {
     };
 
     if !cfg.enabled {
+        tracing::debug!("telegram disabled, skipping notification");
         return;
     }
 
     let bot_token = match cfg.bot_token {
-        Some(t) => t,
+        Some(t) => t.trim().to_owned(),
         None => {
-            tracing::debug!("telegram enabled but bot_token not set, skipping");
+            tracing::warn!("telegram enabled but bot_token not set, skipping notification");
             return;
         }
     };
@@ -50,9 +52,9 @@ pub async fn notify_record(pool: &SqlitePool, record: &NutritionRecord) {
     };
 
     let chat_id = match pet.telegram_chat_id {
-        Some(ref c) => c.clone(),
+        Some(ref c) => c.trim().to_owned(),
         None => {
-            tracing::debug!(pet = %pet.name, "no telegram_chat_id set for pet, skipping");
+            tracing::info!(pet = %pet.name, "no telegram_chat_id set for pet, skipping notification");
             return;
         }
     };
@@ -72,10 +74,12 @@ pub async fn notify_record(pool: &SqlitePool, record: &NutritionRecord) {
         .await
     {
         Ok(resp) if resp.status().is_success() => {
-            tracing::debug!(pet = %pet.name, category = %record.category, "telegram notification sent");
+            tracing::info!(pet = %pet.name, category = %record.category, "telegram notification sent");
         }
         Ok(resp) => {
-            tracing::warn!(status = %resp.status(), pet = %pet.name, "telegram API returned non-success");
+            let status = resp.status();
+            let body = resp.text().await.unwrap_or_default();
+            tracing::warn!(%status, %body, pet = %pet.name, "telegram API returned non-success");
         }
         Err(e) => {
             tracing::warn!(error = %e, pet = %pet.name, "failed to send telegram notification");

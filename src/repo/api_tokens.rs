@@ -70,6 +70,20 @@ pub async fn deactivate(pool: &SqlitePool, id: &str) -> AppResult<()> {
     Ok(())
 }
 
+pub async fn delete(pool: &SqlitePool, id: &str) -> AppResult<()> {
+    let result = sqlx::query("DELETE FROM api_tokens WHERE id = ? AND active = 0")
+        .bind(id)
+        .execute(pool)
+        .await?;
+
+    if result.rows_affected() == 0 {
+        return Err(AppError::BadRequest(format!(
+            "API token '{id}' not found or still active — deactivate it first"
+        )));
+    }
+    Ok(())
+}
+
 pub async fn has_active_tokens(pool: &SqlitePool) -> bool {
     sqlx::query_scalar::<_, i64>("SELECT COUNT(*) FROM api_tokens WHERE active = 1")
         .fetch_one(pool)

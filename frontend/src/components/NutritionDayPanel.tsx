@@ -8,7 +8,8 @@ import { nutritionSchedulesApi } from '../api/nutritionSchedules';
 import { CategoryBadge } from './CategoryBadge';
 import { CumulativeFluidChart } from './CumulativeFluidChart';
 import { IntakeBarsChart } from './IntakeBarsChart';
-import { formatDisplayDate, localToday } from '../lib/dates';
+import { localToday } from '../lib/dates';
+import { useDisplaySettings, useFormatDate, useFormatTime } from '../context/useDisplaySettings';
 import { exportTelegramLog } from '../lib/exportTelegramLog';
 import { LiquidsIcon, WaterIcon, WetFoodIcon, TotalFluidIcon } from '../lib/metricIcons';
 import { highlightFromSummary, totalKnownFluidMl } from '../lib/nutritionMetrics';
@@ -26,22 +27,17 @@ function unitFor(category: string) {
   return UNIT_FOR_CATEGORY[category] ?? '';
 }
 
-function formatTime(iso: string) {
-  return new Date(iso).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-}
-
 function nowTimeString() {
   const now = new Date();
   return `${now.getHours().toString().padStart(2, '0')}:${now.getMinutes().toString().padStart(2, '0')}`;
 }
 
 function isoFromDateAndTime(date: string, time: string) {
-  return new Date(`${date}T${time}:00`).toISOString();
+  return `${date}T${time}:00`;
 }
 
 function timeFromIso(iso: string) {
-  const d = new Date(iso);
-  return `${d.getHours().toString().padStart(2, '0')}:${d.getMinutes().toString().padStart(2, '0')}`;
+  return iso.slice(11, 16);
 }
 
 function invalidateDayData(queryClient: ReturnType<typeof useQueryClient>, date: string, petId: string) {
@@ -138,6 +134,7 @@ interface RecordRowProps {
 }
 
 function RecordRow({ record, onSave, onDelete, saving, deleting }: RecordRowProps) {
+  const formatTime = useFormatTime();
   const [editing, setEditing] = useState(false);
   const [time, setTime] = useState('');
   const [category, setCategory] = useState('');
@@ -241,6 +238,8 @@ interface NutritionDayPanelProps {
 export function NutritionDayPanel({ date, petId }: NutritionDayPanelProps) {
   const queryClient = useQueryClient();
   const [noteDraft, setNoteDraft] = useState('');
+  const { show_water_card } = useDisplaySettings();
+  const formatDate = useFormatDate();
 
   const summaryQuery = useQuery({
     queryKey: ['day-summary', date, petId],
@@ -315,7 +314,7 @@ export function NutritionDayPanel({ date, petId }: NutritionDayPanelProps) {
       <div className="day-panel-header">
         <div>
           <p className="eyebrow">Selected day</p>
-          <h3>{formatDisplayDate(date)}</h3>
+          <h3>{formatDate(date)}</h3>
         </div>
         {date !== localToday() && (
           <Link to="/nutrition" style={{ fontSize: '0.82rem', color: 'var(--text-subtle)' }}>
@@ -330,11 +329,13 @@ export function NutritionDayPanel({ date, petId }: NutritionDayPanelProps) {
           <span className="metric-label">Liquids</span>
           <strong>{Math.round(highlight?.liquids ?? 0)}<span>ml</span></strong>
         </article>
-        <article className="metric-card metric-card-water" style={{ position: 'relative', overflow: 'hidden' }}>
-          <MetricIcon color="var(--metric-water)"><WaterIcon /></MetricIcon>
-          <span className="metric-label">Water</span>
-          <strong>{Math.round(highlight?.water ?? 0)}<span>ml</span></strong>
-        </article>
+        {show_water_card && (
+          <article className="metric-card metric-card-water" style={{ position: 'relative', overflow: 'hidden' }}>
+            <MetricIcon color="var(--metric-water)"><WaterIcon /></MetricIcon>
+            <span className="metric-label">Water</span>
+            <strong>{Math.round(highlight?.water ?? 0)}<span>ml</span></strong>
+          </article>
+        )}
         <article className="metric-card metric-card-wet" style={{ position: 'relative', overflow: 'hidden' }}>
           <MetricIcon color="var(--metric-wet)"><WetFoodIcon /></MetricIcon>
           <span className="metric-label">Wet food</span>
