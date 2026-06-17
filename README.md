@@ -82,6 +82,42 @@ The `/mcp` endpoint accepts JSON-RPC 2.0 requests. Available methods:
 
 Create a `.env` file at the project root to override defaults.
 
+## Observability
+
+### Logging
+
+All logs are emitted as JSON to stdout. Verbosity is controlled by the standard `RUST_LOG` env var (default: `petmon=info`):
+
+```bash
+RUST_LOG=petmon=debug      # verbose app logs
+RUST_LOG=debug             # everything, including dependencies
+RUST_LOG=petmon=trace      # trace-level spans
+```
+
+### Distributed tracing (OpenTelemetry)
+
+When `OTEL_EXPORTER_OTLP_ENDPOINT` is set, spans are exported via **OTLP/HTTP** to that collector in addition to JSON stdout logs. When unset, only stdout logging is active.
+
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `OTEL_EXPORTER_OTLP_ENDPOINT` | *(unset)* | OTLP/HTTP collector endpoint, e.g. `http://localhost:4318` |
+| `OTEL_SERVICE_NAME` | `petmon` | Service name attached to all spans and logs |
+
+Example — sending traces to a local Jaeger instance:
+
+```bash
+docker run -d --name jaeger \
+  -p 4318:4318 \
+  -p 16686:16686 \
+  jaegertracing/all-in-one:latest
+
+OTEL_EXPORTER_OTLP_ENDPOINT=http://localhost:4318 \
+OTEL_SERVICE_NAME=petmon \
+cargo run
+```
+
+Then open the Jaeger UI at `http://localhost:16686`.
+
 ### OIDC environment override
 
 If any of the following vars are present at startup, they are merged over the OIDC config stored in the database. Fields that are absent in the environment are left unchanged — so you can update only the secret without re-supplying the issuer URL, for example.
