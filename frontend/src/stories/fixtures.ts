@@ -1,6 +1,7 @@
 import { localToday, shiftDate } from '../lib/dates';
 import type { BestFluidDay, Category, NutritionDaySummary, NutritionRangeSummary, NutritionRecord, NutritionSchedule, Pet } from '../types';
 import type { DayNutritionHighlight } from '../types/pillars';
+import type { AppInfo } from '../api/info';
 import type { ApiTokenCreated, ApiTokenPublic, DisplaySettings, OidcConfigPublic, TelegramConfigPublic } from '../api/settings';
 
 export const mockPetId = '550e8400-e29b-41d4-a716-446655440000';
@@ -210,6 +211,13 @@ export const mockBestFluidDay: BestFluidDay = {
     { time: '21:15', cumulative_fluid_ml: 110, cumulative_liquids_ml: 80  },
     { time: '22:30', cumulative_fluid_ml: 142, cumulative_liquids_ml: 95  },
   ],
+};
+
+// ── App info fixture ──────────────────────────────────────────────────────────
+
+export const mockAppInfo: AppInfo = {
+  version: '0.0.0-storybook',
+  git_sha: 'abc1234',
 };
 
 // ── Display settings fixtures ─────────────────────────────────────────────────

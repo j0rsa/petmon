@@ -83,6 +83,7 @@ async fn main() -> anyhow::Result<()> {
                     .configure(api::auth::configure_public)
                     .configure(api::auth::configure_protected)
                     .configure(api::health::configure)
+                    .configure(api::info::configure)
                     .configure(api::pets::configure)
                     .configure(api::nutrition::configure)
                     .configure(api::days::configure)

@@ -1,6 +1,7 @@
 pub mod auth;
 pub mod days;
 pub mod health;
+pub mod info;
 pub mod notes;
 pub mod nutrition;
 pub mod pets;

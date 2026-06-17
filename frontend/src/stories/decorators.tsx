@@ -6,6 +6,7 @@ import { DisplaySettingsProvider } from '../context/DisplaySettingsProvider';
 import { localToday, shiftDate } from '../lib/dates';
 import {
   mockApiTokens,
+  mockAppInfo,
   mockBestFluidDay,
   mockCreatedToken,
   mockDaySummary,
@@ -30,11 +31,28 @@ export const withMemoryRouter: Decorator = (Story, { parameters }) => (
   </MemoryRouter>
 );
 
+/** Seeds the minimum query data needed for Layout (me, pets, app-info, display settings). */
+export const withLayoutData: Decorator = (Story) => {
+  const client = makeMockClient();
+  client.setQueryData(['pets'], mockPets);
+  client.setQueryData(['me'], { subject: 'dev', email: null, name: 'Dev', display_name: 'Dev', kind: 'dev' });
+  client.setQueryData(['app-info'], mockAppInfo);
+  client.setQueryData(['settings-display'], mockDisplaySettings);
+  return (
+    <QueryClientProvider client={client}>
+      <DisplaySettingsProvider>
+        <Story />
+      </DisplaySettingsProvider>
+    </QueryClientProvider>
+  );
+};
+
 export function withSelectedPet(petId = mockPetId): Decorator {
   return function SelectedPetDecorator(Story) {
     const client = makeMockClient();
     client.setQueryData(['pets'], mockPets);
     client.setQueryData(['me'], { subject: 'dev', email: null, name: 'Dev', display_name: 'Dev', kind: 'dev' });
+    client.setQueryData(['app-info'], mockAppInfo);
 
     return (
       <QueryClientProvider client={client}>
@@ -69,6 +87,7 @@ export function withNutritionDayPanel(date: string, petId: string, empty = false
     client.setQueryData(['pets'], mockPets);
     client.setQueryData(['me'], { subject: 'dev', email: null, name: 'Dev', display_name: 'Dev', kind: 'dev' });
     client.setQueryData(['settings-display'], mockDisplaySettings);
+    client.setQueryData(['app-info'], mockAppInfo);
     client.setQueryData(['day-summary', date, petId], empty ? { ...mockEmptyDaySummary, local_date: date } : { ...mockDaySummary, local_date: date });
     client.setQueryData(['nutrition-records-day', date, petId], empty ? [] : mockNutritionRecords);
     client.setQueryData(['nutrition-schedules', petId], mockNutritionSchedules);
@@ -106,6 +125,7 @@ export function withAnalyticsPage({
 
     client.setQueryData(['pets'], mockPets);
     client.setQueryData(['me'], { subject: 'dev', email: null, name: 'Dev', display_name: 'Dev', kind: 'dev' });
+    client.setQueryData(['app-info'], mockAppInfo);
 
     // Pre-populate all period variants the page may request (7d, 14d, 30d, 90d)
     const today = localToday();

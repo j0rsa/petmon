@@ -1,5 +1,6 @@
 import type { Meta, StoryObj } from '@storybook/react-vite';
 import { MemoryRouter, Route, Routes } from 'react-router-dom';
+import { withLayoutData } from '../stories/decorators';
 import { Layout } from './Layout';
 
 const meta = {
@@ -29,6 +30,7 @@ const meta = {
       </Routes>
     </MemoryRouter>
   ),
+  decorators: [withLayoutData],
 } satisfies Meta<typeof Layout>;
 
 export default meta;
