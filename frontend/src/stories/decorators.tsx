@@ -74,11 +74,13 @@ export function withNutritionDayPanel(date: string, petId: string, empty = false
     client.setQueryData(['nutrition-best-fluid-day', date, petId], empty ? null : mockBestFluidDay);
 
     return (
-      <QueryClientProvider client={client}>
-        <SelectedPetProvider initialPetId={petId}>
-          <Story />
-        </SelectedPetProvider>
-      </QueryClientProvider>
+      <MemoryRouter>
+        <QueryClientProvider client={client}>
+          <SelectedPetProvider initialPetId={petId}>
+            <Story />
+          </SelectedPetProvider>
+        </QueryClientProvider>
+      </MemoryRouter>
     );
   };
 }
