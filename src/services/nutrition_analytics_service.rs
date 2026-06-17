@@ -24,10 +24,13 @@ pub async fn range_summary(
     pet_id: Option<Uuid>,
     category: Option<&str>,
 ) -> AppResult<NutritionRangeSummary> {
-    let daily_totals = nutrition_analytics::daily_totals(pool, date_from, date_to, pet_id, category).await?;
+    let daily_totals =
+        nutrition_analytics::daily_totals(pool, date_from, date_to, pet_id, category).await?;
     let mut category_sums: HashMap<String, (f64, usize)> = HashMap::new();
     for total in &daily_totals {
-        let entry = category_sums.entry(total.category.clone()).or_insert((0.0, 0));
+        let entry = category_sums
+            .entry(total.category.clone())
+            .or_insert((0.0, 0));
         entry.0 += total.total_amount;
         entry.1 += 1;
     }

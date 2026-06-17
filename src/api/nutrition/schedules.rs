@@ -30,7 +30,10 @@ pub async fn create_schedule(
 }
 
 #[get("/{id}")]
-pub async fn get_schedule(state: web::Data<AppState>, id: web::Path<String>) -> AppResult<HttpResponse> {
+pub async fn get_schedule(
+    state: web::Data<AppState>,
+    id: web::Path<String>,
+) -> AppResult<HttpResponse> {
     let schedule = nutrition_schedule_service::get(&state.pool, &id).await?;
     Ok(HttpResponse::Ok().json(schedule))
 }
@@ -46,7 +49,10 @@ pub async fn update_schedule(
 }
 
 #[delete("/{id}")]
-pub async fn delete_schedule(state: web::Data<AppState>, id: web::Path<String>) -> AppResult<HttpResponse> {
+pub async fn delete_schedule(
+    state: web::Data<AppState>,
+    id: web::Path<String>,
+) -> AppResult<HttpResponse> {
     nutrition_schedule_service::delete(&state.pool, &id).await?;
     Ok(HttpResponse::NoContent().finish())
 }

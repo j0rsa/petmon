@@ -37,5 +37,9 @@ pub async fn update_day_note(
 }
 
 pub fn configure(cfg: &mut web::ServiceConfig) {
-    cfg.service(web::scope("/days").service(get_day).service(update_day_note));
+    cfg.service(
+        web::scope("/days")
+            .service(get_day)
+            .service(update_day_note),
+    );
 }

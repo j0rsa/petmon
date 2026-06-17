@@ -16,7 +16,12 @@ pub struct AppState {
 }
 
 impl AppState {
-    pub fn new(pool: SqlitePool, dev_mode: bool, oidc: Option<OidcValidator>, static_dir: Option<String>) -> Self {
+    pub fn new(
+        pool: SqlitePool,
+        dev_mode: bool,
+        oidc: Option<OidcValidator>,
+        static_dir: Option<String>,
+    ) -> Self {
         AppState {
             pool,
             dev_mode,

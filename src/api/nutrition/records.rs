@@ -1,6 +1,7 @@
 use crate::auth::AppState;
 use crate::domain::nutrition_record::{
-    BatchCreateNutritionRecords, CreateNutritionRecord, NutritionRecordFilters, UpdateNutritionRecord,
+    BatchCreateNutritionRecords, CreateNutritionRecord, NutritionRecordFilters,
+    UpdateNutritionRecord,
 };
 use crate::error::AppResult;
 use crate::services::nutrition_record_service;
@@ -29,12 +30,16 @@ pub async fn batch_create_records(
     state: web::Data<AppState>,
     body: web::Json<BatchCreateNutritionRecords>,
 ) -> AppResult<HttpResponse> {
-    let records = nutrition_record_service::batch_create(&state.pool, body.into_inner().records).await?;
+    let records =
+        nutrition_record_service::batch_create(&state.pool, body.into_inner().records).await?;
     Ok(HttpResponse::Created().json(records))
 }
 
 #[get("/{id}")]
-pub async fn get_record(state: web::Data<AppState>, id: web::Path<String>) -> AppResult<HttpResponse> {
+pub async fn get_record(
+    state: web::Data<AppState>,
+    id: web::Path<String>,
+) -> AppResult<HttpResponse> {
     let record = nutrition_record_service::get(&state.pool, &id).await?;
     Ok(HttpResponse::Ok().json(record))
 }
@@ -50,7 +55,10 @@ pub async fn update_record(
 }
 
 #[delete("/{id}")]
-pub async fn delete_record(state: web::Data<AppState>, id: web::Path<String>) -> AppResult<HttpResponse> {
+pub async fn delete_record(
+    state: web::Data<AppState>,
+    id: web::Path<String>,
+) -> AppResult<HttpResponse> {
     nutrition_record_service::delete(&state.pool, &id).await?;
     Ok(HttpResponse::NoContent().finish())
 }

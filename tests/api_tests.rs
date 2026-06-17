@@ -1,15 +1,18 @@
 use actix_web::{test, web, App};
+use petmon::auth::AppState;
 use sqlx::SqlitePool;
 
-async fn setup_test_pool() -> SqlitePool {
+async fn setup_state() -> web::Data<AppState> {
     let pool = SqlitePool::connect("sqlite::memory:").await.unwrap();
     sqlx::migrate!("./migrations").run(&pool).await.unwrap();
-    pool
+    web::Data::new(AppState::new(pool, true, None, None))
 }
 
 #[actix_web::test]
 async fn test_health_endpoint() {
-    let app = test::init_service(App::new().configure(petmon::api::configure)).await;
+    let state = setup_state().await;
+    let app =
+        test::init_service(App::new().app_data(state).configure(petmon::api::configure)).await;
     let req = test::TestRequest::get().uri("/api/v1/health").to_request();
     let resp = test::call_service(&app, req).await;
     assert_eq!(resp.status(), 200);
@@ -17,14 +20,9 @@ async fn test_health_endpoint() {
 
 #[actix_web::test]
 async fn test_pets_crud() {
-    let pool = setup_test_pool().await;
-    let pool_data = web::Data::new(pool);
-    let app = test::init_service(
-        App::new()
-            .app_data(pool_data.clone())
-            .configure(petmon::api::configure),
-    )
-    .await;
+    let state = setup_state().await;
+    let app =
+        test::init_service(App::new().app_data(state).configure(petmon::api::configure)).await;
 
     let req = test::TestRequest::post()
         .uri("/api/v1/pets")

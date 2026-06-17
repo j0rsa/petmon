@@ -24,7 +24,9 @@ pub async fn daily_totals(
     }
     query.push_str(" GROUP BY local_date, pet_id, category ORDER BY local_date, category");
 
-    let mut q = sqlx::query_as::<_, NutritionDailyTotal>(&query).bind(date_from).bind(date_to);
+    let mut q = sqlx::query_as::<_, NutritionDailyTotal>(&query)
+        .bind(date_from)
+        .bind(date_to);
     if let Some(pet_id) = pet_id {
         q = q.bind(pet_id);
     }
@@ -87,12 +89,7 @@ pub async fn best_fluid_day(
                     continue;
                 }
                 // Extract HH:MM from the occurred_at timestamp
-                let time = rec
-                    .occurred_at
-                    .chars()
-                    .skip(11)
-                    .take(5)
-                    .collect::<String>();
+                let time = rec.occurred_at.chars().skip(11).take(5).collect::<String>();
                 *by_time.entry(time).or_insert(0.0) += fluid;
             }
 

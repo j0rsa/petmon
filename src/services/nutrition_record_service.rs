@@ -20,7 +20,10 @@ fn validate_create(req: &CreateNutritionRecord) -> AppResult<()> {
 }
 
 #[tracing::instrument(skip(pool))]
-pub async fn list(pool: &SqlitePool, filters: NutritionRecordFilters) -> AppResult<Vec<NutritionRecord>> {
+pub async fn list(
+    pool: &SqlitePool,
+    filters: NutritionRecordFilters,
+) -> AppResult<Vec<NutritionRecord>> {
     nutrition_records::list_records(pool, &filters).await
 }
 
@@ -44,7 +47,10 @@ pub async fn create(pool: &SqlitePool, req: CreateNutritionRecord) -> AppResult<
 }
 
 #[tracing::instrument(skip(pool, records))]
-pub async fn batch_create(pool: &SqlitePool, records: Vec<CreateNutritionRecord>) -> AppResult<Vec<NutritionRecord>> {
+pub async fn batch_create(
+    pool: &SqlitePool,
+    records: Vec<CreateNutritionRecord>,
+) -> AppResult<Vec<NutritionRecord>> {
     if records.is_empty() {
         return Err(AppError::Validation {
             field: "records".to_string(),
@@ -72,7 +78,11 @@ pub async fn batch_create(pool: &SqlitePool, records: Vec<CreateNutritionRecord>
 }
 
 #[tracing::instrument(skip(pool))]
-pub async fn update(pool: &SqlitePool, id: &str, req: UpdateNutritionRecord) -> AppResult<NutritionRecord> {
+pub async fn update(
+    pool: &SqlitePool,
+    id: &str,
+    req: UpdateNutritionRecord,
+) -> AppResult<NutritionRecord> {
     if let Some(amount) = req.amount {
         if amount < 0.0 {
             return Err(AppError::Validation {

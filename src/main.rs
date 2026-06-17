@@ -7,8 +7,7 @@ use tracing_subscriber::EnvFilter;
 async fn main() -> anyhow::Result<()> {
     let config = config::Config::from_env();
 
-    let env_filter = EnvFilter::from_default_env()
-        .add_directive("petmon=info".parse()?);
+    let env_filter = EnvFilter::from_default_env().add_directive("petmon=info".parse()?);
 
     let otel_provider = telemetry::init(
         &config.service_name,
@@ -49,23 +48,35 @@ async fn main() -> anyhow::Result<()> {
     }
 
     if dev_mode {
-        tracing::warn!("DEV_MODE is enabled — all requests are unauthenticated. Do not use in production.");
+        tracing::warn!(
+            "DEV_MODE is enabled — all requests are unauthenticated. Do not use in production."
+        );
     }
 
-    let state = web::Data::new(auth::AppState::new(pool, dev_mode, oidc_validator, config.static_dir.clone()));
+    let state = web::Data::new(auth::AppState::new(
+        pool,
+        dev_mode,
+        oidc_validator,
+        config.static_dir.clone(),
+    ));
     let bind_addr = format!("{}:{}", config.host, config.port);
 
     HttpServer::new(move || {
         App::new()
             .wrap(TracingLogger::default())
             .app_data(state.clone())
-            .app_data(web::JsonConfig::default().limit(config.import_max_bytes).error_handler(|err, _req| {
-                let response = actix_web::HttpResponse::BadRequest().json(serde_json::json!({
-                    "error": "BAD_REQUEST",
-                    "message": format!("Invalid JSON: {err}")
-                }));
-                actix_web::error::InternalError::from_response(err, response).into()
-            }))
+            .app_data(
+                web::JsonConfig::default()
+                    .limit(config.import_max_bytes)
+                    .error_handler(|err, _req| {
+                        let response =
+                            actix_web::HttpResponse::BadRequest().json(serde_json::json!({
+                                "error": "BAD_REQUEST",
+                                "message": format!("Invalid JSON: {err}")
+                            }));
+                        actix_web::error::InternalError::from_response(err, response).into()
+                    }),
+            )
             .service(
                 web::scope("/api/v1")
                     .wrap(middleware::auth::RequireAuth)

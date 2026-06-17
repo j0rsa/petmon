@@ -1,8 +1,6 @@
 use arc_swap::ArcSwap;
 use jsonwebtoken::{decode, decode_header, Algorithm, DecodingKey, Validation};
-use openidconnect::{
-    core::CoreProviderMetadata, reqwest::async_http_client, IssuerUrl,
-};
+use openidconnect::{core::CoreProviderMetadata, reqwest::async_http_client, IssuerUrl};
 use serde::Deserialize;
 use std::collections::HashMap;
 use std::sync::Arc;
@@ -142,10 +140,7 @@ impl OidcValidator {
                     .clone()
             }
         } else {
-            jwks.first
-                .as_ref()
-                .ok_or("JWKS is empty")?
-                .clone()
+            jwks.first.as_ref().ok_or("JWKS is empty")?.clone()
         };
 
         let alg = match header.alg {

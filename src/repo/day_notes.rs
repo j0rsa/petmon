@@ -14,7 +14,11 @@ pub struct DayNote {
     pub updated_at: String,
 }
 
-pub async fn get_day_note(pool: &SqlitePool, local_date: &str, pet_id: Option<Uuid>) -> AppResult<Option<DayNote>> {
+pub async fn get_day_note(
+    pool: &SqlitePool,
+    local_date: &str,
+    pet_id: Option<Uuid>,
+) -> AppResult<Option<DayNote>> {
     let note = if let Some(pet_id) = pet_id {
         sqlx::query_as::<_, DayNote>(
             "SELECT id, pet_id, local_date, note, created_at, updated_at FROM day_notes WHERE local_date = ? AND pet_id = ?",
@@ -34,7 +38,12 @@ pub async fn get_day_note(pool: &SqlitePool, local_date: &str, pet_id: Option<Uu
     Ok(note)
 }
 
-pub async fn upsert_day_note(pool: &SqlitePool, local_date: &str, pet_id: Option<Uuid>, note_text: &str) -> AppResult<DayNote> {
+pub async fn upsert_day_note(
+    pool: &SqlitePool,
+    local_date: &str,
+    pet_id: Option<Uuid>,
+    note_text: &str,
+) -> AppResult<DayNote> {
     let now = Utc::now().to_rfc3339();
     let existing = get_day_note(pool, local_date, pet_id).await?;
     if let Some(existing) = existing {
@@ -44,7 +53,9 @@ pub async fn upsert_day_note(pool: &SqlitePool, local_date: &str, pet_id: Option
             .bind(&existing.id)
             .execute(pool)
             .await?;
-        return get_day_note(pool, local_date, pet_id).await.map(|n| n.expect("updated note"));
+        return get_day_note(pool, local_date, pet_id)
+            .await
+            .map(|n| n.expect("updated note"));
     }
     let id = Uuid::new_v4().to_string();
     sqlx::query(
@@ -58,5 +69,7 @@ pub async fn upsert_day_note(pool: &SqlitePool, local_date: &str, pet_id: Option
     .bind(&now)
     .execute(pool)
     .await?;
-    get_day_note(pool, local_date, pet_id).await.map(|n| n.expect("inserted note"))
+    get_day_note(pool, local_date, pet_id)
+        .await
+        .map(|n| n.expect("inserted note"))
 }

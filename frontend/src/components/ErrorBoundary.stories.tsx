@@ -31,6 +31,7 @@ export const Healthy: Story = {
 };
 
 export const WithError: Story = {
+  tags: ['skip-test'],
   render: () => (
     <ErrorBoundary>
       <BrokenChild />

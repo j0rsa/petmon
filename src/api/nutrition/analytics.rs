@@ -56,12 +56,9 @@ pub async fn best_fluid_day(
     state: web::Data<AppState>,
     query: web::Query<BestFluidDayQuery>,
 ) -> AppResult<HttpResponse> {
-    let result = nutrition_analytics_service::best_fluid_day(
-        &state.pool,
-        query.pet_id,
-        &query.exclude_date,
-    )
-    .await?;
+    let result =
+        nutrition_analytics_service::best_fluid_day(&state.pool, query.pet_id, &query.exclude_date)
+            .await?;
     Ok(HttpResponse::Ok().json(result))
 }
 

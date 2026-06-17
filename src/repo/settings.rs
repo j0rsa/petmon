@@ -6,10 +6,11 @@ use sqlx::SqlitePool;
 use crate::error::{AppError, AppResult};
 
 pub async fn get<T: DeserializeOwned + Default>(pool: &SqlitePool, key: &str) -> AppResult<T> {
-    let row: Option<(String,)> = sqlx::query_as("SELECT value_json FROM app_settings WHERE key = ?")
-        .bind(key)
-        .fetch_optional(pool)
-        .await?;
+    let row: Option<(String,)> =
+        sqlx::query_as("SELECT value_json FROM app_settings WHERE key = ?")
+            .bind(key)
+            .fetch_optional(pool)
+            .await?;
 
     match row {
         None => Ok(T::default()),

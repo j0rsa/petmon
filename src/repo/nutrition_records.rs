@@ -1,9 +1,14 @@
-use crate::domain::nutrition_record::{NutritionRecord, NutritionRecordFilters, UpdateNutritionRecord};
+use crate::domain::nutrition_record::{
+    NutritionRecord, NutritionRecordFilters, UpdateNutritionRecord,
+};
 use crate::error::{AppError, AppResult};
 use chrono::Utc;
 use sqlx::SqlitePool;
 
-pub async fn list_records(pool: &SqlitePool, filters: &NutritionRecordFilters) -> AppResult<Vec<NutritionRecord>> {
+pub async fn list_records(
+    pool: &SqlitePool,
+    filters: &NutritionRecordFilters,
+) -> AppResult<Vec<NutritionRecord>> {
     let mut query = String::from(
         "SELECT id, pet_id, occurred_at, local_date, category, amount, unit, source_type, created_at, updated_at FROM nutrition_records WHERE 1=1",
     );
@@ -61,7 +66,10 @@ pub async fn get_record(pool: &SqlitePool, id: &str) -> AppResult<NutritionRecor
     .ok_or_else(|| AppError::NotFound(format!("Nutrition record {id} not found")))
 }
 
-pub async fn create_record(pool: &SqlitePool, record: NutritionRecord) -> AppResult<NutritionRecord> {
+pub async fn create_record(
+    pool: &SqlitePool,
+    record: NutritionRecord,
+) -> AppResult<NutritionRecord> {
     sqlx::query(
         "INSERT INTO nutrition_records (id, pet_id, occurred_at, local_date, category, amount, unit, source_type, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
     )
@@ -80,7 +88,11 @@ pub async fn create_record(pool: &SqlitePool, record: NutritionRecord) -> AppRes
     get_record(pool, &record.id).await
 }
 
-pub async fn update_record(pool: &SqlitePool, id: &str, req: UpdateNutritionRecord) -> AppResult<NutritionRecord> {
+pub async fn update_record(
+    pool: &SqlitePool,
+    id: &str,
+    req: UpdateNutritionRecord,
+) -> AppResult<NutritionRecord> {
     let mut record = get_record(pool, id).await?;
     let now = Utc::now().to_rfc3339();
     if let Some(occurred_at) = req.occurred_at {
@@ -121,12 +133,17 @@ pub async fn delete_record(pool: &SqlitePool, id: &str) -> AppResult<()> {
         .await?
         .rows_affected();
     if rows == 0 {
-        return Err(AppError::NotFound(format!("Nutrition record {id} not found")));
+        return Err(AppError::NotFound(format!(
+            "Nutrition record {id} not found"
+        )));
     }
     Ok(())
 }
 
-pub async fn create_records_batch(pool: &SqlitePool, records: Vec<NutritionRecord>) -> AppResult<Vec<NutritionRecord>> {
+pub async fn create_records_batch(
+    pool: &SqlitePool,
+    records: Vec<NutritionRecord>,
+) -> AppResult<Vec<NutritionRecord>> {
     let mut tx = pool.begin().await?;
     for record in &records {
         sqlx::query(

@@ -33,8 +33,7 @@ impl Config {
                 .parse()
                 .unwrap_or(1_048_576),
             otlp_endpoint: env::var("OTEL_EXPORTER_OTLP_ENDPOINT").ok(),
-            service_name: env::var("OTEL_SERVICE_NAME")
-                .unwrap_or_else(|_| "petmon".to_string()),
+            service_name: env::var("OTEL_SERVICE_NAME").unwrap_or_else(|_| "petmon".to_string()),
             static_dir: env::var("STATIC_DIR").ok(),
         }
     }

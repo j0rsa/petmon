@@ -4,7 +4,10 @@ use chrono::Utc;
 use sqlx::SqlitePool;
 use uuid::Uuid;
 
-pub async fn list_schedules(pool: &SqlitePool, pet_id: Option<Uuid>) -> AppResult<Vec<NutritionSchedule>> {
+pub async fn list_schedules(
+    pool: &SqlitePool,
+    pet_id: Option<Uuid>,
+) -> AppResult<Vec<NutritionSchedule>> {
     let mut query = String::from(
         "SELECT id, pet_id, name, active, rules_json, created_at, updated_at FROM nutrition_schedules",
     );
@@ -30,7 +33,10 @@ pub async fn get_schedule(pool: &SqlitePool, id: &str) -> AppResult<NutritionSch
     .ok_or_else(|| AppError::NotFound(format!("Nutrition schedule {id} not found")))
 }
 
-pub async fn create_schedule(pool: &SqlitePool, schedule: NutritionSchedule) -> AppResult<NutritionSchedule> {
+pub async fn create_schedule(
+    pool: &SqlitePool,
+    schedule: NutritionSchedule,
+) -> AppResult<NutritionSchedule> {
     let active_i = if schedule.active { 1_i64 } else { 0_i64 };
     sqlx::query(
         "INSERT INTO nutrition_schedules (id, pet_id, name, active, rules_json, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?)",
@@ -65,14 +71,16 @@ pub async fn update_schedule(
     }
     schedule.updated_at = now;
     let active_i = if schedule.active { 1_i64 } else { 0_i64 };
-    sqlx::query("UPDATE nutrition_schedules SET name=?, active=?, rules_json=?, updated_at=? WHERE id=?")
-        .bind(&schedule.name)
-        .bind(active_i)
-        .bind(&schedule.rules_json)
-        .bind(&schedule.updated_at)
-        .bind(id)
-        .execute(pool)
-        .await?;
+    sqlx::query(
+        "UPDATE nutrition_schedules SET name=?, active=?, rules_json=?, updated_at=? WHERE id=?",
+    )
+    .bind(&schedule.name)
+    .bind(active_i)
+    .bind(&schedule.rules_json)
+    .bind(&schedule.updated_at)
+    .bind(id)
+    .execute(pool)
+    .await?;
     Ok(schedule)
 }
 
@@ -83,7 +91,9 @@ pub async fn delete_schedule(pool: &SqlitePool, id: &str) -> AppResult<()> {
         .await?
         .rows_affected();
     if rows == 0 {
-        return Err(AppError::NotFound(format!("Nutrition schedule {id} not found")));
+        return Err(AppError::NotFound(format!(
+            "Nutrition schedule {id} not found"
+        )));
     }
     Ok(())
 }

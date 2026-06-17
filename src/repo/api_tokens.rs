@@ -27,7 +27,10 @@ pub async fn list(pool: &SqlitePool) -> AppResult<Vec<ApiToken>> {
     .await?)
 }
 
-pub async fn create(pool: &SqlitePool, req: CreateApiToken) -> AppResult<(ApiToken, ApiTokenCreated)> {
+pub async fn create(
+    pool: &SqlitePool,
+    req: CreateApiToken,
+) -> AppResult<(ApiToken, ApiTokenCreated)> {
     let raw = generate_token();
     let hash = hash_token(&raw);
     let token = ApiToken::new(req, hash);

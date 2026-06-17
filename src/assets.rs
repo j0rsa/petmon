@@ -65,7 +65,9 @@ pub async fn serve_api_docs() -> HttpResponse {
   </script>
 </body>
 </html>"##;
-    HttpResponse::Ok().content_type("text/html; charset=utf-8").body(html)
+    HttpResponse::Ok()
+        .content_type("text/html; charset=utf-8")
+        .body(html)
 }
 
 #[get("/api-docs/openapi.yaml")]

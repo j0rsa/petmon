@@ -7,7 +7,11 @@ use std::collections::HashMap;
 use uuid::Uuid;
 
 #[tracing::instrument(skip(pool))]
-pub async fn get_day_summary(pool: &SqlitePool, date: &str, pet_id: Option<Uuid>) -> AppResult<NutritionDaySummary> {
+pub async fn get_day_summary(
+    pool: &SqlitePool,
+    date: &str,
+    pet_id: Option<Uuid>,
+) -> AppResult<NutritionDaySummary> {
     let filters = NutritionRecordFilters {
         pet_id,
         date: Some(date.to_string()),
@@ -24,7 +28,9 @@ pub async fn get_day_summary(pool: &SqlitePool, date: &str, pet_id: Option<Uuid>
             .entry(record.category.to_string())
             .or_insert(0.0) += record.amount;
     }
-    let note = day_notes::get_day_note(pool, date, pet_id).await?.map(|n| n.note);
+    let note = day_notes::get_day_note(pool, date, pet_id)
+        .await?
+        .map(|n| n.note);
     Ok(NutritionDaySummary {
         local_date: date.to_string(),
         pet_id,
@@ -35,7 +41,12 @@ pub async fn get_day_summary(pool: &SqlitePool, date: &str, pet_id: Option<Uuid>
 }
 
 #[tracing::instrument(skip(pool))]
-pub async fn update_day_note(pool: &SqlitePool, date: &str, pet_id: Option<Uuid>, note: &str) -> AppResult<()> {
+pub async fn update_day_note(
+    pool: &SqlitePool,
+    date: &str,
+    pet_id: Option<Uuid>,
+    note: &str,
+) -> AppResult<()> {
     day_notes::upsert_day_note(pool, date, pet_id, note).await?;
     Ok(())
 }

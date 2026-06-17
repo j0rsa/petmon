@@ -12,7 +12,10 @@ pub async fn list_pets(state: web::Data<AppState>) -> AppResult<HttpResponse> {
 }
 
 #[post("")]
-pub async fn create_pet(state: web::Data<AppState>, body: web::Json<CreatePet>) -> AppResult<HttpResponse> {
+pub async fn create_pet(
+    state: web::Data<AppState>,
+    body: web::Json<CreatePet>,
+) -> AppResult<HttpResponse> {
     let pet = pet_service::create(&state.pool, body.into_inner()).await?;
     Ok(HttpResponse::Created().json(pet))
 }
@@ -34,7 +37,10 @@ pub async fn update_pet(
 }
 
 #[delete("/{id}")]
-pub async fn delete_pet(state: web::Data<AppState>, id: web::Path<Uuid>) -> AppResult<HttpResponse> {
+pub async fn delete_pet(
+    state: web::Data<AppState>,
+    id: web::Path<Uuid>,
+) -> AppResult<HttpResponse> {
     pet_service::delete(&state.pool, *id).await?;
     Ok(HttpResponse::NoContent().finish())
 }

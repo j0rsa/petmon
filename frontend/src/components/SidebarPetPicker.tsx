@@ -1,4 +1,4 @@
-import { useMatch, useNavigate } from 'react-router-dom';
+import { Link, useMatch, useNavigate } from 'react-router-dom';
 import { useSelectedPet } from '../context/SelectedPetContext';
 import { resolvePetColor } from '../lib/petColors';
 import { PetAvatar } from './pet/PetAvatar';

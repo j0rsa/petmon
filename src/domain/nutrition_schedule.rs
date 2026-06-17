@@ -45,7 +45,10 @@ impl NutritionSchedule {
             pet_id: req.pet_id,
             name: req.name,
             active: req.active.unwrap_or(true),
-            rules_json: req.rules.map(|r| r.to_string()).unwrap_or_else(|| "[]".to_string()),
+            rules_json: req
+                .rules
+                .map(|r| r.to_string())
+                .unwrap_or_else(|| "[]".to_string()),
             created_at: now.clone(),
             updated_at: now,
         }

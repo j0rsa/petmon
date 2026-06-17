@@ -23,7 +23,9 @@ where
     type Future = Ready<Result<Self::Transform, Self::InitError>>;
 
     fn new_transform(&self, service: S) -> Self::Future {
-        ready(Ok(RequireAuthMiddleware { service: Rc::new(service) }))
+        ready(Ok(RequireAuthMiddleware {
+            service: Rc::new(service),
+        }))
     }
 }
 
@@ -97,14 +99,18 @@ where
             if token.starts_with("pm_api_") {
                 match api_tokens::find_by_hash(&state.pool, &token).await {
                     Ok(Some(api_token)) => {
-                        let display = api_token.alias.clone()
+                        let display = api_token
+                            .alias
+                            .clone()
                             .or_else(|| api_token.created_by.clone())
                             .unwrap_or_else(|| api_token.id.clone());
                         let identity = Identity {
                             subject: display.clone(),
                             email: None,
                             name: Some(display),
-                            kind: crate::auth::identity::IdentityKind::ApiToken { token_id: api_token.id },
+                            kind: crate::auth::identity::IdentityKind::ApiToken {
+                                token_id: api_token.id,
+                            },
                         };
                         req.extensions_mut().insert(identity);
                         let res = service.call(req).await?;

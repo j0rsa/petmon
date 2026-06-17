@@ -28,12 +28,24 @@ impl actix_web::ResponseError for AppError {
     fn error_response(&self) -> HttpResponse {
         let (status, error_code, field) = match self {
             AppError::NotFound(_) => (actix_web::http::StatusCode::NOT_FOUND, "NOT_FOUND", None),
-            AppError::BadRequest(_) => (actix_web::http::StatusCode::BAD_REQUEST, "BAD_REQUEST", None),
+            AppError::BadRequest(_) => (
+                actix_web::http::StatusCode::BAD_REQUEST,
+                "BAD_REQUEST",
+                None,
+            ),
             AppError::Database(e) => {
                 tracing::error!(error = %e, "database error");
-                (actix_web::http::StatusCode::INTERNAL_SERVER_ERROR, "DATABASE_ERROR", None)
+                (
+                    actix_web::http::StatusCode::INTERNAL_SERVER_ERROR,
+                    "DATABASE_ERROR",
+                    None,
+                )
             }
-            AppError::Internal(_) => (actix_web::http::StatusCode::INTERNAL_SERVER_ERROR, "INTERNAL_ERROR", None),
+            AppError::Internal(_) => (
+                actix_web::http::StatusCode::INTERNAL_SERVER_ERROR,
+                "INTERNAL_ERROR",
+                None,
+            ),
             AppError::Validation { field, .. } => (
                 actix_web::http::StatusCode::UNPROCESSABLE_ENTITY,
                 "VALIDATION_ERROR",

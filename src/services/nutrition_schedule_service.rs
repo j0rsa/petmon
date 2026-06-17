@@ -1,4 +1,6 @@
-use crate::domain::nutrition_schedule::{CreateNutritionSchedule, NutritionSchedule, UpdateNutritionSchedule};
+use crate::domain::nutrition_schedule::{
+    CreateNutritionSchedule, NutritionSchedule, UpdateNutritionSchedule,
+};
 use crate::error::{AppError, AppResult};
 use crate::repo::{nutrition_schedules, pets};
 use sqlx::SqlitePool;
@@ -15,7 +17,10 @@ pub async fn get(pool: &SqlitePool, id: &str) -> AppResult<NutritionSchedule> {
 }
 
 #[tracing::instrument(skip(pool))]
-pub async fn create(pool: &SqlitePool, req: CreateNutritionSchedule) -> AppResult<NutritionSchedule> {
+pub async fn create(
+    pool: &SqlitePool,
+    req: CreateNutritionSchedule,
+) -> AppResult<NutritionSchedule> {
     if req.name.trim().is_empty() {
         return Err(AppError::Validation {
             field: "name".to_string(),
@@ -28,7 +33,11 @@ pub async fn create(pool: &SqlitePool, req: CreateNutritionSchedule) -> AppResul
 }
 
 #[tracing::instrument(skip(pool))]
-pub async fn update(pool: &SqlitePool, id: &str, req: UpdateNutritionSchedule) -> AppResult<NutritionSchedule> {
+pub async fn update(
+    pool: &SqlitePool,
+    id: &str,
+    req: UpdateNutritionSchedule,
+) -> AppResult<NutritionSchedule> {
     nutrition_schedules::update_schedule(pool, id, req).await
 }
 

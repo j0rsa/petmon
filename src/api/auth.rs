@@ -31,9 +31,7 @@ pub struct AuthInfo {
 }
 
 #[get("/auth/info")]
-pub async fn auth_info(
-    state: web::Data<AppState>,
-) -> AppResult<HttpResponse> {
+pub async fn auth_info(state: web::Data<AppState>) -> AppResult<HttpResponse> {
     if state.dev_mode {
         return Ok(HttpResponse::Ok().json(AuthInfo {
             mode: AuthMode::Dev,

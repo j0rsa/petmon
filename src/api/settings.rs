@@ -75,7 +75,8 @@ pub async fn create_token(
     match &identity.kind {
         IdentityKind::ApiToken { .. } => {
             return Err(AppError::BadRequest(
-                "API tokens cannot be created using another API token. Authenticate via OIDC.".to_string(),
+                "API tokens cannot be created using another API token. Authenticate via OIDC."
+                    .to_string(),
             ));
         }
         IdentityKind::Oidc | IdentityKind::Dev => {}

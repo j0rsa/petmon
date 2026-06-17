@@ -44,11 +44,19 @@ pub async fn run(pool: &SqlitePool, fresh: bool) -> AppResult<SeedSummary> {
 }
 
 async fn clear_all(pool: &SqlitePool) -> AppResult<()> {
-    sqlx::query("DELETE FROM nutrition_records").execute(pool).await?;
-    sqlx::query("DELETE FROM elimination_records").execute(pool).await?;
-    sqlx::query("DELETE FROM health_records").execute(pool).await?;
+    sqlx::query("DELETE FROM nutrition_records")
+        .execute(pool)
+        .await?;
+    sqlx::query("DELETE FROM elimination_records")
+        .execute(pool)
+        .await?;
+    sqlx::query("DELETE FROM health_records")
+        .execute(pool)
+        .await?;
     sqlx::query("DELETE FROM day_notes").execute(pool).await?;
-    sqlx::query("DELETE FROM nutrition_schedules").execute(pool).await?;
+    sqlx::query("DELETE FROM nutrition_schedules")
+        .execute(pool)
+        .await?;
     sqlx::query("DELETE FROM pets").execute(pool).await?;
     Ok(())
 }
@@ -103,7 +111,9 @@ async fn seed_pets(pool: &SqlitePool) -> AppResult<Vec<Pet>> {
     ];
 
     let mut created = Vec::with_capacity(profiles.len());
-    for (id, name, species, breed, birth_date, blood_type, color, weight_kg, feeding_notes) in profiles {
+    for (id, name, species, breed, birth_date, blood_type, color, weight_kg, feeding_notes) in
+        profiles
+    {
         let pet = Pet {
             id: Uuid::parse_str(id).expect("valid demo pet id"),
             name: name.to_string(),
@@ -147,7 +157,11 @@ async fn seed_nutrition_records(pool: &SqlitePool, demo_pets: &[Pet]) -> AppResu
     Ok(count)
 }
 
-fn daily_records_for_pet(pet: &Pet, date: NaiveDate, day_offset: i64) -> Vec<CreateNutritionRecord> {
+fn daily_records_for_pet(
+    pet: &Pet,
+    date: NaiveDate,
+    day_offset: i64,
+) -> Vec<CreateNutritionRecord> {
     let local_date = date.format("%Y-%m-%d").to_string();
     let weekend = matches!(date.weekday(), chrono::Weekday::Sat | chrono::Weekday::Sun);
     let variant = (day_offset % 5) as f64;
@@ -156,39 +170,183 @@ fn daily_records_for_pet(pet: &Pet, date: NaiveDate, day_offset: i64) -> Vec<Cre
 
     match pet.species {
         PetSpecies::Cat => {
-            records.push(record(pet.id, &local_date, 8, 30, "wet_food", 75.0 + variant * 5.0, Some("g"), day_offset % 3 == 0));
-            records.push(record(pet.id, &local_date, 12, 0, "water", 45.0 + variant * 4.0, Some("ml"), day_offset % 4 == 1));
-            records.push(record(pet.id, &local_date, 19, 0, "dry_food", 12.0 + variant * 2.0, Some("g"), false));
+            records.push(record(
+                pet.id,
+                &local_date,
+                8,
+                30,
+                "wet_food",
+                75.0 + variant * 5.0,
+                Some("g"),
+                day_offset % 3 == 0,
+            ));
+            records.push(record(
+                pet.id,
+                &local_date,
+                12,
+                0,
+                "water",
+                45.0 + variant * 4.0,
+                Some("ml"),
+                day_offset % 4 == 1,
+            ));
+            records.push(record(
+                pet.id,
+                &local_date,
+                19,
+                0,
+                "dry_food",
+                12.0 + variant * 2.0,
+                Some("g"),
+                false,
+            ));
             if weekend {
-                records.push(record(pet.id, &local_date, 21, 0, "dry_food", 3.0 + variant, Some("g"), false));
+                records.push(record(
+                    pet.id,
+                    &local_date,
+                    21,
+                    0,
+                    "dry_food",
+                    3.0 + variant,
+                    Some("g"),
+                    false,
+                ));
             }
         }
         PetSpecies::Dog => {
-            records.push(record(pet.id, &local_date, 7, 30, "wet_food", 280.0 + variant * 20.0, Some("g"), false));
-            records.push(record(pet.id, &local_date, 12, 30, "water", 350.0 + variant * 25.0, Some("ml"), day_offset % 5 == 2));
-            records.push(record(pet.id, &local_date, 18, 0, "dry_food", 90.0 + variant * 8.0, Some("g"), false));
+            records.push(record(
+                pet.id,
+                &local_date,
+                7,
+                30,
+                "wet_food",
+                280.0 + variant * 20.0,
+                Some("g"),
+                false,
+            ));
+            records.push(record(
+                pet.id,
+                &local_date,
+                12,
+                30,
+                "water",
+                350.0 + variant * 25.0,
+                Some("ml"),
+                day_offset % 5 == 2,
+            ));
+            records.push(record(
+                pet.id,
+                &local_date,
+                18,
+                0,
+                "dry_food",
+                90.0 + variant * 8.0,
+                Some("g"),
+                false,
+            ));
             if weekend || day_offset % 9 == 0 {
-                records.push(record(pet.id, &local_date, 16, 0, "dry_food", 15.0 + variant * 2.0, Some("g"), false));
+                records.push(record(
+                    pet.id,
+                    &local_date,
+                    16,
+                    0,
+                    "dry_food",
+                    15.0 + variant * 2.0,
+                    Some("g"),
+                    false,
+                ));
             }
         }
         PetSpecies::Parrot => {
-            records.push(record(pet.id, &local_date, 8, 0, "wet_food", 35.0 + variant * 3.0, Some("g"), false));
-            records.push(record(pet.id, &local_date, 13, 0, "water", 25.0 + variant * 2.0, Some("ml"), false));
-            records.push(record(pet.id, &local_date, 19, 30, "dry_food", 8.0 + variant, Some("g"), false));
+            records.push(record(
+                pet.id,
+                &local_date,
+                8,
+                0,
+                "wet_food",
+                35.0 + variant * 3.0,
+                Some("g"),
+                false,
+            ));
+            records.push(record(
+                pet.id,
+                &local_date,
+                13,
+                0,
+                "water",
+                25.0 + variant * 2.0,
+                Some("ml"),
+                false,
+            ));
+            records.push(record(
+                pet.id,
+                &local_date,
+                19,
+                30,
+                "dry_food",
+                8.0 + variant,
+                Some("g"),
+                false,
+            ));
             if weekend {
-                records.push(record(pet.id, &local_date, 15, 0, "dry_food", 2.0, Some("g"), false));
+                records.push(record(
+                    pet.id,
+                    &local_date,
+                    15,
+                    0,
+                    "dry_food",
+                    2.0,
+                    Some("g"),
+                    false,
+                ));
             }
         }
         PetSpecies::Bunny => {
-            records.push(record(pet.id, &local_date, 8, 0, "dry_food", 40.0 + variant * 4.0, Some("g"), false));
-            records.push(record(pet.id, &local_date, 11, 0, "water", 120.0 + variant * 10.0, Some("ml"), false));
-            records.push(record(pet.id, &local_date, 18, 0, "wet_food", 50.0 + variant * 5.0, Some("g"), false));
+            records.push(record(
+                pet.id,
+                &local_date,
+                8,
+                0,
+                "dry_food",
+                40.0 + variant * 4.0,
+                Some("g"),
+                false,
+            ));
+            records.push(record(
+                pet.id,
+                &local_date,
+                11,
+                0,
+                "water",
+                120.0 + variant * 10.0,
+                Some("ml"),
+                false,
+            ));
+            records.push(record(
+                pet.id,
+                &local_date,
+                18,
+                0,
+                "wet_food",
+                50.0 + variant * 5.0,
+                Some("g"),
+                false,
+            ));
         }
         PetSpecies::Other => {}
     }
 
     if day_offset % 13 == 0 && pet.species != PetSpecies::Other {
-        records.push(record(pet.id, &local_date, 9, 0, "liquids", 5.0, Some("ml"), false));
+        records.push(record(
+            pet.id,
+            &local_date,
+            9,
+            0,
+            "liquids",
+            5.0,
+            Some("ml"),
+            false,
+        ));
     }
 
     records
@@ -232,13 +390,18 @@ async fn seed_day_notes(pool: &SqlitePool, demo_pets: &[Pet]) -> AppResult<usize
 
     let notes = [
         (0, "Ate well today — finished both wet and dry portions."),
-        (1, "Skipped evening dry food; seemed sleepy after a long play session."),
+        (
+            1,
+            "Skipped evening dry food; seemed sleepy after a long play session.",
+        ),
         (3, "Tried a new wet food brand. Mixed reaction."),
         (7, "Vet check-up went fine. Normal appetite."),
     ];
 
     for (offset, text) in notes {
-        let date = (today - Duration::days(offset)).format("%Y-%m-%d").to_string();
+        let date = (today - Duration::days(offset))
+            .format("%Y-%m-%d")
+            .to_string();
         day_notes::upsert_day_note(pool, &date, Some(mittens.id), text).await?;
     }
 
@@ -309,12 +472,13 @@ async fn seed_schedules(pool: &SqlitePool, demo_pets: &[Pet]) -> AppResult<usize
 
     let count = schedules.len();
     for (pet_id, name, active, rules) in schedules {
-        let schedule = crate::domain::nutrition_schedule::NutritionSchedule::new(CreateNutritionSchedule {
-            pet_id: *pet_id,
-            name: name.to_string(),
-            active: Some(*active),
-            rules: Some(rules.clone()),
-        });
+        let schedule =
+            crate::domain::nutrition_schedule::NutritionSchedule::new(CreateNutritionSchedule {
+                pet_id: *pet_id,
+                name: name.to_string(),
+                active: Some(*active),
+                rules: Some(rules.clone()),
+            });
         nutrition_schedules::create_schedule(pool, schedule).await?;
     }
 
@@ -336,6 +500,7 @@ mod tests {
             import_max_bytes: 1_048_576,
             otlp_endpoint: None,
             service_name: "petmon-test".to_string(),
+            static_dir: None,
         };
         let pool = db::create_pool(&config).await.expect("pool");
         db::run_migrations(&pool).await.expect("migrate");

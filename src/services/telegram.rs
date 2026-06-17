@@ -8,7 +8,11 @@ use crate::repo::{pets, settings};
 /// Format a nutrition record as a Telegram log line.
 /// Example: `#cat_ate #wet_food 75`
 fn format_record_line(record: &NutritionRecord) -> String {
-    format!("#cat_ate #{} {}", record.category, record.amount.round() as i64)
+    format!(
+        "#cat_ate #{} {}",
+        record.category,
+        record.amount.round() as i64
+    )
 }
 
 /// Fire-and-forget: send a record to the pet's configured Telegram chat.
