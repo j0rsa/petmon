@@ -90,7 +90,7 @@ async fn main() -> anyhow::Result<()> {
                     .configure(api::settings::configure),
             )
             .service(
-                web::scope("")
+                web::scope("/mcp")
                     .wrap(middleware::auth::RequireAuth)
                     .configure(mcp::transport::configure),
             )

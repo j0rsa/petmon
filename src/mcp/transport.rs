@@ -53,7 +53,7 @@ impl McpResponse {
     }
 }
 
-#[post("/mcp")]
+#[post("")]
 #[tracing::instrument(name = "mcp_request", skip(state, body), fields(method = tracing::field::Empty))]
 pub async fn mcp_handler(state: web::Data<AppState>, body: web::Json<McpRequest>) -> HttpResponse {
     let req = body.into_inner();
