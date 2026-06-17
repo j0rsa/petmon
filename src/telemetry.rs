@@ -8,7 +8,7 @@ use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt, EnvFilte
 
 /// Initialise the tracing stack.
 ///
-/// When `otlp_endpoint` is `Some`, spans are exported via OTLP/HTTP to that
+/// When `otlp_endpoint` is `Some`, spans are exported via OTLP/gRPC to that
 /// endpoint in addition to being emitted as JSON logs.  The returned
 /// `SdkTracerProvider` must be shut down on process exit (call
 /// [`shutdown`]).  When `otlp_endpoint` is `None` only JSON console logging
@@ -22,7 +22,7 @@ pub fn init(
 
     if let Some(endpoint) = otlp_endpoint {
         let exporter = opentelemetry_otlp::SpanExporter::builder()
-            .with_http()
+            .with_tonic()
             .with_endpoint(endpoint)
             .build()?;
 
