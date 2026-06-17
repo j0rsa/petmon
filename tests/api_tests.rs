@@ -71,7 +71,11 @@ async fn health_is_public_when_auth_is_enabled() {
 
     let req = test::TestRequest::get().uri("/api/v1/health").to_request();
     let resp = test::call_service(&app, req).await;
-    assert_eq!(resp.status(), 200, "health endpoint must be publicly accessible");
+    assert_eq!(
+        resp.status(),
+        200,
+        "health endpoint must be publicly accessible"
+    );
 }
 
 #[actix_web::test]
@@ -119,7 +123,9 @@ async fn frontend_spa_path_is_served_without_auth() {
     let state = web::Data::new(AppState::new(pool, false, None, None));
     let app = build_full_app!(state);
 
-    let req = test::TestRequest::get().uri("/nutrition/2025-01-01").to_request();
+    let req = test::TestRequest::get()
+        .uri("/nutrition/2025-01-01")
+        .to_request();
     let resp = test::call_service(&app, req).await;
     assert_ne!(
         resp.status(),
@@ -156,7 +162,9 @@ async fn auth_info_is_public_at_full_app_level() {
     let state = web::Data::new(AppState::new(pool, false, None, None));
     let app = build_full_app!(state);
 
-    let req = test::TestRequest::get().uri("/api/v1/auth/info").to_request();
+    let req = test::TestRequest::get()
+        .uri("/api/v1/auth/info")
+        .to_request();
     let resp = test::call_service(&app, req).await;
     assert_eq!(
         resp.status(),
