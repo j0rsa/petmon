@@ -1,4 +1,3 @@
-use chrono::Utc;
 use crate::domain::nutrition_record::BatchCreateNutritionRecords;
 use crate::domain::nutrition_record::{
     CreateNutritionRecord, NutritionRecordFilters, UpdateNutritionRecord,
@@ -10,6 +9,7 @@ use crate::services::{
     day_service, nutrition_analytics_service, nutrition_record_service, nutrition_schedule_service,
     pet_service,
 };
+use chrono::Utc;
 use serde_json::{json, Value};
 use sqlx::SqlitePool;
 use uuid::Uuid;
@@ -474,7 +474,13 @@ pub async fn dispatch(pool: &SqlitePool, method: &str, params: Option<Value>) ->
                 pet_service::get(pool, pet_id),
                 day_service::get_day_summary(pool, &today, Some(pet_id)),
                 nutrition_schedule_service::list(pool, Some(pet_id)),
-                nutrition_analytics_service::range_summary(pool, &week_from, &today, Some(pet_id), None),
+                nutrition_analytics_service::range_summary(
+                    pool,
+                    &week_from,
+                    &today,
+                    Some(pet_id),
+                    None
+                ),
             )?;
 
             let active_schedules: Vec<_> = schedules.iter().filter(|s| s.active).collect();
@@ -498,9 +504,10 @@ pub async fn dispatch(pool: &SqlitePool, method: &str, params: Option<Value>) ->
                 .ok_or_else(|| AppError::BadRequest("date_to required".to_string()))?;
             let pet_id = optional_uuid(&params, "pet_id")?;
             let category = params["category"].as_str();
-            let totals =
-                nutrition_analytics_service::daily_totals(pool, date_from, date_to, pet_id, category)
-                    .await?;
+            let totals = nutrition_analytics_service::daily_totals(
+                pool, date_from, date_to, pet_id, category,
+            )
+            .await?;
             Ok(json!(totals))
         }
         "nutrition/analytics/range-summary" => {

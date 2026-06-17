@@ -77,7 +77,9 @@ pub async fn mcp_handler(state: web::Data<AppState>, body: web::Json<McpRequest>
                 .map(str::to_owned);
             match uri {
                 Some(uri) => super::resources::read_resource(&state.pool, &uri).await,
-                None => Err(crate::error::AppError::BadRequest("uri required".to_string())),
+                None => Err(crate::error::AppError::BadRequest(
+                    "uri required".to_string(),
+                )),
             }
         }
         _ => super::tools::dispatch(&state.pool, &req.method, req.params).await,
