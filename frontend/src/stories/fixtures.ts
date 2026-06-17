@@ -218,14 +218,12 @@ export const mockOidcEmpty: OidcConfigPublic = {
   enabled: false,
   issuer_url: null,
   client_id: null,
-  has_client_secret: false,
 };
 
 export const mockOidcConfigured: OidcConfigPublic = {
   enabled: true,
   issuer_url: 'https://sso.example.com',
   client_id: 'petmon-app',
-  has_client_secret: true,
 };
 
 export const mockTelegramEmpty: TelegramConfigPublic = {
