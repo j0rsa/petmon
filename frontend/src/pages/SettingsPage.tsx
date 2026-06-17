@@ -421,29 +421,31 @@ function TokenRow({ token, onDeactivate, deactivating, onDelete, deleting }: {
       <td style={{ fontSize: '0.82rem', color: 'var(--text-muted)' }}>{token.created_at.slice(0, 10)}</td>
       <td style={{ fontSize: '0.82rem', color: 'var(--text-muted)' }}>{token.last_used_at ? token.last_used_at.slice(0, 10) : <span style={{ color: 'var(--text-subtle)' }}>never</span>}</td>
       <td><span className={`status-pill${token.active ? ' active' : ''}`}>{token.active ? 'Active' : 'Inactive'}</span></td>
-      <td style={{ display: 'flex', gap: '0.4rem' }}>
-        {token.active && (
-          <button
-            className="button button-danger"
-            type="button"
-            style={{ padding: '0.3rem 0.75rem', fontSize: '0.82rem' }}
-            disabled={deactivating}
-            onClick={() => { if (window.confirm(`Deactivate token "${token.alias ?? token.id}"?`)) onDeactivate(); }}
-          >
-            {deactivating ? '…' : 'Deactivate'}
-          </button>
-        )}
-        {!token.active && (
-          <button
-            className="button button-danger"
-            type="button"
-            style={{ padding: '0.3rem 0.75rem', fontSize: '0.82rem' }}
-            disabled={deleting}
-            onClick={() => { if (window.confirm(`Permanently delete token "${token.alias ?? token.id}"? This cannot be undone.`)) onDelete(); }}
-          >
-            {deleting ? '…' : 'Delete'}
-          </button>
-        )}
+      <td>
+        <div style={{ display: 'flex', gap: '0.4rem' }}>
+          {token.active && (
+            <button
+              className="button button-danger"
+              type="button"
+              style={{ padding: '0.3rem 0.75rem', fontSize: '0.82rem' }}
+              disabled={deactivating}
+              onClick={() => { if (window.confirm(`Deactivate token "${token.alias ?? token.id}"?`)) onDeactivate(); }}
+            >
+              {deactivating ? '…' : 'Deactivate'}
+            </button>
+          )}
+          {!token.active && (
+            <button
+              className="button button-danger"
+              type="button"
+              style={{ padding: '0.3rem 0.75rem', fontSize: '0.82rem' }}
+              disabled={deleting}
+              onClick={() => { if (window.confirm(`Permanently delete token "${token.alias ?? token.id}"? This cannot be undone.`)) onDelete(); }}
+            >
+              {deleting ? '…' : 'Delete'}
+            </button>
+          )}
+        </div>
       </td>
     </tr>
   );
