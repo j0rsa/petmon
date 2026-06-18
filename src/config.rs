@@ -27,7 +27,9 @@ impl Config {
                 .unwrap_or(8080),
             database_url: env::var("DATABASE_URL")
                 .unwrap_or_else(|_| "sqlite:petmon.db".to_string()),
-            timezone: env::var("TIMEZONE").unwrap_or_else(|_| "UTC".to_string()),
+            timezone: env::var("TIMEZONE")
+                .or_else(|_| env::var("TZ"))
+                .unwrap_or_else(|_| "UTC".to_string()),
             import_max_bytes: env::var("IMPORT_MAX_BYTES")
                 .unwrap_or_else(|_| "1048576".to_string())
                 .parse()

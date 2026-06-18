@@ -2,14 +2,22 @@ import { useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { settingsApi } from '../api/settings';
 import type { ApiTokenCreated, ApiTokenPublic, DisplaySettings, OidcConfigPublic, TelegramConfigPublic } from '../api/settings';
+import { infoApi } from '../api/info';
 
 export default function SettingsPage() {
+  const { data: info } = useQuery({ queryKey: ['app-info'], queryFn: infoApi.get, staleTime: Infinity, retry: false });
+
   return (
     <div className="page-stack">
       <DisplaySection />
       <OidcSection />
       <TelegramSection />
       <ApiTokensSection />
+      {info && (
+        <p style={{ textAlign: 'center', fontSize: '0.72rem', color: 'var(--text-subtle)', letterSpacing: '0.02em', paddingBottom: '0.5rem' }}>
+          v{info.version} · {info.git_sha}
+        </p>
+      )}
     </div>
   );
 }

@@ -56,11 +56,17 @@ async fn main() -> anyhow::Result<()> {
         );
     }
 
-    let state = web::Data::new(auth::AppState::new(
+    let timezone: chrono_tz::Tz = config.timezone.parse().unwrap_or_else(|_| {
+        tracing::warn!(tz = %config.timezone, "unknown TIMEZONE, falling back to UTC");
+        chrono_tz::UTC
+    });
+
+    let state = web::Data::new(auth::AppState::new_with_tz(
         pool,
         dev_mode,
         oidc_validator,
         config.static_dir.clone(),
+        timezone,
     ));
     let bind_addr = format!("{}:{}", config.host, config.port);
 

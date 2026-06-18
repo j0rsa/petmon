@@ -10,6 +10,7 @@ use crate::services::{
     pet_service,
 };
 use chrono::Utc;
+use chrono_tz::Tz;
 use serde_json::{json, Value};
 use sqlx::SqlitePool;
 use uuid::Uuid;
@@ -352,7 +353,12 @@ fn tool_list() -> Value {
     })
 }
 
-pub async fn dispatch(pool: &SqlitePool, method: &str, params: Option<Value>) -> AppResult<Value> {
+pub async fn dispatch(
+    pool: &SqlitePool,
+    method: &str,
+    params: Option<Value>,
+    timezone: Tz,
+) -> AppResult<Value> {
     let params = params.unwrap_or_else(|| json!({}));
 
     match method {
@@ -401,13 +407,14 @@ pub async fn dispatch(pool: &SqlitePool, method: &str, params: Option<Value>) ->
         "nutrition/records/create" => {
             let req: CreateNutritionRecord =
                 serde_json::from_value(params).map_err(|e| AppError::BadRequest(e.to_string()))?;
-            let record = nutrition_record_service::create(pool, req).await?;
+            let record = nutrition_record_service::create(pool, req, timezone).await?;
             Ok(json!(record))
         }
         "nutrition/records/batch-create" => {
             let req: BatchCreateNutritionRecords =
                 serde_json::from_value(params).map_err(|e| AppError::BadRequest(e.to_string()))?;
-            let records = nutrition_record_service::batch_create(pool, req.records).await?;
+            let records =
+                nutrition_record_service::batch_create(pool, req.records, timezone).await?;
             Ok(json!(records))
         }
         "nutrition/records/update" => {

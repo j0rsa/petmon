@@ -196,6 +196,7 @@ export function withSettings({
       client.setQueryData(['settings-oidc'], oidc === 'configured' ? mockOidcConfigured : mockOidcEmpty);
       client.setQueryData(['settings-telegram'], telegram === 'configured' ? mockTelegramConfigured : mockTelegramEmpty);
       client.setQueryData(['api-tokens'], tokens === 'populated' ? mockApiTokens : []);
+      client.setQueryData(['app-info'], mockAppInfo);
     }
 
     return (

@@ -693,7 +693,7 @@ pre {
   }
 
   .content {
-    padding-bottom: calc(4rem + env(safe-area-inset-bottom));
+    padding-bottom: calc(5.5rem + env(safe-area-inset-bottom));
   }
 
   .bottom-nav {
@@ -702,7 +702,7 @@ pre {
     bottom: 0;
     left: 0;
     right: 0;
-    height: calc(3.5rem + env(safe-area-inset-bottom));
+    height: calc(4rem + env(safe-area-inset-bottom));
     padding-bottom: env(safe-area-inset-bottom);
     background: var(--surface-sidebar);
     border-top: 1px solid var(--border-subtle);
@@ -724,7 +724,7 @@ pre {
   background: none;
   border: none;
   cursor: pointer;
-  padding: 0.35rem 0.25rem 0;
+  padding: 0.5rem 0.25rem;
   transition: color 0.15s ease;
   -webkit-tap-highlight-color: transparent;
 }
@@ -778,7 +778,7 @@ pre {
 .bottom-nav-sheet {
   display: none;
   position: fixed;
-  bottom: calc(3.5rem + env(safe-area-inset-bottom));
+  bottom: calc(4rem + env(safe-area-inset-bottom));
   left: 0;
   right: 0;
   background: var(--surface-elevated);
@@ -886,27 +886,28 @@ pre {
   letter-spacing: 0.08em;
 }
 
-.nav-api-docs-link {
+.external-links {
+  display: flex;
+  flex-direction: row;
+  gap: 0.25rem;
+  padding: 0.25rem 0.6rem;
+}
+
+.external-link-btn {
   display: flex;
   align-items: center;
-  gap: 0.45rem;
-  padding: 0.5rem 1rem;
-  border-radius: 14px;
+  justify-content: center;
+  width: 2rem;
+  height: 2rem;
+  border-radius: 10px;
   color: var(--text-subtle);
-  font-size: 0.82rem;
-  transition: 0.2s ease;
   text-decoration: none;
-  margin-top: auto;
+  transition: background 0.15s ease, color 0.15s ease;
 }
 
-.nav-api-docs-link:hover {
+.external-link-btn:hover {
   background: var(--accent-soft);
   color: var(--nav-text-active);
-}
-
-.nav-api-docs-external {
-  margin-left: auto;
-  opacity: 0.5;
 }
 
 .sidebar-user {

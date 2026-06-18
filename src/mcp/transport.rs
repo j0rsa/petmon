@@ -82,7 +82,7 @@ pub async fn mcp_handler(state: web::Data<AppState>, body: web::Json<McpRequest>
                 )),
             }
         }
-        _ => super::tools::dispatch(&state.pool, &req.method, req.params).await,
+        _ => super::tools::dispatch(&state.pool, &req.method, req.params, state.timezone).await,
     };
 
     match result {

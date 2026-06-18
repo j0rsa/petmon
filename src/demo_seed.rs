@@ -1,4 +1,5 @@
 use chrono::{Datelike, Duration, NaiveDate, Utc};
+use chrono_tz;
 use sqlx::SqlitePool;
 use uuid::Uuid;
 
@@ -148,7 +149,8 @@ async fn seed_nutrition_records(pool: &SqlitePool, demo_pets: &[Pet]) -> AppResu
 
             let records = daily_records_for_pet(pet, date, day_offset);
             for req in records {
-                nutrition_records::create_record(pool, NutritionRecord::new(req)).await?;
+                nutrition_records::create_record(pool, NutritionRecord::new(req, chrono_tz::UTC))
+                    .await?;
                 count += 1;
             }
         }

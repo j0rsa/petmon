@@ -4,6 +4,7 @@ use crate::domain::nutrition_record::{
 use crate::error::{AppError, AppResult};
 use crate::repo::{nutrition_records, pets};
 use crate::services::telegram;
+use chrono_tz::Tz;
 use sqlx::SqlitePool;
 use std::collections::HashSet;
 use tracing::Instrument;
@@ -34,10 +35,14 @@ pub async fn get(pool: &SqlitePool, id: &str) -> AppResult<NutritionRecord> {
 }
 
 #[tracing::instrument(skip(pool))]
-pub async fn create(pool: &SqlitePool, req: CreateNutritionRecord) -> AppResult<NutritionRecord> {
+pub async fn create(
+    pool: &SqlitePool,
+    req: CreateNutritionRecord,
+    timezone: Tz,
+) -> AppResult<NutritionRecord> {
     validate_create(&req)?;
     pets::get_pet(pool, req.pet_id).await?;
-    let record = NutritionRecord::new(req);
+    let record = NutritionRecord::new(req, timezone);
     let record = nutrition_records::create_record(pool, record).await?;
 
     let pool2 = pool.clone();
@@ -54,6 +59,7 @@ pub async fn create(pool: &SqlitePool, req: CreateNutritionRecord) -> AppResult<
 pub async fn batch_create(
     pool: &SqlitePool,
     records: Vec<CreateNutritionRecord>,
+    timezone: Tz,
 ) -> AppResult<Vec<NutritionRecord>> {
     if records.is_empty() {
         return Err(AppError::Validation {
@@ -77,7 +83,10 @@ pub async fn batch_create(
         pets::get_pet(pool, pet_id).await?;
     }
 
-    let created: Vec<NutritionRecord> = records.into_iter().map(NutritionRecord::new).collect();
+    let created: Vec<NutritionRecord> = records
+        .into_iter()
+        .map(|r| NutritionRecord::new(r, timezone))
+        .collect();
     nutrition_records::create_records_batch(pool, created).await
 }
 

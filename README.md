@@ -60,14 +60,46 @@ POST        /api/v1/api-tokens            # create — raw token returned once
 DELETE      /api/v1/api-tokens/:id        # deactivate
 ```
 
-## MCP Operations
+## MCP
 
-The `/mcp` endpoint accepts JSON-RPC 2.0 requests. Available methods:
+petmon exposes a **stateless JSON-RPC 2.0** MCP endpoint at `POST /mcp`, protected by the same Bearer-token auth as the REST API.
+
+### Available tools
 
 `pets/list`, `pets/get`, `pets/create`, `pets/update`, `pets/delete`,
 `nutrition/records/list`, `nutrition/records/get`, `nutrition/records/create`, `nutrition/records/batch-create`, `nutrition/records/update`, `nutrition/records/delete`,
 `days/summary`, `nutrition/analytics/daily-totals`, `nutrition/analytics/range-summary`,
 `nutrition/schedules/list`, `nutrition/schedules/get`, `nutrition/schedules/create`, `nutrition/schedules/update`, `nutrition/schedules/delete`
+
+### Connecting Claude to petmon
+
+petmon uses HTTP transport (JSON-RPC over a single `POST /mcp` endpoint). Add it to your Claude Code config (`~/.claude/settings.json` or the project's `.claude/settings.json`):
+
+```json
+{
+  "mcpServers": {
+    "petmon": {
+      "type": "url",
+      "url": "https://<your-petmon-host>/mcp",
+      "headers": {
+        "Authorization": "Bearer pm_api_<your-api-token>"
+      }
+    }
+  }
+}
+```
+
+**Steps:**
+
+1. **Create an API token** — open petmon → Settings → API tokens → Create token. Copy the token immediately (shown once).
+2. **Add the server** to your Claude settings as shown above, replacing `<your-petmon-host>` with your deployment URL (e.g. `petmon.example.com`) and `<your-api-token>` with the token you just copied.
+3. **Restart Claude Code** (or run `/mcp` to reload servers).
+4. Claude can now query and log pet nutrition data directly. Example prompts:
+   - *"List all my pets"*
+   - *"Log 20 ml of water for Mittens now"*
+   - *"Show me today's nutrition summary for Rex"*
+
+For local development use `http://localhost:8080/mcp` as the URL.
 
 ## Configuration
 
@@ -76,7 +108,7 @@ The `/mcp` endpoint accepts JSON-RPC 2.0 requests. Available methods:
 | `HOST` | `0.0.0.0` | Bind address |
 | `PORT` | `8080` | Bind port |
 | `DATABASE_URL` | `sqlite:petmon.db` | SQLite path |
-| `TIMEZONE` | `UTC` | Local timezone for day bucketing |
+| `TIMEZONE` or `TZ` | `UTC` | Local timezone for day bucketing (`TZ` is the standard Unix env var; `TIMEZONE` takes precedence if both are set) |
 | `IMPORT_MAX_BYTES` | `1048576` | Max JSON request body size |
 | `STATIC_DIR` | *(unset)* | Serve frontend from this directory instead of embedded assets |
 

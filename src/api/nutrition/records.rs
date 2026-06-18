@@ -21,7 +21,8 @@ pub async fn create_record(
     state: web::Data<AppState>,
     body: web::Json<CreateNutritionRecord>,
 ) -> AppResult<HttpResponse> {
-    let record = nutrition_record_service::create(&state.pool, body.into_inner()).await?;
+    let record =
+        nutrition_record_service::create(&state.pool, body.into_inner(), state.timezone).await?;
     Ok(HttpResponse::Created().json(record))
 }
 
@@ -30,8 +31,12 @@ pub async fn batch_create_records(
     state: web::Data<AppState>,
     body: web::Json<BatchCreateNutritionRecords>,
 ) -> AppResult<HttpResponse> {
-    let records =
-        nutrition_record_service::batch_create(&state.pool, body.into_inner().records).await?;
+    let records = nutrition_record_service::batch_create(
+        &state.pool,
+        body.into_inner().records,
+        state.timezone,
+    )
+    .await?;
     Ok(HttpResponse::Created().json(records))
 }
 

@@ -1,6 +1,6 @@
 [package]
 name = "petmon"
-version = "0.1.14"
+version = "0.1.15"
 edition = "2021"
 default-run = "petmon"
 
@@ -20,6 +20,7 @@ sqlx = { version = "0.9", features = ["sqlite", "runtime-tokio", "tls-rustls", "
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 chrono = { version = "0.4", features = ["serde"] }
+chrono-tz = "0.10"
 uuid = { version = "1", features = ["v4", "serde"] }
 tracing = "0.1"
 tracing-subscriber = { version = "0.3", features = ["env-filter", "fmt", "json"] }

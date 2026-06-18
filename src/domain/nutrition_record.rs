@@ -1,4 +1,5 @@
-use chrono::{Local, Utc};
+use chrono::Utc;
+use chrono_tz::Tz;
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
@@ -89,11 +90,14 @@ impl std::str::FromStr for NutritionCategory {
 }
 
 impl NutritionRecord {
-    pub fn new(req: CreateNutritionRecord) -> Self {
+    pub fn new(req: CreateNutritionRecord, timezone: Tz) -> Self {
         let now = Utc::now().to_rfc3339();
-        let occurred_at = req
-            .occurred_at
-            .unwrap_or_else(|| Local::now().format("%Y-%m-%dT%H:%M:%S").to_string());
+        let occurred_at = req.occurred_at.unwrap_or_else(|| {
+            Utc::now()
+                .with_timezone(&timezone)
+                .format("%Y-%m-%dT%H:%M:%S")
+                .to_string()
+        });
         let local_date = req
             .local_date
             .unwrap_or_else(|| occurred_at.split('T').next().unwrap_or("").to_string());
