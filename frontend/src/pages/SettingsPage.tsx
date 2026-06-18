@@ -20,7 +20,18 @@ function DisplaySection() {
   const queryClient = useQueryClient();
   const { data, isLoading } = useQuery({ queryKey: ['settings-display'], queryFn: settingsApi.getDisplay });
 
-  const current: DisplaySettings = data ?? { time_format: 'h24', date_format: 'dmy', show_water_card: true };
+  const current: DisplaySettings = data ?? {
+    time_format: 'h24',
+    date_format: 'dmy',
+    show_water_card: true,
+    calendar_show_wet_food: true,
+    calendar_show_liquids: true,
+    calendar_show_water: true,
+    calendar_show_dry_food: true,
+    calendar_show_record_count: true,
+    calendar_show_total_fluid: true,
+    calendar_week_start: 'sunday',
+  };
 
   const mutation = useMutation({
     mutationFn: settingsApi.updateDisplay,
@@ -86,6 +97,48 @@ function DisplaySection() {
               />
               Show water metric card
             </label>
+          </div>
+        </div>
+
+        <div className="display-option-row">
+          <span className="display-option-label">Week starts on</span>
+          <div className="display-option-choices">
+            {(['sunday', 'monday'] as const).map((v) => (
+              <label key={v} className="checkbox-row" style={{ paddingTop: 0 }}>
+                <input
+                  type="radio"
+                  name="calendar_week_start"
+                  checked={current.calendar_week_start === v}
+                  onChange={() => mutation.mutate({ calendar_week_start: v })}
+                />
+                {v === 'sunday' ? 'Sunday' : 'Monday'}
+              </label>
+            ))}
+          </div>
+        </div>
+
+        <div className="display-option-row" style={{ alignItems: 'flex-start' }}>
+          <span className="display-option-label" style={{ paddingTop: '0.15rem' }}>Calendar metrics</span>
+          <div className="display-option-choices" style={{ flexDirection: 'column', alignItems: 'flex-start', gap: '0.5rem' }}>
+            {(
+              [
+                ['calendar_show_total_fluid',   'Total fluid (ml)'],
+                ['calendar_show_wet_food',       'Wet food (g)'],
+                ['calendar_show_liquids',        'Liquids (ml)'],
+                ['calendar_show_water',          'Water (ml)'],
+                ['calendar_show_dry_food',       'Dry food (g)'],
+                ['calendar_show_record_count',   'Record count (fallback)'],
+              ] as const
+            ).map(([field, label]) => (
+              <label key={field} className="checkbox-row" style={{ paddingTop: 0 }}>
+                <input
+                  type="checkbox"
+                  checked={current[field]}
+                  onChange={(e) => mutation.mutate({ [field]: e.target.checked })}
+                />
+                {label}
+              </label>
+            ))}
           </div>
         </div>
       </div>

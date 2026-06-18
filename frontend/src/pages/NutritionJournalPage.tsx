@@ -6,6 +6,7 @@ import { MonthCalendar } from '../components/MonthCalendar';
 import { NoPetSelected } from '../components/NoPetSelected';
 import { NutritionDayPanel } from '../components/NutritionDayPanel';
 import { useSelectedPet } from '../context/SelectedPetContext';
+import { useDisplaySettings } from '../context/useDisplaySettings';
 import { localToday, monthBounds, monthKey } from '../lib/dates';
 import { aggregateDailyHighlights } from '../lib/nutritionMetrics';
 
@@ -15,6 +16,7 @@ export default function NutritionJournalPage() {
   const navigate = useNavigate();
   const { date: routeDate } = useParams();
   const { selectedPetId, petsLoading } = useSelectedPet();
+  const displaySettings = useDisplaySettings();
   const isMobile = useSyncExternalStore(
     (cb) => { mq.addEventListener('change', cb); return () => mq.removeEventListener('change', cb); },
     () => mq.matches,
@@ -59,6 +61,8 @@ export default function NutritionJournalPage() {
         onSelectDate={selectDate}
         onGoToToday={() => selectDate(localToday())}
         compact={isMobile}
+        calendarConfig={displaySettings}
+        weekStart={displaySettings.calendar_week_start}
       />
       <NutritionDayPanel date={selectedDate} petId={selectedPetId} />
     </div>

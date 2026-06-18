@@ -36,9 +36,11 @@ export function shiftMonth(month: string, offset: number) {
   return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
 }
 
-export function calendarCells(month: string) {
+export function calendarCells(month: string, weekStart: 'sunday' | 'monday' = 'sunday') {
   const { year, monthIndex, lastDay } = monthBounds(month);
-  const firstWeekday = new Date(year, monthIndex, 1).getDay();
+  // getDay() returns 0=Sun … 6=Sat; shift by 1 when week starts on Monday
+  const rawWeekday = new Date(year, monthIndex, 1).getDay();
+  const firstWeekday = weekStart === 'monday' ? (rawWeekday + 6) % 7 : rawWeekday;
   const cells: Array<{ date: string | null; day: number | null }> = [];
 
   for (let i = 0; i < firstWeekday; i += 1) {

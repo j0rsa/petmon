@@ -80,6 +80,8 @@ async fn main() -> anyhow::Result<()> {
                         actix_web::error::InternalError::from_response(err, response).into()
                     }),
             )
+            .service(assets::serve_api_docs)
+            .service(assets::serve_openapi_yaml)
             .service(
                 web::scope("/api/v1")
                     .wrap(middleware::auth::RequireAuth)

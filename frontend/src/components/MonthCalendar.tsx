@@ -1,5 +1,6 @@
 import { calendarCells, localToday, shiftMonth } from '../lib/dates';
 import { formatDayHint, formatDayHintCompact } from '../lib/nutritionMetrics';
+import type { CalendarDisplayConfig } from '../lib/nutritionMetrics';
 import type { DayNutritionHighlight } from '../types/pillars';
 
 interface MonthCalendarProps {
@@ -10,12 +11,16 @@ interface MonthCalendarProps {
   onSelectDate: (date: string) => void;
   onGoToToday?: () => void;
   compact?: boolean;
+  calendarConfig?: CalendarDisplayConfig;
+  weekStart?: 'sunday' | 'monday';
 }
 
-const WEEKDAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+const WEEKDAYS_SUN = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+const WEEKDAYS_MON = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
 
-export function MonthCalendar({ month, selectedDate, highlights, onMonthChange, onSelectDate, onGoToToday, compact = false }: MonthCalendarProps) {
-  const cells = calendarCells(month);
+export function MonthCalendar({ month, selectedDate, highlights, onMonthChange, onSelectDate, onGoToToday, compact = false, calendarConfig, weekStart = 'sunday' }: MonthCalendarProps) {
+  const cells = calendarCells(month, weekStart);
+  const weekdays = weekStart === 'monday' ? WEEKDAYS_MON : WEEKDAYS_SUN;
   const today = localToday();
   const isOnToday = selectedDate === today;
   const displayMonth = new Date(`${month}-01T00:00:00`).toLocaleDateString(undefined, { month: 'long', year: 'numeric' });
@@ -53,7 +58,7 @@ export function MonthCalendar({ month, selectedDate, highlights, onMonthChange, 
       </div>
 
       <div className="calendar-weekdays">
-        {WEEKDAYS.map((day) => (
+        {weekdays.map((day) => (
           <span key={day}>{day}</span>
         ))}
       </div>
@@ -66,8 +71,8 @@ export function MonthCalendar({ month, selectedDate, highlights, onMonthChange, 
 
           const highlight = highlights.get(cell.date);
           const hint = compact
-            ? formatDayHintCompact(highlight)
-            : formatDayHint(highlight);
+            ? formatDayHintCompact(highlight, calendarConfig)
+            : formatDayHint(highlight, calendarConfig);
           const hintLines = Array.isArray(hint) ? hint : hint ? [hint] : [];
           const hasData = hintLines.length > 0;
           const isSelected = cell.date === selectedDate;

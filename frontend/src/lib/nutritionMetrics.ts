@@ -40,23 +40,70 @@ export function totalKnownFluidMl(highlight: DayNutritionHighlight) {
   return fromFood + highlight.water + highlight.liquids;
 }
 
-export function formatDayHint(highlight: DayNutritionHighlight | undefined) {
+export interface CalendarDisplayConfig {
+  calendar_show_wet_food: boolean;
+  calendar_show_liquids: boolean;
+  calendar_show_water: boolean;
+  calendar_show_dry_food: boolean;
+  calendar_show_record_count: boolean;
+  calendar_show_total_fluid: boolean;
+}
+
+export function formatDayHint(
+  highlight: DayNutritionHighlight | undefined,
+  cfg?: CalendarDisplayConfig,
+): string | string[] {
   if (!highlight || highlight.recordCount === 0) return '';
   const parts: string[] = [];
-  if (highlight.wetFood > 0) parts.push(`${Math.round(highlight.wetFood)}g wet`);
-  if (highlight.liquids > 0) parts.push(`${Math.round(highlight.liquids)}ml liq`);
-  if (highlight.water > 0) parts.push(`${Math.round(highlight.water)}ml water`);
-  if (highlight.dryFood > 0) parts.push(`${Math.round(highlight.dryFood)}g dry`);
-  if (parts.length === 0) return `${highlight.recordCount} log${highlight.recordCount === 1 ? '' : 's'}`;
+  if (cfg?.calendar_show_total_fluid ?? true) {
+    const ml = totalKnownFluidMl(highlight);
+    if (ml > 0) parts.push(`~${ml}ml fluid`);
+  }
+  if (cfg?.calendar_show_wet_food ?? true) {
+    if (highlight.wetFood > 0) parts.push(`${Math.round(highlight.wetFood)}g wet`);
+  }
+  if (cfg?.calendar_show_liquids ?? true) {
+    if (highlight.liquids > 0) parts.push(`${Math.round(highlight.liquids)}ml liq`);
+  }
+  if (cfg?.calendar_show_water ?? true) {
+    if (highlight.water > 0) parts.push(`${Math.round(highlight.water)}ml water`);
+  }
+  if (cfg?.calendar_show_dry_food ?? true) {
+    if (highlight.dryFood > 0) parts.push(`${Math.round(highlight.dryFood)}g dry`);
+  }
+  if (parts.length === 0 && (cfg?.calendar_show_record_count ?? true)) {
+    return `${highlight.recordCount} log${highlight.recordCount === 1 ? '' : 's'}`;
+  }
+  if (parts.length === 0) return '';
   return parts;
 }
 
-export function formatDayHintCompact(highlight: DayNutritionHighlight | undefined): string {
+export function formatDayHintCompact(
+  highlight: DayNutritionHighlight | undefined,
+  cfg?: CalendarDisplayConfig,
+): string {
   if (!highlight || highlight.recordCount === 0) return '';
-  const ml = totalKnownFluidMl(highlight);
-  if (ml > 0) return `${ml}ml`;
-  if (highlight.dryFood > 0) return `${Math.round(highlight.dryFood)}g`;
-  return `${highlight.recordCount}×`;
+  const parts: string[] = [];
+  if (cfg?.calendar_show_total_fluid ?? true) {
+    const ml = totalKnownFluidMl(highlight);
+    if (ml > 0) parts.push(`~${ml}ml`);
+  }
+  if (cfg?.calendar_show_wet_food ?? true) {
+    if (highlight.wetFood > 0) parts.push(`${Math.round(highlight.wetFood)}g wet`);
+  }
+  if (cfg?.calendar_show_liquids ?? true) {
+    if (highlight.liquids > 0) parts.push(`${Math.round(highlight.liquids)}ml liq`);
+  }
+  if (cfg?.calendar_show_water ?? true) {
+    if (highlight.water > 0) parts.push(`${Math.round(highlight.water)}ml water`);
+  }
+  if (cfg?.calendar_show_dry_food ?? true) {
+    if (highlight.dryFood > 0) parts.push(`${Math.round(highlight.dryFood)}g dry`);
+  }
+  if (parts.length === 0 && (cfg?.calendar_show_record_count ?? true)) {
+    return `${highlight.recordCount}×`;
+  }
+  return parts.join(' · ');
 }
 
 export type DayHint = ReturnType<typeof formatDayHint>;
