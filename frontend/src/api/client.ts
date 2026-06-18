@@ -1,4 +1,4 @@
-import { clearToken, fetchAuthInfo, getStoredToken, redirectToLogin, storeRedirectPath } from '../lib/auth';
+import { clearToken, fetchAuthInfo, getStoredToken, redirectToLogin } from '../lib/auth';
 
 const BASE = '/api/v1';
 
@@ -35,12 +35,15 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
   };
 
   if (res.status === 401) {
-    // Token missing or expired — fetch auth info and redirect to login
+    // Token missing or expired — redirect to login once; parallel 401s all see
+    // the token already cleared and bail out to avoid clobbering PKCE state.
+    if (!getStoredToken()) {
+      throw new ApiError(res.status, await parseBody());
+    }
     clearToken();
     try {
       const authInfo = await fetchAuthInfo();
       if (authInfo.mode === 'oidc') {
-        storeRedirectPath(window.location.pathname + window.location.search);
         await redirectToLogin(authInfo);
         // redirectToLogin navigates away; this promise never resolves
         return new Promise(() => {});

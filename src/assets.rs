@@ -41,7 +41,7 @@ pub async fn serve_frontend(req: HttpRequest, state: web::Data<AppState>) -> Htt
     }
 }
 
-#[get("/api-docs")]
+#[get("/api/docs")]
 pub async fn serve_api_docs() -> HttpResponse {
     let html = r##"<!doctype html>
 <html>
@@ -56,7 +56,7 @@ pub async fn serve_api_docs() -> HttpResponse {
   <script src="https://unpkg.com/swagger-ui-dist/swagger-ui-bundle.js"></script>
   <script>
     SwaggerUIBundle({
-      url: "/api-docs/openapi.yaml",
+      url: "/api/docs/openapi.yaml",
       dom_id: "#swagger-ui",
       presets: [SwaggerUIBundle.presets.apis, SwaggerUIBundle.SwaggerUIStandalonePreset],
       layout: "BaseLayout",
@@ -70,7 +70,7 @@ pub async fn serve_api_docs() -> HttpResponse {
         .body(html)
 }
 
-#[get("/api-docs/openapi.yaml")]
+#[get("/api/docs/openapi.yaml")]
 pub async fn serve_openapi_yaml() -> HttpResponse {
     match DocsAssets::get("api.yaml") {
         Some(content) => HttpResponse::Ok()

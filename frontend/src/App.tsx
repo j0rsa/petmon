@@ -1,4 +1,3 @@
-import { useEffect } from 'react';
 import { Navigate, Route, Routes, useParams } from 'react-router-dom';
 import { AuthGuard } from './components/AuthGuard';
 import { Layout } from './components/Layout';
@@ -19,8 +18,6 @@ export default function App() {
     <Routes>
       {/* Public — no layout, no auth */}
       <Route path="/auth/callback" element={<AuthCallbackPage />} />
-      <Route path="/api-docs" element={<HardRedirect to="/api-docs" />} />
-      <Route path="/api-docs/*" element={<HardRedirect to="/api-docs" />} />
 
       <Route element={<AuthGuard />}>
         <Route element={<Layout />}>
@@ -51,11 +48,4 @@ export default function App() {
 function DayRedirect() {
   const { date } = useParams();
   return <Navigate to={date ? `/nutrition/${date}` : '/nutrition'} replace />;
-}
-
-function HardRedirect({ to }: { to: string }) {
-  useEffect(() => {
-    window.location.replace(to);
-  }, [to]);
-  return null;
 }

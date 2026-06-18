@@ -95,6 +95,9 @@ export async function fetchAuthInfo(): Promise<AuthInfo> {
 export async function redirectToLogin(authInfo: AuthInfo, redirectTo?: string): Promise<void> {
   if (!authInfo.authorization_endpoint || !authInfo.client_id) return;
 
+  // Clear any stale token so the callback page starts with a clean slate.
+  clearToken();
+
   const verifier = await generateCodeVerifier();
   const challenge = await generateCodeChallenge(verifier);
   const state = generateState();
