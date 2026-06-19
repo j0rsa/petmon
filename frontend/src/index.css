@@ -86,7 +86,8 @@
 
 body {
   margin: 0;
-  min-width: 320px;
+  min-width: 0;
+  overflow-x: hidden;
   background:
     radial-gradient(circle at top, var(--bg-accent-glow), transparent 30%),
     linear-gradient(180deg, var(--bg) 0%, var(--bg-gradient-end) 100%);
@@ -137,6 +138,10 @@ textarea {
 table {
   width: 100%;
   border-collapse: collapse;
+  /* Prevent table from blowing past the panel width on narrow screens */
+  display: block;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
 }
 
 th,
@@ -308,7 +313,7 @@ pre {
 
 .two-column-grid {
   display: grid;
-  grid-template-columns: minmax(0, 2fr) minmax(320px, 1fr);
+  grid-template-columns: minmax(0, 2fr) minmax(0, 1fr);
   gap: 1rem;
   align-items: start;
 }
@@ -693,7 +698,17 @@ pre {
   }
 
   .content {
+    padding: 1rem;
     padding-bottom: calc(5.5rem + env(safe-area-inset-bottom));
+  }
+
+  .two-column-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .filter-panel,
+  .form-grid {
+    grid-template-columns: 1fr;
   }
 
   .bottom-nav {

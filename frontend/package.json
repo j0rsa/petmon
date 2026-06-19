@@ -18,7 +18,8 @@
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
     "react-router-dom": "^6.30.4",
-    "recharts": "^3.8.1"
+    "recharts": "^3.8.1",
+    "ua-parser-js": "^1.0.41"
   },
   "devDependencies": {
     "@chromatic-com/storybook": "^5.2.1",
@@ -31,6 +32,7 @@
     "@types/node": "^24.12.3",
     "@types/react": "^18.3.31",
     "@types/react-dom": "^18.3.7",
+    "@types/ua-parser-js": "^0.7.39",
     "@vitejs/plugin-react": "^6.0.1",
     "@vitest/browser-playwright": "^4.1.8",
     "@vitest/coverage-v8": "^4.1.8",

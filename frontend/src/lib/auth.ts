@@ -78,36 +78,28 @@ export function consumeState(): string | null {
 
 // ── Device alias ─────────────────────────────────────────────────────────────
 
-export function deriveDeviceAlias(ua = navigator.userAgent): string {
+import UAParser from 'ua-parser-js';
 
-  // iOS: Apple doesn't include model numbers anymore, but device type and OS version are reliable
-  // e.g. "Mozilla/5.0 (iPhone; CPU iPhone OS 18_7 like Mac OS X) ..."
-  if (/iPhone|iPad/.test(ua)) {
-    const device = /iPad/.test(ua) ? 'iPad' : 'iPhone';
-    const version = ua.match(/CPU (?:iPhone )?OS (\d+_\d+)/)?.[1]?.replace('_', '.') ?? '';
-    return version ? `${device} (iOS ${version})` : device;
+export function deriveDeviceAlias(ua = navigator.userAgent): string {
+  const { device, os, browser } = new UAParser(ua).getResult();
+
+  if (os.name === 'iOS' || os.name === 'iPadOS') {
+    const model = device.model ?? 'iPhone';
+    return os.version ? `${model} (iOS ${os.version})` : model;
   }
 
-  // Android: model sits between last semicolon and "Build/"
-  // e.g. "Dalvik/2.1.0 (Linux; U; Android 16; SM-F766B Build/...)"
-  const androidModel = ua.match(/Android[^;]*;\s*([^)]+?)\s+Build\//)?.[1]?.trim();
-  if (androidModel) {
-    const version = ua.match(/Android (\d+(?:\.\d+)?)/)?.[1] ?? '';
-    return version ? `${androidModel} (Android ${version})` : androidModel;
+  if (os.name === 'Android') {
+    // Some Chrome UAs report a privacy-masked model ("K") — skip it
+    const model = device.model && device.model !== 'K' ? device.model : null;
+    return model
+      ? `${model} (Android ${os.version ?? ''})`
+      : `Android ${os.version ?? ''}`.trim();
   }
 
   // Desktop: browser + OS
-  const edge    = /Edg\//.test(ua);
-  const chrome  = /Chrome\//.test(ua) && !edge;
-  const firefox = /Firefox\//.test(ua);
-  const safari  = /Safari\//.test(ua) && !chrome && !edge;
-  const browser = edge ? 'Edge' : chrome ? 'Chrome' : firefox ? 'Firefox' : safari ? 'Safari' : 'Browser';
-
-  const mac     = /Mac OS X/.test(ua);
-  const windows = /Windows NT/.test(ua);
-  const os      = mac ? 'macOS' : windows ? 'Windows' : 'Linux';
-
-  return `${browser} on ${os}`;
+  const b = browser.name ?? 'Browser';
+  const o = os.name ?? 'Unknown';
+  return `${b} on ${o}`;
 }
 
 // ── Login redirect ────────────────────────────────────────────────────────────

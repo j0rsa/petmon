@@ -10,9 +10,14 @@ const cases: [string, string, string][] = [
     'iPhone (iOS 18.7)',
   ],
   [
-    'Samsung Galaxy Z Fold running Android 16',
+    'Samsung Galaxy Z Fold running Android 16 (Dalvik UA)',
     'Dalvik/2.1.0 (Linux; U; Android 16; SM-F766B Build/BP4A.251205.006)',
     'SM-F766B (Android 16)',
+  ],
+  [
+    'Android phone with privacy-masked model K (Chrome UA)',
+    'Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/149.0.0.0 Mobile Safari/537.36',
+    'Android 10',
   ],
 ];
 
@@ -24,7 +29,7 @@ describe('deriveDeviceAlias', () => {
   describe('desktop fallback', () => {
     it('Chrome on macOS', () => {
       const ua = 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/136.0.0.0 Safari/537.36';
-      expect(deriveDeviceAlias(ua)).toBe('Chrome on macOS');
+      expect(deriveDeviceAlias(ua)).toBe('Chrome on Mac OS');
     });
 
     it('Firefox on Windows', () => {
@@ -39,7 +44,7 @@ describe('deriveDeviceAlias', () => {
 
     it('Safari on macOS', () => {
       const ua = 'Mozilla/5.0 (Macintosh; Intel Mac OS X 14_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.3 Safari/605.1.15';
-      expect(deriveDeviceAlias(ua)).toBe('Safari on macOS');
+      expect(deriveDeviceAlias(ua)).toBe('Safari on Mac OS');
     });
   });
 
