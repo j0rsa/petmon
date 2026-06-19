@@ -67,6 +67,40 @@ pub async fn mcp_handler(state: web::Data<AppState>, body: web::Json<McpRequest>
 
     // Resource methods are handled separately from tool dispatch
     let result = match req.method.as_str() {
+        "initialize" => Ok(serde_json::json!({
+            "protocolVersion": "2024-11-05",
+            "capabilities": {
+                "tools": {},
+                "resources": {}
+            },
+            "serverInfo": {
+                "name": "petmon",
+                "version": env!("CARGO_PKG_VERSION")
+            }
+        })),
+        "notifications/initialized" => Ok(serde_json::json!(null)),
+        "ping" => Ok(serde_json::json!({})),
+        "tools/call" => {
+            let params = req.params.unwrap_or_else(|| serde_json::json!({}));
+            let name = params
+                .get("name")
+                .and_then(|v| v.as_str())
+                .ok_or_else(|| crate::error::AppError::BadRequest("name required".to_string()));
+            match name {
+                Err(e) => Err(e),
+                Ok(name) => {
+                    let arguments = params.get("arguments").cloned().map(Some).unwrap_or(None);
+                    super::tools::dispatch(&state.pool, name, arguments, state.timezone)
+                        .await
+                        .map(|content| {
+                            serde_json::json!({
+                                "content": [{ "type": "text", "text": content.to_string() }],
+                                "isError": false
+                            })
+                        })
+                }
+            }
+        }
         "resources/list" => Ok(super::resources::resource_list()),
         "resources/read" => {
             let uri = req
