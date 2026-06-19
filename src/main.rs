@@ -73,6 +73,7 @@ async fn main() -> anyhow::Result<()> {
     HttpServer::new(move || {
         App::new()
             .wrap(TracingLogger::default())
+            .wrap(actix_web::middleware::NormalizePath::trim())
             .app_data(state.clone())
             .app_data(
                 web::JsonConfig::default()
@@ -86,8 +87,6 @@ async fn main() -> anyhow::Result<()> {
                         actix_web::error::InternalError::from_response(err, response).into()
                     }),
             )
-            .service(assets::serve_api_docs)
-            .service(assets::serve_openapi_yaml)
             .service(
                 web::scope("/api/v1")
                     .wrap(middleware::auth::RequireAuth)

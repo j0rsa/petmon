@@ -2,13 +2,23 @@ import { useEffect, useRef, useState } from 'react';
 import { Outlet } from 'react-router-dom';
 import { fetchAuthInfo, getStoredToken, redirectToLogin, storeRedirectPath } from '../lib/auth';
 
-type State = 'checking' | 'authenticated' | 'redirecting';
+type State = 'checking' | 'authenticated' | 'redirecting' | 'offline';
 
 export function AuthGuard() {
-  const [state, setState] = useState<State>(() =>
-    getStoredToken() ? 'authenticated' : 'checking'
-  );
+  const [state, setState] = useState<State>(() => {
+    if (getStoredToken()) return 'authenticated';
+    if (!navigator.onLine) return 'offline';
+    return 'checking';
+  });
   const ran = useRef(false);
+
+  // Reset the ran ref whenever we return to 'checking' so the auth effect
+  // can re-run (e.g. after coming back online from the 'offline' state).
+  useEffect(() => {
+    if (state === 'checking') {
+      ran.current = false;
+    }
+  }, [state]);
 
   useEffect(() => {
     if (state !== 'checking') return;
@@ -24,12 +34,33 @@ export function AuthGuard() {
         setState('authenticated');
       }
     }).catch(() => {
-      setState('authenticated');
+      // Network failure fetching auth info — treat as offline rather than
+      // accidentally letting the user through unauthenticated.
+      setState('offline');
     });
   }, [state]);
 
+  useEffect(() => {
+    if (state !== 'offline') return;
+    const handler = () => setState('checking');
+    window.addEventListener('online', handler);
+    return () => window.removeEventListener('online', handler);
+  }, [state]);
+
   if (state === 'checking' || state === 'redirecting') {
-    return null;
+    return (
+      <div className="loading-state" role="status" aria-live="polite">
+        {state === 'redirecting' ? 'Redirecting to sign-in…' : 'Loading…'}
+      </div>
+    );
+  }
+
+  if (state === 'offline') {
+    return (
+      <div className="loading-state" role="status" aria-live="polite">
+        No connection — waiting to sign in…
+      </div>
+    );
   }
 
   return <Outlet />;

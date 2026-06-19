@@ -35,6 +35,11 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
   };
 
   if (res.status === 401) {
+    // Do not clear the token or attempt SSO while offline — the request failed
+    // due to no connectivity, not because the token is invalid.
+    if (!navigator.onLine) {
+      throw new ApiError(res.status, await parseBody());
+    }
     // Token missing or expired — redirect to login once; parallel 401s all see
     // the token already cleared and bail out to avoid clobbering PKCE state.
     if (!getStoredToken()) {

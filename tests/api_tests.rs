@@ -1,5 +1,4 @@
 use actix_web::{test, web, App};
-use petmon::assets::{serve_api_docs, serve_openapi_yaml};
 use petmon::auth::AppState;
 use petmon::{api, assets, mcp, middleware};
 use sqlx::SqlitePool;
@@ -36,9 +35,8 @@ macro_rules! build_full_app {
     ($state:expr) => {
         test::init_service(
             App::new()
+                .wrap(actix_web::middleware::NormalizePath::trim())
                 .app_data($state.clone())
-                .service(serve_api_docs)
-                .service(serve_openapi_yaml)
                 .service(
                     web::scope("/api/v1")
                         .wrap(middleware::auth::RequireAuth)
@@ -250,6 +248,53 @@ async fn api_docs_is_not_caught_by_spa_fallback() {
     assert!(
         !body.contains("<div id=\"root\">"),
         "GET /api/docs must not serve the React SPA"
+    );
+}
+
+#[actix_web::test]
+async fn api_docs_trailing_slash_is_not_caught_by_spa_fallback() {
+    let pool = setup_pool().await;
+    let state = web::Data::new(AppState::new(pool, false, None, None));
+    let app = build_full_app!(state);
+
+    let req = test::TestRequest::get().uri("/api/docs/").to_request();
+    let resp = test::call_service(&app, req).await;
+    assert_eq!(
+        resp.status(),
+        200,
+        "GET /api/docs/ must resolve to Swagger UI (not SPA or 404)"
+    );
+    let body = String::from_utf8(test::read_body(resp).await.to_vec()).unwrap();
+    assert!(
+        body.contains("swagger"),
+        "GET /api/docs/ must return Swagger HTML, not SPA"
+    );
+}
+
+#[actix_web::test]
+async fn api_docs_openapi_yaml_trailing_slash_serves_yaml() {
+    let pool = setup_pool().await;
+    let state = web::Data::new(AppState::new(pool, false, None, None));
+    let app = build_full_app!(state);
+
+    let req = test::TestRequest::get()
+        .uri("/api/docs/openapi.yaml/")
+        .to_request();
+    let resp = test::call_service(&app, req).await;
+    assert_eq!(
+        resp.status(),
+        200,
+        "GET /api/docs/openapi.yaml/ must resolve to YAML (trailing slash trimmed)"
+    );
+    let ct = resp
+        .headers()
+        .get("content-type")
+        .unwrap()
+        .to_str()
+        .unwrap();
+    assert!(
+        ct.contains("yaml"),
+        "must return YAML content-type, got: {ct}"
     );
 }
 

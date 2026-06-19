@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { forwardRef, useEffect, useImperativeHandle, useMemo, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { nutritionAnalyticsApi } from '../api/analytics';
@@ -56,13 +56,28 @@ interface AddRowProps {
   petId: string;
   onSave: (payload: CreateNutritionRecord) => void;
   saving: boolean;
+  isPaused: boolean;
 }
 
-function AddRow({ date, petId, onSave, saving }: AddRowProps) {
+export interface AddRowHandle {
+  clearForm: () => void;
+}
+
+const AddRow = forwardRef<AddRowHandle, AddRowProps>(function AddRow(
+  { date, petId, onSave, saving, isPaused },
+  ref,
+) {
   const [time, setTime] = useState(nowTimeString);
   const [category, setCategory] = useState<string>('liquids');
   const [amount, setAmount] = useState('');
   const amountRef = useRef<HTMLInputElement>(null);
+
+  useImperativeHandle(ref, () => ({
+    clearForm() {
+      setAmount('');
+      amountRef.current?.focus();
+    },
+  }));
 
   function handleAdd() {
     const n = Number(amount);
@@ -75,8 +90,8 @@ function AddRow({ date, petId, onSave, saving }: AddRowProps) {
       amount: n,
       unit: unitFor(category),
     });
-    setAmount('');
-    amountRef.current?.focus();
+    // Form clears via ref.clearForm() called from createMutation.onSuccess,
+    // so values are preserved while the mutation is paused offline.
   }
 
   return (
@@ -117,11 +132,11 @@ function AddRow({ date, petId, onSave, saving }: AddRowProps) {
         disabled={saving || !amount}
         onClick={handleAdd}
       >
-        {saving ? '…' : '+ add'}
+        {isPaused ? '⏸ offline' : saving ? '…' : '+ add'}
       </button>
     </div>
   );
-}
+});
 
 // ── Single record row ───────────────────────────────────────────────────────
 
@@ -130,10 +145,12 @@ interface RecordRowProps {
   onSave: (id: string, payload: UpdateNutritionRecord) => void;
   onDelete: (id: string) => void;
   saving: boolean;
+  savingPaused: boolean;
   deleting: boolean;
+  deletingPaused: boolean;
 }
 
-function RecordRow({ record, onSave, onDelete, saving, deleting }: RecordRowProps) {
+function RecordRow({ record, onSave, onDelete, saving, savingPaused, deleting, deletingPaused }: RecordRowProps) {
   const formatTime = useFormatTime();
   const [editing, setEditing] = useState(false);
   const [time, setTime] = useState('');
@@ -193,7 +210,7 @@ function RecordRow({ record, onSave, onDelete, saving, deleting }: RecordRowProp
           <span className="entry-unit-hint">{unitFor(category)}</span>
           <div className="entry-row-actions">
             <button className="icon-button" type="button" title="Save" aria-label="Save" disabled={saving} onClick={commitEdit}>
-              {saving ? '…' : '✓'}
+              {savingPaused ? '⏸' : saving ? '…' : '✓'}
             </button>
             <button className="icon-button" type="button" title="Cancel" aria-label="Cancel" onClick={() => setEditing(false)}>
               ✕
@@ -220,7 +237,7 @@ function RecordRow({ record, onSave, onDelete, saving, deleting }: RecordRowProp
             disabled={deleting}
             onClick={() => { if (window.confirm('Delete this record?')) onDelete(record.id); }}
           >
-            ✕
+            {deletingPaused ? '⏸' : '✕'}
           </button>
         </div>
       </div>
@@ -239,6 +256,7 @@ export function NutritionDayPanel({ date, petId }: NutritionDayPanelProps) {
   const queryClient = useQueryClient();
   const [noteDraft, setNoteDraft] = useState('');
   const { show_water_card } = useDisplaySettings();
+  const addRowRef = useRef<AddRowHandle>(null);
   const formatDate = useFormatDate();
 
   const summaryQuery = useQuery({
@@ -272,7 +290,10 @@ export function NutritionDayPanel({ date, petId }: NutritionDayPanelProps) {
 
   const createMutation = useMutation({
     mutationFn: (payload: CreateNutritionRecord) => nutritionRecordsApi.create(payload),
-    onSuccess: () => invalidateDayData(queryClient, date, petId),
+    onSuccess: () => {
+      invalidateDayData(queryClient, date, petId);
+      addRowRef.current?.clearForm();
+    },
   });
 
   const updateMutation = useMutation({
@@ -391,7 +412,9 @@ export function NutritionDayPanel({ date, petId }: NutritionDayPanelProps) {
                 key={record.id}
                 record={record}
                 saving={updateMutation.isPending && updateMutation.variables?.id === record.id}
+                savingPaused={updateMutation.isPaused && updateMutation.variables?.id === record.id}
                 deleting={deleteMutation.isPending && deleteMutation.variables === record.id}
+                deletingPaused={deleteMutation.isPaused && deleteMutation.variables === record.id}
                 onSave={(id, payload) => updateMutation.mutate({ id, payload })}
                 onDelete={(id) => deleteMutation.mutate(id)}
               />
@@ -400,9 +423,11 @@ export function NutritionDayPanel({ date, petId }: NutritionDayPanelProps) {
         )}
 
         <AddRow
+          ref={addRowRef}
           date={date}
           petId={petId}
           saving={createMutation.isPending}
+          isPaused={createMutation.isPaused}
           onSave={(payload) => createMutation.mutate(payload)}
         />
       </div>

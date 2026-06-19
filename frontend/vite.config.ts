@@ -16,6 +16,10 @@ export default defineConfig({
     react(),
     VitePWA({
       registerType: 'autoUpdate',
+      workbox: {
+        navigateFallback: '/index.html',
+        navigateFallbackDenylist: [/^\/api/, /^\/mcp/],
+      },
       includeAssets: ['favicon.svg', 'icons/*.png'],
       manifest: {
         name: 'Petmon',

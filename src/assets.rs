@@ -81,5 +81,7 @@ pub async fn serve_openapi_yaml() -> HttpResponse {
 }
 
 pub fn configure(cfg: &mut web::ServiceConfig) {
-    cfg.default_service(web::get().to(serve_frontend));
+    cfg.service(serve_api_docs)
+        .service(serve_openapi_yaml)
+        .default_service(web::get().to(serve_frontend));
 }
