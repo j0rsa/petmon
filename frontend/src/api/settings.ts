@@ -52,6 +52,7 @@ export interface ApiTokenPublic {
   id: string;
   alias: string | null;
   active: boolean;
+  current: boolean;
   created_by: string | null;
   created_at: string;
   last_used_at: string | null;
@@ -77,6 +78,7 @@ export const settingsApi = {
   updateTelegram: (body: UpdateTelegramConfig) => api.post<TelegramConfigPublic>('/settings/telegram', body),
   listTokens: () => api.get<ApiTokenPublic[]>('/api-tokens'),
   createToken: (body: CreateApiToken) => api.post<ApiTokenCreated>('/api-tokens', body),
+  activateToken: (id: string) => api.post<void>(`/api-tokens/${id}/activate`, {}),
   deactivateToken: (id: string) => api.delete(`/api-tokens/${id}`),
   deleteToken: (id: string) => api.delete(`/api-tokens/${id}/permanent`),
 };

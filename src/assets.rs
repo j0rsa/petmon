@@ -7,7 +7,7 @@ use crate::auth::AppState;
 
 #[derive(RustEmbed)]
 #[folder = "docs"]
-#[include = "api.yaml"]
+#[include = "openapi.yaml"]
 pub struct DocsAssets;
 
 pub async fn serve_frontend(req: HttpRequest, state: web::Data<AppState>) -> HttpResponse {
@@ -72,11 +72,11 @@ pub async fn serve_api_docs() -> HttpResponse {
 
 #[get("/api/docs/openapi.yaml")]
 pub async fn serve_openapi_yaml() -> HttpResponse {
-    match DocsAssets::get("api.yaml") {
+    match DocsAssets::get("openapi.yaml") {
         Some(content) => HttpResponse::Ok()
             .content_type("application/yaml")
             .body(content.data.to_vec()),
-        None => HttpResponse::NotFound().body("api.yaml not found"),
+        None => HttpResponse::NotFound().body("openapi.yaml not found"),
     }
 }
 

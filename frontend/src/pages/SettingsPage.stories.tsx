@@ -46,6 +46,16 @@ export const Loading: Story = {
   decorators: [withSettings({ loading: true })],
 };
 
+/** OIDC session — shows "Remember this device" panel above the token list. */
+export const RememberDevicePrompt: Story = {
+  decorators: [withSettings({ oidc: 'configured', telegram: 'configured', tokens: 'populated', usingApiToken: false })],
+};
+
+/** Browser already holding an API token — shows info banner and current-token highlight. */
+export const UsingDeviceToken: Story = {
+  decorators: [withSettings({ oidc: 'configured', telegram: 'configured', tokens: 'populated', usingApiToken: true })],
+};
+
 /** Token just created — shows the one-time reveal banner. */
 export const TokenJustCreated: StoryObj<{ token: ApiTokenCreated }> = {
   render: () => <TokenRevealBannerPreview />,

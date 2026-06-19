@@ -72,7 +72,7 @@ async fn main() -> anyhow::Result<()> {
 
     HttpServer::new(move || {
         App::new()
-            .wrap(TracingLogger::default())
+            .wrap(TracingLogger::<telemetry::HealthFilteredSpanBuilder>::new())
             .wrap(actix_web::middleware::NormalizePath::trim())
             .app_data(state.clone())
             .app_data(

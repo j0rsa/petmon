@@ -76,6 +76,40 @@ export function consumeState(): string | null {
   return s;
 }
 
+// ── Device alias ─────────────────────────────────────────────────────────────
+
+export function deriveDeviceAlias(ua = navigator.userAgent): string {
+
+  // iOS: Apple doesn't include model numbers anymore, but device type and OS version are reliable
+  // e.g. "Mozilla/5.0 (iPhone; CPU iPhone OS 18_7 like Mac OS X) ..."
+  if (/iPhone|iPad/.test(ua)) {
+    const device = /iPad/.test(ua) ? 'iPad' : 'iPhone';
+    const version = ua.match(/CPU (?:iPhone )?OS (\d+_\d+)/)?.[1]?.replace('_', '.') ?? '';
+    return version ? `${device} (iOS ${version})` : device;
+  }
+
+  // Android: model sits between last semicolon and "Build/"
+  // e.g. "Dalvik/2.1.0 (Linux; U; Android 16; SM-F766B Build/...)"
+  const androidModel = ua.match(/Android[^;]*;\s*([^)]+?)\s+Build\//)?.[1]?.trim();
+  if (androidModel) {
+    const version = ua.match(/Android (\d+(?:\.\d+)?)/)?.[1] ?? '';
+    return version ? `${androidModel} (Android ${version})` : androidModel;
+  }
+
+  // Desktop: browser + OS
+  const edge    = /Edg\//.test(ua);
+  const chrome  = /Chrome\//.test(ua) && !edge;
+  const firefox = /Firefox\//.test(ua);
+  const safari  = /Safari\//.test(ua) && !chrome && !edge;
+  const browser = edge ? 'Edge' : chrome ? 'Chrome' : firefox ? 'Firefox' : safari ? 'Safari' : 'Browser';
+
+  const mac     = /Mac OS X/.test(ua);
+  const windows = /Windows NT/.test(ua);
+  const os      = mac ? 'macOS' : windows ? 'Windows' : 'Linux';
+
+  return `${browser} on ${os}`;
+}
+
 // ── Login redirect ────────────────────────────────────────────────────────────
 
 export interface AuthInfo {

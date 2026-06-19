@@ -164,12 +164,16 @@ export function withAnalyticsPageForPet(petId = mockPetId): Decorator {
   return withAnalyticsPage({ petId });
 }
 
+const API_TOKEN_STUB = 'pm_api_storybook000000000000000000000000000000000000000000000000000000';
+
 interface WithSettingsOptions {
   oidc?: 'empty' | 'configured';
   telegram?: 'empty' | 'configured';
   tokens?: 'empty' | 'populated';
   loading?: boolean;
   newToken?: boolean;
+  /** Simulate the browser having stored an API token (shows the "using device token" banner). */
+  usingApiToken?: boolean;
 }
 
 export function withSettings({
@@ -178,9 +182,18 @@ export function withSettings({
   tokens = 'populated',
   loading = false,
   newToken = false,
+  usingApiToken = false,
 }: WithSettingsOptions = {}): Decorator {
   return function SettingsDecorator(Story) {
     const client = makeMockClient();
+
+    // Seed localStorage so SettingsPage's `usingApiToken` branch renders correctly.
+    if (usingApiToken) {
+      localStorage.setItem('pm_id_token', API_TOKEN_STUB);
+    } else {
+      localStorage.removeItem('pm_id_token');
+    }
+
     if (newToken) {
       client.setQueryDefaults(['create-token-mock'], { queryFn: () => Promise.resolve(mockCreatedToken) });
     }

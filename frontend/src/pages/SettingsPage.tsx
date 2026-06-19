@@ -3,6 +3,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { settingsApi } from '../api/settings';
 import type { ApiTokenCreated, ApiTokenPublic, DisplaySettings, OidcConfigPublic, TelegramConfigPublic } from '../api/settings';
 import { infoApi } from '../api/info';
+import { deriveDeviceAlias, getStoredToken, storeToken } from '../lib/auth';
 
 export default function SettingsPage() {
   const { data: info } = useQuery({ queryKey: ['app-info'], queryFn: infoApi.get, staleTime: Infinity, retry: false });
@@ -346,8 +347,11 @@ function ApiTokensSection() {
   const [alias, setAlias] = useState('');
   const [justCreated, setJustCreated] = useState<ApiTokenCreated | null>(null);
   const [copied, setCopied] = useState(false);
+  const [deviceAlias, setDeviceAlias] = useState(() => deriveDeviceAlias());
+  const [deviceRemembered, setDeviceRemembered] = useState(false);
 
   const oidcEnabled = oidc?.enabled ?? false;
+  const usingApiToken = getStoredToken()?.startsWith('pm_api_') ?? false;
 
   const createMutation = useMutation({
     mutationFn: () => settingsApi.createToken({ alias: alias || undefined }),
@@ -356,6 +360,20 @@ function ApiTokensSection() {
       setAlias('');
       queryClient.invalidateQueries({ queryKey: ['api-tokens'] });
     },
+  });
+
+  const rememberMutation = useMutation({
+    mutationFn: () => settingsApi.createToken({ alias: deviceAlias || undefined }),
+    onSuccess: (created) => {
+      storeToken(created.token);
+      setDeviceRemembered(true);
+      queryClient.invalidateQueries({ queryKey: ['api-tokens'] });
+    },
+  });
+
+  const activateMutation = useMutation({
+    mutationFn: (id: string) => settingsApi.activateToken(id),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['api-tokens'] }),
   });
 
   const deactivateMutation = useMutation({
@@ -384,6 +402,46 @@ function ApiTokensSection() {
           <h3>API tokens</h3>
         </div>
       </div>
+
+      {/* Remember this device — shown when using OIDC and OIDC is enabled */}
+      {oidcEnabled && !usingApiToken && (
+        <div style={{ background: 'var(--surface-raised)', border: '1px solid var(--border)', borderRadius: 12, padding: '1rem', display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+          <div>
+            <p style={{ fontSize: '0.88rem', fontWeight: 600, marginBottom: '0.25rem' }}>Remember this device</p>
+            <p style={{ fontSize: '0.82rem', color: 'var(--text-muted)' }}>Creates a long-lived token stored on this device so you won't be redirected to SSO repeatedly.</p>
+          </div>
+          {deviceRemembered ? (
+            <p style={{ fontSize: '0.88rem', color: 'var(--success-text, #4ade80)', fontWeight: 500 }}>This device is now remembered. You'll stay signed in without SSO.</p>
+          ) : (
+            <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center', flexWrap: 'wrap' }}>
+              <input
+                value={deviceAlias}
+                onChange={(e) => setDeviceAlias(e.target.value)}
+                placeholder="Device label"
+                style={{ flex: '1 1 160px', minWidth: 0 }}
+              />
+              <button
+                className="button"
+                type="button"
+                disabled={rememberMutation.isPending}
+                onClick={() => rememberMutation.mutate()}
+              >
+                {rememberMutation.isPending ? 'Saving…' : 'Remember device'}
+              </button>
+            </div>
+          )}
+          {rememberMutation.isError && (
+            <p style={{ fontSize: '0.82rem', color: 'var(--error-text)' }}>Failed to create token — try again.</p>
+          )}
+        </div>
+      )}
+
+      {/* Info banner when already on an API token */}
+      {usingApiToken && (
+        <div style={{ background: 'var(--surface-raised)', border: '1px solid var(--border)', borderRadius: 12, padding: '0.75rem 1rem', fontSize: '0.88rem', color: 'var(--text-muted)' }}>
+          This device is authenticated with a long-lived API token (highlighted below).
+        </div>
+      )}
 
       {/* One-time token reveal */}
       {justCreated && (
@@ -455,6 +513,8 @@ function ApiTokensSection() {
               <TokenRow
                 key={token.id}
                 token={token}
+                onActivate={() => activateMutation.mutate(token.id)}
+                activating={activateMutation.isPending && activateMutation.variables === token.id}
                 onDeactivate={() => deactivateMutation.mutate(token.id)}
                 deactivating={deactivateMutation.isPending && deactivateMutation.variables === token.id}
                 onDelete={() => deleteMutation.mutate(token.id)}
@@ -468,16 +528,27 @@ function ApiTokensSection() {
   );
 }
 
-function TokenRow({ token, onDeactivate, deactivating, onDelete, deleting }: {
+function TokenRow({ token, onActivate, activating, onDeactivate, deactivating, onDelete, deleting }: {
   token: ApiTokenPublic;
+  onActivate: () => void;
+  activating: boolean;
   onDeactivate: () => void;
   deactivating: boolean;
   onDelete: () => void;
   deleting: boolean;
 }) {
   return (
-    <tr style={{ opacity: token.active ? 1 : 0.5 }}>
-      <td style={{ fontFamily: 'monospace', fontSize: '0.88rem' }}>{token.alias ?? <span style={{ color: 'var(--text-subtle)' }}>—</span>}</td>
+    <tr style={{ opacity: token.active ? 1 : 0.5, borderLeft: token.current ? '2px solid var(--accent)' : undefined }}>
+      <td style={{ fontFamily: 'monospace', fontSize: '0.88rem' }}>
+        <span style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+          {token.alias ?? <span style={{ color: 'var(--text-subtle)' }}>—</span>}
+          {token.current && (
+            <span style={{ fontSize: '0.72rem', fontFamily: 'inherit', background: 'var(--accent)', color: 'var(--accent-fg, #fff)', borderRadius: 4, padding: '0.1rem 0.35rem', fontWeight: 600, letterSpacing: '0.02em' }}>
+              current
+            </span>
+          )}
+        </span>
+      </td>
       <td style={{ fontSize: '0.88rem' }}>{token.created_by ?? <span style={{ color: 'var(--text-subtle)' }}>—</span>}</td>
       <td style={{ fontSize: '0.82rem', color: 'var(--text-muted)' }}>{token.created_at.slice(0, 10)}</td>
       <td style={{ fontSize: '0.82rem', color: 'var(--text-muted)' }}>{token.last_used_at ? token.last_used_at.slice(0, 10) : <span style={{ color: 'var(--text-subtle)' }}>never</span>}</td>
@@ -496,15 +567,26 @@ function TokenRow({ token, onDeactivate, deactivating, onDelete, deleting }: {
             </button>
           )}
           {!token.active && (
-            <button
-              className="button button-danger"
-              type="button"
-              style={{ padding: '0.3rem 0.75rem', fontSize: '0.82rem' }}
-              disabled={deleting}
-              onClick={() => { if (window.confirm(`Permanently delete token "${token.alias ?? token.id}"? This cannot be undone.`)) onDelete(); }}
-            >
-              {deleting ? '…' : 'Delete'}
-            </button>
+            <>
+              <button
+                className="button button-secondary"
+                type="button"
+                style={{ padding: '0.3rem 0.75rem', fontSize: '0.82rem' }}
+                disabled={activating}
+                onClick={onActivate}
+              >
+                {activating ? '…' : 'Activate'}
+              </button>
+              <button
+                className="button button-danger"
+                type="button"
+                style={{ padding: '0.3rem 0.75rem', fontSize: '0.82rem' }}
+                disabled={deleting}
+                onClick={() => { if (window.confirm(`Permanently delete token "${token.alias ?? token.id}"? This cannot be undone.`)) onDelete(); }}
+              >
+                {deleting ? '…' : 'Delete'}
+              </button>
+            </>
           )}
         </div>
       </td>

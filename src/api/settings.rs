@@ -1,6 +1,9 @@
 use actix_web::{delete, get, post, web, HttpMessage, HttpRequest, HttpResponse};
 
-use crate::auth::{identity::IdentityKind, AppState};
+use crate::auth::{
+    identity::{Identity, IdentityKind},
+    AppState,
+};
 use crate::domain::settings::{
     ApiTokenPublic, CreateApiToken, DisplaySettings, OidcConfig, OidcConfigPublic, TelegramConfig,
     TelegramConfigPublic, UpdateDisplaySettings, UpdateOidcConfig, UpdateTelegramConfig,
@@ -72,9 +75,33 @@ pub async fn update_telegram(
 // ── API tokens ────────────────────────────────────────────────────────────────
 
 #[get("")]
-pub async fn list_tokens(state: web::Data<AppState>) -> AppResult<HttpResponse> {
+pub async fn list_tokens(req: HttpRequest, state: web::Data<AppState>) -> AppResult<HttpResponse> {
     let tokens = api_tokens::list(&state.pool).await?;
-    let public: Vec<ApiTokenPublic> = tokens.into_iter().map(ApiTokenPublic::from).collect();
+
+    let current_token_id: Option<String> =
+        req.extensions()
+            .get::<Identity>()
+            .and_then(|i| match &i.kind {
+                IdentityKind::ApiToken { token_id } => Some(token_id.clone()),
+                _ => None,
+            });
+
+    let public: Vec<ApiTokenPublic> = tokens
+        .into_iter()
+        .map(|t| {
+            let is_current = current_token_id.as_deref() == Some(t.id.as_str());
+            ApiTokenPublic {
+                id: t.id,
+                alias: t.alias,
+                active: t.active,
+                current: is_current,
+                created_by: t.created_by,
+                created_at: t.created_at,
+                last_used_at: t.last_used_at,
+            }
+        })
+        .collect();
+
     Ok(HttpResponse::Ok().json(public))
 }
 
@@ -115,6 +142,15 @@ pub async fn create_token(
     Ok(HttpResponse::Created().json(created))
 }
 
+#[post("/{id}/activate")]
+pub async fn activate_token(
+    state: web::Data<AppState>,
+    path: web::Path<String>,
+) -> AppResult<HttpResponse> {
+    api_tokens::activate(&state.pool, &path.into_inner()).await?;
+    Ok(HttpResponse::NoContent().finish())
+}
+
 #[delete("/{id}")]
 pub async fn deactivate_token(
     state: web::Data<AppState>,
@@ -147,6 +183,7 @@ pub fn configure(cfg: &mut web::ServiceConfig) {
         web::scope("/api-tokens")
             .service(list_tokens)
             .service(create_token)
+            .service(activate_token)
             .service(deactivate_token)
             .service(delete_token),
     );

@@ -1,10 +1,32 @@
+use actix_web::dev::ServiceRequest;
 use opentelemetry::trace::TracerProvider as _;
 use opentelemetry_otlp::WithExportConfig;
 use opentelemetry_sdk::{
     trace::{BatchSpanProcessor, SdkTracerProvider},
     Resource,
 };
+use tracing::Span;
+use tracing_actix_web::{DefaultRootSpanBuilder, RootSpanBuilder};
 use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt, EnvFilter};
+
+/// A [`RootSpanBuilder`] that suppresses tracing for the health-check endpoint.
+pub struct HealthFilteredSpanBuilder;
+
+impl RootSpanBuilder for HealthFilteredSpanBuilder {
+    fn on_request_start(request: &ServiceRequest) -> Span {
+        if request.path() == "/api/v1/health" {
+            return Span::none();
+        }
+        DefaultRootSpanBuilder::on_request_start(request)
+    }
+
+    fn on_request_end<B: actix_web::body::MessageBody>(
+        span: Span,
+        outcome: &Result<actix_web::dev::ServiceResponse<B>, actix_web::Error>,
+    ) {
+        DefaultRootSpanBuilder::on_request_end(span, outcome);
+    }
+}
 
 /// Initialise the tracing stack.
 ///

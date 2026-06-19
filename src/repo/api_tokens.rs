@@ -58,6 +58,18 @@ pub async fn create(
     Ok((token, created))
 }
 
+pub async fn activate(pool: &SqlitePool, id: &str) -> AppResult<()> {
+    let result = sqlx::query("UPDATE api_tokens SET active = 1 WHERE id = ?")
+        .bind(id)
+        .execute(pool)
+        .await?;
+
+    if result.rows_affected() == 0 {
+        return Err(AppError::NotFound(format!("API token '{id}' not found")));
+    }
+    Ok(())
+}
+
 pub async fn deactivate(pool: &SqlitePool, id: &str) -> AppResult<()> {
     let result = sqlx::query("UPDATE api_tokens SET active = 0 WHERE id = ?")
         .bind(id)

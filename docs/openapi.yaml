@@ -493,6 +493,27 @@ paths:
         '401':
           $ref: '#/components/responses/Unauthorized'
 
+  /api-tokens/{id}/activate:
+    post:
+      tags:
+        - API Tokens
+      summary: Activate API token
+      description: Re-activate a previously deactivated API token
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: API token ID
+          schema:
+            type: string
+      responses:
+        '204':
+          description: API token activated
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
   /api-tokens/{id}:
     delete:
       tags:
@@ -1629,6 +1650,13 @@ components:
         - mmm_dd_yyyy
       description: "Date display format: DD.MM.YYYY or MMM DD, YYYY"
 
+    WeekStart:
+      type: string
+      enum:
+        - sunday
+        - monday
+      description: First day of the week for calendar display
+
     DisplaySettings:
       type: object
       properties:
@@ -1639,10 +1667,31 @@ components:
         show_water_card:
           type: boolean
           description: Whether to show the water metric card on the day panel
+        calendar_show_wet_food:
+          type: boolean
+        calendar_show_liquids:
+          type: boolean
+        calendar_show_water:
+          type: boolean
+        calendar_show_dry_food:
+          type: boolean
+        calendar_show_record_count:
+          type: boolean
+        calendar_show_total_fluid:
+          type: boolean
+        calendar_week_start:
+          $ref: '#/components/schemas/WeekStart'
       required:
         - time_format
         - date_format
         - show_water_card
+        - calendar_show_wet_food
+        - calendar_show_liquids
+        - calendar_show_water
+        - calendar_show_dry_food
+        - calendar_show_record_count
+        - calendar_show_total_fluid
+        - calendar_week_start
 
     UpdateDisplaySettings:
       type: object
@@ -1654,6 +1703,26 @@ components:
         show_water_card:
           type: boolean
           nullable: true
+        calendar_show_wet_food:
+          type: boolean
+          nullable: true
+        calendar_show_liquids:
+          type: boolean
+          nullable: true
+        calendar_show_water:
+          type: boolean
+          nullable: true
+        calendar_show_dry_food:
+          type: boolean
+          nullable: true
+        calendar_show_record_count:
+          type: boolean
+          nullable: true
+        calendar_show_total_fluid:
+          type: boolean
+          nullable: true
+        calendar_week_start:
+          $ref: '#/components/schemas/WeekStart'
 
     OidcConfigPublic:
       type: object
@@ -1722,6 +1791,9 @@ components:
         active:
           type: boolean
           description: Whether the token is active
+        current:
+          type: boolean
+          description: Whether this token is authenticating the current request
         created_by:
           type: string
           nullable: true
@@ -1738,6 +1810,7 @@ components:
       required:
         - id
         - active
+        - current
         - created_at
 
     ApiTokenCreated:

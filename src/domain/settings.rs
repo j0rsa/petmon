@@ -217,22 +217,11 @@ pub struct ApiTokenPublic {
     pub id: String,
     pub alias: Option<String>,
     pub active: bool,
+    /// True when this token is the one authenticating the current request.
+    pub current: bool,
     pub created_by: Option<String>,
     pub created_at: String,
     pub last_used_at: Option<String>,
-}
-
-impl From<ApiToken> for ApiTokenPublic {
-    fn from(t: ApiToken) -> Self {
-        ApiTokenPublic {
-            id: t.id,
-            alias: t.alias,
-            active: t.active,
-            created_by: t.created_by,
-            created_at: t.created_at,
-            last_used_at: t.last_used_at,
-        }
-    }
 }
 
 /// Returned once at creation — includes the raw token
