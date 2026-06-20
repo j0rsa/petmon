@@ -4,10 +4,12 @@ import { SelectedPetProvider } from '../context/SelectedPetContext';
 import { NavBar, SidebarUserChip } from './NavBar';
 import { SidebarPetPicker } from './SidebarPetPicker';
 import { BottomNav } from './BottomNav';
+import { PwaUpdateBanner } from './PwaUpdateBanner';
 
 export function Layout() {
   return (
     <SelectedPetProvider>
+      <PwaUpdateBanner />
       <div className="app-shell">
         <aside className="sidebar">
           <span className="sidebar-wordmark">
