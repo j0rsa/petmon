@@ -1,8 +1,10 @@
 import { localToday, shiftDate } from '../lib/dates';
 import type { BestFluidDay, Category, NutritionDaySummary, NutritionRangeSummary, NutritionRecord, NutritionSchedule, Pet } from '../types';
-import type { DayNutritionHighlight } from '../types/pillars';
+import type { DayNutritionHighlight, DayEliminationHighlight } from '../types/pillars';
 import type { AppInfo } from '../api/info';
 import type { ApiTokenCreated, ApiTokenPublic, DisplaySettings, OidcConfigPublic, TelegramConfigPublic } from '../api/settings';
+import type { EliminationRecord, EliminationDailySummary, EliminationRangeSummary } from '../api/elimination';
+import type { WeightRecord } from '../api/weight';
 
 export const mockPetId = '550e8400-e29b-41d4-a716-446655440000';
 
@@ -295,3 +297,94 @@ export const mockCreatedToken: ApiTokenCreated = {
   token: 'pm_api_a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2',
   created_at: '2026-06-17T12:00:00Z',
 };
+
+// ── Elimination fixtures ──────────────────────────────────────────────────────
+
+const elim_date = '2024-06-15';
+
+export const mockEliminationRecords: EliminationRecord[] = [
+  {
+    id: 'elim-01', pet_id: mockPetId, occurred_at: `${elim_date}T06:15:00`, local_date: elim_date,
+    event_type: 'urination', subtype: null, duration_seconds: null, note: null,
+    source_type: 'manual', created_at: `${elim_date}T06:15:00`, updated_at: `${elim_date}T06:15:00`,
+  },
+  {
+    id: 'elim-02', pet_id: mockPetId, occurred_at: `${elim_date}T08:30:00`, local_date: elim_date,
+    event_type: 'defecation', subtype: 'normal', duration_seconds: 90, note: 'Normal stool',
+    source_type: 'manual', created_at: `${elim_date}T08:30:00`, updated_at: `${elim_date}T08:30:00`,
+  },
+  {
+    id: 'elim-03', pet_id: mockPetId, occurred_at: `${elim_date}T11:00:00`, local_date: elim_date,
+    event_type: 'urination', subtype: null, duration_seconds: null, note: null,
+    source_type: 'manual', created_at: `${elim_date}T11:00:00`, updated_at: `${elim_date}T11:00:00`,
+  },
+  {
+    id: 'elim-04', pet_id: mockPetId, occurred_at: `${elim_date}T14:45:00`, local_date: elim_date,
+    event_type: 'vomit', subtype: 'bile', duration_seconds: null, note: 'Yellow bile, small amount',
+    source_type: 'manual', created_at: `${elim_date}T14:45:00`, updated_at: `${elim_date}T14:45:00`,
+  },
+  {
+    id: 'elim-05', pet_id: mockPetId, occurred_at: `${elim_date}T19:20:00`, local_date: elim_date,
+    event_type: 'urination', subtype: null, duration_seconds: null, note: null,
+    source_type: 'manual', created_at: `${elim_date}T19:20:00`, updated_at: `${elim_date}T19:20:00`,
+  },
+];
+
+export const mockEliminationDaySummary: EliminationDailySummary = {
+  local_date: elim_date,
+  pet_id: mockPetId,
+  total_count: 5,
+  urination_count: 3,
+  defecation_count: 1,
+  vomit_count: 1,
+  general_count: 0,
+  has_vomit: true,
+};
+
+export function mockEliminationCalendarHighlights(month = '2024-06'): Map<string, DayEliminationHighlight> {
+  const map = new Map<string, DayEliminationHighlight>();
+  map.set(`${month}-15`, { totalCount: 5, hasVomit: true });
+  map.set(`${month}-14`, { totalCount: 4, hasVomit: false });
+  map.set(`${month}-10`, { totalCount: 3, hasVomit: false });
+  return map;
+}
+
+export const mockEliminationRangeSummary: EliminationRangeSummary = {
+  date_from: shiftDate(localToday(), -6),
+  date_to: localToday(),
+  pet_id: mockPetId,
+  daily_summaries: [
+    { local_date: shiftDate(localToday(), -6), pet_id: mockPetId, total_count: 4, urination_count: 2, defecation_count: 1, vomit_count: 0, general_count: 1, has_vomit: false },
+    { local_date: shiftDate(localToday(), -5), pet_id: mockPetId, total_count: 3, urination_count: 2, defecation_count: 1, vomit_count: 0, general_count: 0, has_vomit: false },
+    { local_date: shiftDate(localToday(), -4), pet_id: mockPetId, total_count: 5, urination_count: 3, defecation_count: 1, vomit_count: 1, general_count: 0, has_vomit: true },
+    { local_date: shiftDate(localToday(), -3), pet_id: mockPetId, total_count: 4, urination_count: 2, defecation_count: 2, vomit_count: 0, general_count: 0, has_vomit: false },
+    { local_date: shiftDate(localToday(), -2), pet_id: mockPetId, total_count: 6, urination_count: 4, defecation_count: 1, vomit_count: 0, general_count: 1, has_vomit: false },
+    { local_date: shiftDate(localToday(), -1), pet_id: mockPetId, total_count: 4, urination_count: 3, defecation_count: 1, vomit_count: 0, general_count: 0, has_vomit: false },
+    { local_date: localToday(), pet_id: mockPetId, total_count: 5, urination_count: 3, defecation_count: 1, vomit_count: 1, general_count: 0, has_vomit: true },
+  ],
+  type_totals: { urination: 19, defecation: 8, vomit: 2, general: 2 },
+  avg_per_day: 4.4,
+  p50_per_day: 4.0,
+  p90_per_day: 5.8,
+  p99_per_day: 6.0,
+};
+
+// ── Weight fixtures ───────────────────────────────────────────────────────────
+
+export const mockWeightRecords: WeightRecord[] = [
+  {
+    id: 'wt-01', pet_id: mockPetId, measured_at: '2024-06-01T09:00:00', local_date: '2024-06-01',
+    weight_kg: 4.2, note: 'Morning weigh-in', source_type: 'manual',
+    created_at: '2024-06-01T09:00:00', updated_at: '2024-06-01T09:00:00',
+  },
+  {
+    id: 'wt-02', pet_id: mockPetId, measured_at: '2024-06-08T09:00:00', local_date: '2024-06-08',
+    weight_kg: 4.15, note: null, source_type: 'manual',
+    created_at: '2024-06-08T09:00:00', updated_at: '2024-06-08T09:00:00',
+  },
+  {
+    id: 'wt-03', pet_id: mockPetId, measured_at: '2024-06-15T09:00:00', local_date: '2024-06-15',
+    weight_kg: 4.18, note: 'Post vet visit', source_type: 'manual',
+    created_at: '2024-06-15T09:00:00', updated_at: '2024-06-15T09:00:00',
+  },
+];

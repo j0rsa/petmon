@@ -1,11 +1,13 @@
 pub mod auth;
 pub mod days;
+pub mod elimination;
 pub mod health;
 pub mod info;
 pub mod notes;
 pub mod nutrition;
 pub mod pets;
 pub mod settings;
+pub mod weight;
 
 use actix_web::web;
 
@@ -17,6 +19,8 @@ pub fn configure(cfg: &mut web::ServiceConfig) {
             .configure(health::configure)
             .configure(pets::configure)
             .configure(nutrition::configure)
+            .configure(elimination::configure)
+            .configure(weight::configure)
             .configure(days::configure)
             .configure(notes::configure)
             .configure(settings::configure),

@@ -24,7 +24,7 @@ export const PILLARS: PillarDefinition[] = [
     label: 'Toileting',
     description: 'Litter-box visits, potty breaks, and daily patterns',
     route: '/elimination',
-    available: false,
+    available: true,
   },
   {
     id: 'health',
@@ -68,4 +68,9 @@ export interface DayNutritionHighlight {
   water: number;
   liquids: number;
   dryFood: number;
+}
+
+export interface DayEliminationHighlight {
+  totalCount: number;
+  hasVomit: boolean;
 }

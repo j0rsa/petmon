@@ -11,6 +11,8 @@ import {
   mockCreatedToken,
   mockDaySummary,
   mockDisplaySettings,
+  mockEliminationRecords,
+  mockEliminationRangeSummary,
   mockEmptyDaySummary,
   mockEmptyRangeSummary,
   mockNutritionRecords,
@@ -162,6 +164,83 @@ export function withAnalyticsPage({
 
 export function withAnalyticsPageForPet(petId = mockPetId): Decorator {
   return withAnalyticsPage({ petId });
+}
+
+// ── Elimination decorators ───────────────────────────────────────────────────
+
+export function withEliminationDayPanel(date: string, petId: string, empty = false): Decorator {
+  return function EliminationDayDecorator(Story) {
+    const client = makeMockClient();
+    client.setQueryData(['pets'], mockPets);
+    client.setQueryData(['me'], { subject: 'dev', email: null, name: 'Dev', display_name: 'Dev', kind: 'dev' });
+    client.setQueryData(['settings-display'], mockDisplaySettings);
+    client.setQueryData(['app-info'], mockAppInfo);
+    client.setQueryData(['elimination-records-day', date, petId], empty ? [] : mockEliminationRecords.map((r) => ({ ...r, local_date: date })));
+
+    return (
+      <MemoryRouter>
+        <QueryClientProvider client={client}>
+          <DisplaySettingsProvider>
+            <SelectedPetProvider initialPetId={petId}>
+              <Story />
+            </SelectedPetProvider>
+          </DisplaySettingsProvider>
+        </QueryClientProvider>
+      </MemoryRouter>
+    );
+  };
+}
+
+interface EliminationAnalyticsDecoratorOptions {
+  empty?: boolean;
+  petId?: string;
+  loading?: boolean;
+  error?: boolean;
+}
+
+export function withEliminationAnalyticsPage({
+  empty = false,
+  petId = mockPetId,
+  loading = false,
+  error = false,
+}: EliminationAnalyticsDecoratorOptions = {}): Decorator {
+  return function EliminationAnalyticsDecorator(Story) {
+    const client = makeMockClient();
+    client.setQueryData(['pets'], mockPets);
+    client.setQueryData(['me'], { subject: 'dev', email: null, name: 'Dev', display_name: 'Dev', kind: 'dev' });
+    client.setQueryData(['app-info'], mockAppInfo);
+
+    const today = localToday();
+    const emptyRangeSummary = { ...mockEliminationRangeSummary, daily_summaries: [], type_totals: {}, avg_per_day: 0, p50_per_day: 0, p90_per_day: 0, p99_per_day: 0 };
+    const summary = empty ? emptyRangeSummary : mockEliminationRangeSummary;
+
+    if (loading) {
+      const pending = () => new Promise(() => {});
+      for (const days of [7, 14, 30, 90]) {
+        const from = shiftDate(today, -(days - 1));
+        client.setQueryDefaults(['elimination-analytics', from, today, petId], { queryFn: pending });
+      }
+    } else if (error) {
+      const fail = () => Promise.reject(new Error('Unable to load analytics.'));
+      for (const days of [7, 14, 30, 90]) {
+        const from = shiftDate(today, -(days - 1));
+        client.setQueryDefaults(['elimination-analytics', from, today, petId], { queryFn: fail });
+      }
+    } else {
+      for (const days of [7, 14, 30, 90]) {
+        const from = shiftDate(today, -(days - 1));
+        client.setQueryData(['elimination-analytics', from, today, petId], summary);
+      }
+    }
+
+    return (
+      <QueryClientProvider client={client}>
+        <SelectedPetProvider initialPetId={petId}>
+          <Story />
+        </SelectedPetProvider>
+      </QueryClientProvider>
+    );
+  };
 }
 
 const API_TOKEN_STUB = 'pm_api_storybook000000000000000000000000000000000000000000000000000000';

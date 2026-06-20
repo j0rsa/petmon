@@ -1,13 +1,18 @@
+use crate::domain::elimination::{
+    CreateEliminationRecord, EliminationRecordFilters, UpdateEliminationRecord,
+};
 use crate::domain::nutrition_record::BatchCreateNutritionRecords;
 use crate::domain::nutrition_record::{
     CreateNutritionRecord, NutritionRecordFilters, UpdateNutritionRecord,
 };
 use crate::domain::nutrition_schedule::{CreateNutritionSchedule, UpdateNutritionSchedule};
 use crate::domain::pet::{CreatePet, UpdatePet};
+use crate::domain::weight::{CreateWeightRecord, WeightRecordFilters};
 use crate::error::{AppError, AppResult};
 use crate::services::{
-    day_service, nutrition_analytics_service, nutrition_record_service, nutrition_schedule_service,
-    pet_service,
+    day_service, elimination_analytics_service, elimination_record_service,
+    nutrition_analytics_service, nutrition_record_service, nutrition_schedule_service, pet_service,
+    weight_service,
 };
 use chrono::Utc;
 use chrono_tz::Tz;
@@ -348,6 +353,117 @@ fn tool_list() -> Value {
                     "required": ["id"],
                     "properties": { "id": { "type": "string" } }
                 }
+            },
+
+            // ── Elimination / toileting records ──────────────────────────────
+            {
+                "name": "elimination/records/list",
+                "description": "List toileting/elimination records for a pet. event_type: general|urination|defecation|vomit",
+                "inputSchema": {
+                    "type": "object",
+                    "properties": {
+                        "pet_id":     { "type": "string", "format": "uuid" },
+                        "date":       { "type": "string", "format": "date" },
+                        "date_from":  { "type": "string", "format": "date" },
+                        "date_to":    { "type": "string", "format": "date" },
+                        "event_type": { "type": "string", "enum": ["general", "urination", "defecation", "vomit"] },
+                        "limit":      { "type": "integer" },
+                        "offset":     { "type": "integer" }
+                    }
+                }
+            },
+            {
+                "name": "elimination/records/create",
+                "description": "Log a toileting event. subtype for defecation: normal|soft|liquid|hard|blood|mucus; for vomit: food|fur|bile|other",
+                "inputSchema": {
+                    "type": "object",
+                    "required": ["pet_id", "event_type"],
+                    "properties": {
+                        "pet_id":           { "type": "string", "format": "uuid" },
+                        "event_type":       { "type": "string", "enum": ["general", "urination", "defecation", "vomit"] },
+                        "subtype":          { "type": "string" },
+                        "duration_seconds": { "type": "integer" },
+                        "occurred_at":      { "type": "string", "format": "date-time" },
+                        "note":             { "type": "string" }
+                    }
+                }
+            },
+            {
+                "name": "elimination/records/update",
+                "description": "Update an elimination record.",
+                "inputSchema": {
+                    "type": "object",
+                    "required": ["id"],
+                    "properties": {
+                        "id":               { "type": "string" },
+                        "event_type":       { "type": "string", "enum": ["general", "urination", "defecation", "vomit"] },
+                        "subtype":          { "type": ["string", "null"] },
+                        "duration_seconds": { "type": ["integer", "null"] },
+                        "occurred_at":      { "type": "string" },
+                        "note":             { "type": ["string", "null"] }
+                    }
+                }
+            },
+            {
+                "name": "elimination/records/delete",
+                "description": "Delete an elimination record by ID.",
+                "inputSchema": {
+                    "type": "object",
+                    "required": ["id"],
+                    "properties": { "id": { "type": "string" } }
+                }
+            },
+            {
+                "name": "elimination/analytics/range-summary",
+                "description": "Get aggregated elimination summary with daily breakdown and percentiles for a date range.",
+                "inputSchema": {
+                    "type": "object",
+                    "required": ["date_from", "date_to"],
+                    "properties": {
+                        "date_from": { "type": "string", "format": "date" },
+                        "date_to":   { "type": "string", "format": "date" },
+                        "pet_id":    { "type": "string", "format": "uuid" }
+                    }
+                }
+            },
+
+            // ── Weight records ───────────────────────────────────────────────
+            {
+                "name": "weight/records/list",
+                "description": "List weight records for a pet.",
+                "inputSchema": {
+                    "type": "object",
+                    "properties": {
+                        "pet_id":    { "type": "string", "format": "uuid" },
+                        "date_from": { "type": "string", "format": "date" },
+                        "date_to":   { "type": "string", "format": "date" },
+                        "limit":     { "type": "integer" },
+                        "offset":    { "type": "integer" }
+                    }
+                }
+            },
+            {
+                "name": "weight/records/create",
+                "description": "Record a weight measurement. Also updates the pet's current weight_kg.",
+                "inputSchema": {
+                    "type": "object",
+                    "required": ["pet_id", "weight_kg"],
+                    "properties": {
+                        "pet_id":      { "type": "string", "format": "uuid" },
+                        "weight_kg":   { "type": "number" },
+                        "measured_at": { "type": "string", "format": "date-time" },
+                        "note":        { "type": "string" }
+                    }
+                }
+            },
+            {
+                "name": "weight/records/delete",
+                "description": "Delete a weight record by ID.",
+                "inputSchema": {
+                    "type": "object",
+                    "required": ["id"],
+                    "properties": { "id": { "type": "string" } }
+                }
             }
         ]
     })
@@ -576,6 +692,71 @@ pub async fn dispatch(
                 .as_str()
                 .ok_or_else(|| AppError::BadRequest("id required".to_string()))?;
             nutrition_schedule_service::delete(pool, id).await?;
+            Ok(json!({ "deleted": true }))
+        }
+
+        // ── Elimination records ───────────────────────────────────────────────
+        "elimination/records/list" => {
+            let filters: EliminationRecordFilters =
+                serde_json::from_value(params).map_err(|e| AppError::BadRequest(e.to_string()))?;
+            let records = elimination_record_service::list(pool, filters).await?;
+            Ok(json!(records))
+        }
+        "elimination/records/create" => {
+            let req: CreateEliminationRecord =
+                serde_json::from_value(params).map_err(|e| AppError::BadRequest(e.to_string()))?;
+            let record = elimination_record_service::create(pool, req, timezone).await?;
+            Ok(json!(record))
+        }
+        "elimination/records/update" => {
+            let id = params["id"]
+                .as_str()
+                .ok_or_else(|| AppError::BadRequest("id required".to_string()))?
+                .to_string();
+            let req: UpdateEliminationRecord =
+                serde_json::from_value(params).map_err(|e| AppError::BadRequest(e.to_string()))?;
+            let record = elimination_record_service::update(pool, &id, req).await?;
+            Ok(json!(record))
+        }
+        "elimination/records/delete" => {
+            let id = params["id"]
+                .as_str()
+                .ok_or_else(|| AppError::BadRequest("id required".to_string()))?;
+            elimination_record_service::delete(pool, id).await?;
+            Ok(json!({ "deleted": true }))
+        }
+        "elimination/analytics/range-summary" => {
+            let date_from = params["date_from"]
+                .as_str()
+                .ok_or_else(|| AppError::BadRequest("date_from required".to_string()))?;
+            let date_to = params["date_to"]
+                .as_str()
+                .ok_or_else(|| AppError::BadRequest("date_to required".to_string()))?;
+            let pet_id = params["pet_id"].as_str();
+            let summary =
+                elimination_analytics_service::range_summary(pool, pet_id, date_from, date_to)
+                    .await?;
+            Ok(json!(summary))
+        }
+
+        // ── Weight records ────────────────────────────────────────────────────
+        "weight/records/list" => {
+            let filters: WeightRecordFilters =
+                serde_json::from_value(params).map_err(|e| AppError::BadRequest(e.to_string()))?;
+            let records = weight_service::list(pool, filters).await?;
+            Ok(json!(records))
+        }
+        "weight/records/create" => {
+            let req: CreateWeightRecord =
+                serde_json::from_value(params).map_err(|e| AppError::BadRequest(e.to_string()))?;
+            let record = weight_service::create(pool, req, timezone).await?;
+            Ok(json!(record))
+        }
+        "weight/records/delete" => {
+            let id = params["id"]
+                .as_str()
+                .ok_or_else(|| AppError::BadRequest("id required".to_string()))?;
+            weight_service::delete(pool, id).await?;
             Ok(json!({ "deleted": true }))
         }
 

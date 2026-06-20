@@ -2,11 +2,14 @@ import { Navigate, Route, Routes, useParams } from 'react-router-dom';
 import { AuthGuard } from './components/AuthGuard';
 import { Layout } from './components/Layout';
 import { NutritionLayout } from './layouts/NutritionLayout';
+import { EliminationLayout } from './layouts/EliminationLayout';
 import AnalyticsPage from './pages/AnalyticsPage';
 import PetsPage from './pages/PetsPage';
 import PetInfoPage from './pages/PetInfoPage';
 import OverviewPage from './pages/OverviewPage';
 import NutritionJournalPage from './pages/NutritionJournalPage';
+import EliminationJournalPage from './pages/EliminationJournalPage';
+import EliminationAnalyticsPage from './pages/EliminationAnalyticsPage';
 import ImportsPage from './pages/ImportsPage';
 import SchedulesPage from './pages/SchedulesPage';
 import PillarPlaceholderPage from './pages/PillarPlaceholderPage';
@@ -29,7 +32,11 @@ export default function App() {
             <Route path="import" element={<ImportsPage />} />
             <Route path=":date" element={<NutritionJournalPage />} />
           </Route>
-          <Route path="/elimination" element={<PillarPlaceholderPage pillarId="elimination" />} />
+          <Route path="/elimination" element={<EliminationLayout />}>
+            <Route index element={<EliminationJournalPage />} />
+            <Route path="analytics" element={<EliminationAnalyticsPage />} />
+            <Route path=":date" element={<EliminationJournalPage />} />
+          </Route>
           <Route path="/health" element={<PillarPlaceholderPage pillarId="health" />} />
           <Route path="/pets" element={<PetsPage />} />
           <Route path="/pets/:id" element={<PetInfoPage />} />

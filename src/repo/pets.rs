@@ -104,6 +104,17 @@ pub async fn update_pet(pool: &SqlitePool, id: Uuid, req: UpdatePet) -> AppResul
     Ok(pet)
 }
 
+pub async fn update_weight(pool: &SqlitePool, pet_id: &str, weight_kg: f64) -> AppResult<()> {
+    let now = Utc::now().to_rfc3339();
+    sqlx::query("UPDATE pets SET weight_kg=?, updated_at=? WHERE id=?")
+        .bind(weight_kg)
+        .bind(&now)
+        .bind(pet_id)
+        .execute(pool)
+        .await?;
+    Ok(())
+}
+
 pub async fn delete_pet(pool: &SqlitePool, id: Uuid) -> AppResult<()> {
     let rows = sqlx::query("DELETE FROM pets WHERE id=?")
         .bind(id)

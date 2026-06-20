@@ -3,13 +3,14 @@ use chrono_tz;
 use sqlx::SqlitePool;
 use uuid::Uuid;
 
+use crate::domain::elimination::{CreateEliminationRecord, EliminationEventType};
 use crate::domain::nutrition_record::{CreateNutritionRecord, NutritionRecord};
 use crate::domain::nutrition_schedule::CreateNutritionSchedule;
 use crate::domain::pet::Pet;
 use crate::domain::pet_status::PetStatus;
 use crate::domain::species::PetSpecies;
 use crate::error::AppResult;
-use crate::repo::{day_notes, nutrition_records, nutrition_schedules, pets};
+use crate::repo::{day_notes, elimination_records, nutrition_records, nutrition_schedules, pets};
 
 pub const MITTENS_ID: &str = "550e8400-e29b-41d4-a716-446655440000";
 pub const REX_ID: &str = "6ba7b810-9dad-11d1-80b4-00c04fd430c8";
@@ -22,6 +23,7 @@ const DEMO_DAYS: i64 = 45;
 pub struct SeedSummary {
     pub pets: usize,
     pub nutrition_records: usize,
+    pub elimination_records: usize,
     pub day_notes: usize,
     pub schedules: usize,
 }
@@ -33,12 +35,14 @@ pub async fn run(pool: &SqlitePool, fresh: bool) -> AppResult<SeedSummary> {
 
     let demo_pets = seed_pets(pool).await?;
     let nutrition_count = seed_nutrition_records(pool, &demo_pets).await?;
+    let elimination_count = seed_elimination_records(pool, &demo_pets).await?;
     let note_count = seed_day_notes(pool, &demo_pets).await?;
     let schedule_count = seed_schedules(pool, &demo_pets).await?;
 
     Ok(SeedSummary {
         pets: demo_pets.len(),
         nutrition_records: nutrition_count,
+        elimination_records: elimination_count,
         day_notes: note_count,
         schedules: schedule_count,
     })
@@ -49,6 +53,9 @@ async fn clear_all(pool: &SqlitePool) -> AppResult<()> {
         .execute(pool)
         .await?;
     sqlx::query("DELETE FROM elimination_records")
+        .execute(pool)
+        .await?;
+    sqlx::query("DELETE FROM weight_records")
         .execute(pool)
         .await?;
     sqlx::query("DELETE FROM health_records")
@@ -383,6 +390,225 @@ fn record(
     }
 }
 
+async fn seed_elimination_records(pool: &SqlitePool, demo_pets: &[Pet]) -> AppResult<usize> {
+    let today = Utc::now().date_naive();
+    let mut count = 0usize;
+
+    for pet in demo_pets {
+        for day_offset in 0..DEMO_DAYS {
+            let date = today - Duration::days(day_offset);
+            // Skip the same gap days as nutrition for realism
+            if day_offset % 11 == 7 {
+                continue;
+            }
+            let local_date = date.format("%Y-%m-%d").to_string();
+            let events = daily_elimination_for_pet(pet, &local_date, day_offset);
+            for req in events {
+                elimination_records::create(pool, req, chrono_tz::UTC).await?;
+                count += 1;
+            }
+        }
+    }
+
+    Ok(count)
+}
+
+fn daily_elimination_for_pet(
+    pet: &Pet,
+    local_date: &str,
+    day_offset: i64,
+) -> Vec<CreateEliminationRecord> {
+    let mut events = Vec::new();
+
+    match pet.species {
+        PetSpecies::Cat => {
+            // Morning urination
+            events.push(elim_event(
+                pet.id,
+                local_date,
+                7,
+                15,
+                EliminationEventType::Urination,
+                None,
+                Some(45),
+            ));
+            // Morning defecation (most days)
+            if day_offset % 3 != 2 {
+                let subtype = match day_offset % 5 {
+                    0 => "normal",
+                    1 => "soft",
+                    _ => "normal",
+                };
+                events.push(elim_event(
+                    pet.id,
+                    local_date,
+                    9,
+                    0,
+                    EliminationEventType::Defecation,
+                    Some(subtype),
+                    Some(180),
+                ));
+            }
+            // Afternoon urination
+            events.push(elim_event(
+                pet.id,
+                local_date,
+                15,
+                30,
+                EliminationEventType::Urination,
+                None,
+                Some(40),
+            ));
+            // Occasional evening urination
+            if day_offset % 4 == 0 {
+                events.push(elim_event(
+                    pet.id,
+                    local_date,
+                    21,
+                    0,
+                    EliminationEventType::Urination,
+                    None,
+                    Some(35),
+                ));
+            }
+            // Rare vomit — fur every ~10 days, food every ~15 days
+            if day_offset % 10 == 3 {
+                events.push(elim_event(
+                    pet.id,
+                    local_date,
+                    11,
+                    0,
+                    EliminationEventType::Vomit,
+                    Some("fur"),
+                    None,
+                ));
+            } else if day_offset % 15 == 8 {
+                events.push(elim_event(
+                    pet.id,
+                    local_date,
+                    19,
+                    30,
+                    EliminationEventType::Vomit,
+                    Some("food"),
+                    None,
+                ));
+            }
+        }
+        PetSpecies::Dog => {
+            // Morning walk
+            events.push(elim_event(
+                pet.id,
+                local_date,
+                7,
+                0,
+                EliminationEventType::Urination,
+                None,
+                None,
+            ));
+            events.push(elim_event(
+                pet.id,
+                local_date,
+                7,
+                5,
+                EliminationEventType::Defecation,
+                Some("normal"),
+                None,
+            ));
+            // Midday
+            events.push(elim_event(
+                pet.id,
+                local_date,
+                12,
+                0,
+                EliminationEventType::Urination,
+                None,
+                None,
+            ));
+            // Evening walk
+            events.push(elim_event(
+                pet.id,
+                local_date,
+                18,
+                30,
+                EliminationEventType::Urination,
+                None,
+                None,
+            ));
+            if day_offset % 2 == 0 {
+                events.push(elim_event(
+                    pet.id,
+                    local_date,
+                    18,
+                    35,
+                    EliminationEventType::Defecation,
+                    Some("normal"),
+                    None,
+                ));
+            }
+            // Occasional upset stomach
+            if day_offset % 20 == 5 {
+                events.push(elim_event(
+                    pet.id,
+                    local_date,
+                    10,
+                    0,
+                    EliminationEventType::Vomit,
+                    Some("food"),
+                    None,
+                ));
+            }
+        }
+        // Parrot and Bunny: general events only (hard to classify individually)
+        PetSpecies::Parrot | PetSpecies::Bunny => {
+            events.push(elim_event(
+                pet.id,
+                local_date,
+                9,
+                0,
+                EliminationEventType::General,
+                None,
+                None,
+            ));
+            if day_offset % 2 == 0 {
+                events.push(elim_event(
+                    pet.id,
+                    local_date,
+                    15,
+                    0,
+                    EliminationEventType::General,
+                    None,
+                    None,
+                ));
+            }
+        }
+        PetSpecies::Other => {}
+    }
+
+    events
+}
+
+fn elim_event(
+    pet_id: Uuid,
+    local_date: &str,
+    hour: u32,
+    minute: u32,
+    event_type: EliminationEventType,
+    subtype: Option<&str>,
+    duration_seconds: Option<i64>,
+) -> CreateEliminationRecord {
+    let occurred_at = format!("{local_date}T{hour:02}:{minute:02}:00");
+    CreateEliminationRecord {
+        pet_id: pet_id.to_string(),
+        occurred_at: Some(occurred_at),
+        local_date: Some(local_date.to_string()),
+        event_type,
+        subtype: subtype.map(str::to_string),
+        duration_seconds,
+        note: None,
+        source_type: Some("manual".to_string()),
+    }
+}
+
 async fn seed_day_notes(pool: &SqlitePool, demo_pets: &[Pet]) -> AppResult<usize> {
     let mittens = demo_pets
         .iter()
@@ -510,6 +736,7 @@ mod tests {
         let summary = run(&pool, true).await.expect("seed");
         assert_eq!(summary.pets, 4);
         assert!(summary.nutrition_records > 100);
+        assert!(summary.elimination_records > 50);
         assert_eq!(summary.day_notes, 4);
         assert_eq!(summary.schedules, 3);
 

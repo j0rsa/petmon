@@ -1,3 +1,4 @@
+import type React from 'react';
 import { calendarCells, localToday, shiftMonth } from '../lib/dates';
 import { formatDayHint, formatDayHintCompact } from '../lib/nutritionMetrics';
 import type { CalendarDisplayConfig } from '../lib/nutritionMetrics';
@@ -13,12 +14,15 @@ interface MonthCalendarProps {
   compact?: boolean;
   calendarConfig?: CalendarDisplayConfig;
   weekStart?: 'sunday' | 'monday';
+  /** Optional override: render custom hint content for a given date cell. */
+  renderDayHints?: (date: string) => { hasData: boolean; lines: string[]; extra?: React.ReactNode };
+  footnote?: string;
 }
 
 const WEEKDAYS_SUN = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 const WEEKDAYS_MON = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
 
-export function MonthCalendar({ month, selectedDate, highlights, onMonthChange, onSelectDate, onGoToToday, compact = false, calendarConfig, weekStart = 'sunday' }: MonthCalendarProps) {
+export function MonthCalendar({ month, selectedDate, highlights, onMonthChange, onSelectDate, onGoToToday, compact = false, calendarConfig, weekStart = 'sunday', renderDayHints, footnote }: MonthCalendarProps) {
   const cells = calendarCells(month, weekStart);
   const weekdays = weekStart === 'monday' ? WEEKDAYS_MON : WEEKDAYS_SUN;
   const today = localToday();
@@ -69,14 +73,26 @@ export function MonthCalendar({ month, selectedDate, highlights, onMonthChange, 
             return <div key={`empty-${index}`} className="calendar-cell calendar-cell-empty" />;
           }
 
-          const highlight = highlights.get(cell.date);
-          const hint = compact
-            ? formatDayHintCompact(highlight, calendarConfig)
-            : formatDayHint(highlight, calendarConfig);
-          const hintLines = Array.isArray(hint) ? hint : hint ? [hint] : [];
-          const hasData = hintLines.length > 0;
           const isSelected = cell.date === selectedDate;
           const isToday = cell.date === localToday();
+
+          let hasData: boolean;
+          let hintLines: string[];
+          let hintExtra: React.ReactNode = null;
+
+          if (renderDayHints) {
+            const custom = renderDayHints(cell.date);
+            hasData = custom.hasData;
+            hintLines = custom.lines;
+            hintExtra = custom.extra ?? null;
+          } else {
+            const highlight = highlights.get(cell.date);
+            const hint = compact
+              ? formatDayHintCompact(highlight, calendarConfig)
+              : formatDayHint(highlight, calendarConfig);
+            hintLines = Array.isArray(hint) ? hint : hint ? [hint] : [];
+            hasData = hintLines.length > 0;
+          }
 
           return (
             <button
@@ -90,11 +106,12 @@ export function MonthCalendar({ month, selectedDate, highlights, onMonthChange, 
                 ? hintLines.map((line) => <span key={line} className="calendar-hint">{line}</span>)
                 : <span className="calendar-hint muted-text">—</span>
               }
+              {hintExtra}
             </button>
           );
         })}
       </div>
-      <p className="calendar-footnote muted-text">Dates show nutrition highlights. Select a day to open its log.</p>
+      <p className="calendar-footnote muted-text">{footnote ?? 'Dates show nutrition highlights. Select a day to open its log.'}</p>
     </section>
   );
 }

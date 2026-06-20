@@ -1,7 +1,10 @@
 pub mod api_tokens;
 pub mod day_notes;
+pub mod elimination_analytics;
+pub mod elimination_records;
 pub mod nutrition_analytics;
 pub mod nutrition_records;
 pub mod nutrition_schedules;
 pub mod pets;
 pub mod settings;
+pub mod weight_records;
