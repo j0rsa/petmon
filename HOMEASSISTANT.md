@@ -1,0 +1,154 @@
+# Home Assistant Integration
+
+Log toileting events (and optionally weight) from Home Assistant automations, scripts, or dashboard buttons using the petmon REST API.
+
+## Prerequisites
+
+1. **API token** — go to petmon → Settings → API tokens → Create token. Copy the token; it is shown only once.
+2. **Pet UUID** — go to petmon → Pets → open the pet profile. The UUID is in the URL: `/pets/<uuid>`.
+3. petmon must be reachable from your Home Assistant instance (`http://petmon.local:8080` or your external URL).
+
+---
+
+## `rest_command` definitions
+
+Add these to `configuration.yaml` (or a file included via `!include`). Replace the placeholder values:
+
+- `PETMON_HOST` → your petmon URL, e.g. `http://petmon.local:8080`
+- Store your token in `secrets.yaml` as `petmon_token: pm_api_YOURTOKEN`
+
+**`secrets.yaml`:**
+```yaml
+petmon_token: pm_api_YOURTOKEN
+```
+
+**`configuration.yaml`:**
+```yaml
+rest_command:
+
+  # Log a toileting event (urination / defecation / vomit / general)
+  petmon_log_elimination:
+    url: "http://PETMON_HOST/api/v1/elimination/records"
+    method: POST
+    content_type: "application/json"
+    headers:
+      Authorization: "Bearer !secret petmon_token"
+    payload: >
+      {
+        "pet_id": "{{ pet_id }}",
+        "event_type": "{{ event_type }}",
+        "subtype": {{ ('\"' ~ subtype ~ '\"') if subtype else 'null' }},
+        "duration_seconds": {{ duration_seconds | default(None) | tojson }},
+        "note": {{ ('\"' ~ note ~ '\"') if note else 'null' }},
+        "occurred_at": "{{ occurred_at | default('') }}"
+      }
+
+  # Log a toileting event and a weight measurement together
+  petmon_log_elimination_with_weight:
+    url: "http://PETMON_HOST/api/v1/elimination/records/with-weight"
+    method: POST
+    content_type: "application/json"
+    headers:
+      Authorization: "Bearer !secret petmon_token"
+    payload: >
+      {
+        "pet_id": "{{ pet_id }}",
+        "event_type": {{ ('\"' ~ event_type ~ '\"') if event_type else 'null' }},
+        "weight_kg": {{ weight_kg }},
+        "note": {{ ('\"' ~ note ~ '\"') if note else 'null' }},
+        "occurred_at": "{{ occurred_at | default('') }}"
+      }
+```
+
+> **Note:** `!secret` references in `headers` values require HA 2023.11+. On older versions, inline the token string directly.
+
+> **`occurred_at`** accepts a naive local datetime string `YYYY-MM-DDTHH:MM:SS`. When omitted or empty the server defaults to the current time in the configured timezone. For automations triggered by a sensor you can pass the sensor's last-changed time; for manual button presses you can omit it entirely.
+
+---
+
+## Example: automation triggered by a litter-box sensor
+
+```yaml
+automation:
+  - alias: "Mittens used the litter box"
+    trigger:
+      - platform: state
+        entity_id: binary_sensor.litter_box_occupied
+        from: "on"
+        to: "off"
+    action:
+      - service: rest_command.petmon_log_elimination
+        data:
+          pet_id: "550e8400-e29b-41d4-a716-446655440000"   # Mittens' UUID
+          event_type: "urination"
+          subtype: ""
+          duration_seconds: >
+            {{ (as_timestamp(now()) - as_timestamp(states.binary_sensor.litter_box_occupied.last_changed)) | int }}
+          note: ""
+```
+
+---
+
+## Example: dashboard button card
+
+Use a `button` card with a `tap_action` to log a one-tap poop entry for a pet:
+
+```yaml
+type: button
+name: "Mittens — poop"
+icon: mdi:emoticon-poop-outline
+tap_action:
+  action: call-service
+  service: rest_command.petmon_log_elimination
+  service_data:
+    pet_id: "550e8400-e29b-41d4-a716-446655440000"
+    event_type: "defecation"
+    subtype: "normal"
+    duration_seconds: ""
+    note: ""
+```
+
+Add one button per pet and event type. A `grid` card with 2–3 columns works well for a compact litter-box panel.
+
+---
+
+## Example: weigh-in with toileting (combined endpoint)
+
+Send a weight measurement at the same time as a toileting event — useful if you have a smart scale under the litter box or weigh the pet before/after a visit:
+
+```yaml
+script:
+  mittens_weigh_in:
+    alias: "Mittens — weigh-in with poop"
+    sequence:
+      - service: rest_command.petmon_log_elimination_with_weight
+        data:
+          pet_id: "550e8400-e29b-41d4-a716-446655440000"
+          event_type: "defecation"
+          weight_kg: "{{ states('sensor.smart_scale_weight') | float }}"
+          note: "auto from scale"
+```
+
+`event_type` is optional for this endpoint — omit it (pass `null`) to log the weight as a general visit.
+
+---
+
+## Event types and subtypes
+
+| `event_type` | `subtype` values |
+|---|---|
+| `urination` | *(none)* |
+| `defecation` | `normal`, `soft`, `liquid`, `hard`, `blood`, `mucus` |
+| `vomit` | `food`, `fur`, `bile`, `other` |
+| `general` | *(none)* |
+
+Leave `subtype` empty or omit it when not applicable.
+
+---
+
+## Troubleshooting
+
+- **401 Unauthorized** — check the `Authorization` header value; the token must start with `pm_api_`.
+- **400 Bad Request** — verify `pet_id` is a valid UUID and `event_type` is one of the values above.
+- **No records appearing** — confirm the request reaches petmon (check logs with `RUST_LOG=petmon=debug`).
+- Test a command manually from HA's Developer Tools → Services → `rest_command.petmon_log_elimination`.

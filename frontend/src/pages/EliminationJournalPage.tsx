@@ -66,7 +66,7 @@ export default function EliminationJournalPage() {
     }
     const dots = (
       <>
-        {h.hasDefecation && <span key="poop-dot" style={{ display: 'inline-block', width: 6, height: 6, borderRadius: '50%', background: 'var(--metric-water)', marginTop: 2 }} title="poop" />}
+        {h.hasDefecation && <span key="poop-dot" style={{ display: 'inline-block', width: 6, height: 6, borderRadius: '50%', background: 'var(--metric-wet)', marginTop: 2 }} title="poop" />}
         {h.hasVomit && <span key="vomit-dot" style={{ display: 'inline-block', width: 6, height: 6, borderRadius: '50%', background: 'var(--error-text)', marginTop: 2 }} title="vomit" />}
       </>
     );

@@ -6,7 +6,7 @@ import {
 } from 'recharts';
 import { eliminationApi } from '../api/elimination';
 import { NoPetSelected } from '../components/NoPetSelected';
-import { StatCard, type TrendDir } from '../components/StatCard';
+import { StatCard } from '../components/StatCard';
 import { useSelectedPet } from '../context/SelectedPetContext';
 import { localToday, shiftDate } from '../lib/dates';
 import { AlertIcon, ClockIcon, TrendUpIcon } from '../lib/metricIcons';
@@ -115,10 +115,7 @@ export default function EliminationAnalyticsPage() {
     const data = analyticsQuery.data;
     if (!data) return null;
     const vomitDays = data.daily_summaries.filter((s) => s.has_vomit).length;
-    const deviationPct = data.avg_per_day > 0
-      ? Math.round(((data.p50_per_day - data.avg_per_day) / data.avg_per_day) * 100)
-      : 0;
-    return { median: data.p50_per_day, avg: data.avg_per_day, vomitDays, deviationPct };
+    return { median: data.p50_per_day, avg: data.avg_per_day, vomitDays };
   }, [analyticsQuery.data]);
 
   // Regression trend lines
@@ -131,15 +128,17 @@ export default function EliminationAnalyticsPage() {
     [dailyData],
   );
 
-  // Median duration across days that have data
-  const medianDuration = useMemo(() => {
+  // Median + mean duration across days that have data
+  const { medianDuration, avgDuration } = useMemo(() => {
     const vals = dailyData
       .map((d) => d.avgDuration)
       .filter((v): v is number => v != null)
       .sort((a, b) => a - b);
-    if (!vals.length) return null;
+    if (!vals.length) return { medianDuration: null, avgDuration: null };
     const mid = Math.floor(vals.length / 2);
-    return vals.length % 2 === 0 ? (vals[mid - 1] + vals[mid]) / 2 : vals[mid];
+    const median = vals.length % 2 === 0 ? (vals[mid - 1] + vals[mid]) / 2 : vals[mid];
+    const mean = vals.reduce((s, v) => s + v, 0) / vals.length;
+    return { medianDuration: median, avgDuration: mean };
   }, [dailyData]);
 
   // Combined chart data (visits + duration + trend lines)
@@ -194,25 +193,19 @@ export default function EliminationAnalyticsPage() {
                 label="median visits / day"
                 value={stats.median.toFixed(1)}
                 color="var(--accent)"
-                trend={trendDir(visitTrend)}
                 icon={<TrendUpIcon />}
-                note={stats.deviationPct !== 0
-                  ? `${stats.deviationPct > 0 ? '+' : ''}${stats.deviationPct}% vs avg ${stats.avg.toFixed(1)}`
-                  : `avg ${stats.avg.toFixed(1)}`}
+                current={stats.median}
+                avg={stats.avg}
               />
-              {medianDuration != null && (
+              {medianDuration != null && avgDuration != null && (
                 <StatCard
                   label="median time spent"
                   value={fmtSec(medianDuration)}
                   color="var(--metric-wet)"
-                  trend={trendDir(durationTrend)}
                   icon={<ClockIcon />}
-                  note={(() => {
-                    const trend = durationTrend;
-                    if (!trend || trend.length < 2 || trend[0] <= 0) return undefined;
-                    const pct = Math.round(((trend[trend.length - 1] - trend[0]) / trend[0]) * 100);
-                    return pct !== 0 ? `${pct > 0 ? '+' : ''}${pct}% trend` : 'stable trend';
-                  })()}
+                  current={medianDuration}
+                  avg={avgDuration}
+                  avgLabel={`avg ${fmtSec(avgDuration)}`}
                 />
               )}
               <StatCard
@@ -329,15 +322,5 @@ export default function EliminationAnalyticsPage() {
   );
 }
 
-function trendDir(trend: number[] | null, threshold = 0.05): TrendDir | null {
-  if (!trend || trend.length < 2) return null;
-  const first = trend[0];
-  const last = trend[trend.length - 1];
-  if (first <= 0) return null;
-  const pct = (last - first) / first;
-  if (pct > threshold) return 'up';
-  if (pct < -threshold) return 'down';
-  return 'flat';
-}
 
 export { EVENT_TYPE_LABELS };

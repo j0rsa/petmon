@@ -2,6 +2,8 @@ import type { ReactNode } from 'react';
 
 export type TrendDir = 'up' | 'down' | 'flat';
 
+const TREND_THRESHOLD = 0.05;
+
 export function TrendArrow({ dir }: { dir: TrendDir }) {
   const map: Record<TrendDir, { symbol: string; color: string }> = {
     up:   { symbol: '▲', color: 'var(--error-text)' },
@@ -14,26 +16,56 @@ export function TrendArrow({ dir }: { dir: TrendDir }) {
 
 interface StatCardProps {
   label: string;
+  /** Pre-formatted display string (e.g. "4.2", "1m 35s"). */
   value: string;
   color?: string;
-  trend?: TrendDir | null;
-  /** Small unit suffix rendered after the value (e.g. "ml", "g"). */
   unit?: string;
-  /** Secondary line shown below the value — use for deviation % or context notes. */
-  note?: string;
-  /** Icon rendered as a dim watermark in the bottom-right corner. */
   icon?: ReactNode;
+  /**
+   * Numeric current value. When paired with `avg`, the component derives the
+   * trend arrow and deviation note from the same ±5% dead-band, so they
+   * always agree. Omit both to show no trend.
+   */
+  current?: number;
+  avg?: number;
+  /** Optional reference label appended to the note (e.g. "avg 4.1"). */
+  avgLabel?: string;
+  /** Overrides the auto-computed note — use for context like "14% of period". */
+  note?: string;
+}
+
+function deriveTrend(current: number, avg: number): { dir: TrendDir; notePct: string } {
+  if (avg <= 0) return { dir: 'flat', notePct: '' };
+  const pct = (current - avg) / avg;
+  const pctRounded = Math.round(pct * 100);
+  const sign = pctRounded > 0 ? '+' : '';
+  if (pct > TREND_THRESHOLD)  return { dir: 'up',   notePct: `${sign}${pctRounded}%` };
+  if (pct < -TREND_THRESHOLD) return { dir: 'down', notePct: `${sign}${pctRounded}%` };
+  return { dir: 'flat', notePct: '' };
 }
 
 export function StatCard({
   label,
   value,
   color = 'var(--accent)',
-  trend,
   unit,
-  note,
   icon,
+  current,
+  avg,
+  avgLabel,
+  note,
 }: StatCardProps) {
+  const hasTrend = current !== undefined && avg !== undefined;
+  const derived = hasTrend ? deriveTrend(current, avg) : null;
+
+  const autoNote = derived
+    ? derived.notePct
+      ? `${derived.notePct} vs ${avgLabel ?? `avg ${avg!.toFixed(1)}`}`
+      : `stable · ${avgLabel ?? `avg ${avg!.toFixed(1)}`}`
+    : null;
+
+  const displayNote = note ?? autoNote;
+
   return (
     <div className="stat-card" style={{ position: 'relative', overflow: 'hidden' }}>
       {icon && (
@@ -56,10 +88,10 @@ export function StatCard({
           {value}
           {unit && <span style={{ fontSize: '0.9rem', color: 'var(--text-muted)', marginLeft: '0.2rem' }}>{unit}</span>}
         </strong>
-        {trend && <TrendArrow dir={trend} />}
+        {derived && <TrendArrow dir={derived.dir} />}
       </div>
-      {note && (
-        <span style={{ fontSize: '0.72rem', color: 'var(--text-subtle)', marginTop: '0.1rem' }}>{note}</span>
+      {displayNote && (
+        <span style={{ fontSize: '0.72rem', color: 'var(--text-subtle)', marginTop: '0.1rem' }}>{displayNote}</span>
       )}
     </div>
   );
