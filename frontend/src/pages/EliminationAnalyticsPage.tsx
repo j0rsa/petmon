@@ -26,8 +26,8 @@ const EVENT_TYPE_COLORS: Record<string, string> = {
 };
 
 const EVENT_TYPE_LABELS: Record<string, string> = {
-  urination:  'Urination',
-  defecation: 'Defecation',
+  urination:  'Wee',
+  defecation: 'Poop',
   vomit:      'Vomit',
   general:    'General',
 };

@@ -151,7 +151,7 @@ function WeightPanel({ petId, weightsQuery, queryClient }: {
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ['weight-records', petId] }),
   });
 
-  const records = [...(weightsQuery.data ?? [])].sort((a, b) => a.measured_at.localeCompare(b.measured_at));
+  const records = [...(weightsQuery.data ?? [])].sort((a, b) => (a.local_date ?? '').localeCompare(b.local_date ?? ''));
   const chartData = records.map((r) => ({
     date: r.local_date.slice(5),
     weight: r.weight_kg,

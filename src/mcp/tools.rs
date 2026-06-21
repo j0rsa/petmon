@@ -427,6 +427,20 @@ fn tool_list() -> Value {
                 }
             },
 
+            // ── Elimination context ──────────────────────────────────────────
+            {
+                "name": "pets/elimination-context",
+                "description": "Returns a complete toileting context for a single pet in one call: pet profile, today's elimination records with type breakdown, and a 7-day trend summary (avg visits/day, vomit days, p50/p90 per day). Use this as the starting point for any question about a pet's toileting habits — it answers 'how many times today?', 'any vomit recently?', 'is the frequency normal?', and 'what types occurred?' without additional tool calls. Event types use informal labels: urination=wee, defecation=poop.",
+                "inputSchema": {
+                    "type": "object",
+                    "required": ["pet_id"],
+                    "properties": {
+                        "pet_id": { "type": "string", "format": "uuid", "description": "UUID of the pet" },
+                        "today":  { "type": "string", "format": "date", "description": "Override today's date (YYYY-MM-DD). Defaults to server UTC date." }
+                    }
+                }
+            },
+
             // ── Weight records ───────────────────────────────────────────────
             {
                 "name": "weight/records/list",
@@ -737,6 +751,69 @@ pub async fn dispatch(
                 elimination_analytics_service::range_summary(pool, pet_id, date_from, date_to)
                     .await?;
             Ok(json!(summary))
+        }
+
+        // ── Elimination context ───────────────────────────────────────────────
+        "pets/elimination-context" => {
+            let pet_id = require_uuid(&params, "pet_id")?;
+            let today = params["today"]
+                .as_str()
+                .map(str::to_owned)
+                .unwrap_or_else(|| Utc::now().date_naive().to_string());
+            let week_from = {
+                let d = chrono::NaiveDate::parse_from_str(&today, "%Y-%m-%d")
+                    .map_err(|_| AppError::BadRequest("invalid today date".to_string()))?;
+                (d - chrono::Duration::days(6)).to_string()
+            };
+
+            let today_filters = crate::domain::elimination::EliminationRecordFilters {
+                pet_id: Some(pet_id.to_string()),
+                date: Some(today.clone()),
+                date_from: None,
+                date_to: None,
+                event_type: None,
+                limit: None,
+                offset: None,
+            };
+
+            let pet_id_str = pet_id.to_string();
+            let (pet, today_records, trend) = tokio::try_join!(
+                pet_service::get(pool, pet_id),
+                elimination_record_service::list(pool, today_filters),
+                elimination_analytics_service::range_summary(
+                    pool,
+                    Some(pet_id_str.as_str()),
+                    &week_from,
+                    &today
+                ),
+            )?;
+
+            let wee_count = today_records
+                .iter()
+                .filter(|r| r.event_type.to_string() == "urination")
+                .count();
+            let poop_count = today_records
+                .iter()
+                .filter(|r| r.event_type.to_string() == "defecation")
+                .count();
+            let vomit_count = today_records
+                .iter()
+                .filter(|r| r.event_type.to_string() == "vomit")
+                .count();
+
+            Ok(json!({
+                "pet": pet,
+                "today": today,
+                "today_summary": {
+                    "total": today_records.len(),
+                    "wee": wee_count,
+                    "poop": poop_count,
+                    "vomit": vomit_count,
+                    "general": today_records.len() - wee_count - poop_count - vomit_count,
+                    "records": today_records
+                },
+                "trend_7d": trend
+            }))
         }
 
         // ── Weight records ────────────────────────────────────────────────────

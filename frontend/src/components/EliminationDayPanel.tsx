@@ -15,8 +15,8 @@ import { useFormatTime, useFormatDate } from '../context/useDisplaySettings';
 
 const EVENT_TYPE_LABELS: Record<EliminationEventType, string> = {
   general: 'General',
-  urination: 'Urination',
-  defecation: 'Defecation',
+  urination: 'Wee',
+  defecation: 'Poop',
   vomit: 'Vomit',
 };
 
@@ -437,19 +437,19 @@ export function EliminationDayPanel({ date, petId }: EliminationDayPanelProps) {
           </strong>
         </article>
         <article className="metric-card">
-          <span className="metric-label">Urinations</span>
+          <span className="metric-label">Wees</span>
           <strong style={{ fontFamily: 'monospace', fontSize: '1.65rem', color: 'var(--metric-water)' }}>
             {urinationCount}
           </strong>
         </article>
         <article className="metric-card">
-          <span className="metric-label">Defecations</span>
+          <span className="metric-label">Poops</span>
           <strong style={{ fontFamily: 'monospace', fontSize: '1.65rem', color: 'var(--metric-wet)' }}>
             {defecationCount}
           </strong>
         </article>
         <article className="metric-card">
-          <span className="metric-label">Vomits</span>
+          <span className="metric-label">Vomit</span>
           <strong style={{ fontFamily: 'monospace', fontSize: '1.65rem', color: 'var(--error-text)' }}>
             {vomitCount}
           </strong>
