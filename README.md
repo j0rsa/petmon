@@ -12,7 +12,7 @@ Pet monitoring system — a single deployable service with a React SPA frontend 
 - **Actix Web JSON API** versioned under `/api/v1`
 - **SQLite** persistence via SQLx with automatic migrations on startup
 - **Stateless MCP** (JSON-RPC) endpoint at `/mcp` for agent/LLM integrations
-- **Embedded frontend** assets compiled into the binary via `rust-embed`
+- **Embedded OpenAPI spec** (`/api/docs`) via `rust-embed`; frontend is served from `STATIC_DIR` at runtime
 - **PWA** — installable on iOS and Android, with service worker update banner
 - **Structured JSON logging** with `tracing`, optional OTLP export
 - **Environment-based configuration**
@@ -309,4 +309,4 @@ OIDC_CLIENT_ID=your-client-id \
 ./target/release/petmon
 ```
 
-The binary embeds all frontend assets and runs migrations automatically on startup.
+The binary runs migrations automatically on startup. Frontend assets must be built separately and pointed to via `STATIC_DIR`.
