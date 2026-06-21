@@ -8,6 +8,8 @@ import {
   type EliminationRecord,
   type UpdateEliminationRecord,
 } from '../api/elimination';
+import { TimeInput } from './TimeInput';
+import { nowTimeString, isoFromDateAndTime } from '../lib/time';
 import { localToday } from '../lib/dates';
 import { useFormatTime, useFormatDate } from '../context/useDisplaySettings';
 
@@ -51,17 +53,6 @@ function subtypesFor(eventType: EliminationEventType) {
   return null;
 }
 
-// ── Helpers ─────────────────────────────────────────────────────────────────
-
-function nowDateTimeLocal() {
-  const now = new Date();
-  const pad = (n: number) => String(n).padStart(2, '0');
-  return `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}T${pad(now.getHours())}:${pad(now.getMinutes())}`;
-}
-
-function toLocalDateFromDT(dt: string) {
-  return dt.slice(0, 10);
-}
 
 function invalidateDayData(queryClient: ReturnType<typeof useQueryClient>, date: string, petId: string) {
   return Promise.all([
@@ -102,7 +93,7 @@ const AddRow = forwardRef<AddRowHandle, AddRowProps>(function AddRow(
   { date, petId, onSave, saving, isPaused },
   ref,
 ) {
-  const [occurredAt, setOccurredAt] = useState(nowDateTimeLocal);
+  const [time, setTime] = useState(nowTimeString);
   const [eventType, setEventType] = useState<EliminationEventType>('urination');
   const [subtype, setSubtype] = useState('');
   const [durationSeconds, setDurationSeconds] = useState('');
@@ -112,20 +103,18 @@ const AddRow = forwardRef<AddRowHandle, AddRowProps>(function AddRow(
 
   useImperativeHandle(ref, () => ({
     clearForm() {
-      setOccurredAt(nowDateTimeLocal());
+      setTime(nowTimeString());
       setSubtype('');
       setDurationSeconds('');
       setNote('');
     },
   }));
 
-
   function handleAdd() {
-    const localDate = toLocalDateFromDT(occurredAt) || date;
     onSave({
       pet_id: petId,
-      occurred_at: `${occurredAt}:00`,
-      local_date: localDate,
+      occurred_at: isoFromDateAndTime(date, time),
+      local_date: date,
       event_type: eventType,
       subtype: subtype || null,
       duration_seconds: durationSeconds ? Number(durationSeconds) : null,
@@ -137,14 +126,7 @@ const AddRow = forwardRef<AddRowHandle, AddRowProps>(function AddRow(
   return (
     <div className="entry-add-row" style={{ flexDirection: 'column', alignItems: 'stretch', gap: '0.65rem' }}>
       <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap', alignItems: 'center' }}>
-        <input
-          className="entry-inline-input"
-          style={{ width: '13rem' }}
-          type="datetime-local"
-          aria-label="Occurred at"
-          value={occurredAt}
-          onChange={(e) => setOccurredAt(e.target.value)}
-        />
+        <TimeInput value={time} onChange={setTime} />
         <select
           className="entry-inline-input entry-inline-select"
           aria-label="Event type"
@@ -221,7 +203,7 @@ interface RecordRowProps {
 function RecordRow({ record, onSave, onDelete, saving, savingPaused, deleting, deletingPaused }: RecordRowProps) {
   const formatTime = useFormatTime();
   const [editing, setEditing] = useState(false);
-  const [occurredAt, setOccurredAt] = useState('');
+  const [time, setTime] = useState('');
   const [eventType, setEventType] = useState<EliminationEventType>('general');
   const [subtype, setSubtype] = useState('');
   const [durationSeconds, setDurationSeconds] = useState('');
@@ -230,7 +212,7 @@ function RecordRow({ record, onSave, onDelete, saving, savingPaused, deleting, d
   const availableSubtypes = subtypesFor(eventType);
 
   function startEdit() {
-    setOccurredAt(record.occurred_at.slice(0, 16));
+    setTime(record.occurred_at.slice(11, 16));
     setEventType(record.event_type);
     setSubtype(record.subtype ?? '');
     setDurationSeconds(record.duration_seconds != null ? String(record.duration_seconds) : '');
@@ -239,10 +221,9 @@ function RecordRow({ record, onSave, onDelete, saving, savingPaused, deleting, d
   }
 
   function commitEdit() {
-    const localDate = toLocalDateFromDT(occurredAt) || record.local_date;
     onSave(record.id, {
-      occurred_at: `${occurredAt}:00`,
-      local_date: localDate,
+      occurred_at: isoFromDateAndTime(record.local_date, time),
+      local_date: record.local_date,
       event_type: eventType,
       subtype: subtype || null,
       duration_seconds: durationSeconds ? Number(durationSeconds) : null,
@@ -256,15 +237,7 @@ function RecordRow({ record, onSave, onDelete, saving, savingPaused, deleting, d
       <div className="entry-row-wrap entry-row-editing">
         <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', padding: '0.25rem 0' }}>
           <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap', alignItems: 'center' }}>
-            <input
-              className="entry-inline-input"
-              style={{ width: '13rem' }}
-              type="datetime-local"
-              aria-label="Occurred at"
-              value={occurredAt}
-              onChange={(e) => setOccurredAt(e.target.value)}
-              autoFocus
-            />
+            <TimeInput value={time} onChange={setTime} autoFocus />
             <select
               className="entry-inline-input entry-inline-select"
               aria-label="Event type"

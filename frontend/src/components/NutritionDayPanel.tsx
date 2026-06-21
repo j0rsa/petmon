@@ -8,6 +8,8 @@ import { nutritionSchedulesApi } from '../api/nutritionSchedules';
 import { CategoryBadge } from './CategoryBadge';
 import { CumulativeFluidChart } from './CumulativeFluidChart';
 import { IntakeBarsChart } from './IntakeBarsChart';
+import { TimeInput } from './TimeInput';
+import { nowTimeString, isoFromDateAndTime, timeFromIso } from '../lib/time';
 import { localToday } from '../lib/dates';
 import { useDisplaySettings, useFormatDate, useFormatTime } from '../context/useDisplaySettings';
 import { exportTelegramLog } from '../lib/exportTelegramLog';
@@ -28,18 +30,6 @@ function unitFor(category: string) {
   return UNIT_FOR_CATEGORY[category] ?? '';
 }
 
-function nowTimeString() {
-  const now = new Date();
-  return `${now.getHours().toString().padStart(2, '0')}:${now.getMinutes().toString().padStart(2, '0')}`;
-}
-
-function isoFromDateAndTime(date: string, time: string) {
-  return `${date}T${time}:00`;
-}
-
-function timeFromIso(iso: string) {
-  return iso.slice(11, 16);
-}
 
 function invalidateDayData(queryClient: ReturnType<typeof useQueryClient>, date: string, petId: string) {
   return Promise.all([
@@ -97,13 +87,7 @@ const AddRow = forwardRef<AddRowHandle, AddRowProps>(function AddRow(
 
   return (
     <div className="entry-add-row">
-      <input
-        className="entry-inline-input entry-inline-time"
-        type="time"
-        aria-label="Time"
-        value={time}
-        onChange={(e) => setTime(e.target.value)}
-      />
+      <TimeInput value={time} onChange={setTime} />
       <select
         className="entry-inline-input entry-inline-select"
         aria-label="Category"
@@ -179,14 +163,7 @@ function RecordRow({ record, onSave, onDelete, saving, savingPaused, deleting, d
     return (
       <div className="entry-row-wrap entry-row-editing">
         <div className="entry-row">
-          <input
-            className="entry-inline-input entry-inline-time"
-            type="time"
-            aria-label="Time"
-            value={time}
-            onChange={(e) => setTime(e.target.value)}
-            autoFocus
-          />
+          <TimeInput value={time} onChange={setTime} autoFocus />
           <select
             className="entry-inline-input entry-inline-select"
             aria-label="Category"
