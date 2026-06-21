@@ -132,7 +132,7 @@ petmon exposes a **stateless JSON-RPC 2.0** MCP endpoint at `POST /mcp`, protect
 When creating elimination records, use `event_type`:
 - `urination` (wee)
 - `defecation` (poop) — subtypes: `normal`, `soft`, `liquid`, `hard`, `blood`, `mucus`
-- `vomit` — subtypes: `food`, `fur`, `bile`, `other`
+- `vomit` — subtypes: `food`, `fur`, `fur_with_food`, `bile`, `other`
 - `general`
 
 ### Connecting Claude to petmon
@@ -165,6 +165,10 @@ petmon uses HTTP transport (JSON-RPC over a single `POST /mcp` endpoint). Add it
    - *"What does Clover weigh and is the trend stable?"*
 
 For local development use `http://localhost:8080/mcp` as the URL.
+
+## Home Assistant
+
+petmon can receive toileting records (and combined weight measurements) directly from Home Assistant automations and scripts via REST commands. See **[HOMEASSISTANT.md](HOMEASSISTANT.md)** for a complete setup guide including `rest_command` definitions, example automations, and a dashboard button card.
 
 ## Authentication
 

@@ -2169,7 +2169,7 @@ components:
         - urination
         - defecation
         - vomit
-      description: "Type of elimination event. Subtypes for defecation: normal|soft|liquid|hard|blood|mucus. Subtypes for vomit: food|fur|bile|other."
+      description: "Type of elimination event. Subtypes for defecation: normal|soft|liquid|hard|blood|mucus. Subtypes for vomit: food|fur|fur_with_food|bile|other."
 
     EliminationRecord:
       type: object

@@ -139,7 +139,7 @@ script:
 |---|---|
 | `urination` | *(none)* |
 | `defecation` | `normal`, `soft`, `liquid`, `hard`, `blood`, `mucus` |
-| `vomit` | `food`, `fur`, `bile`, `other` |
+| `vomit` | `food`, `fur`, `fur_with_food`, `bile`, `other` |
 | `general` | *(none)* |
 
 Leave `subtype` empty or omit it when not applicable.

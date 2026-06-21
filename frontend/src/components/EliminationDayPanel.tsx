@@ -39,9 +39,10 @@ const DEFECATION_SUBTYPES: Array<{ value: string; label: string }> = [
 ];
 
 const VOMIT_SUBTYPES: Array<{ value: string; label: string }> = [
-  { value: 'food',  label: 'Food' },
-  { value: 'fur',   label: 'Fur / Hairball' },
-  { value: 'bile',  label: 'Bile' },
+  { value: 'food',          label: 'Food' },
+  { value: 'fur',           label: 'Fur / Hairball' },
+  { value: 'fur_with_food', label: 'Fur with food' },
+  { value: 'bile',          label: 'Bile' },
   { value: 'other', label: 'Other' },
 ];
 
