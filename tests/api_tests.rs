@@ -748,13 +748,13 @@ async fn weight_records_returns_json_not_spa() {
     let app = build_app!(state);
 
     let req = test::TestRequest::get()
-        .uri("/api/v1/weight-records")
+        .uri("/api/v1/health/weight")
         .to_request();
     let resp = test::call_service(&app, req).await;
     assert_eq!(
         resp.status(),
         200,
-        "GET /api/v1/weight-records must return 200"
+        "GET /api/v1/health/weight must return 200"
     );
     let ct = resp
         .headers()
@@ -764,6 +764,6 @@ async fn weight_records_returns_json_not_spa() {
         .unwrap();
     assert!(
         ct.contains("application/json"),
-        "weight-records must return JSON, got: {ct}"
+        "health/weight must return JSON, got: {ct}"
     );
 }

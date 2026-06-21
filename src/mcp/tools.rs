@@ -478,6 +478,19 @@ fn tool_list() -> Value {
                     "required": ["id"],
                     "properties": { "id": { "type": "string" } }
                 }
+            },
+
+            // ── Health context ───────────────────────────────────────────────
+            {
+                "name": "pets/health-context",
+                "description": "Returns a complete health context for a single pet in one call: pet profile (including current weight_kg), the last 10 weight records, and a 30-day weight stats summary (latest_kg, avg_kg, count). Use this as the starting point for any question about a pet's weight or health trend — answers 'what does the pet weigh now?', 'is the weight stable?', 'has it changed recently?' without additional tool calls.",
+                "inputSchema": {
+                    "type": "object",
+                    "required": ["pet_id"],
+                    "properties": {
+                        "pet_id": { "type": "string", "format": "uuid", "description": "UUID of the pet" }
+                    }
+                }
             }
         ]
     })
@@ -835,6 +848,36 @@ pub async fn dispatch(
                 .ok_or_else(|| AppError::BadRequest("id required".to_string()))?;
             weight_service::delete(pool, id).await?;
             Ok(json!({ "deleted": true }))
+        }
+
+        // ── Health context ────────────────────────────────────────────────────
+        "pets/health-context" => {
+            let pet_id = require_uuid(&params, "pet_id")?;
+            let pet_id_str = pet_id.to_string();
+            let today = Utc::now().date_naive().to_string();
+            let thirty_days_ago =
+                (Utc::now().date_naive() - chrono::Duration::days(29)).to_string();
+
+            let (pet, recent_weights, stats) = tokio::try_join!(
+                pet_service::get(pool, pet_id),
+                weight_service::list(
+                    pool,
+                    crate::domain::weight::WeightRecordFilters {
+                        pet_id: Some(pet_id_str.clone()),
+                        date_from: None,
+                        date_to: None,
+                        limit: Some(10),
+                        offset: None,
+                    }
+                ),
+                weight_service::stats(pool, &pet_id_str, &thirty_days_ago, &today),
+            )?;
+
+            Ok(json!({
+                "pet": pet,
+                "recent_weights": recent_weights,
+                "stats_30d": stats
+            }))
         }
 
         _ => Err(AppError::BadRequest(format!("Unknown method: {method}"))),

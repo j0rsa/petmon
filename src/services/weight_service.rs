@@ -1,4 +1,4 @@
-use crate::domain::weight::{CreateWeightRecord, WeightRecord, WeightRecordFilters};
+use crate::domain::weight::{CreateWeightRecord, WeightRecord, WeightRecordFilters, WeightStats};
 use crate::error::{AppError, AppResult};
 use crate::repo::{pets, weight_records};
 use chrono_tz::Tz;
@@ -31,6 +31,16 @@ pub async fn create(
     pets::update_weight(pool, &pet_id_str, weight_kg).await?;
 
     Ok(record)
+}
+
+#[tracing::instrument(skip(pool))]
+pub async fn stats(
+    pool: &SqlitePool,
+    pet_id: &str,
+    date_from: &str,
+    date_to: &str,
+) -> AppResult<WeightStats> {
+    weight_records::stats(pool, pet_id, date_from, date_to).await
 }
 
 #[tracing::instrument(skip(pool))]

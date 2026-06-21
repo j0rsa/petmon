@@ -700,7 +700,7 @@ pre {
 
   .content {
     padding: 1rem;
-    padding-bottom: calc(5.5rem + env(safe-area-inset-bottom));
+    padding-bottom: calc(10rem + env(safe-area-inset-bottom));
   }
 
   .two-column-grid {

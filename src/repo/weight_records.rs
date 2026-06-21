@@ -1,4 +1,4 @@
-use crate::domain::weight::{CreateWeightRecord, WeightRecord, WeightRecordFilters};
+use crate::domain::weight::{CreateWeightRecord, WeightRecord, WeightRecordFilters, WeightStats};
 use crate::error::{AppError, AppResult};
 use chrono::Utc;
 use chrono_tz::Tz;
@@ -96,6 +96,52 @@ pub async fn create(
     .await?;
 
     get(pool, &id).await
+}
+
+#[tracing::instrument(skip(pool))]
+pub async fn stats(
+    pool: &SqlitePool,
+    pet_id: &str,
+    date_from: &str,
+    date_to: &str,
+) -> AppResult<WeightStats> {
+    let pet_uuid = Uuid::parse_str(pet_id)
+        .map_err(|_| AppError::BadRequest(format!("invalid pet_id: {pet_id}")))?;
+
+    // Latest record overall for this pet
+    let latest = sqlx::query_as::<_, WeightRecord>(
+        "SELECT id, pet_id, measured_at, local_date, weight_kg, note, source_type, created_at
+         FROM weight_records WHERE pet_id = ? ORDER BY measured_at DESC LIMIT 1",
+    )
+    .bind(pet_uuid)
+    .fetch_optional(pool)
+    .await?;
+
+    // Avg within the date window
+    let avg: Option<f64> = sqlx::query_scalar(
+        "SELECT AVG(weight_kg) FROM weight_records WHERE pet_id = ? AND local_date >= ? AND local_date <= ?",
+    )
+    .bind(pet_uuid)
+    .bind(date_from)
+    .bind(date_to)
+    .fetch_one(pool)
+    .await?;
+
+    let count: i64 = sqlx::query_scalar(
+        "SELECT COUNT(*) FROM weight_records WHERE pet_id = ? AND local_date >= ? AND local_date <= ?",
+    )
+    .bind(pet_uuid)
+    .bind(date_from)
+    .bind(date_to)
+    .fetch_one(pool)
+    .await?;
+
+    Ok(WeightStats {
+        latest_kg: latest.as_ref().map(|r| r.weight_kg),
+        latest_date: latest.map(|r| r.local_date),
+        avg_kg: avg,
+        count,
+    })
 }
 
 #[tracing::instrument(skip(pool))]

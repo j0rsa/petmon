@@ -755,7 +755,7 @@ paths:
         '401':
           $ref: '#/components/responses/Unauthorized'
 
-  /weight-records:
+  /health/weight:
     get:
       tags:
         - Weight Records
@@ -812,7 +812,38 @@ paths:
         '401':
           $ref: '#/components/responses/Unauthorized'
 
-  /weight-records/{id}:
+  /health/weight/stats:
+    get:
+      tags:
+        - Weight Records
+      summary: Get weight stats for a date range
+      description: Returns the latest weight, 30-day average, and record count. Used for overview and health-context comparisons.
+      parameters:
+        - name: pet_id
+          in: query
+          required: true
+          schema: { type: string, format: uuid }
+        - name: date_from
+          in: query
+          required: true
+          schema: { type: string, format: date }
+        - name: date_to
+          in: query
+          required: true
+          schema: { type: string, format: date }
+      responses:
+        '200':
+          description: Weight stats
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/WeightStats'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  /health/weight/{id}:
     delete:
       tags:
         - Weight Records
@@ -2254,6 +2285,11 @@ components:
           format: int64
         has_vomit:
           type: boolean
+        avg_duration_seconds:
+          type: number
+          format: double
+          nullable: true
+          description: Average session duration in seconds for records that have duration logged; null if none.
       required:
         - local_date
         - total_count
@@ -2368,6 +2404,31 @@ components:
       required:
         - pet_id
         - weight_kg
+
+    WeightStats:
+      type: object
+      properties:
+        latest_kg:
+          type: number
+          format: double
+          nullable: true
+          description: Most recent weight measurement for the pet
+        latest_date:
+          type: string
+          format: date
+          nullable: true
+          description: Date of the most recent measurement
+        avg_kg:
+          type: number
+          format: double
+          nullable: true
+          description: Average weight within the requested date window
+        count:
+          type: integer
+          format: int64
+          description: Number of measurements within the date window
+      required:
+        - count
 
 tags:
   - name: Health

@@ -9,7 +9,6 @@ export interface WeightRecord {
   note: string | null;
   source_type: string;
   created_at: string;
-  updated_at: string;
 }
 
 export interface CreateWeightRecord {
@@ -40,11 +39,20 @@ function toQueryString(params: Record<string, string | number | undefined>): str
   return query ? `?${query}` : '';
 }
 
+export interface WeightStats {
+  latest_kg: number | null;
+  latest_date: string | null;
+  avg_kg: number | null;
+  count: number;
+}
+
 export const weightApi = {
   list: (filters: WeightRecordFilters = {}) =>
     api.get<WeightRecord[]>(
       `/health/weight${toQueryString(filters as Record<string, string | number | undefined>)}`,
     ),
+  stats: (petId: string, dateFrom: string, dateTo: string) =>
+    api.get<WeightStats>(`/health/weight/stats?pet_id=${encodeURIComponent(petId)}&date_from=${dateFrom}&date_to=${dateTo}`),
   create: (data: CreateWeightRecord) => api.post<WeightRecord>('/health/weight', data),
   delete: (id: string) => api.delete(`/health/weight/${id}`),
 };

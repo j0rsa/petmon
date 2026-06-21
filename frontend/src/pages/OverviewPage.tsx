@@ -2,6 +2,8 @@ import { Link } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { nutritionAnalyticsApi } from '../api/analytics';
 import { daysApi } from '../api/days';
+import { eliminationApi } from '../api/elimination';
+import { weightApi } from '../api/weight';
 import { NoPetSelected } from '../components/NoPetSelected';
 import { useSelectedPet } from '../context/SelectedPetContext';
 import { localToday, shiftDate } from '../lib/dates';
@@ -68,6 +70,19 @@ export default function OverviewPage() {
     if (recordedDates.has(date)) streak++;
     else break;
   }
+
+  const toiletingQuery = useQuery({
+    queryKey: ['elimination-records-day', today, selectedPetId],
+    queryFn: () => eliminationApi.list({ date: today, pet_id: selectedPetId! }),
+    enabled: Boolean(selectedPetId),
+  });
+
+  const weightStatsFrom = shiftDate(today, -29);
+  const weightStatsQuery = useQuery({
+    queryKey: ['weight-stats', selectedPetId, weightStatsFrom, today],
+    queryFn: () => weightApi.stats(selectedPetId!, weightStatsFrom, today),
+    enabled: Boolean(selectedPetId),
+  });
 
   const isLoading = todayQuery.isLoading || weekQuery.isLoading || streakQuery.isLoading;
 
@@ -222,7 +237,7 @@ export default function OverviewPage() {
             </section>
           </div>
 
-          {/* Quick links */}
+          {/* Nutrition links */}
           <section className="panel" style={{ gap: '0.5rem' }}>
             <p className="eyebrow">Nutrition</p>
             <div className="pillar-links" style={{ gap: '0.5rem' }}>
@@ -231,9 +246,98 @@ export default function OverviewPage() {
               <Link className="button button-secondary button-compact" to="/nutrition/schedules">Schedules</Link>
               <Link className="button button-secondary button-compact" to="/nutrition/import">Import</Link>
             </div>
-            <p style={{ fontSize: '0.78rem', color: 'var(--text-subtle)', marginTop: '0.25rem' }}>
-              Toileting and health pillars coming soon.
-            </p>
+          </section>
+
+          {/* Toileting overview */}
+          <section className="panel">
+            <div className="section-heading">
+              <div>
+                <p className="eyebrow">Toileting</p>
+                <h3>Today</h3>
+              </div>
+              <Link className="button button-secondary button-compact" to="/elimination">
+                Open →
+              </Link>
+            </div>
+
+            {toiletingQuery.isLoading ? (
+              <p className="muted-text" style={{ fontSize: '0.88rem' }}>Loading…</p>
+            ) : (() => {
+              const records = toiletingQuery.data ?? [];
+              const wees = records.filter(r => r.event_type === 'urination').length;
+              const poops = records.filter(r => r.event_type === 'defecation').length;
+              const vomits = records.filter(r => r.event_type === 'vomit').length;
+              const total = records.length;
+
+              if (total === 0) {
+                return <p className="muted-text" style={{ fontSize: '0.88rem' }}>No visits logged today yet.</p>;
+              }
+
+              return (
+                <div style={{ display: 'flex', gap: '1.5rem', flexWrap: 'wrap', alignItems: 'baseline' }}>
+                  <span style={{ fontFamily: 'monospace', fontSize: '1.65rem', color: 'var(--accent)' }}>
+                    {total}
+                    <span style={{ fontSize: '0.82rem', color: 'var(--text-muted)', marginLeft: '0.3rem', fontFamily: 'inherit' }}>
+                      visit{total === 1 ? '' : 's'}
+                    </span>
+                  </span>
+                  {wees > 0 && (
+                    <span style={{ fontSize: '0.88rem', color: 'var(--metric-water)' }}>{wees} wee{wees === 1 ? '' : 's'}</span>
+                  )}
+                  {poops > 0 && (
+                    <span style={{ fontSize: '0.88rem', color: 'var(--metric-wet)' }}>{poops} poop{poops === 1 ? '' : 's'}</span>
+                  )}
+                  {vomits > 0 && (
+                    <span style={{ fontSize: '0.88rem', color: 'var(--error-text)', fontWeight: 600 }}>⚠ {vomits} vomit{vomits === 1 ? '' : 's'}</span>
+                  )}
+                </div>
+              );
+            })()}
+
+            <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap', marginTop: '0.25rem' }}>
+              <Link className="button button-secondary button-compact" to="/elimination">Journal</Link>
+              <Link className="button button-secondary button-compact" to="/elimination/analytics">Analytics</Link>
+            </div>
+          </section>
+
+          {/* Health overview */}
+          <section className="panel">
+            <div className="section-heading">
+              <div>
+                <p className="eyebrow">Health</p>
+                <h3>Weight</h3>
+              </div>
+              <Link className="button button-secondary button-compact" to="/health">
+                Manage →
+              </Link>
+            </div>
+
+            {weightStatsQuery.isLoading ? (
+              <p className="muted-text" style={{ fontSize: '0.88rem' }}>Loading…</p>
+            ) : (() => {
+              const s = weightStatsQuery.data;
+              if (!s || s.latest_kg == null) {
+                return <p className="muted-text" style={{ fontSize: '0.88rem' }}>No weight recorded yet.</p>;
+              }
+              const delta = s.avg_kg != null ? s.latest_kg - s.avg_kg : null;
+
+              return (
+                <div style={{ display: 'flex', alignItems: 'baseline', gap: '1rem', flexWrap: 'wrap' }}>
+                  <span style={{ fontFamily: 'monospace', fontSize: '2rem', color: 'var(--accent)' }}>
+                    {s.latest_kg.toFixed(2)}
+                    <span style={{ fontSize: '0.9rem', color: 'var(--text-muted)', marginLeft: '0.25rem' }}>kg</span>
+                  </span>
+                  {delta !== null && s.count >= 2 && (
+                    <span style={{ fontSize: '0.88rem', color: delta > 0.05 ? 'var(--error-text)' : delta < -0.05 ? 'var(--metric-water)' : 'var(--text-muted)' }}>
+                      {delta > 0 ? '▲' : delta < 0 ? '▼' : '='} {Math.abs(delta).toFixed(2)} kg vs 30d avg
+                    </span>
+                  )}
+                  <span style={{ fontSize: '0.82rem', color: 'var(--text-subtle)', marginLeft: 'auto' }}>
+                    {s.latest_date}
+                  </span>
+                </div>
+              );
+            })()}
           </section>
         </>
       )}

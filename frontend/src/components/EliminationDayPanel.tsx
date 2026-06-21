@@ -382,9 +382,17 @@ export function EliminationDayPanel({ date, petId }: EliminationDayPanelProps) {
 
   // Derived metrics
   const totalCount = records.length;
-  const urinationCount = records.filter((r) => r.event_type === 'urination').length;
   const defecationCount = records.filter((r) => r.event_type === 'defecation').length;
   const vomitCount = records.filter((r) => r.event_type === 'vomit').length;
+  const durRecords = records.filter((r) => r.duration_seconds != null);
+  const avgDurationSec = durRecords.length > 0
+    ? durRecords.reduce((s, r) => s + (r.duration_seconds ?? 0), 0) / durRecords.length
+    : null;
+  const fmtDuration = (sec: number) => {
+    const m = Math.floor(sec / 60);
+    const s = Math.round(sec % 60);
+    return m > 0 ? `${m}m ${s}s` : `${s}s`;
+  };
 
   const createMutation = useMutation({
     mutationFn: (payload: CreateEliminationRecord) => eliminationApi.create(payload),
@@ -428,18 +436,12 @@ export function EliminationDayPanel({ date, petId }: EliminationDayPanelProps) {
         )}
       </div>
 
-      {/* Metric cards */}
-      <div className="metric-cards">
+      {/* Metric cards — 4 per row, compact */}
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, minmax(0, max-content))', gap: '0.75rem' }}>
         <article className="metric-card">
-          <span className="metric-label">Total visits</span>
+          <span className="metric-label">Visits</span>
           <strong style={{ fontFamily: 'monospace', fontSize: '1.65rem' }}>
             {totalCount}
-          </strong>
-        </article>
-        <article className="metric-card">
-          <span className="metric-label">Wees</span>
-          <strong style={{ fontFamily: 'monospace', fontSize: '1.65rem', color: 'var(--metric-water)' }}>
-            {urinationCount}
           </strong>
         </article>
         <article className="metric-card">
@@ -449,8 +451,14 @@ export function EliminationDayPanel({ date, petId }: EliminationDayPanelProps) {
           </strong>
         </article>
         <article className="metric-card">
+          <span className="metric-label">Avg time</span>
+          <strong style={{ fontFamily: 'monospace', fontSize: avgDurationSec != null ? '1.2rem' : '1.65rem', color: 'var(--text-muted)' }}>
+            {avgDurationSec != null ? fmtDuration(avgDurationSec) : '—'}
+          </strong>
+        </article>
+        <article className="metric-card">
           <span className="metric-label">Vomit</span>
-          <strong style={{ fontFamily: 'monospace', fontSize: '1.65rem', color: 'var(--error-text)' }}>
+          <strong style={{ fontFamily: 'monospace', fontSize: '1.65rem', color: vomitCount > 0 ? 'var(--error-text)' : 'var(--text-subtle)' }}>
             {vomitCount}
           </strong>
         </article>

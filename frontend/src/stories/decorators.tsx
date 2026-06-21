@@ -24,6 +24,7 @@ import {
   mockRangeSummary,
   mockTelegramConfigured,
   mockTelegramEmpty,
+  mockWeightRecords,
 } from './fixtures';
 
 /** Single router wrapper — use `parameters.route` per story to set the active path. */
@@ -239,6 +240,66 @@ export function withEliminationAnalyticsPage({
           <Story />
         </SelectedPetProvider>
       </QueryClientProvider>
+    );
+  };
+}
+
+// ── Pet info page decorator ──────────────────────────────────────────────────
+
+export function withPetInfoPage(petId = mockPetId, withWeights = true): Decorator {
+  return function PetInfoDecorator(Story) {
+    const client = makeMockClient();
+    client.setQueryData(['pets'], mockPets);
+    client.setQueryData(['pets', petId], mockPets.find((p) => p.id === petId) ?? mockPets[0]);
+    client.setQueryData(['me'], { subject: 'dev', email: null, name: 'Dev', display_name: 'Dev', kind: 'dev' });
+    client.setQueryData(['app-info'], mockAppInfo);
+    client.setQueryData(['weight-records', petId], withWeights ? mockWeightRecords.map((r) => ({ ...r, pet_id: petId })) : []);
+
+    return (
+      <MemoryRouter initialEntries={[`/pets/${petId}`]}>
+        <QueryClientProvider client={client}>
+          <SelectedPetProvider initialPetId={petId}>
+            <Story />
+          </SelectedPetProvider>
+        </QueryClientProvider>
+      </MemoryRouter>
+    );
+  };
+}
+
+// ── Health page decorator ────────────────────────────────────────────────────
+
+interface WithHealthPageOptions {
+  petId?: string;
+  loading?: boolean;
+  empty?: boolean;
+}
+
+export function withHealthPage({ petId = mockPetId, loading = false, empty = false }: WithHealthPageOptions = {}): Decorator {
+  return function HealthDecorator(Story) {
+    const client = makeMockClient();
+    client.setQueryData(['pets'], mockPets);
+    client.setQueryData(['me'], { subject: 'dev', email: null, name: 'Dev', display_name: 'Dev', kind: 'dev' });
+    client.setQueryData(['app-info'], mockAppInfo);
+
+    if (loading) {
+      const pending = () => new Promise(() => {});
+      client.setQueryDefaults(['weight-records', petId], { queryFn: pending });
+    } else {
+      client.setQueryData(
+        ['weight-records', petId],
+        empty ? [] : mockWeightRecords.map((r) => ({ ...r, pet_id: petId })),
+      );
+    }
+
+    return (
+      <MemoryRouter initialEntries={['/health']}>
+        <QueryClientProvider client={client}>
+          <SelectedPetProvider initialPetId={petId}>
+            <Story />
+          </SelectedPetProvider>
+        </QueryClientProvider>
+      </MemoryRouter>
     );
   };
 }

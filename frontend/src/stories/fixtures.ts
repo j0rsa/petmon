@@ -339,13 +339,14 @@ export const mockEliminationDaySummary: EliminationDailySummary = {
   vomit_count: 1,
   general_count: 0,
   has_vomit: true,
+  avg_duration_seconds: 95,
 };
 
 export function mockEliminationCalendarHighlights(month = '2024-06'): Map<string, DayEliminationHighlight> {
   const map = new Map<string, DayEliminationHighlight>();
-  map.set(`${month}-15`, { totalCount: 5, hasVomit: true });
-  map.set(`${month}-14`, { totalCount: 4, hasVomit: false });
-  map.set(`${month}-10`, { totalCount: 3, hasVomit: false });
+  map.set(`${month}-15`, { totalCount: 5, hasVomit: true, avgDurationSec: 95 });
+  map.set(`${month}-14`, { totalCount: 4, hasVomit: false, avgDurationSec: 72 });
+  map.set(`${month}-10`, { totalCount: 3, hasVomit: false, avgDurationSec: null });
   return map;
 }
 
@@ -354,13 +355,13 @@ export const mockEliminationRangeSummary: EliminationRangeSummary = {
   date_to: localToday(),
   pet_id: mockPetId,
   daily_summaries: [
-    { local_date: shiftDate(localToday(), -6), pet_id: mockPetId, total_count: 4, urination_count: 2, defecation_count: 1, vomit_count: 0, general_count: 1, has_vomit: false },
-    { local_date: shiftDate(localToday(), -5), pet_id: mockPetId, total_count: 3, urination_count: 2, defecation_count: 1, vomit_count: 0, general_count: 0, has_vomit: false },
-    { local_date: shiftDate(localToday(), -4), pet_id: mockPetId, total_count: 5, urination_count: 3, defecation_count: 1, vomit_count: 1, general_count: 0, has_vomit: true },
-    { local_date: shiftDate(localToday(), -3), pet_id: mockPetId, total_count: 4, urination_count: 2, defecation_count: 2, vomit_count: 0, general_count: 0, has_vomit: false },
-    { local_date: shiftDate(localToday(), -2), pet_id: mockPetId, total_count: 6, urination_count: 4, defecation_count: 1, vomit_count: 0, general_count: 1, has_vomit: false },
-    { local_date: shiftDate(localToday(), -1), pet_id: mockPetId, total_count: 4, urination_count: 3, defecation_count: 1, vomit_count: 0, general_count: 0, has_vomit: false },
-    { local_date: localToday(), pet_id: mockPetId, total_count: 5, urination_count: 3, defecation_count: 1, vomit_count: 1, general_count: 0, has_vomit: true },
+    { local_date: shiftDate(localToday(), -6), pet_id: mockPetId, total_count: 4, urination_count: 2, defecation_count: 1, vomit_count: 0, general_count: 1, has_vomit: false, avg_duration_seconds: 80 },
+    { local_date: shiftDate(localToday(), -5), pet_id: mockPetId, total_count: 3, urination_count: 2, defecation_count: 1, vomit_count: 0, general_count: 0, has_vomit: false, avg_duration_seconds: null },
+    { local_date: shiftDate(localToday(), -4), pet_id: mockPetId, total_count: 5, urination_count: 3, defecation_count: 1, vomit_count: 1, general_count: 0, has_vomit: true, avg_duration_seconds: 120 },
+    { local_date: shiftDate(localToday(), -3), pet_id: mockPetId, total_count: 4, urination_count: 2, defecation_count: 2, vomit_count: 0, general_count: 0, has_vomit: false, avg_duration_seconds: 95 },
+    { local_date: shiftDate(localToday(), -2), pet_id: mockPetId, total_count: 6, urination_count: 4, defecation_count: 1, vomit_count: 0, general_count: 1, has_vomit: false, avg_duration_seconds: 70 },
+    { local_date: shiftDate(localToday(), -1), pet_id: mockPetId, total_count: 4, urination_count: 3, defecation_count: 1, vomit_count: 0, general_count: 0, has_vomit: false, avg_duration_seconds: null },
+    { local_date: localToday(), pet_id: mockPetId, total_count: 5, urination_count: 3, defecation_count: 1, vomit_count: 1, general_count: 0, has_vomit: true, avg_duration_seconds: 105 },
   ],
   type_totals: { urination: 19, defecation: 8, vomit: 2, general: 2 },
   avg_per_day: 4.4,
@@ -375,16 +376,16 @@ export const mockWeightRecords: WeightRecord[] = [
   {
     id: 'wt-01', pet_id: mockPetId, measured_at: '2024-06-01T09:00:00', local_date: '2024-06-01',
     weight_kg: 4.2, note: 'Morning weigh-in', source_type: 'manual',
-    created_at: '2024-06-01T09:00:00', updated_at: '2024-06-01T09:00:00',
+    created_at: '2024-06-01T09:00:00',
   },
   {
     id: 'wt-02', pet_id: mockPetId, measured_at: '2024-06-08T09:00:00', local_date: '2024-06-08',
     weight_kg: 4.15, note: null, source_type: 'manual',
-    created_at: '2024-06-08T09:00:00', updated_at: '2024-06-08T09:00:00',
+    created_at: '2024-06-08T09:00:00',
   },
   {
     id: 'wt-03', pet_id: mockPetId, measured_at: '2024-06-15T09:00:00', local_date: '2024-06-15',
     weight_kg: 4.18, note: 'Post vet visit', source_type: 'manual',
-    created_at: '2024-06-15T09:00:00', updated_at: '2024-06-15T09:00:00',
+    created_at: '2024-06-15T09:00:00',
   },
 ];

@@ -43,6 +43,7 @@ export default function EliminationJournalPage() {
       map.set(summary.local_date, {
         totalCount: summary.total_count,
         hasVomit: summary.has_vomit,
+        avgDurationSec: summary.avg_duration_seconds ?? null,
       });
     }
     return map;
@@ -55,10 +56,16 @@ export default function EliminationJournalPage() {
   function renderDayHints(date: string) {
     const h = highlights.get(date);
     if (!h || h.totalCount === 0) return { hasData: false, lines: [] };
-    const label = isMobile ? `${h.totalCount}×` : `${h.totalCount} visit${h.totalCount === 1 ? '' : 's'}`;
+    const visitLabel = isMobile ? `${h.totalCount}×` : `${h.totalCount} visit${h.totalCount === 1 ? '' : 's'}`;
+    const lines = [visitLabel];
+    if (h.avgDurationSec != null) {
+      const mins = Math.floor(h.avgDurationSec / 60);
+      const secs = Math.round(h.avgDurationSec % 60);
+      lines.push(mins > 0 ? `~${mins}m ${secs}s` : `~${secs}s`);
+    }
     return {
       hasData: true,
-      lines: [label],
+      lines,
       extra: h.hasVomit
         ? <span key="vomit-dot" style={{ display: 'inline-block', width: 6, height: 6, borderRadius: '50%', background: 'var(--error-text)', marginTop: 2 }} title="vomit" />
         : undefined,

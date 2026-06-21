@@ -1,10 +1,10 @@
 import { useEffect, useState } from 'react';
-import { useMutation, useQuery, useQueryClient, type UseQueryResult } from '@tanstack/react-query';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Link, useParams } from 'react-router-dom';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 import { petsApi } from '../api/pets';
 import { weightApi } from '../api/weight';
-import type { CreateWeightRecord, WeightRecord } from '../api/weight';
+import { localToday, shiftDate } from '../lib/dates';
 import { useSelectedPet } from '../context/SelectedPetContext';
 import { PetAvatar } from '../components/pet/PetAvatar';
 import { PetInfoFields } from '../components/pet/PetInfoFields';
@@ -48,9 +48,13 @@ export default function PetInfoPage() {
     },
   });
 
+  const weightDateFrom = shiftDate(localToday(), -29);
+  const weightDateTo = localToday();
+
+  // 30-day window for chart — read-only; full management is in /health
   const weightsQuery = useQuery({
-    queryKey: ['weight-records', id],
-    queryFn: () => weightApi.list({ pet_id: id, limit: 90 }),
+    queryKey: ['weight-records', id, weightDateFrom],
+    queryFn: () => weightApi.list({ pet_id: id, date_from: weightDateFrom, date_to: weightDateTo }),
     enabled: Boolean(id),
   });
 
@@ -122,62 +126,39 @@ export default function PetInfoPage() {
           <PetInfoFields pet={pet} />
         </section>
       )}
-      <WeightPanel petId={id} weightsQuery={weightsQuery} queryClient={queryClient} />
+      <WeightChartPanel weightsQuery={weightsQuery} />
     </div>
   );
 }
 
-function WeightPanel({ petId, weightsQuery, queryClient }: {
-  petId: string;
-  weightsQuery: UseQueryResult<WeightRecord[]>;
-  queryClient: ReturnType<typeof useQueryClient>;
+function WeightChartPanel({ weightsQuery }: {
+  weightsQuery: ReturnType<typeof useQuery<ReturnType<typeof weightApi.list> extends Promise<infer T> ? T : never>>;
 }) {
-  const [weightInput, setWeightInput] = useState('');
-  const [noteInput, setNoteInput] = useState('');
-
-  const addMutation = useMutation({
-    mutationFn: (payload: CreateWeightRecord) => weightApi.create(payload),
-    onSuccess: () => {
-      setWeightInput('');
-      setNoteInput('');
-      queryClient.invalidateQueries({ queryKey: ['weight-records', petId] });
-      queryClient.invalidateQueries({ queryKey: ['pets', petId] });
-      queryClient.invalidateQueries({ queryKey: ['pets'] });
-    },
-  });
-
-  const deleteMutation = useMutation({
-    mutationFn: (id: string) => weightApi.delete(id),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['weight-records', petId] }),
-  });
-
-  const records = [...(weightsQuery.data ?? [])].sort((a, b) => (a.local_date ?? '').localeCompare(b.local_date ?? ''));
-  const chartData = records.map((r) => ({
-    date: r.local_date.slice(5),
-    weight: r.weight_kg,
-  }));
-
-  function handleAdd() {
-    const kg = parseFloat(weightInput);
-    if (isNaN(kg) || kg <= 0) return;
-    addMutation.mutate({
-      pet_id: petId,
-      weight_kg: kg,
-      note: noteInput.trim() || undefined,
-    });
-  }
+  const records = [...(weightsQuery.data ?? [])].filter((r) => r.local_date && r.weight_kg != null).sort((a, b) => a.local_date.localeCompare(b.local_date));
+  const chartData = records.map((r) => ({ date: r.local_date.slice(5), weight: r.weight_kg }));
+  const latest = records[records.length - 1];
 
   return (
     <section className="panel">
       <div className="section-heading">
         <div>
           <p className="eyebrow">Health</p>
-          <h3>Weight history</h3>
+          <h3>Weight</h3>
+        </div>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+          {latest && (
+            <span style={{ fontFamily: 'monospace', fontSize: '1.4rem', color: 'var(--accent)' }}>
+              {latest.weight_kg} kg
+            </span>
+          )}
+          <Link className="button button-secondary button-compact" to="/health">
+            Manage →
+          </Link>
         </div>
       </div>
 
-      {records.length >= 2 && (
-        <ResponsiveContainer width="100%" height={180}>
+      {records.length >= 2 ? (
+        <ResponsiveContainer width="100%" height={150}>
           <LineChart data={chartData} margin={{ top: 4, right: 8, left: -20, bottom: 0 }}>
             <CartesianGrid strokeDasharray="3 3" stroke="var(--border-subtle)" />
             <XAxis dataKey="date" tick={{ fontSize: 11, fill: 'var(--text-muted)' }} />
@@ -189,74 +170,10 @@ function WeightPanel({ petId, weightsQuery, queryClient }: {
             <Line type="monotone" dataKey="weight" stroke="var(--accent)" strokeWidth={2} dot={{ r: 3 }} />
           </LineChart>
         </ResponsiveContainer>
-      )}
-
-      {/* Add record */}
-      <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap', alignItems: 'flex-end' }}>
-        <div className="form-row" style={{ flex: '0 0 auto' }}>
-          <label style={{ fontSize: '0.82rem' }}>Weight (kg)</label>
-          <input
-            type="number"
-            step="0.01"
-            min="0"
-            placeholder="e.g. 4.35"
-            value={weightInput}
-            onChange={(e) => setWeightInput(e.target.value)}
-            style={{ width: '9rem' }}
-          />
-        </div>
-        <div className="form-row" style={{ flex: '1 1 140px' }}>
-          <label style={{ fontSize: '0.82rem' }}>Note (optional)</label>
-          <input
-            type="text"
-            placeholder="After meal, vet, etc."
-            value={noteInput}
-            onChange={(e) => setNoteInput(e.target.value)}
-          />
-        </div>
-        <button
-          className="button"
-          type="button"
-          disabled={addMutation.isPending || !weightInput}
-          onClick={handleAdd}
-          style={{ alignSelf: 'flex-end' }}
-        >
-          {addMutation.isPending ? 'Saving…' : 'Log weight'}
-        </button>
-      </div>
-
-      {/* Recent records */}
-      {records.length > 0 && (
-        <table>
-          <thead>
-            <tr>
-              <th>Date</th>
-              <th>Weight</th>
-              <th>Note</th>
-              <th></th>
-            </tr>
-          </thead>
-          <tbody>
-            {[...records].reverse().slice(0, 20).map((r) => (
-              <tr key={r.id}>
-                <td style={{ fontSize: '0.82rem', color: 'var(--text-muted)' }}>{r.local_date}</td>
-                <td style={{ fontFamily: 'monospace', fontWeight: 600 }}>{r.weight_kg} kg</td>
-                <td style={{ fontSize: '0.82rem', color: 'var(--text-muted)' }}>{r.note ?? <span style={{ color: 'var(--text-subtle)' }}>—</span>}</td>
-                <td>
-                  <button
-                    className="button button-danger"
-                    type="button"
-                    style={{ padding: '0.2rem 0.6rem', fontSize: '0.78rem' }}
-                    disabled={deleteMutation.isPending && deleteMutation.variables === r.id}
-                    onClick={() => { if (window.confirm('Delete this weight entry?')) deleteMutation.mutate(r.id); }}
-                  >
-                    Delete
-                  </button>
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
+      ) : (
+        <p className="muted-text" style={{ fontSize: '0.88rem' }}>
+          {records.length === 0 ? 'No weight records yet.' : 'Add at least 2 measurements to see a chart.'}
+        </p>
       )}
     </section>
   );

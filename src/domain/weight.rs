@@ -24,6 +24,14 @@ pub struct CreateWeightRecord {
     pub source_type: Option<String>,
 }
 
+#[derive(Debug, Serialize)]
+pub struct WeightStats {
+    pub latest_kg: Option<f64>,
+    pub latest_date: Option<String>,
+    pub avg_kg: Option<f64>,
+    pub count: i64,
+}
+
 #[derive(Debug, Deserialize)]
 pub struct WeightRecordFilters {
     pub pet_id: Option<String>,
