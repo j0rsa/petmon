@@ -70,9 +70,6 @@ pub async fn update_pet(pool: &SqlitePool, id: Uuid, req: UpdatePet) -> AppResul
     if req.color.is_some() {
         pet.color = req.color;
     }
-    if req.weight_kg.is_some() {
-        pet.weight_kg = req.weight_kg;
-    }
     if req.feeding_notes.is_some() {
         pet.feeding_notes = req.feeding_notes;
     }

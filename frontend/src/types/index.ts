@@ -26,7 +26,6 @@ export interface Pet {
   birth_date?: string;
   blood_type?: string;
   color?: string;
-  weight_kg?: number;
   feeding_notes?: string;
   telegram_chat_id?: string;
   telegram_thread_id?: string;

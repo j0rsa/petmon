@@ -31,7 +31,7 @@ export const PILLARS: PillarDefinition[] = [
     label: 'Health',
     description: 'Weight, medication, and vet notes',
     route: '/health',
-    available: false,
+    available: true,
   },
 ];
 

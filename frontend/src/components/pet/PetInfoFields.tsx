@@ -21,7 +21,6 @@ export function PetInfoFields({ pet }: PetInfoFieldsProps) {
     { label: 'Color', value: pet.color?.trim() || '—' },
     { label: 'Blood type', value: pet.blood_type?.trim() || '—' },
     { label: 'Status', value: PET_STATUS_LABELS[pet.status] },
-    { label: 'Weight', value: pet.weight_kg != null ? `${pet.weight_kg} kg` : '—' },
   ];
 
   return (

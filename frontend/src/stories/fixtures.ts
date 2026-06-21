@@ -18,7 +18,6 @@ export const mockPets: Pet[] = [
     birth_date: '2020-03-15',
     blood_type: 'A',
     color: '#c4a882',
-    weight_kg: 4.2,
     feeding_notes: 'Prefers wet food in the morning.',
     created_at: '2024-01-01T00:00:00Z',
     updated_at: '2024-01-01T00:00:00Z',

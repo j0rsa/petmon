@@ -10,7 +10,6 @@ interface PetFormState {
   name: string;
   species: PetSpecies;
   status: PetStatus;
-  weight_kg: string;
   feeding_notes: string;
 }
 
@@ -18,7 +17,6 @@ const emptyForm: PetFormState = {
   name: '',
   species: 'cat',
   status: 'active',
-  weight_kg: '',
   feeding_notes: '',
 };
 
@@ -27,7 +25,6 @@ function toPayload(form: PetFormState) {
     name: form.name,
     species: form.species,
     status: form.status,
-    weight_kg: form.weight_kg ? Number(form.weight_kg) : undefined,
     feeding_notes: form.feeding_notes || undefined,
   };
 }
@@ -125,7 +122,6 @@ export default function PetsPage() {
                       <p className="muted-text">{pet.breed || 'Breed not set'}</p>
                     </div>
                   </div>
-                  <p className="muted-text">Weight: {pet.weight_kg ?? '—'} kg</p>
                   <p>{pet.feeding_notes || 'No feeding notes yet.'}</p>
                   <div className="button-row">
                     <Link className="button" to={`/pets/${pet.id}`}>
@@ -140,7 +136,6 @@ export default function PetsPage() {
                           name: pet.name,
                           species: pet.species,
                           status: pet.status,
-                          weight_kg: pet.weight_kg ? String(pet.weight_kg) : '',
                           feeding_notes: pet.feeding_notes ?? '',
                         });
                       }}
@@ -214,10 +209,6 @@ function PetForm({
             </option>
           ))}
         </select>
-      </div>
-      <div className="form-row">
-        <label htmlFor="pet-weight">Weight (kg)</label>
-        <input id="pet-weight" type="number" min="0" step="0.01" value={form.weight_kg} onChange={(event) => setForm((current) => ({ ...current, weight_kg: event.target.value }))} />
       </div>
       <div className="form-row form-row-full">
         <label htmlFor="pet-notes">Feeding notes</label>

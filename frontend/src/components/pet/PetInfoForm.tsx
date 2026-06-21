@@ -10,7 +10,6 @@ export interface PetInfoFormState {
   birth_date: string;
   color: string;
   blood_type: string;
-  weight_kg: string;
   feeding_notes: string;
   telegram_chat_id: string;
   telegram_thread_id: string;
@@ -37,7 +36,6 @@ export function petToFormState(pet: {
   birth_date?: string;
   color?: string;
   blood_type?: string;
-  weight_kg?: number;
   feeding_notes?: string;
   telegram_chat_id?: string;
   telegram_thread_id?: string;
@@ -50,7 +48,6 @@ export function petToFormState(pet: {
     birth_date: pet.birth_date ?? '',
     color: pet.color ?? '',
     blood_type: pet.blood_type ?? '',
-    weight_kg: pet.weight_kg != null ? String(pet.weight_kg) : '',
     feeding_notes: pet.feeding_notes ?? '',
     telegram_chat_id: pet.telegram_chat_id ?? '',
     telegram_thread_id: pet.telegram_thread_id ?? '',
@@ -67,7 +64,6 @@ export function formStateToPayload(form: PetInfoFormState) {
     birth_date: form.birth_date || undefined,
     color: form.color.trim() || undefined,
     blood_type: form.blood_type.trim() || undefined,
-    weight_kg: form.weight_kg ? Number(form.weight_kg) : undefined,
     feeding_notes: form.feeding_notes.trim() || undefined,
     telegram_chat_id: form.telegram_chat_id.trim() || undefined,
     telegram_thread_id: form.telegram_thread_id.trim() || undefined,
@@ -164,10 +160,6 @@ export function PetInfoForm({
               </option>
             ))}
           </select>
-        </div>
-        <div className="form-row">
-          <label htmlFor="pet-info-weight">Weight (kg)</label>
-          <input id="pet-info-weight" type="number" min="0" step="0.01" value={form.weight_kg} onChange={(event) => setForm((current) => ({ ...current, weight_kg: event.target.value }))} />
         </div>
         <div className="form-row form-row-full">
           <label htmlFor="pet-info-notes">Feeding notes</label>

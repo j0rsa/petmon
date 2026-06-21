@@ -15,6 +15,9 @@ pub struct Pet {
     pub birth_date: Option<String>,
     pub blood_type: Option<String>,
     pub color: Option<String>,
+    // Kept in DB as a cached snapshot updated by weight_records::create.
+    // Not exposed in the API — use /health/weight for current/historical weight.
+    #[serde(skip_serializing)]
     pub weight_kg: Option<f64>,
     pub feeding_notes: Option<String>,
     pub telegram_chat_id: Option<String>,
@@ -34,7 +37,6 @@ pub struct CreatePet {
     pub birth_date: Option<String>,
     pub blood_type: Option<String>,
     pub color: Option<String>,
-    pub weight_kg: Option<f64>,
     pub feeding_notes: Option<String>,
     pub telegram_chat_id: Option<String>,
     pub telegram_thread_id: Option<String>,
@@ -49,7 +51,6 @@ pub struct UpdatePet {
     pub birth_date: Option<String>,
     pub blood_type: Option<String>,
     pub color: Option<String>,
-    pub weight_kg: Option<f64>,
     pub feeding_notes: Option<String>,
     pub telegram_chat_id: Option<String>,
     pub telegram_thread_id: Option<String>,
@@ -67,7 +68,7 @@ impl Pet {
             birth_date: req.birth_date,
             blood_type: req.blood_type,
             color: req.color,
-            weight_kg: req.weight_kg,
+            weight_kg: None,
             feeding_notes: req.feeding_notes,
             telegram_chat_id: req.telegram_chat_id,
             telegram_thread_id: req.telegram_thread_id,

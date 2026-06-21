@@ -78,7 +78,6 @@ fn tool_list() -> Value {
                         "birth_date":      { "type": "string", "format": "date" },
                         "blood_type":      { "type": "string" },
                         "color":           { "type": "string" },
-                        "weight_kg":       { "type": "number" },
                         "feeding_notes":   { "type": "string" },
                         "telegram_chat_id":   { "type": "string" },
                         "telegram_thread_id": { "type": "string" }
@@ -87,7 +86,7 @@ fn tool_list() -> Value {
             },
             {
                 "name": "pets/update",
-                "description": "Update fields on an existing pet.",
+                "description": "Update fields on an existing pet. Weight is managed via weight/records/create — do not pass weight_kg here.",
                 "inputSchema": {
                     "type": "object",
                     "required": ["id"],
@@ -100,7 +99,6 @@ fn tool_list() -> Value {
                         "birth_date":      { "type": "string", "format": "date" },
                         "blood_type":      { "type": "string" },
                         "color":           { "type": "string" },
-                        "weight_kg":       { "type": "number" },
                         "feeding_notes":   { "type": "string" },
                         "telegram_chat_id":   { "type": "string" },
                         "telegram_thread_id": { "type": "string" }
@@ -483,7 +481,7 @@ fn tool_list() -> Value {
             // ── Health context ───────────────────────────────────────────────
             {
                 "name": "pets/health-context",
-                "description": "Returns a complete health context for a single pet in one call: pet profile (including current weight_kg), the last 10 weight records, and a 30-day weight stats summary (latest_kg, avg_kg, count). Use this as the starting point for any question about a pet's weight or health trend — answers 'what does the pet weigh now?', 'is the weight stable?', 'has it changed recently?' without additional tool calls.",
+                "description": "Returns a complete health context for a single pet in one call: pet profile, the last 10 weight records (most recent first), and a 30-day weight stats summary (latest_kg, avg_kg, count). Weight is not included in the pet profile — use stats_30d.latest_kg for the current weight. Answers 'what does the pet weigh now?', 'is the weight stable?', 'has it changed recently?' without additional tool calls.",
                 "inputSchema": {
                     "type": "object",
                     "required": ["pet_id"],
