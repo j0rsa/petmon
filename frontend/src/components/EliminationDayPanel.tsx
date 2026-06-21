@@ -172,6 +172,7 @@ const AddRow = forwardRef<AddRowHandle, AddRowProps>(function AddRow(
           className="entry-inline-input"
           style={{ width: '5.5rem' }}
           type="number"
+          inputMode="numeric"
           min="1"
           step="1"
           aria-label="Duration (seconds)"

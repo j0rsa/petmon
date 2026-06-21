@@ -4,6 +4,7 @@ import { nutritionSchedulesApi } from '../api/nutritionSchedules';
 import { NoPetSelected } from '../components/NoPetSelected';
 import { useSelectedPet } from '../context/SelectedPetContext';
 import type { NutritionSchedule } from '../types';
+import { parseDecimal } from '../lib/numbers';
 
 type ScheduleType = 'liquid' | 'food';
 
@@ -80,8 +81,8 @@ export default function SchedulesPage() {
     mutationFn: () => {
       const rules: ScheduleRules = {
         ...DEFAULT_RULES[createForm.type],
-        target_min: createForm.target_min ? Number(createForm.target_min) : DEFAULT_RULES[createForm.type].target_min,
-        target_max: createForm.target_max ? Number(createForm.target_max) : DEFAULT_RULES[createForm.type].target_max,
+        target_min: createForm.target_min ? parseDecimal(createForm.target_min) : DEFAULT_RULES[createForm.type].target_min,
+        target_max: createForm.target_max ? parseDecimal(createForm.target_max) : DEFAULT_RULES[createForm.type].target_max,
       };
       return nutritionSchedulesApi.create({
         pet_id: selectedPetId!,
@@ -148,7 +149,8 @@ export default function SchedulesPage() {
             <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
               <span style={{ fontSize: '0.82rem', color: 'var(--text-muted)', whiteSpace: 'nowrap' }}>target:</span>
               <input
-                type="number"
+                type="text"
+                inputMode="decimal"
                 aria-label={`Minimum target in ${unit}`}
                 placeholder={`min ${unit}`}
                 value={createForm.target_min}
@@ -157,7 +159,8 @@ export default function SchedulesPage() {
               />
               <span style={{ color: 'var(--text-subtle)' }}>–</span>
               <input
-                type="number"
+                type="text"
+                inputMode="decimal"
                 aria-label={`Maximum target in ${unit}`}
                 placeholder={`max ${unit}`}
                 value={createForm.target_max}
@@ -317,8 +320,8 @@ function ScheduleCard({ schedule }: { schedule: NutritionSchedule }) {
               <input type="time" aria-label="From" value={editRow.from} onChange={(e) => setEditRow({ ...editRow, from: e.target.value })} style={{ width: 120 }} />
               <span style={{ color: 'var(--text-subtle)' }}>–</span>
               <input type="time" aria-label="To" value={editRow.to} onChange={(e) => setEditRow({ ...editRow, to: e.target.value })} style={{ width: 120 }} />
-              <input type="number" aria-label={`Minimum ${unit}`} placeholder={`min ${unit}`} value={editRow.min || ''} onChange={(e) => setEditRow({ ...editRow, min: Number(e.target.value) })} style={{ width: 90 }} />
-              <input type="number" aria-label={`Maximum ${unit}`} placeholder={`max ${unit}`} value={editRow.max || ''} onChange={(e) => setEditRow({ ...editRow, max: Number(e.target.value) })} style={{ width: 90 }} />
+              <input type="text" inputMode="decimal" aria-label={`Minimum ${unit}`} placeholder={`min ${unit}`} value={editRow.min || ''} onChange={(e) => setEditRow({ ...editRow, min: parseDecimal(e.target.value) })} style={{ width: 90 }} />
+              <input type="text" inputMode="decimal" aria-label={`Maximum ${unit}`} placeholder={`max ${unit}`} value={editRow.max || ''} onChange={(e) => setEditRow({ ...editRow, max: parseDecimal(e.target.value) })} style={{ width: 90 }} />
               <input aria-label="Note" placeholder="note" value={editRow.note} onChange={(e) => setEditRow({ ...editRow, note: e.target.value })} style={{ flex: 1, minWidth: 120 }} />
               <button className="button" type="button" style={{ padding: '0.4rem 0.8rem', fontSize: '0.82rem' }} onClick={saveEdit}>save</button>
               <button className="button button-secondary" type="button" style={{ padding: '0.4rem 0.8rem', fontSize: '0.82rem' }} onClick={() => { setEditingIndex(null); setEditRow(null); }}>cancel</button>
@@ -334,8 +337,8 @@ function ScheduleCard({ schedule }: { schedule: NutritionSchedule }) {
           <input type="time" aria-label="From" value={addRow.from ?? '08:00'} onChange={(e) => setAddRow({ ...addRow, from: e.target.value })} style={{ width: 120 }} />
           <span style={{ color: 'var(--text-subtle)' }}>–</span>
           <input type="time" aria-label="To" value={addRow.to ?? '09:00'} onChange={(e) => setAddRow({ ...addRow, to: e.target.value })} style={{ width: 120 }} />
-          <input type="number" aria-label={`Minimum ${unit}`} placeholder={`min ${unit}`} value={addRow.min ?? ''} onChange={(e) => setAddRow({ ...addRow, min: Number(e.target.value) })} style={{ width: 90 }} />
-          <input type="number" aria-label={`Maximum ${unit}`} placeholder={`max ${unit}`} value={addRow.max ?? ''} onChange={(e) => setAddRow({ ...addRow, max: Number(e.target.value) })} style={{ width: 90 }} />
+          <input type="text" inputMode="decimal" aria-label={`Minimum ${unit}`} placeholder={`min ${unit}`} value={addRow.min ?? ''} onChange={(e) => setAddRow({ ...addRow, min: parseDecimal(e.target.value) })} style={{ width: 90 }} />
+          <input type="text" inputMode="decimal" aria-label={`Maximum ${unit}`} placeholder={`max ${unit}`} value={addRow.max ?? ''} onChange={(e) => setAddRow({ ...addRow, max: parseDecimal(e.target.value) })} style={{ width: 90 }} />
           <input aria-label="Note" placeholder="note (optional)" value={addRow.note ?? ''} onChange={(e) => setAddRow({ ...addRow, note: e.target.value })} style={{ flex: 1, minWidth: 160 }} />
           <button className="button" type="button" style={{ whiteSpace: 'nowrap' }} onClick={addWindow} disabled={saveMutation.isPending}>
             + add

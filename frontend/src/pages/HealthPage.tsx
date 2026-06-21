@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 import { weightApi } from '../api/weight';
+import { parseDecimal } from '../lib/numbers';
 import type { CreateWeightRecord } from '../api/weight';
 import { NoPetSelected } from '../components/NoPetSelected';
 import { useSelectedPet } from '../context/SelectedPetContext';
@@ -45,7 +46,7 @@ export default function HealthPage() {
   const latest = records[records.length - 1];
 
   function handleAdd() {
-    const kg = parseFloat(weightInput);
+    const kg = parseDecimal(weightInput);
     if (isNaN(kg) || kg <= 0 || !selectedPetId) return;
     addMutation.mutate({ pet_id: selectedPetId, weight_kg: kg, note: noteInput.trim() || undefined });
   }
@@ -99,9 +100,8 @@ export default function HealthPage() {
           <div className="form-row" style={{ flex: '0 0 auto' }}>
             <label style={{ fontSize: '0.82rem' }}>Weight (kg)</label>
             <input
-              type="number"
-              step="0.01"
-              min="0"
+              type="text"
+              inputMode="decimal"
               placeholder="e.g. 4.35"
               value={weightInput}
               onChange={(e) => setWeightInput(e.target.value)}
