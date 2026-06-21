@@ -556,6 +556,280 @@ paths:
         '401':
           $ref: '#/components/responses/Unauthorized'
 
+  /elimination/records:
+    get:
+      tags:
+        - Elimination Records
+      summary: List elimination records
+      description: Retrieve elimination records with optional filtering
+      parameters:
+        - name: pet_id
+          in: query
+          required: false
+          schema: { type: string, format: uuid }
+        - name: date
+          in: query
+          required: false
+          schema: { type: string, format: date }
+        - name: date_from
+          in: query
+          required: false
+          schema: { type: string, format: date }
+        - name: date_to
+          in: query
+          required: false
+          schema: { type: string, format: date }
+        - name: event_type
+          in: query
+          required: false
+          schema: { $ref: '#/components/schemas/EliminationEventType' }
+        - name: limit
+          in: query
+          required: false
+          schema: { type: integer, format: int64, minimum: 1 }
+        - name: offset
+          in: query
+          required: false
+          schema: { type: integer, format: int64, minimum: 0 }
+      responses:
+        '200':
+          description: List of elimination records
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/EliminationRecord'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+    post:
+      tags:
+        - Elimination Records
+      summary: Create elimination record
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateEliminationRecord'
+      responses:
+        '201':
+          description: Record created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/EliminationRecord'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  /elimination/records/{id}:
+    get:
+      tags:
+        - Elimination Records
+      summary: Get elimination record by ID
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string }
+      responses:
+        '200':
+          description: Elimination record
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/EliminationRecord'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+    patch:
+      tags:
+        - Elimination Records
+      summary: Update elimination record
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateEliminationRecord'
+      responses:
+        '200':
+          description: Record updated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/EliminationRecord'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+    delete:
+      tags:
+        - Elimination Records
+      summary: Delete elimination record
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string }
+      responses:
+        '204':
+          description: Record deleted
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /elimination/analytics/daily-summaries:
+    get:
+      tags:
+        - Elimination Analytics
+      summary: Get daily elimination summaries
+      parameters:
+        - name: date_from
+          in: query
+          required: true
+          schema: { type: string, format: date }
+        - name: date_to
+          in: query
+          required: true
+          schema: { type: string, format: date }
+        - name: pet_id
+          in: query
+          required: false
+          schema: { type: string, format: uuid }
+      responses:
+        '200':
+          description: Daily summaries
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/EliminationDailySummary'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  /elimination/analytics/range-summary:
+    get:
+      tags:
+        - Elimination Analytics
+      summary: Get elimination range summary with percentiles
+      parameters:
+        - name: date_from
+          in: query
+          required: true
+          schema: { type: string, format: date }
+        - name: date_to
+          in: query
+          required: true
+          schema: { type: string, format: date }
+        - name: pet_id
+          in: query
+          required: false
+          schema: { type: string, format: uuid }
+      responses:
+        '200':
+          description: Range summary with avg/p50/p90/p99 per day
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/EliminationRangeSummary'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  /weight-records:
+    get:
+      tags:
+        - Weight Records
+      summary: List weight records
+      parameters:
+        - name: pet_id
+          in: query
+          required: false
+          schema: { type: string, format: uuid }
+        - name: date_from
+          in: query
+          required: false
+          schema: { type: string, format: date }
+        - name: date_to
+          in: query
+          required: false
+          schema: { type: string, format: date }
+        - name: limit
+          in: query
+          required: false
+          schema: { type: integer, format: int64, minimum: 1 }
+      responses:
+        '200':
+          description: List of weight records
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/WeightRecord'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+    post:
+      tags:
+        - Weight Records
+      summary: Create weight record
+      description: Creates a weight record and updates the pet's current weight_kg.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateWeightRecord'
+      responses:
+        '201':
+          description: Weight record created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/WeightRecord'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  /weight-records/{id}:
+    delete:
+      tags:
+        - Weight Records
+      summary: Delete weight record
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string }
+      responses:
+        '204':
+          description: Weight record deleted
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
   /nutrition/records:
     get:
       tags:
@@ -1843,6 +2117,258 @@ components:
           nullable: true
           description: Human-readable alias for the token
 
+    EliminationEventType:
+      type: string
+      enum:
+        - general
+        - urination
+        - defecation
+        - vomit
+      description: "Type of elimination event. Subtypes for defecation: normal|soft|liquid|hard|blood|mucus. Subtypes for vomit: food|fur|bile|other."
+
+    EliminationRecord:
+      type: object
+      properties:
+        id:
+          type: string
+        pet_id:
+          type: string
+          format: uuid
+        occurred_at:
+          type: string
+          format: date-time
+          description: Naive local datetime (RFC3339, no Z suffix)
+        local_date:
+          type: string
+          format: date
+        event_type:
+          $ref: '#/components/schemas/EliminationEventType'
+        subtype:
+          type: string
+          nullable: true
+          description: Event-specific subtype (defecation or vomit only)
+        duration_seconds:
+          type: integer
+          nullable: true
+          description: Time spent in seconds (optional)
+        note:
+          type: string
+          nullable: true
+        source_type:
+          type: string
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+      required:
+        - id
+        - pet_id
+        - occurred_at
+        - local_date
+        - event_type
+        - source_type
+        - created_at
+        - updated_at
+
+    CreateEliminationRecord:
+      type: object
+      properties:
+        pet_id:
+          type: string
+          format: uuid
+        event_type:
+          $ref: '#/components/schemas/EliminationEventType'
+        occurred_at:
+          type: string
+          format: date-time
+          nullable: true
+        local_date:
+          type: string
+          format: date
+          nullable: true
+        subtype:
+          type: string
+          nullable: true
+        duration_seconds:
+          type: integer
+          nullable: true
+        note:
+          type: string
+          nullable: true
+        source_type:
+          type: string
+          nullable: true
+      required:
+        - pet_id
+        - event_type
+
+    UpdateEliminationRecord:
+      type: object
+      properties:
+        event_type:
+          $ref: '#/components/schemas/EliminationEventType'
+        occurred_at:
+          type: string
+          format: date-time
+          nullable: true
+        local_date:
+          type: string
+          format: date
+          nullable: true
+        subtype:
+          type: string
+          nullable: true
+        duration_seconds:
+          type: integer
+          nullable: true
+        note:
+          type: string
+          nullable: true
+
+    EliminationDailySummary:
+      type: object
+      properties:
+        local_date:
+          type: string
+          format: date
+        pet_id:
+          type: string
+          format: uuid
+          nullable: true
+        total_count:
+          type: integer
+          format: int64
+        urination_count:
+          type: integer
+          format: int64
+        defecation_count:
+          type: integer
+          format: int64
+        vomit_count:
+          type: integer
+          format: int64
+        general_count:
+          type: integer
+          format: int64
+        has_vomit:
+          type: boolean
+      required:
+        - local_date
+        - total_count
+        - urination_count
+        - defecation_count
+        - vomit_count
+        - general_count
+        - has_vomit
+
+    EliminationRangeSummary:
+      type: object
+      properties:
+        date_from:
+          type: string
+          format: date
+        date_to:
+          type: string
+          format: date
+        pet_id:
+          type: string
+          format: uuid
+          nullable: true
+        daily_summaries:
+          type: array
+          items:
+            $ref: '#/components/schemas/EliminationDailySummary'
+        type_totals:
+          type: object
+          additionalProperties:
+            type: integer
+            format: int64
+        avg_per_day:
+          type: number
+          format: double
+        p50_per_day:
+          type: number
+          format: double
+        p90_per_day:
+          type: number
+          format: double
+        p99_per_day:
+          type: number
+          format: double
+      required:
+        - date_from
+        - date_to
+        - daily_summaries
+        - type_totals
+        - avg_per_day
+        - p50_per_day
+        - p90_per_day
+        - p99_per_day
+
+    WeightRecord:
+      type: object
+      properties:
+        id:
+          type: string
+        pet_id:
+          type: string
+          format: uuid
+        measured_at:
+          type: string
+          format: date-time
+          description: Naive local datetime (RFC3339, no Z suffix)
+        local_date:
+          type: string
+          format: date
+        weight_kg:
+          type: number
+          format: double
+        note:
+          type: string
+          nullable: true
+        source_type:
+          type: string
+        created_at:
+          type: string
+          format: date-time
+      required:
+        - id
+        - pet_id
+        - measured_at
+        - local_date
+        - weight_kg
+        - source_type
+        - created_at
+
+    CreateWeightRecord:
+      type: object
+      properties:
+        pet_id:
+          type: string
+          format: uuid
+        weight_kg:
+          type: number
+          format: double
+        measured_at:
+          type: string
+          format: date-time
+          nullable: true
+        local_date:
+          type: string
+          format: date
+          nullable: true
+        note:
+          type: string
+          nullable: true
+        source_type:
+          type: string
+          nullable: true
+      required:
+        - pet_id
+        - weight_kg
+
 tags:
   - name: Health
     description: Health check endpoints
@@ -1864,3 +2390,9 @@ tags:
     description: Feeding schedules and targets
   - name: Nutrition Analytics
     description: Nutrition analytics and aggregations
+  - name: Elimination Records
+    description: Toileting and elimination events
+  - name: Elimination Analytics
+    description: Elimination analytics and frequency trends
+  - name: Weight Records
+    description: Pet weight history (creation also updates pet profile weight_kg)

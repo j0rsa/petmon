@@ -9,8 +9,11 @@ use crate::domain::nutrition_schedule::CreateNutritionSchedule;
 use crate::domain::pet::Pet;
 use crate::domain::pet_status::PetStatus;
 use crate::domain::species::PetSpecies;
+use crate::domain::weight::CreateWeightRecord;
 use crate::error::AppResult;
-use crate::repo::{day_notes, elimination_records, nutrition_records, nutrition_schedules, pets};
+use crate::repo::{
+    day_notes, elimination_records, nutrition_records, nutrition_schedules, pets, weight_records,
+};
 
 pub const MITTENS_ID: &str = "550e8400-e29b-41d4-a716-446655440000";
 pub const REX_ID: &str = "6ba7b810-9dad-11d1-80b4-00c04fd430c8";
@@ -24,6 +27,7 @@ pub struct SeedSummary {
     pub pets: usize,
     pub nutrition_records: usize,
     pub elimination_records: usize,
+    pub weight_records: usize,
     pub day_notes: usize,
     pub schedules: usize,
 }
@@ -36,6 +40,7 @@ pub async fn run(pool: &SqlitePool, fresh: bool) -> AppResult<SeedSummary> {
     let demo_pets = seed_pets(pool).await?;
     let nutrition_count = seed_nutrition_records(pool, &demo_pets).await?;
     let elimination_count = seed_elimination_records(pool, &demo_pets).await?;
+    let weight_count = seed_weight_records(pool, &demo_pets).await?;
     let note_count = seed_day_notes(pool, &demo_pets).await?;
     let schedule_count = seed_schedules(pool, &demo_pets).await?;
 
@@ -43,6 +48,7 @@ pub async fn run(pool: &SqlitePool, fresh: bool) -> AppResult<SeedSummary> {
         pets: demo_pets.len(),
         nutrition_records: nutrition_count,
         elimination_records: elimination_count,
+        weight_records: weight_count,
         day_notes: note_count,
         schedules: schedule_count,
     })
@@ -609,6 +615,54 @@ fn elim_event(
     }
 }
 
+async fn seed_weight_records(pool: &SqlitePool, _demo_pets: &[Pet]) -> AppResult<usize> {
+    let today = Utc::now().date_naive();
+    let mut count = 0usize;
+
+    // Base weights and typical variation per species
+    let baselines: &[(Uuid, f64, f64)] = &[
+        (Uuid::parse_str(MITTENS_ID).unwrap(), 4.20, 0.08),
+        (Uuid::parse_str(REX_ID).unwrap(), 32.50, 0.30),
+        (Uuid::parse_str(PEPPER_ID).unwrap(), 0.065, 0.003),
+        (Uuid::parse_str(CLOVER_ID).unwrap(), 1.80, 0.05),
+    ];
+
+    for (pet_id, base, variation) in baselines {
+        // One measurement every ~7 days over the last 90 days
+        for week in 0..13i64 {
+            let days_ago = week * 7;
+            let date = today - Duration::days(days_ago);
+            let local_date = date.format("%Y-%m-%d").to_string();
+            // Gentle trend: slight increase over time (reversed since we go back in time)
+            let trend = (week as f64) * variation * 0.15;
+            let weight = (base - trend + (week % 3) as f64 * variation * 0.1 - variation * 0.05)
+                .max(base * 0.9);
+            let weight = (weight * 100.0).round() / 100.0;
+
+            weight_records::create(
+                pool,
+                CreateWeightRecord {
+                    pet_id: pet_id.to_string(),
+                    measured_at: Some(format!("{local_date}T09:00:00")),
+                    local_date: Some(local_date.clone()),
+                    weight_kg: weight,
+                    note: if days_ago == 0 {
+                        Some("Regular weigh-in".to_string())
+                    } else {
+                        None
+                    },
+                    source_type: Some("manual".to_string()),
+                },
+                chrono_tz::UTC,
+            )
+            .await?;
+            count += 1;
+        }
+    }
+
+    Ok(count)
+}
+
 async fn seed_day_notes(pool: &SqlitePool, demo_pets: &[Pet]) -> AppResult<usize> {
     let mittens = demo_pets
         .iter()
@@ -737,6 +791,7 @@ mod tests {
         assert_eq!(summary.pets, 4);
         assert!(summary.nutrition_records > 100);
         assert!(summary.elimination_records > 50);
+        assert!(summary.weight_records > 0);
         assert_eq!(summary.day_notes, 4);
         assert_eq!(summary.schedules, 3);
 

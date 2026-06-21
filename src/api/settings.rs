@@ -178,8 +178,11 @@ pub fn configure(cfg: &mut web::ServiceConfig) {
             .service(update_display)
             .service(get_telegram)
             .service(update_telegram),
-    )
-    .service(
+    );
+}
+
+pub fn configure_api_tokens(cfg: &mut web::ServiceConfig) {
+    cfg.service(
         web::scope("/api-tokens")
             .service(list_tokens)
             .service(create_token)

@@ -9,7 +9,8 @@ async fn setup_pool() -> SqlitePool {
     pool
 }
 
-/// Builds the /api/v1 slice only (used by existing CRUD tests).
+/// Builds the /api/v1 slice only (used by CRUD tests).
+/// Must stay in sync with the service registration in main.rs.
 macro_rules! build_app {
     ($state:expr) => {
         test::init_service(
@@ -21,9 +22,12 @@ macro_rules! build_app {
                     .configure(api::health::configure)
                     .configure(api::pets::configure)
                     .configure(api::nutrition::configure)
+                    .configure(api::elimination::configure)
+                    .configure(api::weight::configure)
                     .configure(api::days::configure)
                     .configure(api::notes::configure)
-                    .configure(api::settings::configure),
+                    .configure(api::settings::configure)
+                    .configure(api::settings::configure_api_tokens),
             ),
         )
         .await
@@ -31,6 +35,8 @@ macro_rules! build_app {
 }
 
 /// Builds the full app routing exactly as main.rs does, including MCP and assets.
+/// This macro is the authoritative mirror of main.rs — if a route works here
+/// it will work in production, and divergence is caught by the routing tests below.
 macro_rules! build_full_app {
     ($state:expr) => {
         test::init_service(
@@ -46,9 +52,12 @@ macro_rules! build_full_app {
                         .configure(api::info::configure)
                         .configure(api::pets::configure)
                         .configure(api::nutrition::configure)
+                        .configure(api::elimination::configure)
+                        .configure(api::weight::configure)
                         .configure(api::days::configure)
                         .configure(api::notes::configure)
-                        .configure(api::settings::configure),
+                        .configure(api::settings::configure)
+                        .configure(api::settings::configure_api_tokens),
                 )
                 .service(
                     web::scope("/mcp")
@@ -621,4 +630,140 @@ async fn nutrition_record_crud() {
         .to_request();
     let resp = test::call_service(&app, req).await;
     assert_eq!(resp.status(), 404);
+}
+
+// ── Route registration smoke tests ───────────────────────────────────────────
+// These guard against routes silently falling through to the SPA/assets
+// fallback. Each test hits a real endpoint and asserts it returns JSON (not
+// HTML), which proves actix matched the route.
+
+#[actix_web::test]
+async fn settings_display_returns_json_not_spa() {
+    let pool = setup_pool().await;
+    let state = web::Data::new(AppState::new(pool, true, None, None));
+    let app = build_app!(state);
+
+    let req = test::TestRequest::get()
+        .uri("/api/v1/settings/display")
+        .to_request();
+    let resp = test::call_service(&app, req).await;
+    assert_eq!(
+        resp.status(),
+        200,
+        "GET /api/v1/settings/display must return 200"
+    );
+    let ct = resp
+        .headers()
+        .get("content-type")
+        .unwrap()
+        .to_str()
+        .unwrap();
+    assert!(
+        ct.contains("application/json"),
+        "settings/display must return JSON, got: {ct}"
+    );
+}
+
+#[actix_web::test]
+async fn settings_oidc_returns_json_not_spa() {
+    let pool = setup_pool().await;
+    let state = web::Data::new(AppState::new(pool, true, None, None));
+    let app = build_app!(state);
+
+    let req = test::TestRequest::get()
+        .uri("/api/v1/settings/oidc")
+        .to_request();
+    let resp = test::call_service(&app, req).await;
+    assert_eq!(
+        resp.status(),
+        200,
+        "GET /api/v1/settings/oidc must return 200"
+    );
+    let ct = resp
+        .headers()
+        .get("content-type")
+        .unwrap()
+        .to_str()
+        .unwrap();
+    assert!(
+        ct.contains("application/json"),
+        "settings/oidc must return JSON, got: {ct}"
+    );
+}
+
+#[actix_web::test]
+async fn api_tokens_returns_json_not_spa() {
+    let pool = setup_pool().await;
+    let state = web::Data::new(AppState::new(pool, true, None, None));
+    let app = build_app!(state);
+
+    let req = test::TestRequest::get()
+        .uri("/api/v1/api-tokens")
+        .to_request();
+    let resp = test::call_service(&app, req).await;
+    assert_eq!(resp.status(), 200, "GET /api/v1/api-tokens must return 200");
+    let ct = resp
+        .headers()
+        .get("content-type")
+        .unwrap()
+        .to_str()
+        .unwrap();
+    assert!(
+        ct.contains("application/json"),
+        "api-tokens must return JSON, got: {ct}"
+    );
+}
+
+#[actix_web::test]
+async fn elimination_records_returns_json_not_spa() {
+    let pool = setup_pool().await;
+    let state = web::Data::new(AppState::new(pool, true, None, None));
+    let app = build_app!(state);
+
+    let req = test::TestRequest::get()
+        .uri("/api/v1/elimination/records")
+        .to_request();
+    let resp = test::call_service(&app, req).await;
+    assert_eq!(
+        resp.status(),
+        200,
+        "GET /api/v1/elimination/records must return 200"
+    );
+    let ct = resp
+        .headers()
+        .get("content-type")
+        .unwrap()
+        .to_str()
+        .unwrap();
+    assert!(
+        ct.contains("application/json"),
+        "elimination/records must return JSON, got: {ct}"
+    );
+}
+
+#[actix_web::test]
+async fn weight_records_returns_json_not_spa() {
+    let pool = setup_pool().await;
+    let state = web::Data::new(AppState::new(pool, true, None, None));
+    let app = build_app!(state);
+
+    let req = test::TestRequest::get()
+        .uri("/api/v1/weight-records")
+        .to_request();
+    let resp = test::call_service(&app, req).await;
+    assert_eq!(
+        resp.status(),
+        200,
+        "GET /api/v1/weight-records must return 200"
+    );
+    let ct = resp
+        .headers()
+        .get("content-type")
+        .unwrap()
+        .to_str()
+        .unwrap();
+    assert!(
+        ct.contains("application/json"),
+        "weight-records must return JSON, got: {ct}"
+    );
 }

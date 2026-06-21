@@ -32,10 +32,7 @@ pub async fn delete_record(
 }
 
 pub fn configure(cfg: &mut web::ServiceConfig) {
-    cfg.service(
-        web::scope("/weight-records")
-            .service(list_records)
-            .service(create_record)
-            .service(delete_record),
-    );
+    cfg.service(list_records)
+        .service(create_record)
+        .service(delete_record);
 }

@@ -25,6 +25,7 @@ build-fe: install-fe
 	cd $(FE_DIR) && npm run build
 
 run-be:
+	-pkill -f 'target/debug/petmon' 2>/dev/null; sleep 0.3
 	DEV_MODE=true STATIC_DIR=frontend/dist cargo run
 
 seed-demo:
