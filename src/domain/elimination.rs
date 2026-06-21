@@ -1,3 +1,4 @@
+use crate::domain::weight::WeightRecord;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use uuid::Uuid;
@@ -63,6 +64,30 @@ pub struct CreateEliminationRecord {
     pub duration_seconds: Option<i64>,
     pub note: Option<String>,
     pub source_type: Option<String>,
+}
+
+/// Submit a toileting event and a weight measurement in a single request.
+/// Both records share the same resolved timestamp.
+#[derive(Debug, Deserialize)]
+pub struct CreateEliminationWithWeight {
+    pub pet_id: String,
+    /// Naive local datetime YYYY-MM-DDTHH:MM:SS. Defaults to now in configured timezone.
+    /// Applied to both the elimination record and the weight record.
+    pub occurred_at: Option<String>,
+    pub local_date: Option<String>,
+    pub event_type: EliminationEventType,
+    pub subtype: Option<String>,
+    pub duration_seconds: Option<i64>,
+    pub note: Option<String>,
+    pub source_type: Option<String>,
+    pub weight_kg: f64,
+    pub weight_note: Option<String>,
+}
+
+#[derive(Debug, Serialize)]
+pub struct EliminationWithWeightCreated {
+    pub elimination: EliminationRecord,
+    pub weight: WeightRecord,
 }
 
 #[derive(Debug, Deserialize)]

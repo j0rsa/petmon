@@ -1,6 +1,7 @@
 use crate::auth::AppState;
 use crate::domain::elimination::{
-    CreateEliminationRecord, EliminationRecordFilters, UpdateEliminationRecord,
+    CreateEliminationRecord, CreateEliminationWithWeight, EliminationRecordFilters,
+    UpdateEliminationRecord,
 };
 use crate::error::AppResult;
 use crate::services::elimination_record_service;
@@ -53,11 +54,26 @@ pub async fn delete_record(
     Ok(HttpResponse::NoContent().finish())
 }
 
+#[post("/with-weight")]
+pub async fn create_record_with_weight(
+    state: web::Data<AppState>,
+    body: web::Json<CreateEliminationWithWeight>,
+) -> AppResult<HttpResponse> {
+    let result = elimination_record_service::create_with_weight(
+        &state.pool,
+        body.into_inner(),
+        state.timezone,
+    )
+    .await?;
+    Ok(HttpResponse::Created().json(result))
+}
+
 pub fn configure(cfg: &mut web::ServiceConfig) {
     cfg.service(
         web::scope("/records")
             .service(list_records)
             .service(create_record)
+            .service(create_record_with_weight)
             .service(get_record)
             .service(update_record)
             .service(delete_record),

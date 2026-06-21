@@ -1,8 +1,11 @@
 use crate::domain::elimination::{
-    CreateEliminationRecord, EliminationRecord, EliminationRecordFilters, UpdateEliminationRecord,
+    CreateEliminationRecord, CreateEliminationWithWeight, EliminationRecord,
+    EliminationRecordFilters, EliminationWithWeightCreated, UpdateEliminationRecord,
 };
+use crate::domain::weight::CreateWeightRecord;
 use crate::error::{AppError, AppResult};
-use crate::repo::{elimination_records, pets};
+use crate::repo::{elimination_records, pets, weight_records};
+use chrono::Utc;
 use chrono_tz::Tz;
 use sqlx::SqlitePool;
 use uuid::Uuid;
@@ -34,6 +37,58 @@ pub async fn create(
         .map_err(|_| AppError::BadRequest(format!("Pet {} not found", req.pet_id)))?;
 
     elimination_records::create(pool, req, timezone).await
+}
+
+#[tracing::instrument(skip(pool))]
+pub async fn create_with_weight(
+    pool: &SqlitePool,
+    req: CreateEliminationWithWeight,
+    timezone: Tz,
+) -> AppResult<EliminationWithWeightCreated> {
+    let pet_id = Uuid::parse_str(&req.pet_id)
+        .map_err(|_| AppError::BadRequest(format!("invalid pet_id: {}", req.pet_id)))?;
+    pets::get_pet(pool, pet_id)
+        .await
+        .map_err(|_| AppError::BadRequest(format!("Pet {} not found", req.pet_id)))?;
+
+    // Resolve the shared timestamp once so both records land at exactly the same moment.
+    let occurred_at = req.occurred_at.unwrap_or_else(|| {
+        Utc::now()
+            .with_timezone(&timezone)
+            .format("%Y-%m-%dT%H:%M:%S")
+            .to_string()
+    });
+    let local_date = req
+        .local_date
+        .unwrap_or_else(|| occurred_at.split('T').next().unwrap_or("").to_string());
+
+    let elim_req = CreateEliminationRecord {
+        pet_id: req.pet_id.clone(),
+        occurred_at: Some(occurred_at.clone()),
+        local_date: Some(local_date.clone()),
+        event_type: req.event_type,
+        subtype: req.subtype,
+        duration_seconds: req.duration_seconds,
+        note: req.note,
+        source_type: req.source_type.clone(),
+    };
+    let weight_req = CreateWeightRecord {
+        pet_id: req.pet_id.clone(),
+        measured_at: Some(occurred_at),
+        local_date: Some(local_date),
+        weight_kg: req.weight_kg,
+        note: req.weight_note,
+        source_type: req.source_type,
+    };
+
+    let elimination = elimination_records::create(pool, elim_req, timezone).await?;
+    let weight = weight_records::create(pool, weight_req, timezone).await?;
+    pets::update_weight(pool, &req.pet_id, req.weight_kg).await?;
+
+    Ok(EliminationWithWeightCreated {
+        elimination,
+        weight,
+    })
 }
 
 #[tracing::instrument(skip(pool))]

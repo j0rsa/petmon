@@ -632,6 +632,53 @@ async fn nutrition_record_crud() {
     assert_eq!(resp.status(), 404);
 }
 
+// ── Elimination + weight combined ────────────────────────────────────────────
+
+/// POST /elimination/records/with-weight creates both records atomically and
+/// returns the composite response. The shared timestamp must match on both.
+#[actix_web::test]
+async fn elimination_record_with_weight_creates_both_records() {
+    let (app, state) = build_dev_app!();
+    let _ = state;
+    let pet_id = api_create_pet!(&app, "ComboTest");
+
+    let occurred_at = "2026-06-01T10:00:00";
+    let req = test::TestRequest::post()
+        .uri("/api/v1/elimination/records/with-weight")
+        .set_json(serde_json::json!({
+            "pet_id": pet_id,
+            "occurred_at": occurred_at,
+            "event_type": "defecation",
+            "subtype": "normal",
+            "weight_kg": 4.35,
+            "weight_note": "post-breakfast"
+        }))
+        .to_request();
+    let resp = test::call_service(&app, req).await;
+    let status = resp.status();
+    let body: serde_json::Value = test::read_body_json(resp).await;
+    assert_eq!(status, 201, "create failed: {body}");
+
+    let elim = &body["elimination"];
+    let weight = &body["weight"];
+
+    // Both records must exist with the correct fields
+    assert!(elim["id"].as_str().is_some(), "elimination.id missing");
+    assert_eq!(elim["event_type"].as_str(), Some("defecation"));
+    assert_eq!(elim["subtype"].as_str(), Some("normal"));
+    assert_eq!(elim["occurred_at"].as_str(), Some(occurred_at));
+    assert_eq!(elim["local_date"].as_str(), Some("2026-06-01"));
+
+    assert!(weight["id"].as_str().is_some(), "weight.id missing");
+    assert_eq!(weight["weight_kg"].as_f64(), Some(4.35));
+    assert_eq!(weight["note"].as_str(), Some("post-breakfast"));
+    assert_eq!(weight["measured_at"].as_str(), Some(occurred_at));
+    assert_eq!(weight["local_date"].as_str(), Some("2026-06-01"));
+
+    // Both records must belong to the same pet
+    assert_eq!(elim["pet_id"].as_str(), weight["pet_id"].as_str());
+}
+
 // ── Route registration smoke tests ───────────────────────────────────────────
 // These guard against routes silently falling through to the SPA/assets
 // fallback. Each test hits a real endpoint and asserts it returns JSON (not

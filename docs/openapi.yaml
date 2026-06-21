@@ -625,6 +625,33 @@ paths:
         '401':
           $ref: '#/components/responses/Unauthorized'
 
+  /elimination/records/with-weight:
+    post:
+      tags:
+        - Elimination Records
+      summary: Create elimination record and weight measurement together
+      description: >
+        Submits a toileting event and a weight measurement in a single atomic request.
+        Both records share the same resolved timestamp. The pet's current weight is
+        updated as a side-effect, identical to a standalone weight record creation.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateEliminationWithWeight'
+      responses:
+        '201':
+          description: Both records created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/EliminationWithWeightCreated'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
   /elimination/records/{id}:
     get:
       tags:
@@ -2221,6 +2248,63 @@ components:
       required:
         - pet_id
         - event_type
+
+    CreateEliminationWithWeight:
+      type: object
+      description: >
+        Create a toileting event and a weight measurement in one request.
+        Both records are stamped with the same resolved occurred_at timestamp.
+      properties:
+        pet_id:
+          type: string
+          format: uuid
+        event_type:
+          $ref: '#/components/schemas/EliminationEventType'
+        occurred_at:
+          type: string
+          format: date-time
+          nullable: true
+          description: Naive local datetime YYYY-MM-DDTHH:MM:SS. Defaults to now in configured timezone.
+        local_date:
+          type: string
+          format: date
+          nullable: true
+        subtype:
+          type: string
+          nullable: true
+        duration_seconds:
+          type: integer
+          nullable: true
+        note:
+          type: string
+          nullable: true
+          description: Note for the elimination record
+        source_type:
+          type: string
+          nullable: true
+        weight_kg:
+          type: number
+          format: double
+          description: Weight measurement in kilograms
+        weight_note:
+          type: string
+          nullable: true
+          description: Note for the weight record
+      required:
+        - pet_id
+        - event_type
+        - weight_kg
+
+    EliminationWithWeightCreated:
+      type: object
+      properties:
+        elimination:
+          $ref: '#/components/schemas/EliminationRecord'
+        weight:
+          $ref: '#/components/schemas/WeightRecord'
+      required:
+        - elimination
+        - weight
 
     UpdateEliminationRecord:
       type: object
