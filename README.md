@@ -4,7 +4,7 @@
 
 # petmon
 
-Pet monitoring system — a single deployable service with a React SPA frontend and a Rust/Actix Web backend backed by SQLite. Track nutrition (meals, water, treats), with separate record tables planned per monitoring pillar (nutrition, elimination, health).
+Pet monitoring system — a single deployable service with a React SPA frontend and a Rust/Actix Web backend backed by SQLite. Track nutrition, toileting habits, and weight across multiple pets.
 
 ## Features
 
@@ -13,52 +13,89 @@ Pet monitoring system — a single deployable service with a React SPA frontend 
 - **SQLite** persistence via SQLx with automatic migrations on startup
 - **Stateless MCP** (JSON-RPC) endpoint at `/mcp` for agent/LLM integrations
 - **Embedded frontend** assets compiled into the binary via `rust-embed`
-- **Structured JSON logging** with `tracing`
+- **PWA** — installable on iOS and Android, with service worker update banner
+- **Structured JSON logging** with `tracing`, optional OTLP export
 - **Environment-based configuration**
+
+## Monitoring pillars
+
+### Nutrition
+Track meals, water, treats, and liquids. Feeding schedules with target windows. Full analytics (daily totals, range summaries, best-fluid-day chart).
+
+### Toileting (Elimination)
+Log litter box visits and potty breaks with event type (wee, poop, vomit, general), optional subtype (e.g. soft/hard/blood for poop; fur/food for vomit), and optional time-in-box duration. Month calendar with visit count, average duration, and vomit dot per day. Analytics with median visits/day trend and time-spent trend chart including regression line and median reference.
+
+### Health
+Weight history per pet — log measurements, view a 30-day trend chart on the pet profile, and manage the full history at `/health`. Overview shows the latest weight with a ▲/▼/● indicator vs the 30-day average.
 
 ## Pages
 
 | Page | Route | Description |
 |------|-------|-------------|
-| Overview | `/` | Cross-pillar highlights (nutrition live; elimination/health planned) |
-| Nutrition journal | `/nutrition` | Month calendar with per-day hints + selected day log |
+| Overview | `/` | Cross-pillar highlights: today's fluid intake + streak, toileting visits, latest weight |
+| Nutrition journal | `/nutrition` | Month calendar + selected day log |
 | Nutrition analytics | `/nutrition/analytics` | Charts and range summaries |
 | Feeding schedules | `/nutrition/schedules` | Nutrition feeding schedules |
 | Import | `/nutrition/import` | Paste Telegram nutrition logs (parsed in the browser) |
-| Pets | `/pets` | Manage pet profiles |
-| Settings | `/settings` | OIDC/SSO, Telegram notifications, API token management |
+| Toileting journal | `/elimination` | Month calendar (visit count, avg duration, vomit dot) + day log |
+| Toileting analytics | `/elimination/analytics` | Median visits, time-spent trend, vomit days |
+| Health | `/health` | Weight history chart, log form, full measurements table |
+| Pet profile | `/pets/:id` | Profile fields + 30-day weight chart |
+| Pets | `/pets` | List of pet profiles |
+| Settings | `/settings` | OIDC/SSO, Telegram, API token management, display preferences |
+
+## Mobile / PWA
+
+The app is installable as a PWA on iOS and Android. After installing:
+
+- **Stay signed in**: go to Settings → API tokens → **Remember this device**. This creates a long-lived API token stored on the device, eliminating repeated SSO redirects.
+- **Updates**: when a new version is deployed, a banner appears at the top of the screen. Tap **Update** to reload with the latest assets.
 
 ## API Overview
 
 ```
-GET/POST    /api/v1/pets
+GET/POST         /api/v1/pets
 GET/PATCH/DELETE /api/v1/pets/:id
 
-GET/POST    /api/v1/nutrition/records          # filters: pet_id, date, date_from, date_to, category
-POST        /api/v1/nutrition/records/batch    # { records: CreateNutritionRecord[] }
+GET/POST         /api/v1/nutrition/records       # filters: pet_id, date, date_from, date_to, category
+POST             /api/v1/nutrition/records/batch
 GET/PATCH/DELETE /api/v1/nutrition/records/:id
 
-GET         /api/v1/days/:date       # nutrition day summary + records; ?pet_id=
-PATCH       /api/v1/days/:date/note
+GET              /api/v1/days/:date              # nutrition day summary; ?pet_id=
+PATCH            /api/v1/days/:date/note
 
-GET         /api/v1/nutrition/analytics/daily-totals   # ?date_from=&date_to=&pet_id=
-GET         /api/v1/nutrition/analytics/range-summary
+GET              /api/v1/nutrition/analytics/daily-totals
+GET              /api/v1/nutrition/analytics/range-summary
+GET              /api/v1/nutrition/analytics/best-fluid-day
 
-GET/POST    /api/v1/nutrition/schedules        # ?pet_id=
+GET/POST         /api/v1/nutrition/schedules     # ?pet_id=
 GET/PATCH/DELETE /api/v1/nutrition/schedules/:id
 
-GET         /api/v1/health
-POST        /mcp                     # JSON-RPC 2.0
+GET/POST         /api/v1/elimination/records     # filters: pet_id, date, date_from, date_to, event_type
+GET/PATCH/DELETE /api/v1/elimination/records/:id
+GET              /api/v1/elimination/analytics/daily-summaries
+GET              /api/v1/elimination/analytics/range-summary
 
-GET         /api/v1/settings/oidc         # public view (no secret)
-POST        /api/v1/settings/oidc         # merge-update (omit secret to keep existing)
-GET         /api/v1/settings/telegram     # public view (no bot token)
-POST        /api/v1/settings/telegram     # merge-update (omit bot_token to keep existing)
+GET/POST         /api/v1/health/weight           # weight records; filters: pet_id, date_from, date_to
+DELETE           /api/v1/health/weight/:id
+GET              /api/v1/health/weight/stats     # ?pet_id=&date_from=&date_to= → latest_kg, avg_kg, count
 
-GET         /api/v1/api-tokens            # list all tokens (hash never returned)
-POST        /api/v1/api-tokens            # create — raw token returned once
-DELETE      /api/v1/api-tokens/:id        # deactivate
+GET              /api/v1/settings/display
+POST             /api/v1/settings/display
+GET/POST         /api/v1/settings/oidc
+GET/POST         /api/v1/settings/telegram
+
+GET/POST         /api/v1/api-tokens
+POST             /api/v1/api-tokens/:id/activate
+DELETE           /api/v1/api-tokens/:id
+DELETE           /api/v1/api-tokens/:id/permanent
+
+GET              /api/v1/health                  # health check (unauthenticated)
+GET              /api/v1/info                    # version + git SHA (unauthenticated)
+POST             /mcp                            # JSON-RPC 2.0
 ```
+
+Full schema at `/api/docs` (Swagger UI) or `/api/docs/openapi.yaml`.
 
 ## MCP
 
@@ -66,10 +103,37 @@ petmon exposes a **stateless JSON-RPC 2.0** MCP endpoint at `POST /mcp`, protect
 
 ### Available tools
 
-`pets/list`, `pets/get`, `pets/create`, `pets/update`, `pets/delete`,
-`nutrition/records/list`, `nutrition/records/get`, `nutrition/records/create`, `nutrition/records/batch-create`, `nutrition/records/update`, `nutrition/records/delete`,
-`days/summary`, `nutrition/analytics/daily-totals`, `nutrition/analytics/range-summary`,
+**Context tools** (recommended starting points — return everything needed in one call):
+
+| Tool | Returns |
+|------|---------|
+| `pets/nutrition-context` | Pet profile + today's nutrition summary + active schedules + 7-day trend |
+| `pets/elimination-context` | Pet profile + today's wee/poop/vomit counts + 7-day trend |
+| `pets/health-context` | Pet profile + last 10 weight records + 30-day stats |
+
+**Individual tools:**
+
+`pets/list`, `pets/get`, `pets/create`, `pets/update`
+
+`nutrition/records/list`, `nutrition/records/get`, `nutrition/records/create`, `nutrition/records/batch-create`, `nutrition/records/update`, `nutrition/records/delete`
+
+`nutrition/analytics/daily-totals`, `nutrition/analytics/range-summary`, `nutrition/analytics/best-fluid-day`
+
 `nutrition/schedules/list`, `nutrition/schedules/get`, `nutrition/schedules/create`, `nutrition/schedules/update`, `nutrition/schedules/delete`
+
+`days/summary`, `days/note/get`, `days/note/set`
+
+`elimination/records/list`, `elimination/records/create`, `elimination/records/update`, `elimination/records/delete`, `elimination/analytics/range-summary`
+
+`weight/records/list`, `weight/records/create`, `weight/records/delete`
+
+### Event types for toileting
+
+When creating elimination records, use `event_type`:
+- `urination` (wee)
+- `defecation` (poop) — subtypes: `normal`, `soft`, `liquid`, `hard`, `blood`, `mucus`
+- `vomit` — subtypes: `food`, `fur`, `bile`, `other`
+- `general`
 
 ### Connecting Claude to petmon
 
@@ -91,15 +155,31 @@ petmon uses HTTP transport (JSON-RPC over a single `POST /mcp` endpoint). Add it
 
 **Steps:**
 
-1. **Create an API token** — open petmon → Settings → API tokens → Create token. Copy the token immediately (shown once).
-2. **Add the server** to your Claude settings as shown above, replacing `<your-petmon-host>` with your deployment URL (e.g. `petmon.example.com`) and `<your-api-token>` with the token you just copied.
+1. **Create an API token** — open petmon → Settings → API tokens → Create token. Copy the token immediately (shown once). Or use **Remember this device** to generate and store a token automatically.
+2. **Add the server** to your Claude settings, replacing `<your-petmon-host>` and `<your-api-token>`.
 3. **Restart Claude Code** (or run `/mcp` to reload servers).
-4. Claude can now query and log pet nutrition data directly. Example prompts:
-   - *"List all my pets"*
+4. Example prompts:
+   - *"How much has Mittens drunk today?"*
    - *"Log 20 ml of water for Mittens now"*
-   - *"Show me today's nutrition summary for Rex"*
+   - *"Did Rex vomit recently? Show me the last week."*
+   - *"What does Clover weigh and is the trend stable?"*
 
 For local development use `http://localhost:8080/mcp` as the URL.
+
+## Authentication
+
+petmon supports two auth methods:
+
+- **OIDC/SSO (PKCE flow)** — the browser exchanges the authorization code directly with the provider. No client secret required. Configure via Settings → OIDC, or via environment variables (`OIDC_ISSUER_URL`, `OIDC_CLIENT_ID`, `OIDC_ENABLED`).
+- **API tokens** — long-lived `pm_api_*` tokens. Can be created by OIDC-authenticated users. Use for MCP, scripts, and "Remember this device" on PWA.
+
+`DEV_MODE=true` bypasses all auth for local development.
+
+### OIDC provider setup
+
+- Set client type to **public** (no client secret).
+- Enable **Authorization Code + PKCE**.
+- Add `https://<your-domain>/auth/callback` as an allowed redirect URI.
 
 ## Configuration
 
@@ -108,98 +188,40 @@ For local development use `http://localhost:8080/mcp` as the URL.
 | `HOST` | `0.0.0.0` | Bind address |
 | `PORT` | `8080` | Bind port |
 | `DATABASE_URL` | `sqlite:petmon.db` | SQLite path |
-| `TIMEZONE` or `TZ` | `UTC` | Local timezone for day bucketing (`TZ` is the standard Unix env var; `TIMEZONE` takes precedence if both are set) |
+| `TIMEZONE` / `TZ` | `UTC` | Local timezone for day bucketing |
+| `DEV_MODE` | `false` | Skip all auth (local dev only) |
 | `IMPORT_MAX_BYTES` | `1048576` | Max JSON request body size |
 | `STATIC_DIR` | *(unset)* | Serve frontend from this directory instead of embedded assets |
-
-Create a `.env` file at the project root to override defaults.
-
-## Observability
-
-### Logging
-
-All logs are emitted as JSON to stdout. Verbosity is controlled by the standard `RUST_LOG` env var (default: `petmon=info`):
-
-```bash
-RUST_LOG=petmon=debug      # verbose app logs
-RUST_LOG=debug             # everything, including dependencies
-RUST_LOG=petmon=trace      # trace-level spans
-```
-
-### Distributed tracing (OpenTelemetry)
-
-When `OTEL_EXPORTER_OTLP_ENDPOINT` is set, spans are exported via **OTLP/HTTP** to that collector in addition to JSON stdout logs. When unset, only stdout logging is active.
-
-| Variable | Default | Description |
-|----------|---------|-------------|
-| `OTEL_EXPORTER_OTLP_ENDPOINT` | *(unset)* | OTLP/HTTP collector endpoint, e.g. `http://localhost:4318` |
-| `OTEL_SERVICE_NAME` | `petmon` | Service name attached to all spans and logs |
-
-Example — sending traces to a local Jaeger instance:
-
-```bash
-docker run -d --name jaeger \
-  -p 4318:4318 \
-  -p 16686:16686 \
-  jaegertracing/all-in-one:latest
-
-OTEL_EXPORTER_OTLP_ENDPOINT=http://localhost:4318 \
-OTEL_SERVICE_NAME=petmon \
-cargo run
-```
-
-Then open the Jaeger UI at `http://localhost:16686`.
-
-### OIDC provider setup
-
-petmon uses the **PKCE (Proof Key for Code Exchange)** flow — the browser exchanges the authorization code directly with the provider, without a client secret. When registering your OIDC application:
-
-- Set the client type to **public** (not confidential).
-- Enable **PKCE** / **Authorization Code with PKCE** on the client.
-- Do **not** require a client secret for token requests.
-- Add `https://<your-domain>/auth/callback` as an allowed redirect URI.
-
-No client secret is needed or stored — petmon uses PKCE exclusively.
-
-### OIDC environment override
-
-If any of the following vars are present at startup, they are merged over the OIDC config stored in the database. Fields that are absent in the environment are left unchanged — so you can update only the secret without re-supplying the issuer URL, for example.
-
-| Variable | Description |
-|----------|-------------|
-| `OIDC_ISSUER_URL` | Issuer URL for autodiscovery (`/.well-known/openid-configuration`) |
-| `OIDC_CLIENT_ID` | OAuth2 client ID |
-| `OIDC_ENABLED` | `1` / `true` / `yes` to enable, any other value to disable |
-
-If none of the four vars are set, no database write occurs.  This is useful for container deployments where secrets are injected via the environment but UI-driven changes (e.g. toggling enabled) should persist across restarts.
+| `OIDC_ISSUER_URL` | *(unset)* | Merged over DB config at startup |
+| `OIDC_CLIENT_ID` | *(unset)* | Merged over DB config at startup |
+| `OIDC_ENABLED` | *(unset)* | `1`/`true`/`yes` to enable |
+| `OTEL_EXPORTER_OTLP_ENDPOINT` | *(unset)* | OTLP/gRPC collector for distributed tracing |
+| `OTEL_SERVICE_NAME` | `petmon` | Service name in traces |
 
 ## Demo data
 
-Load a ready-to-explore dataset (4 pets, ~45 days of nutrition logs, day notes, schedules):
+Load a ready-to-explore dataset (4 pets, ~45 days of nutrition, elimination, and weight records):
 
 ```bash
 make seed-demo
-# or: cargo run --bin seed-demo
 ```
 
-This clears existing rows by default, then seeds the database. Use `make seed-demo ARGS="--append"` only on an empty database.
-
-Demo pets **Mittens** and **Rex** use the same IDs as the frontend Storybook fixtures.
+This clears existing rows and seeds Mittens, Rex, Pepper, and Clover. Demo pet IDs match the Storybook fixtures.
 
 ## Quick Start
 
 ```bash
-# Optional: populate demo data
+# 1. Seed demo data (optional)
 make seed-demo
 
-# Run the server (migrations applied automatically)
-cargo run
+# 2. Run (DEV_MODE skips OIDC)
+DEV_MODE=true make run-be
 
-# Open the UI
+# 3. Open the UI
 open http://localhost:8080
 
-# Health check
-curl http://localhost:8080/api/v1/health
+# Or run frontend dev server separately for hot-reload
+make run-dev-fe   # → http://localhost:5173
 ```
 
 ## Development
@@ -207,110 +229,84 @@ curl http://localhost:8080/api/v1/health
 ### Backend
 
 ```bash
-# Check, test, build
 cargo check
-cargo test
+cargo test          # runs unit + integration tests via nextest
 cargo build --release
 ```
 
 ### Frontend
 
-The built frontend assets are committed to `frontend/dist/` and embedded into the binary at compile time. To rebuild the frontend after changes:
-
 ```bash
 cd frontend
 npm install
-npm run build
-# Then rebuild the backend: cd .. && cargo build
+npm run build       # tsc + vite → frontend/dist/
+npm run dev         # Vite dev server with API proxy to :8080
 ```
 
 ### Storybook
-
-Component stories live next to each component (`*.stories.tsx`). Run the catalog with:
 
 ```bash
 make story
 # or: cd frontend && npm run storybook
 ```
 
-### Logging records via API
+Stories live next to each component (`*.stories.tsx`). Coverage: all major components + Nutrition, Elimination, Health, Settings, and Analytics pages.
 
-Create a record for a pet using the current server time (omit `occurred_at`):
+### Makefile targets
 
-```bash
-curl -X POST http://localhost:8080/api/v1/nutrition/records \
-  -H "Authorization: Bearer pm_api_<your-token>" \
-  -H "Content-Type: application/json" \
-  -d '{
-    "pet_id": "550e8400-e29b-41d4-a716-446655440000",
-    "category": "liquids",
-    "amount": 15,
-    "unit": "ml"
-  }'
-```
+| Target | Description |
+|--------|-------------|
+| `make run-be` | Kill any stale backend, rebuild, run with `DEV_MODE=true` |
+| `make run-dev-fe` | Vite dev server (proxies `/api` and `/mcp` to `:8080`) |
+| `make seed-demo` | Reset DB and load demo data |
+| `make check` | Full check: `cargo fmt`, `cargo clippy`, `cargo nextest`, `tsc`, `eslint` |
+| `make story` | Storybook component catalog |
 
-Supply `occurred_at` (RFC3339) to backfill a specific time:
+## Observability
+
+Logs are emitted as JSON to stdout. `/api/v1/health` spans are suppressed from traces.
 
 ```bash
-curl -X POST http://localhost:8080/api/v1/nutrition/records \
-  -H "Authorization: Bearer pm_api_<your-token>" \
-  -H "Content-Type: application/json" \
-  -d '{
-    "pet_id": "550e8400-e29b-41d4-a716-446655440000",
-    "category": "wet_food",
-    "amount": 75,
-    "unit": "g",
-    "occurred_at": "2026-06-17T08:30:00Z"
-  }'
+RUST_LOG=petmon=debug     # verbose app logs
+RUST_LOG=debug            # everything including deps
 ```
 
-Valid categories: `wet_food`, `dry_food`, `water`, `liquids`.
+Distributed tracing with Jaeger:
 
-The pet ID is shown on the pet profile page (Settings → Pets → Open profile) or returned by `GET /api/v1/pets`.
-
-### Telegram
-
-**Import** — the `/imports` page parses Telegram bot logs in the browser (same format as the original `cat-intake-tracker` prototype), then commits via `POST /api/v1/nutrition/records/batch`:
-
+```bash
+docker run -d --name jaeger -p 4317:4317 -p 16686:16686 jaegertracing/all-in-one:latest
+OTEL_EXPORTER_OTLP_ENDPOINT=http://localhost:4317 cargo run
+# UI: http://localhost:16686
 ```
-Staging Bot, [31. May 2026 at 06:15:15]:
-#cat_ate #wet_food 15
-#cat_ate #liquids 16
-```
-
-**Forwarding** — when Telegram is enabled in Settings (`/settings`), every new nutrition record is forwarded to the configured chat in the same format (`#cat_ate #<category> <amount>`). Configure the bot token and chat/group ID through the UI; the bot token is stored in the database and never returned by GET endpoints.
-
-Each pillar will get its own parser on the frontend; the backend only accepts structured record payloads.
 
 ## CI/CD
 
-The pipeline only runs when source files change (README, icons, and other non-code files are ignored).
-
 ```
-version-check ──► frontend ──────────────────────────────────────────────────┐
-              └──► backend-check ──► backend-test ──► backend-amd64 ──────────┤──► docker
-                                                  └──► backend-arm64 ─────────┘
+version-check ──► frontend ──────────────────────────────────────────────┐
+              └──► backend-check ──► backend-test ──► backend-amd64 ─────┤──► docker
+                                                  └──► backend-arm64 ────┘
 ```
 
 | Job | What it does |
 |-----|--------------|
-| `version-check` | Reads `version` from `Cargo.toml`, fails if that tag already exists in GHCR (main push only) |
-| `frontend` | tsc, lint, Vitest/Storybook tests, Vite build → uploads `frontend/dist` artifact |
-| `backend-check` | `cargo fmt`, `cargo clippy` (platform-agnostic, runs once) |
-| `backend-test` | `cargo nextest` with JUnit report published to the GitHub Actions summary |
-| `backend-amd64` | musl release build for `x86_64` → uploads binary artifact |
-| `backend-arm64` | musl release build for `aarch64` on a native ARM runner → uploads binary artifact |
-| `docker` | Assembles both binaries + frontend dist, builds and pushes multiarch image to GHCR |
+| `version-check` | Fails if the `Cargo.toml` version tag already exists in GHCR |
+| `frontend` | tsc, lint, Vitest, Vite build |
+| `backend-check` | `cargo fmt` + `cargo clippy` |
+| `backend-test` | `cargo nextest` |
+| `backend-amd64/arm64` | musl release builds |
+| `docker` | Multiarch image → GHCR tagged `v<version>`, `sha-<short>`, `latest` |
 
-On **main push** the Docker image is tagged `v<version>`, `sha-<short>`, and `latest`.  
-On **pull requests** all jobs run but nothing is pushed to the registry.  
-To release a new version, bump `version` in `Cargo.toml` and push.
+To release: bump `version` in `Cargo.toml` and push to main.
 
 ## Deployment
 
-The release binary is self-contained — it embeds all frontend assets and auto-runs SQLite migrations:
-
 ```bash
 cargo build --release
-DATABASE_URL=sqlite:/data/petmon.db ./target/release/petmon
+DATABASE_URL=sqlite:/data/petmon.db \
+STATIC_DIR=/app/frontend/dist \
+OIDC_ISSUER_URL=https://your-provider.com \
+OIDC_CLIENT_ID=your-client-id \
+./target/release/petmon
 ```
+
+The binary embeds all frontend assets and runs migrations automatically on startup.
