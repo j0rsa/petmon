@@ -41,8 +41,9 @@ export default function EliminationJournalPage() {
     const map = new Map<string, DayEliminationHighlight>();
     for (const summary of calendarQuery.data ?? []) {
       map.set(summary.local_date, {
-        totalCount: summary.total_count,
+        totalCount: summary.total_count - summary.vomit_count,
         hasVomit: summary.has_vomit,
+        hasDefecation: summary.defecation_count > 0,
         avgDurationSec: summary.avg_duration_seconds ?? null,
       });
     }
@@ -55,7 +56,7 @@ export default function EliminationJournalPage() {
 
   function renderDayHints(date: string) {
     const h = highlights.get(date);
-    if (!h || h.totalCount === 0) return { hasData: false, lines: [] };
+    if (!h || (h.totalCount === 0 && !h.hasVomit && !h.hasDefecation)) return { hasData: false, lines: [] };
     const visitLabel = isMobile ? `${h.totalCount}×` : `${h.totalCount} visit${h.totalCount === 1 ? '' : 's'}`;
     const lines = [visitLabel];
     if (h.avgDurationSec != null) {
@@ -63,12 +64,16 @@ export default function EliminationJournalPage() {
       const secs = Math.round(h.avgDurationSec % 60);
       lines.push(mins > 0 ? `~${mins}m ${secs}s` : `~${secs}s`);
     }
+    const dots = (
+      <>
+        {h.hasDefecation && <span key="poop-dot" style={{ display: 'inline-block', width: 6, height: 6, borderRadius: '50%', background: 'var(--metric-water)', marginTop: 2 }} title="poop" />}
+        {h.hasVomit && <span key="vomit-dot" style={{ display: 'inline-block', width: 6, height: 6, borderRadius: '50%', background: 'var(--error-text)', marginTop: 2 }} title="vomit" />}
+      </>
+    );
     return {
       hasData: true,
       lines,
-      extra: h.hasVomit
-        ? <span key="vomit-dot" style={{ display: 'inline-block', width: 6, height: 6, borderRadius: '50%', background: 'var(--error-text)', marginTop: 2 }} title="vomit" />
-        : undefined,
+      extra: dots,
     };
   }
 
@@ -93,7 +98,7 @@ export default function EliminationJournalPage() {
         compact={isMobile}
         calendarConfig={displaySettings}
         weekStart={displaySettings.calendar_week_start}
-        footnote="Dates show visit counts. Red dot = vomit logged. Select a day to open its log."
+        footnote="Visits exclude vomit. Blue dot = poop, red dot = vomit. Select a day to open its log."
       />
       <EliminationDayPanel date={selectedDate} petId={selectedPetId} />
     </div>

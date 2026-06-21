@@ -7,6 +7,7 @@ import {
 import { ANALYTICS_CATEGORIES, CATEGORY_COLORS, CATEGORY_LABELS } from '../types';
 import { nutritionAnalyticsApi } from '../api/analytics';
 import { NoPetSelected } from '../components/NoPetSelected';
+import { StatCard } from '../components/StatCard';
 import { LiquidsIcon, TotalFluidIcon, TrendUpIcon, WetFoodIcon } from '../lib/metricIcons';
 import { useSelectedPet } from '../context/SelectedPetContext';
 import { localToday, shiftDate } from '../lib/dates';
@@ -134,10 +135,10 @@ export default function AnalyticsPage() {
           {/* Stat cards */}
           {stats && (
             <div className="summary-grid">
-              <StatCard label="avg total fluid / day" value={`~${stats.avgTotal}`} unit="ml" color="var(--accent)" />
-              <StatCard label="peak total fluid" value={`~${stats.peakTotal}`} unit="ml" color="var(--accent)" />
-              <StatCard label="avg liquids / day" value={`${stats.avgLiquids}`} unit="ml" color="var(--metric-water)" />
-              <StatCard label="avg wet food / day" value={`${stats.avgWetFood}`} unit="g" color="var(--metric-wet)" />
+              <StatCard label="avg total fluid / day" value={`~${stats.avgTotal}`} unit="ml" color="var(--accent)" icon={<TotalFluidIcon />} />
+              <StatCard label="peak total fluid" value={`~${stats.peakTotal}`} unit="ml" color="var(--accent)" icon={<TrendUpIcon />} />
+              <StatCard label="avg liquids / day" value={`${stats.avgLiquids}`} unit="ml" color="var(--metric-water)" icon={<LiquidsIcon />} />
+              <StatCard label="avg wet food / day" value={`${stats.avgWetFood}`} unit="g" color="var(--metric-wet)" icon={<WetFoodIcon />} />
             </div>
           )}
 
@@ -248,35 +249,3 @@ export default function AnalyticsPage() {
   );
 }
 
-const STAT_ICONS: Record<string, JSX.Element> = {
-  'avg total fluid / day': <TotalFluidIcon />,
-  'peak total fluid': <TrendUpIcon />,
-  'avg liquids / day': <LiquidsIcon />,
-  'avg wet food / day': <WetFoodIcon />,
-};
-
-function StatCard({ label, value, unit, color }: { label: string; value: string; unit: string; color: string }) {
-  const icon = STAT_ICONS[label];
-  return (
-    <div className="stat-card" style={{ position: 'relative', overflow: 'hidden' }}>
-      {icon && (
-        <div style={{
-          position: 'absolute',
-          right: '0.75rem',
-          bottom: '0.5rem',
-          width: 52,
-          height: 52,
-          color,
-          opacity: 0.08,
-          pointerEvents: 'none',
-        }}>
-          {icon}
-        </div>
-      )}
-      <span className="metric-label">{label}</span>
-      <strong style={{ color, fontFamily: 'monospace', fontSize: '2rem' }}>
-        {value}<span style={{ fontSize: '0.9rem', color: 'var(--text-muted)', marginLeft: '0.2rem' }}>{unit}</span>
-      </strong>
-    </div>
-  );
-}

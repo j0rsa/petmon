@@ -73,5 +73,6 @@ export interface DayNutritionHighlight {
 export interface DayEliminationHighlight {
   totalCount: number;
   hasVomit: boolean;
+  hasDefecation: boolean;
   avgDurationSec: number | null;
 }

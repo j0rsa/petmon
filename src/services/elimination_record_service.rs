@@ -1,5 +1,5 @@
 use crate::domain::elimination::{
-    CreateEliminationRecord, CreateEliminationWithWeight, EliminationRecord,
+    CreateEliminationRecord, CreateEliminationWithWeight, EliminationEventType, EliminationRecord,
     EliminationRecordFilters, EliminationWithWeightCreated, UpdateEliminationRecord,
 };
 use crate::domain::weight::CreateWeightRecord;
@@ -66,7 +66,7 @@ pub async fn create_with_weight(
         pet_id: req.pet_id.clone(),
         occurred_at: Some(occurred_at.clone()),
         local_date: Some(local_date.clone()),
-        event_type: req.event_type,
+        event_type: req.event_type.unwrap_or(EliminationEventType::General),
         subtype: req.subtype,
         duration_seconds: req.duration_seconds,
         note: req.note,

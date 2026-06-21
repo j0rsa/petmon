@@ -343,9 +343,9 @@ export const mockEliminationDaySummary: EliminationDailySummary = {
 
 export function mockEliminationCalendarHighlights(month = '2024-06'): Map<string, DayEliminationHighlight> {
   const map = new Map<string, DayEliminationHighlight>();
-  map.set(`${month}-15`, { totalCount: 5, hasVomit: true, avgDurationSec: 95 });
-  map.set(`${month}-14`, { totalCount: 4, hasVomit: false, avgDurationSec: 72 });
-  map.set(`${month}-10`, { totalCount: 3, hasVomit: false, avgDurationSec: null });
+  map.set(`${month}-15`, { totalCount: 5, hasVomit: true, hasDefecation: true, avgDurationSec: 95 });
+  map.set(`${month}-14`, { totalCount: 4, hasVomit: false, hasDefecation: true, avgDurationSec: 72 });
+  map.set(`${month}-10`, { totalCount: 3, hasVomit: false, hasDefecation: false, avgDurationSec: null });
   return map;
 }
 

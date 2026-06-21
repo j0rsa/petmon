@@ -354,8 +354,8 @@ export function EliminationDayPanel({ date, petId }: EliminationDayPanelProps) {
     [recordsQuery.data],
   );
 
-  // Derived metrics
-  const totalCount = records.length;
+  // Derived metrics — vomit is shown separately, not counted as a visit
+  const totalCount = records.filter((r) => r.event_type !== 'vomit').length;
   const defecationCount = records.filter((r) => r.event_type === 'defecation').length;
   const vomitCount = records.filter((r) => r.event_type === 'vomit').length;
   const durRecords = records.filter((r) => r.duration_seconds != null);

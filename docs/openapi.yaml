@@ -2259,7 +2259,10 @@ components:
           type: string
           format: uuid
         event_type:
-          $ref: '#/components/schemas/EliminationEventType'
+          allOf:
+            - $ref: '#/components/schemas/EliminationEventType'
+          nullable: true
+          description: Defaults to general when omitted.
         occurred_at:
           type: string
           format: date-time
@@ -2292,7 +2295,6 @@ components:
           description: Note for the weight record
       required:
         - pet_id
-        - event_type
         - weight_kg
 
     EliminationWithWeightCreated:

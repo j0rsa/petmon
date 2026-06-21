@@ -75,7 +75,8 @@ pub struct CreateEliminationWithWeight {
     /// Applied to both the elimination record and the weight record.
     pub occurred_at: Option<String>,
     pub local_date: Option<String>,
-    pub event_type: EliminationEventType,
+    /// Defaults to General when omitted.
+    pub event_type: Option<EliminationEventType>,
     pub subtype: Option<String>,
     pub duration_seconds: Option<i64>,
     pub note: Option<String>,

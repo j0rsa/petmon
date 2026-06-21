@@ -9,6 +9,7 @@ import { NoPetSelected } from '../components/NoPetSelected';
 import { StatCard, type TrendDir } from '../components/StatCard';
 import { useSelectedPet } from '../context/SelectedPetContext';
 import { localToday, shiftDate } from '../lib/dates';
+import { AlertIcon, ClockIcon, TrendUpIcon } from '../lib/metricIcons';
 
 const PERIODS = [
   { label: '7d',  days: 7  },
@@ -109,12 +110,15 @@ export default function EliminationAnalyticsPage() {
     return result;
   }, [analyticsQuery.data, days, today]);
 
-  // Stats: p50 (median) + vomit days
+  // Stats: p50 (median) + vomit days + deviation from avg
   const stats = useMemo(() => {
     const data = analyticsQuery.data;
     if (!data) return null;
     const vomitDays = data.daily_summaries.filter((s) => s.has_vomit).length;
-    return { median: data.p50_per_day, vomitDays };
+    const deviationPct = data.avg_per_day > 0
+      ? Math.round(((data.p50_per_day - data.avg_per_day) / data.avg_per_day) * 100)
+      : 0;
+    return { median: data.p50_per_day, avg: data.avg_per_day, vomitDays, deviationPct };
   }, [analyticsQuery.data]);
 
   // Regression trend lines
@@ -186,11 +190,38 @@ export default function EliminationAnalyticsPage() {
           {/* Stat cards */}
           {stats && (
             <div className="summary-grid">
-              <StatCard label="median visits / day" value={stats.median.toFixed(1)} color="var(--accent)" trend={trendDir(visitTrend)} />
+              <StatCard
+                label="median visits / day"
+                value={stats.median.toFixed(1)}
+                color="var(--accent)"
+                trend={trendDir(visitTrend)}
+                icon={<TrendUpIcon />}
+                note={stats.deviationPct !== 0
+                  ? `${stats.deviationPct > 0 ? '+' : ''}${stats.deviationPct}% vs avg ${stats.avg.toFixed(1)}`
+                  : `avg ${stats.avg.toFixed(1)}`}
+              />
               {medianDuration != null && (
-                <StatCard label="median time spent" value={fmtSec(medianDuration)} color="var(--accent)" trend={trendDir(durationTrend)} />
+                <StatCard
+                  label="median time spent"
+                  value={fmtSec(medianDuration)}
+                  color="var(--metric-wet)"
+                  trend={trendDir(durationTrend)}
+                  icon={<ClockIcon />}
+                  note={(() => {
+                    const trend = durationTrend;
+                    if (!trend || trend.length < 2 || trend[0] <= 0) return undefined;
+                    const pct = Math.round(((trend[trend.length - 1] - trend[0]) / trend[0]) * 100);
+                    return pct !== 0 ? `${pct > 0 ? '+' : ''}${pct}% trend` : 'stable trend';
+                  })()}
+                />
               )}
-              <StatCard label="vomit days" value={String(stats.vomitDays)} color="var(--error-text)" />
+              <StatCard
+                label="vomit days"
+                value={String(stats.vomitDays)}
+                color="var(--error-text)"
+                icon={<AlertIcon />}
+                note={days > 0 ? `${Math.round((stats.vomitDays / days) * 100)}% of period` : undefined}
+              />
             </div>
           )}
 
