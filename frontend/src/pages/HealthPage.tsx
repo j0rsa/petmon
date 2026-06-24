@@ -7,6 +7,12 @@ import type { CreateWeightRecord } from '../api/weight';
 import { NoPetSelected } from '../components/NoPetSelected';
 import { useSelectedPet } from '../context/SelectedPetContext';
 
+function nowLocalDateTimeString(): string {
+  const now = new Date();
+  const pad = (n: number) => String(n).padStart(2, '0');
+  return `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}T${pad(now.getHours())}:${pad(now.getMinutes())}`;
+}
+
 export default function HealthPage() {
   const { selectedPetId, selectedPet, petsLoading } = useSelectedPet();
   const queryClient = useQueryClient();
@@ -19,12 +25,14 @@ export default function HealthPage() {
 
   const [weightInput, setWeightInput] = useState('');
   const [noteInput, setNoteInput] = useState('');
+  const [measuredAt, setMeasuredAt] = useState(() => nowLocalDateTimeString());
 
   const addMutation = useMutation({
     mutationFn: (payload: CreateWeightRecord) => weightApi.create(payload),
     onSuccess: () => {
       setWeightInput('');
       setNoteInput('');
+      setMeasuredAt(nowLocalDateTimeString());
       queryClient.invalidateQueries({ queryKey: ['weight-records', selectedPetId] });
       queryClient.invalidateQueries({ queryKey: ['pets', selectedPetId] });
       queryClient.invalidateQueries({ queryKey: ['pets'] });
@@ -48,7 +56,12 @@ export default function HealthPage() {
   function handleAdd() {
     const kg = parseDecimal(weightInput);
     if (isNaN(kg) || kg <= 0 || !selectedPetId) return;
-    addMutation.mutate({ pet_id: selectedPetId, weight_kg: kg, note: noteInput.trim() || undefined });
+    addMutation.mutate({
+      pet_id: selectedPetId,
+      weight_kg: kg,
+      note: noteInput.trim() || undefined,
+      measured_at: measuredAt ? measuredAt + ':00' : undefined,
+    });
   }
 
   return (
@@ -97,6 +110,15 @@ export default function HealthPage() {
 
         {/* Log weight */}
         <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap', alignItems: 'flex-end' }}>
+          <div className="form-row" style={{ flex: '0 0 auto' }}>
+            <label style={{ fontSize: '0.82rem' }}>Date &amp; time</label>
+            <input
+              type="datetime-local"
+              value={measuredAt}
+              onChange={(e) => setMeasuredAt(e.target.value)}
+              style={{ width: '13rem' }}
+            />
+          </div>
           <div className="form-row" style={{ flex: '0 0 auto' }}>
             <label style={{ fontSize: '0.82rem' }}>Weight (kg)</label>
             <input

@@ -48,6 +48,25 @@ const VOMIT_SUBTYPES: Array<{ value: string; label: string }> = [
 
 const EVENT_TYPES: EliminationEventType[] = ['general', 'urination', 'defecation', 'vomit'];
 
+function secsToMmss(secs: number): string {
+  const m = Math.floor(secs / 60);
+  const s = secs % 60;
+  return `${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`;
+}
+
+function mmssToSecs(mmss: string): number | null {
+  const match = mmss.match(/^(\d{1,2}):(\d{2})$/);
+  if (!match) return null;
+  const secs = parseInt(match[1], 10) * 60 + parseInt(match[2], 10);
+  return secs > 0 ? secs : null;
+}
+
+function fmtDurationSecs(sec: number): string {
+  const m = Math.floor(sec / 60);
+  const s = Math.round(sec % 60);
+  return m > 0 ? `${m}m ${s}s` : `${s}s`;
+}
+
 function subtypesFor(eventType: EliminationEventType) {
   if (eventType === 'defecation') return DEFECATION_SUBTYPES;
   if (eventType === 'vomit') return VOMIT_SUBTYPES;
@@ -97,7 +116,7 @@ const AddRow = forwardRef<AddRowHandle, AddRowProps>(function AddRow(
   const [time, setTime] = useState(nowTimeString);
   const [eventType, setEventType] = useState<EliminationEventType>('urination');
   const [subtype, setSubtype] = useState('');
-  const [durationSeconds, setDurationSeconds] = useState('');
+  const [durationMmss, setDurationMmss] = useState('');
   const [note, setNote] = useState('');
 
   const availableSubtypes = subtypesFor(eventType);
@@ -106,7 +125,7 @@ const AddRow = forwardRef<AddRowHandle, AddRowProps>(function AddRow(
     clearForm() {
       setTime(nowTimeString());
       setSubtype('');
-      setDurationSeconds('');
+      setDurationMmss('');
       setNote('');
     },
   }));
@@ -118,7 +137,7 @@ const AddRow = forwardRef<AddRowHandle, AddRowProps>(function AddRow(
       local_date: date,
       event_type: eventType,
       subtype: subtype || null,
-      duration_seconds: durationSeconds ? Number(durationSeconds) : null,
+      duration_seconds: mmssToSecs(durationMmss),
       note: note.trim() || null,
       source_type: 'manual',
     });
@@ -152,18 +171,15 @@ const AddRow = forwardRef<AddRowHandle, AddRowProps>(function AddRow(
           </select>
         )}
         <input
-          className="entry-inline-input"
-          style={{ width: '5.5rem' }}
-          type="number"
+          className="entry-inline-input entry-inline-time"
+          style={{ width: '5rem' }}
+          type="text"
           inputMode="numeric"
-          min="1"
-          step="1"
-          aria-label="Duration (seconds)"
-          placeholder="secs"
-          value={durationSeconds}
-          onChange={(e) => setDurationSeconds(e.target.value)}
+          aria-label="Duration (MM:SS)"
+          placeholder="MM:SS"
+          value={durationMmss}
+          onChange={(e) => setDurationMmss(e.target.value)}
         />
-        <span className="entry-unit-hint">sec</span>
       </div>
       <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap', alignItems: 'center' }}>
         <input
@@ -207,7 +223,7 @@ function RecordRow({ record, onSave, onDelete, saving, savingPaused, deleting, d
   const [time, setTime] = useState('');
   const [eventType, setEventType] = useState<EliminationEventType>('general');
   const [subtype, setSubtype] = useState('');
-  const [durationSeconds, setDurationSeconds] = useState('');
+  const [durationMmss, setDurationMmss] = useState('');
   const [note, setNote] = useState('');
 
   const availableSubtypes = subtypesFor(eventType);
@@ -216,7 +232,7 @@ function RecordRow({ record, onSave, onDelete, saving, savingPaused, deleting, d
     setTime(record.occurred_at.slice(11, 16));
     setEventType(record.event_type);
     setSubtype(record.subtype ?? '');
-    setDurationSeconds(record.duration_seconds != null ? String(record.duration_seconds) : '');
+    setDurationMmss(record.duration_seconds != null ? secsToMmss(record.duration_seconds) : '');
     setNote(record.note ?? '');
     setEditing(true);
   }
@@ -227,7 +243,7 @@ function RecordRow({ record, onSave, onDelete, saving, savingPaused, deleting, d
       local_date: record.local_date,
       event_type: eventType,
       subtype: subtype || null,
-      duration_seconds: durationSeconds ? Number(durationSeconds) : null,
+      duration_seconds: mmssToSecs(durationMmss),
       note: note.trim() || null,
     });
     setEditing(false);
@@ -263,17 +279,15 @@ function RecordRow({ record, onSave, onDelete, saving, savingPaused, deleting, d
               </select>
             )}
             <input
-              className="entry-inline-input"
-              style={{ width: '5.5rem' }}
-              type="number"
-              min="1"
-              step="1"
-              aria-label="Duration (seconds)"
-              placeholder="secs"
-              value={durationSeconds}
-              onChange={(e) => setDurationSeconds(e.target.value)}
+              className="entry-inline-input entry-inline-time"
+              style={{ width: '5rem' }}
+              type="text"
+              inputMode="numeric"
+              aria-label="Duration (MM:SS)"
+              placeholder="MM:SS"
+              value={durationMmss}
+              onChange={(e) => setDurationMmss(e.target.value)}
             />
-            <span className="entry-unit-hint">sec</span>
           </div>
           <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap', alignItems: 'center' }}>
             <input
@@ -307,7 +321,7 @@ function RecordRow({ record, onSave, onDelete, saving, savingPaused, deleting, d
         <TypeBadge eventType={record.event_type} />
         <span className="entry-amount" style={{ color: 'var(--text-muted)', fontSize: '0.82rem' }}>
           {record.subtype ? record.subtype : ''}
-          {record.duration_seconds != null ? ` ${record.duration_seconds}s` : ''}
+          {record.duration_seconds != null ? ` ${fmtDurationSecs(record.duration_seconds)}` : ''}
         </span>
         <div className="entry-row-actions">
           <button className="icon-button" type="button" title="Edit" aria-label="Edit" onClick={startEdit}>✎</button>
@@ -363,11 +377,6 @@ export function EliminationDayPanel({ date, petId }: EliminationDayPanelProps) {
   const avgDurationSec = durRecords.length > 0
     ? durRecords.reduce((s, r) => s + (r.duration_seconds ?? 0), 0) / durRecords.length
     : null;
-  const fmtDuration = (sec: number) => {
-    const m = Math.floor(sec / 60);
-    const s = Math.round(sec % 60);
-    return m > 0 ? `${m}m ${s}s` : `${s}s`;
-  };
 
   const createMutation = useMutation({
     mutationFn: (payload: CreateEliminationRecord) => eliminationApi.create(payload),
@@ -428,7 +437,7 @@ export function EliminationDayPanel({ date, petId }: EliminationDayPanelProps) {
         <article className="metric-card">
           <span className="metric-label">Avg time</span>
           <strong style={{ fontFamily: 'monospace', fontSize: avgDurationSec != null ? '1.2rem' : '1.65rem', color: 'var(--text-muted)' }}>
-            {avgDurationSec != null ? fmtDuration(avgDurationSec) : '—'}
+            {avgDurationSec != null ? fmtDurationSecs(avgDurationSec) : '—'}
           </strong>
         </article>
         <article className="metric-card">
