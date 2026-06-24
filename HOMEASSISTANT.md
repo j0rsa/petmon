@@ -15,11 +15,11 @@ Log toileting events (and optionally weight) from Home Assistant automations usi
 Add these to `configuration.yaml` (or a file included via `!include`). Replace the placeholder values:
 
 - `PETMON_HOST` → your petmon URL, e.g. `http://petmon.local:8080`
-- Store your token in `secrets.yaml` as `petmon_token: pm_api_YOURTOKEN`
+- Store your token in `secrets.yaml` as shown below — the full `Bearer …` prefix must be included because `!secret` inside a quoted string is not resolved by HA
 
 **`secrets.yaml`:**
 ```yaml
-petmon_token: pm_api_YOURTOKEN
+petmon_auth_header: "Bearer pm_api_YOURTOKEN"
 ```
 
 **`configuration.yaml`:**
@@ -32,7 +32,7 @@ rest_command:
     method: POST
     content_type: "application/json"
     headers:
-      Authorization: "Bearer !secret petmon_token"
+      Authorization: !secret petmon_auth_header
     payload: >
       {
         "pet_id": "{{ pet_id }}",
@@ -49,7 +49,7 @@ rest_command:
     method: POST
     content_type: "application/json"
     headers:
-      Authorization: "Bearer !secret petmon_token"
+      Authorization: !secret petmon_auth_header
     payload: >
       {
         "pet_id": "{{ pet_id }}",
@@ -64,7 +64,7 @@ rest_command:
     method: POST
     content_type: "application/json"
     headers:
-      Authorization: "Bearer !secret petmon_token"
+      Authorization: !secret petmon_auth_header
     payload: >
       {
         "pet_id": "{{ pet_id }}",
@@ -74,8 +74,6 @@ rest_command:
         "occurred_at": "{{ occurred_at | default('') }}"
       }
 ```
-
-> **Note:** `!secret` references in `headers` values require HA 2023.11+. On older versions, inline the token string directly.
 
 > **`occurred_at`** accepts a naive local datetime string `YYYY-MM-DDTHH:MM:SS`. When omitted or empty the server defaults to the current time in the configured timezone. For automations triggered by a sensor you can pass the sensor's last-changed time; for manual button presses you can omit it entirely.
 
@@ -162,7 +160,7 @@ Leave `subtype` empty or omit it when not applicable.
 
 ## Troubleshooting
 
-- **401 Unauthorized** — check the `Authorization` header value; the token must start with `pm_api_`.
+- **401 Unauthorized** — verify `secrets.yaml` has `petmon_auth_header: "Bearer pm_api_YOURTOKEN"` (the full value including `Bearer `). Using `"Bearer !secret petmon_token"` won't work — `!secret` inside a quoted string is not resolved.
 - **400 Bad Request** — verify `pet_id` is a valid UUID and `event_type` is one of the values above.
 - **No records appearing** — confirm the request reaches petmon (check logs with `RUST_LOG=petmon=debug`).
 - Test a command manually from HA's Developer Tools → Services → `rest_command.petmon_log_elimination`.
