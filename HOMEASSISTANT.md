@@ -1,6 +1,6 @@
 # Home Assistant Integration
 
-Log toileting events (and optionally weight) from Home Assistant automations, scripts, or dashboard buttons using the petmon REST API.
+Log toileting events (and optionally weight) from Home Assistant automations using the petmon REST API.
 
 ## Prerequisites
 
@@ -43,6 +43,21 @@ rest_command:
         "occurred_at": "{{ occurred_at | default('') }}"
       }
 
+  # Log a standalone weight measurement
+  petmon_log_weight:
+    url: "http://PETMON_HOST/api/v1/health/weight"
+    method: POST
+    content_type: "application/json"
+    headers:
+      Authorization: "Bearer !secret petmon_token"
+    payload: >
+      {
+        "pet_id": "{{ pet_id }}",
+        "weight_kg": {{ weight_kg | string | replace(',', '.') | float }},
+        "note": {{ ('\"' ~ note ~ '\"') if note else 'null' }},
+        "measured_at": "{{ measured_at | default('') }}"
+      }
+
   # Log a toileting event and a weight measurement together
   petmon_log_elimination_with_weight:
     url: "http://PETMON_HOST/api/v1/elimination/records/with-weight"
@@ -54,7 +69,7 @@ rest_command:
       {
         "pet_id": "{{ pet_id }}",
         "event_type": {{ ('\"' ~ event_type ~ '\"') if event_type else 'null' }},
-        "weight_kg": {{ weight_kg }},
+        "weight_kg": {{ weight_kg | string | replace(',', '.') | float }},
         "note": {{ ('\"' ~ note ~ '\"') if note else 'null' }},
         "occurred_at": "{{ occurred_at | default('') }}"
       }
@@ -63,6 +78,8 @@ rest_command:
 > **Note:** `!secret` references in `headers` values require HA 2023.11+. On older versions, inline the token string directly.
 
 > **`occurred_at`** accepts a naive local datetime string `YYYY-MM-DDTHH:MM:SS`. When omitted or empty the server defaults to the current time in the configured timezone. For automations triggered by a sensor you can pass the sensor's last-changed time; for manual button presses you can omit it entirely.
+
+> **`weight_kg` decimal separator:** the payload renders through `| replace(',', '.') | float`, so both `4.2` and `4,2` are accepted regardless of locale.
 
 ---
 
@@ -89,44 +106,41 @@ automation:
 
 ---
 
-## Example: dashboard button card
-
-Use a `button` card with a `tap_action` to log a one-tap poop entry for a pet:
+## Example: automation triggered by a smart scale
 
 ```yaml
-type: button
-name: "Mittens — poop"
-icon: mdi:emoticon-poop-outline
-tap_action:
-  action: call-service
-  service: rest_command.petmon_log_elimination
-  service_data:
-    pet_id: "550e8400-e29b-41d4-a716-446655440000"
-    event_type: "defecation"
-    subtype: "normal"
-    duration_seconds: ""
-    note: ""
+automation:
+  - alias: "Mittens stepped off the scale"
+    trigger:
+      - platform: state
+        entity_id: sensor.smart_scale_weight
+    action:
+      - service: rest_command.petmon_log_weight
+        data:
+          pet_id: "550e8400-e29b-41d4-a716-446655440000"
+          weight_kg: "{{ states('sensor.smart_scale_weight') }}"
+          note: ""
 ```
-
-Add one button per pet and event type. A `grid` card with 2–3 columns works well for a compact litter-box panel.
 
 ---
 
-## Example: weigh-in with toileting (combined endpoint)
-
-Send a weight measurement at the same time as a toileting event — useful if you have a smart scale under the litter box or weigh the pet before/after a visit:
+## Example: automation triggered by a smart scale under the litter box
 
 ```yaml
-script:
-  mittens_weigh_in:
-    alias: "Mittens — weigh-in with poop"
-    sequence:
+automation:
+  - alias: "Mittens used the litter box (with weight)"
+    trigger:
+      - platform: state
+        entity_id: binary_sensor.litter_box_occupied
+        from: "on"
+        to: "off"
+    action:
       - service: rest_command.petmon_log_elimination_with_weight
         data:
           pet_id: "550e8400-e29b-41d4-a716-446655440000"
           event_type: "defecation"
-          weight_kg: "{{ states('sensor.smart_scale_weight') | float }}"
-          note: "auto from scale"
+          weight_kg: "{{ states('sensor.smart_scale_weight') }}"
+          note: ""
 ```
 
 `event_type` is optional for this endpoint — omit it (pass `null`) to log the weight as a general visit.
