@@ -48,17 +48,60 @@ const VOMIT_SUBTYPES: Array<{ value: string; label: string }> = [
 
 const EVENT_TYPES: EliminationEventType[] = ['general', 'urination', 'defecation', 'vomit'];
 
-function secsToMmss(secs: number): string {
-  const m = Math.floor(secs / 60);
-  const s = secs % 60;
-  return `${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`;
+// digits is up to 4 raw digit chars, right-to-left filled (ATM style)
+function digitsToSecs(digits: string): number | null {
+  if (!digits) return null;
+  const padded = digits.padStart(4, '0');
+  const m = parseInt(padded.slice(0, 2), 10);
+  const s = parseInt(padded.slice(2), 10);
+  const total = m * 60 + s;
+  return total > 0 ? total : null;
 }
 
-function mmssToSecs(mmss: string): number | null {
-  const match = mmss.match(/^(\d{1,2}):(\d{2})$/);
-  if (!match) return null;
-  const secs = parseInt(match[1], 10) * 60 + parseInt(match[2], 10);
-  return secs > 0 ? secs : null;
+function secsToDigits(secs: number): string {
+  const m = Math.floor(secs / 60);
+  const s = secs % 60;
+  return `${String(m).padStart(2, '0')}${String(s).padStart(2, '0')}`;
+}
+
+function digitsToDisplay(digits: string): string {
+  const padded = digits.padStart(4, '0');
+  return `${padded.slice(0, 2)}:${padded.slice(2)}`;
+}
+
+// ── DurationInput ─────────────────────────────────────────────────────────────
+
+interface DurationInputProps {
+  digits: string;
+  onChange: (digits: string) => void;
+}
+
+function DurationInput({ digits, onChange }: DurationInputProps) {
+  return (
+    <input
+      className="entry-inline-input entry-inline-time"
+      style={{ width: '4.5rem', textAlign: 'center', fontVariantNumeric: 'tabular-nums' }}
+      type="text"
+      inputMode="numeric"
+      aria-label="Duration (MM:SS)"
+      value={digitsToDisplay(digits)}
+      onKeyDown={(e) => {
+        if (e.key === 'Backspace') {
+          onChange(digits.slice(0, -1));
+          e.preventDefault();
+        }
+      }}
+      onChange={(e) => {
+        // Extract only the newly typed digit (works for both desktop and mobile)
+        const raw = e.target.value.replace(/\D/g, '');
+        // raw is the full displayed value stripped of colon; take only digits beyond current length
+        const newDigit = raw.slice(-1);
+        if (newDigit && digits.length < 4) {
+          onChange(digits + newDigit);
+        }
+      }}
+    />
+  );
 }
 
 function fmtDurationSecs(sec: number): string {
@@ -116,7 +159,7 @@ const AddRow = forwardRef<AddRowHandle, AddRowProps>(function AddRow(
   const [time, setTime] = useState(nowTimeString);
   const [eventType, setEventType] = useState<EliminationEventType>('urination');
   const [subtype, setSubtype] = useState('');
-  const [durationMmss, setDurationMmss] = useState('');
+  const [durationDigits, setDurationDigits] = useState('');
   const [note, setNote] = useState('');
 
   const availableSubtypes = subtypesFor(eventType);
@@ -125,7 +168,7 @@ const AddRow = forwardRef<AddRowHandle, AddRowProps>(function AddRow(
     clearForm() {
       setTime(nowTimeString());
       setSubtype('');
-      setDurationMmss('');
+      setDurationDigits('');
       setNote('');
     },
   }));
@@ -137,7 +180,7 @@ const AddRow = forwardRef<AddRowHandle, AddRowProps>(function AddRow(
       local_date: date,
       event_type: eventType,
       subtype: subtype || null,
-      duration_seconds: mmssToSecs(durationMmss),
+      duration_seconds: digitsToSecs(durationDigits),
       note: note.trim() || null,
       source_type: 'manual',
     });
@@ -170,16 +213,7 @@ const AddRow = forwardRef<AddRowHandle, AddRowProps>(function AddRow(
             ))}
           </select>
         )}
-        <input
-          className="entry-inline-input entry-inline-time"
-          style={{ width: '5rem' }}
-          type="text"
-          inputMode="numeric"
-          aria-label="Duration (MM:SS)"
-          placeholder="MM:SS"
-          value={durationMmss}
-          onChange={(e) => setDurationMmss(e.target.value)}
-        />
+        <DurationInput digits={durationDigits} onChange={setDurationDigits} />
       </div>
       <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap', alignItems: 'center' }}>
         <input
@@ -223,7 +257,7 @@ function RecordRow({ record, onSave, onDelete, saving, savingPaused, deleting, d
   const [time, setTime] = useState('');
   const [eventType, setEventType] = useState<EliminationEventType>('general');
   const [subtype, setSubtype] = useState('');
-  const [durationMmss, setDurationMmss] = useState('');
+  const [durationDigits, setDurationDigits] = useState('');
   const [note, setNote] = useState('');
 
   const availableSubtypes = subtypesFor(eventType);
@@ -232,7 +266,7 @@ function RecordRow({ record, onSave, onDelete, saving, savingPaused, deleting, d
     setTime(record.occurred_at.slice(11, 16));
     setEventType(record.event_type);
     setSubtype(record.subtype ?? '');
-    setDurationMmss(record.duration_seconds != null ? secsToMmss(record.duration_seconds) : '');
+    setDurationDigits(record.duration_seconds != null ? secsToDigits(record.duration_seconds) : '');
     setNote(record.note ?? '');
     setEditing(true);
   }
@@ -243,7 +277,7 @@ function RecordRow({ record, onSave, onDelete, saving, savingPaused, deleting, d
       local_date: record.local_date,
       event_type: eventType,
       subtype: subtype || null,
-      duration_seconds: mmssToSecs(durationMmss),
+      duration_seconds: digitsToSecs(durationDigits),
       note: note.trim() || null,
     });
     setEditing(false);
@@ -278,16 +312,7 @@ function RecordRow({ record, onSave, onDelete, saving, savingPaused, deleting, d
                 ))}
               </select>
             )}
-            <input
-              className="entry-inline-input entry-inline-time"
-              style={{ width: '5rem' }}
-              type="text"
-              inputMode="numeric"
-              aria-label="Duration (MM:SS)"
-              placeholder="MM:SS"
-              value={durationMmss}
-              onChange={(e) => setDurationMmss(e.target.value)}
-            />
+            <DurationInput digits={durationDigits} onChange={setDurationDigits} />
           </div>
           <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap', alignItems: 'center' }}>
             <input
