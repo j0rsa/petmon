@@ -12,6 +12,7 @@ import { TimeInput } from './TimeInput';
 import { nowTimeString, isoFromDateAndTime } from '../lib/time';
 import { localToday } from '../lib/dates';
 import { useFormatTime, useFormatDate } from '../context/useDisplaySettings';
+import { digitsToDisplay, digitsToSecs, secsToDigits, normaliseDigits } from '../lib/duration';
 
 // ── Label maps ──────────────────────────────────────────────────────────────
 
@@ -48,26 +49,6 @@ const VOMIT_SUBTYPES: Array<{ value: string; label: string }> = [
 
 const EVENT_TYPES: EliminationEventType[] = ['general', 'urination', 'defecation', 'vomit'];
 
-// digits is up to 4 raw digit chars, right-to-left filled (ATM style)
-function digitsToSecs(digits: string): number | null {
-  if (!digits) return null;
-  const padded = digits.padStart(4, '0');
-  const m = parseInt(padded.slice(0, 2), 10);
-  const s = parseInt(padded.slice(2), 10);
-  const total = m * 60 + s;
-  return total > 0 ? total : null;
-}
-
-function secsToDigits(secs: number): string {
-  const m = Math.floor(secs / 60);
-  const s = secs % 60;
-  return `${String(m).padStart(2, '0')}${String(s).padStart(2, '0')}`;
-}
-
-function digitsToDisplay(digits: string): string {
-  const padded = digits.padStart(4, '0');
-  return `${padded.slice(0, 2)}:${padded.slice(2)}`;
-}
 
 // ── DurationInput ─────────────────────────────────────────────────────────────
 
@@ -92,14 +73,13 @@ function DurationInput({ digits, onChange }: DurationInputProps) {
         }
       }}
       onChange={(e) => {
-        // Extract only the newly typed digit (works for both desktop and mobile)
         const raw = e.target.value.replace(/\D/g, '');
-        // raw is the full displayed value stripped of colon; take only digits beyond current length
         const newDigit = raw.slice(-1);
         if (newDigit && digits.length < 4) {
           onChange(digits + newDigit);
         }
       }}
+      onBlur={() => onChange(normaliseDigits(digits))}
     />
   );
 }
