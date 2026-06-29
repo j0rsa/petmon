@@ -703,7 +703,7 @@ pre {
 
   .content {
     padding: 1rem;
-    padding-top: calc(1rem + 5rem + env(safe-area-inset-top));
+    padding-top: calc(3rem + env(safe-area-inset-top));
     padding-bottom: calc(5rem + env(safe-area-inset-bottom));
   }
 
@@ -973,6 +973,12 @@ pre {
   display: flex;
   gap: 0;
   border-bottom: 1px solid var(--border-subtle);
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+
+.pillar-tab-bar::-webkit-scrollbar {
+  display: none;
 }
 
 .pillar-tab {
@@ -981,6 +987,7 @@ pre {
   color: var(--text-muted);
   font-size: 0.88rem;
   white-space: nowrap;
+  flex-shrink: 0;
   position: relative;
   transition: color 0.15s ease;
 }
@@ -1521,6 +1528,7 @@ pre {
 @media (max-width: 640px) {
   .content {
     padding: 1rem;
+    padding-top: calc(3rem + env(safe-area-inset-top));
     padding-bottom: calc(5rem + env(safe-area-inset-bottom));
   }
 
