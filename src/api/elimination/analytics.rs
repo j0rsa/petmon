@@ -2,6 +2,7 @@ use crate::auth::AppState;
 use crate::error::AppResult;
 use crate::services::elimination_analytics_service;
 use actix_web::{get, web, HttpResponse};
+use petmon_macros::require_scope;
 use serde::Deserialize;
 
 #[derive(Deserialize)]
@@ -12,6 +13,7 @@ pub struct EliminationAnalyticsQuery {
 }
 
 #[get("/daily-summaries")]
+#[require_scope("api_read")]
 pub async fn daily_summaries(
     state: web::Data<AppState>,
     query: web::Query<EliminationAnalyticsQuery>,
@@ -27,6 +29,7 @@ pub async fn daily_summaries(
 }
 
 #[get("/range-summary")]
+#[require_scope("api_read")]
 pub async fn range_summary(
     state: web::Data<AppState>,
     query: web::Query<EliminationAnalyticsQuery>,

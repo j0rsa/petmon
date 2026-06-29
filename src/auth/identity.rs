@@ -1,3 +1,5 @@
+use std::collections::HashSet;
+
 /// Authenticated caller, injected into request extensions by the auth middleware.
 #[derive(Debug, Clone)]
 pub struct Identity {
@@ -6,6 +8,8 @@ pub struct Identity {
     /// `name` claim from the OIDC JWT, if present.
     pub name: Option<String>,
     pub kind: IdentityKind,
+    /// Granted scopes. Empty for OIDC/Dev (treated as full access). HashSet for O(1) lookup.
+    pub scopes: HashSet<String>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -25,6 +29,7 @@ impl Identity {
             email: Some("dev@localhost".to_string()),
             name: Some("Dev".to_string()),
             kind: IdentityKind::Dev,
+            scopes: HashSet::new(),
         }
     }
 
@@ -34,5 +39,18 @@ impl Identity {
             .as_deref()
             .or(self.email.as_deref())
             .unwrap_or(&self.subject)
+    }
+
+    /// Returns true if this identity is permitted to use `required_scope`.
+    ///
+    /// - OIDC and Dev identities always pass (no scope restriction).
+    /// - API token identities pass when their scopes contain `"all"` or `required_scope`.
+    pub fn has_scope(&self, required_scope: &str) -> bool {
+        match self.kind {
+            IdentityKind::Oidc | IdentityKind::Dev => true,
+            IdentityKind::ApiToken { .. } => {
+                self.scopes.contains("all") || self.scopes.contains(required_scope)
+            }
+        }
     }
 }

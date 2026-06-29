@@ -71,6 +71,7 @@ paths:
       tags:
         - Pets
       summary: List all pets
+      x-required-scope: api_read
       description: Retrieve a list of all pets in the system
       responses:
         '200':
@@ -81,6 +82,8 @@ paths:
                 type: array
                 items:
                   $ref: '#/components/schemas/Pet'
+        '403':
+          $ref: '#/components/responses/Forbidden'
         '401':
           $ref: '#/components/responses/Unauthorized'
 
@@ -88,6 +91,7 @@ paths:
       tags:
         - Pets
       summary: Create a new pet
+      x-required-scope: api_write
       description: Create a new pet record with the provided information
       requestBody:
         required: true
@@ -104,6 +108,8 @@ paths:
                 $ref: '#/components/schemas/Pet'
         '400':
           $ref: '#/components/responses/BadRequest'
+        '403':
+          $ref: '#/components/responses/Forbidden'
         '401':
           $ref: '#/components/responses/Unauthorized'
 
@@ -112,6 +118,7 @@ paths:
       tags:
         - Pets
       summary: Get a pet by ID
+      x-required-scope: api_read
       description: Retrieve a specific pet by its UUID
       parameters:
         - name: id
@@ -128,6 +135,8 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/Pet'
+        '403':
+          $ref: '#/components/responses/Forbidden'
         '401':
           $ref: '#/components/responses/Unauthorized'
         '404':
@@ -137,6 +146,7 @@ paths:
       tags:
         - Pets
       summary: Update a pet
+      x-required-scope: api_write
       description: Update one or more fields of an existing pet
       parameters:
         - name: id
@@ -161,6 +171,8 @@ paths:
                 $ref: '#/components/schemas/Pet'
         '400':
           $ref: '#/components/responses/BadRequest'
+        '403':
+          $ref: '#/components/responses/Forbidden'
         '401':
           $ref: '#/components/responses/Unauthorized'
         '404':
@@ -170,6 +182,7 @@ paths:
       tags:
         - Pets
       summary: Delete a pet
+      x-required-scope: api_write
       description: Delete a pet by its UUID
       parameters:
         - name: id
@@ -182,6 +195,8 @@ paths:
       responses:
         '204':
           description: Pet deleted successfully
+        '403':
+          $ref: '#/components/responses/Forbidden'
         '401':
           $ref: '#/components/responses/Unauthorized'
         '404':
@@ -192,6 +207,7 @@ paths:
       tags:
         - Days
       summary: Get day summary
+      x-required-scope: api_read
       description: Retrieve nutrition records and summary for a specific date. Optionally filter by pet.
       parameters:
         - name: date
@@ -217,6 +233,8 @@ paths:
                 $ref: '#/components/schemas/NutritionDaySummary'
         '400':
           $ref: '#/components/responses/BadRequest'
+        '403':
+          $ref: '#/components/responses/Forbidden'
         '401':
           $ref: '#/components/responses/Unauthorized'
 
@@ -225,6 +243,7 @@ paths:
       tags:
         - Days
       summary: Update day note
+      x-required-scope: api_write
       description: Update or create a note for a specific day. Optionally scoped to a pet.
       parameters:
         - name: date
@@ -255,6 +274,8 @@ paths:
           description: Note updated successfully
         '400':
           $ref: '#/components/responses/BadRequest'
+        '403':
+          $ref: '#/components/responses/Forbidden'
         '401':
           $ref: '#/components/responses/Unauthorized'
 
@@ -263,6 +284,7 @@ paths:
       tags:
         - Notes
       summary: Get day note
+      x-required-scope: api_read
       description: Retrieve the note for a specific date. Optionally filter by pet.
       parameters:
         - name: date
@@ -288,6 +310,8 @@ paths:
                 $ref: '#/components/schemas/DayNote'
         '400':
           $ref: '#/components/responses/BadRequest'
+        '403':
+          $ref: '#/components/responses/Forbidden'
         '401':
           $ref: '#/components/responses/Unauthorized'
 
@@ -295,6 +319,7 @@ paths:
       tags:
         - Notes
       summary: Update or create day note
+      x-required-scope: api_write
       description: Update or create a note for a specific date. Optionally scoped to a pet.
       parameters:
         - name: date
@@ -332,6 +357,8 @@ paths:
                 $ref: '#/components/schemas/DayNote'
         '400':
           $ref: '#/components/responses/BadRequest'
+        '403':
+          $ref: '#/components/responses/Forbidden'
         '401':
           $ref: '#/components/responses/Unauthorized'
 
@@ -340,6 +367,7 @@ paths:
       tags:
         - Settings
       summary: Get display settings
+      x-required-scope: api_read
       description: Retrieve display preferences (time format, date format, water card visibility)
       responses:
         '200':
@@ -348,6 +376,8 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/DisplaySettings'
+        '403':
+          $ref: '#/components/responses/Forbidden'
         '401':
           $ref: '#/components/responses/Unauthorized'
 
@@ -355,6 +385,7 @@ paths:
       tags:
         - Settings
       summary: Update display settings
+      x-required-scope: api_write
       description: Update display preferences. Omitted fields keep their existing values.
       requestBody:
         required: true
@@ -371,6 +402,8 @@ paths:
                 $ref: '#/components/schemas/DisplaySettings'
         '400':
           $ref: '#/components/responses/BadRequest'
+        '403':
+          $ref: '#/components/responses/Forbidden'
         '401':
           $ref: '#/components/responses/Unauthorized'
 
@@ -379,6 +412,7 @@ paths:
       tags:
         - Settings
       summary: Get OIDC configuration
+      x-required-scope: api_read
       description: Retrieve the current OIDC configuration (client secret is never exposed)
       responses:
         '200':
@@ -387,6 +421,8 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/OidcConfigPublic'
+        '403':
+          $ref: '#/components/responses/Forbidden'
         '401':
           $ref: '#/components/responses/Unauthorized'
 
@@ -394,6 +430,7 @@ paths:
       tags:
         - Settings
       summary: Update OIDC configuration
+      x-required-scope: api_write
       description: Update OIDC settings. Omitting client_secret keeps the existing value.
       requestBody:
         required: true
@@ -410,6 +447,8 @@ paths:
                 $ref: '#/components/schemas/OidcConfigPublic'
         '400':
           $ref: '#/components/responses/BadRequest'
+        '403':
+          $ref: '#/components/responses/Forbidden'
         '401':
           $ref: '#/components/responses/Unauthorized'
 
@@ -418,6 +457,7 @@ paths:
       tags:
         - Settings
       summary: Get Telegram configuration
+      x-required-scope: api_read
       description: Retrieve the current Telegram configuration (bot token is never exposed)
       responses:
         '200':
@@ -426,6 +466,8 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/TelegramConfigPublic'
+        '403':
+          $ref: '#/components/responses/Forbidden'
         '401':
           $ref: '#/components/responses/Unauthorized'
 
@@ -433,6 +475,7 @@ paths:
       tags:
         - Settings
       summary: Update Telegram configuration
+      x-required-scope: api_write
       description: Update Telegram settings. Omitting bot_token keeps the existing value.
       requestBody:
         required: true
@@ -449,6 +492,8 @@ paths:
                 $ref: '#/components/schemas/TelegramConfigPublic'
         '400':
           $ref: '#/components/responses/BadRequest'
+        '403':
+          $ref: '#/components/responses/Forbidden'
         '401':
           $ref: '#/components/responses/Unauthorized'
 
@@ -457,6 +502,7 @@ paths:
       tags:
         - API Tokens
       summary: List API tokens
+      x-required-scope: api_read
       description: List all API tokens (token hashes are never exposed)
       responses:
         '200':
@@ -467,6 +513,8 @@ paths:
                 type: array
                 items:
                   $ref: '#/components/schemas/ApiTokenPublic'
+        '403':
+          $ref: '#/components/responses/Forbidden'
         '401':
           $ref: '#/components/responses/Unauthorized'
 
@@ -474,6 +522,7 @@ paths:
       tags:
         - API Tokens
       summary: Create API token
+      x-required-scope: api_write
       description: Create a new API token. Can only be created by OIDC-authenticated users, not by other API tokens.
       requestBody:
         required: true
@@ -490,6 +539,8 @@ paths:
                 $ref: '#/components/schemas/ApiTokenCreated'
         '400':
           $ref: '#/components/responses/BadRequest'
+        '403':
+          $ref: '#/components/responses/Forbidden'
         '401':
           $ref: '#/components/responses/Unauthorized'
 
@@ -498,6 +549,7 @@ paths:
       tags:
         - API Tokens
       summary: Activate API token
+      x-required-scope: api_write
       description: Re-activate a previously deactivated API token
       parameters:
         - name: id
@@ -509,6 +561,8 @@ paths:
       responses:
         '204':
           description: API token activated
+        '403':
+          $ref: '#/components/responses/Forbidden'
         '401':
           $ref: '#/components/responses/Unauthorized'
         '404':
@@ -519,6 +573,7 @@ paths:
       tags:
         - API Tokens
       summary: Deactivate API token
+      x-required-scope: api_write
       description: Deactivate an API token by ID
       parameters:
         - name: id
@@ -530,6 +585,42 @@ paths:
       responses:
         '204':
           description: API token deactivated
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /api-tokens/{id}/scopes:
+    patch:
+      tags:
+        - API Tokens
+      summary: Update token scopes
+      x-required-scope: api_write
+      description: Replace the scope set on an existing token. Valid scopes are all, api_read, api_write, mcp.
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateApiTokenScopes'
+      responses:
+        '200':
+          description: Updated token
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiTokenPublic'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '403':
+          $ref: '#/components/responses/Forbidden'
         '401':
           $ref: '#/components/responses/Unauthorized'
         '404':
@@ -540,6 +631,7 @@ paths:
       tags:
         - API Tokens
       summary: Permanently delete API token
+      x-required-scope: api_write
       description: Permanently delete an inactive API token. The token must be deactivated first.
       parameters:
         - name: id
@@ -553,6 +645,8 @@ paths:
           description: API token permanently deleted
         '400':
           $ref: '#/components/responses/BadRequest'
+        '403':
+          $ref: '#/components/responses/Forbidden'
         '401':
           $ref: '#/components/responses/Unauthorized'
 
@@ -561,6 +655,7 @@ paths:
       tags:
         - Elimination Records
       summary: List elimination records
+      x-required-scope: api_read
       description: Retrieve elimination records with optional filtering
       parameters:
         - name: pet_id
@@ -600,6 +695,8 @@ paths:
                 type: array
                 items:
                   $ref: '#/components/schemas/EliminationRecord'
+        '403':
+          $ref: '#/components/responses/Forbidden'
         '401':
           $ref: '#/components/responses/Unauthorized'
 
@@ -607,6 +704,7 @@ paths:
       tags:
         - Elimination Records
       summary: Create elimination record
+      x-required-scope: api_write
       requestBody:
         required: true
         content:
@@ -622,6 +720,8 @@ paths:
                 $ref: '#/components/schemas/EliminationRecord'
         '400':
           $ref: '#/components/responses/BadRequest'
+        '403':
+          $ref: '#/components/responses/Forbidden'
         '401':
           $ref: '#/components/responses/Unauthorized'
 
@@ -630,6 +730,7 @@ paths:
       tags:
         - Elimination Records
       summary: Create elimination record and weight measurement together
+      x-required-scope: api_write
       description: >
         Submits a toileting event and a weight measurement in a single atomic request.
         Both records share the same resolved timestamp. The pet's current weight is
@@ -649,6 +750,8 @@ paths:
                 $ref: '#/components/schemas/EliminationWithWeightCreated'
         '400':
           $ref: '#/components/responses/BadRequest'
+        '403':
+          $ref: '#/components/responses/Forbidden'
         '401':
           $ref: '#/components/responses/Unauthorized'
 
@@ -657,6 +760,7 @@ paths:
       tags:
         - Elimination Records
       summary: Get elimination record by ID
+      x-required-scope: api_read
       parameters:
         - name: id
           in: path
@@ -669,6 +773,8 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/EliminationRecord'
+        '403':
+          $ref: '#/components/responses/Forbidden'
         '401':
           $ref: '#/components/responses/Unauthorized'
         '404':
@@ -678,6 +784,7 @@ paths:
       tags:
         - Elimination Records
       summary: Update elimination record
+      x-required-scope: api_write
       parameters:
         - name: id
           in: path
@@ -698,6 +805,8 @@ paths:
                 $ref: '#/components/schemas/EliminationRecord'
         '400':
           $ref: '#/components/responses/BadRequest'
+        '403':
+          $ref: '#/components/responses/Forbidden'
         '401':
           $ref: '#/components/responses/Unauthorized'
         '404':
@@ -707,6 +816,7 @@ paths:
       tags:
         - Elimination Records
       summary: Delete elimination record
+      x-required-scope: api_write
       parameters:
         - name: id
           in: path
@@ -715,6 +825,8 @@ paths:
       responses:
         '204':
           description: Record deleted
+        '403':
+          $ref: '#/components/responses/Forbidden'
         '401':
           $ref: '#/components/responses/Unauthorized'
         '404':
@@ -725,6 +837,7 @@ paths:
       tags:
         - Elimination Analytics
       summary: Get daily elimination summaries
+      x-required-scope: api_read
       parameters:
         - name: date_from
           in: query
@@ -749,6 +862,8 @@ paths:
                   $ref: '#/components/schemas/EliminationDailySummary'
         '400':
           $ref: '#/components/responses/BadRequest'
+        '403':
+          $ref: '#/components/responses/Forbidden'
         '401':
           $ref: '#/components/responses/Unauthorized'
 
@@ -757,6 +872,7 @@ paths:
       tags:
         - Elimination Analytics
       summary: Get elimination range summary with percentiles
+      x-required-scope: api_read
       parameters:
         - name: date_from
           in: query
@@ -779,6 +895,8 @@ paths:
                 $ref: '#/components/schemas/EliminationRangeSummary'
         '400':
           $ref: '#/components/responses/BadRequest'
+        '403':
+          $ref: '#/components/responses/Forbidden'
         '401':
           $ref: '#/components/responses/Unauthorized'
 
@@ -787,6 +905,7 @@ paths:
       tags:
         - Weight Records
       summary: List weight records
+      x-required-scope: api_read
       parameters:
         - name: pet_id
           in: query
@@ -813,6 +932,8 @@ paths:
                 type: array
                 items:
                   $ref: '#/components/schemas/WeightRecord'
+        '403':
+          $ref: '#/components/responses/Forbidden'
         '401':
           $ref: '#/components/responses/Unauthorized'
 
@@ -820,6 +941,7 @@ paths:
       tags:
         - Weight Records
       summary: Create weight record
+      x-required-scope: api_write
       description: Creates a weight record and updates the pet's current weight_kg.
       requestBody:
         required: true
@@ -836,6 +958,8 @@ paths:
                 $ref: '#/components/schemas/WeightRecord'
         '400':
           $ref: '#/components/responses/BadRequest'
+        '403':
+          $ref: '#/components/responses/Forbidden'
         '401':
           $ref: '#/components/responses/Unauthorized'
 
@@ -844,6 +968,7 @@ paths:
       tags:
         - Weight Records
       summary: Get weight stats for a date range
+      x-required-scope: api_read
       description: Returns the latest weight, 30-day average, and record count. Used for overview and health-context comparisons.
       parameters:
         - name: pet_id
@@ -867,6 +992,8 @@ paths:
                 $ref: '#/components/schemas/WeightStats'
         '400':
           $ref: '#/components/responses/BadRequest'
+        '403':
+          $ref: '#/components/responses/Forbidden'
         '401':
           $ref: '#/components/responses/Unauthorized'
 
@@ -875,6 +1002,7 @@ paths:
       tags:
         - Weight Records
       summary: Get aggregated weight history
+      x-required-scope: api_read
       description: |
         Returns weight records bucketed by granularity. Use this for charts with large datasets.
         - `raw`: one bucket per individual measurement (for short windows, ≤30d)
@@ -908,6 +1036,8 @@ paths:
                   $ref: '#/components/schemas/WeightSummaryBucket'
         '400':
           $ref: '#/components/responses/BadRequest'
+        '403':
+          $ref: '#/components/responses/Forbidden'
         '401':
           $ref: '#/components/responses/Unauthorized'
 
@@ -916,6 +1046,7 @@ paths:
       tags:
         - Weight Records
       summary: Delete weight record
+      x-required-scope: api_write
       parameters:
         - name: id
           in: path
@@ -924,6 +1055,8 @@ paths:
       responses:
         '204':
           description: Weight record deleted
+        '403':
+          $ref: '#/components/responses/Forbidden'
         '401':
           $ref: '#/components/responses/Unauthorized'
         '404':
@@ -934,6 +1067,7 @@ paths:
       tags:
         - Nutrition Records
       summary: List nutrition records
+      x-required-scope: api_read
       description: Retrieve nutrition records with optional filtering
       parameters:
         - name: pet_id
@@ -997,6 +1131,8 @@ paths:
                   $ref: '#/components/schemas/NutritionRecord'
         '400':
           $ref: '#/components/responses/BadRequest'
+        '403':
+          $ref: '#/components/responses/Forbidden'
         '401':
           $ref: '#/components/responses/Unauthorized'
 
@@ -1004,6 +1140,7 @@ paths:
       tags:
         - Nutrition Records
       summary: Create nutrition record
+      x-required-scope: api_write
       description: Create a single nutrition record
       requestBody:
         required: true
@@ -1020,6 +1157,8 @@ paths:
                 $ref: '#/components/schemas/NutritionRecord'
         '400':
           $ref: '#/components/responses/BadRequest'
+        '403':
+          $ref: '#/components/responses/Forbidden'
         '401':
           $ref: '#/components/responses/Unauthorized'
 
@@ -1028,6 +1167,7 @@ paths:
       tags:
         - Nutrition Records
       summary: Create multiple nutrition records
+      x-required-scope: api_write
       description: Create multiple nutrition records in a single request
       requestBody:
         required: true
@@ -1053,6 +1193,8 @@ paths:
                   $ref: '#/components/schemas/NutritionRecord'
         '400':
           $ref: '#/components/responses/BadRequest'
+        '403':
+          $ref: '#/components/responses/Forbidden'
         '401':
           $ref: '#/components/responses/Unauthorized'
 
@@ -1061,6 +1203,7 @@ paths:
       tags:
         - Nutrition Records
       summary: Get nutrition record by ID
+      x-required-scope: api_read
       description: Retrieve a specific nutrition record
       parameters:
         - name: id
@@ -1076,6 +1219,8 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/NutritionRecord'
+        '403':
+          $ref: '#/components/responses/Forbidden'
         '401':
           $ref: '#/components/responses/Unauthorized'
         '404':
@@ -1085,6 +1230,7 @@ paths:
       tags:
         - Nutrition Records
       summary: Update nutrition record
+      x-required-scope: api_write
       description: Update one or more fields of a nutrition record
       parameters:
         - name: id
@@ -1108,6 +1254,8 @@ paths:
                 $ref: '#/components/schemas/NutritionRecord'
         '400':
           $ref: '#/components/responses/BadRequest'
+        '403':
+          $ref: '#/components/responses/Forbidden'
         '401':
           $ref: '#/components/responses/Unauthorized'
         '404':
@@ -1117,6 +1265,7 @@ paths:
       tags:
         - Nutrition Records
       summary: Delete nutrition record
+      x-required-scope: api_write
       description: Delete a nutrition record
       parameters:
         - name: id
@@ -1128,6 +1277,8 @@ paths:
       responses:
         '204':
           description: Nutrition record deleted
+        '403':
+          $ref: '#/components/responses/Forbidden'
         '401':
           $ref: '#/components/responses/Unauthorized'
         '404':
@@ -1138,6 +1289,7 @@ paths:
       tags:
         - Nutrition Schedules
       summary: List nutrition schedules
+      x-required-scope: api_read
       description: Retrieve nutrition schedules for all pets or a specific pet
       parameters:
         - name: pet_id
@@ -1156,6 +1308,8 @@ paths:
                 type: array
                 items:
                   $ref: '#/components/schemas/NutritionSchedule'
+        '403':
+          $ref: '#/components/responses/Forbidden'
         '401':
           $ref: '#/components/responses/Unauthorized'
 
@@ -1163,6 +1317,7 @@ paths:
       tags:
         - Nutrition Schedules
       summary: Create nutrition schedule
+      x-required-scope: api_write
       description: Create a new nutrition schedule for a pet
       requestBody:
         required: true
@@ -1179,6 +1334,8 @@ paths:
                 $ref: '#/components/schemas/NutritionSchedule'
         '400':
           $ref: '#/components/responses/BadRequest'
+        '403':
+          $ref: '#/components/responses/Forbidden'
         '401':
           $ref: '#/components/responses/Unauthorized'
 
@@ -1187,6 +1344,7 @@ paths:
       tags:
         - Nutrition Schedules
       summary: Get nutrition schedule by ID
+      x-required-scope: api_read
       description: Retrieve a specific nutrition schedule
       parameters:
         - name: id
@@ -1202,6 +1360,8 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/NutritionSchedule'
+        '403':
+          $ref: '#/components/responses/Forbidden'
         '401':
           $ref: '#/components/responses/Unauthorized'
         '404':
@@ -1211,6 +1371,7 @@ paths:
       tags:
         - Nutrition Schedules
       summary: Update nutrition schedule
+      x-required-scope: api_write
       description: Update one or more fields of a nutrition schedule
       parameters:
         - name: id
@@ -1234,6 +1395,8 @@ paths:
                 $ref: '#/components/schemas/NutritionSchedule'
         '400':
           $ref: '#/components/responses/BadRequest'
+        '403':
+          $ref: '#/components/responses/Forbidden'
         '401':
           $ref: '#/components/responses/Unauthorized'
         '404':
@@ -1243,6 +1406,7 @@ paths:
       tags:
         - Nutrition Schedules
       summary: Delete nutrition schedule
+      x-required-scope: api_write
       description: Delete a nutrition schedule
       parameters:
         - name: id
@@ -1254,6 +1418,8 @@ paths:
       responses:
         '204':
           description: Nutrition schedule deleted
+        '403':
+          $ref: '#/components/responses/Forbidden'
         '401':
           $ref: '#/components/responses/Unauthorized'
         '404':
@@ -1264,6 +1430,7 @@ paths:
       tags:
         - Nutrition Analytics
       summary: Get daily totals
+      x-required-scope: api_read
       description: Get nutrition daily totals for a date range, optionally filtered by pet and category
       parameters:
         - name: pet_id
@@ -1304,6 +1471,8 @@ paths:
                   $ref: '#/components/schemas/NutritionDailyTotal'
         '400':
           $ref: '#/components/responses/BadRequest'
+        '403':
+          $ref: '#/components/responses/Forbidden'
         '401':
           $ref: '#/components/responses/Unauthorized'
 
@@ -1312,6 +1481,7 @@ paths:
       tags:
         - Nutrition Analytics
       summary: Get range summary
+      x-required-scope: api_read
       description: Get aggregated nutrition summary for a date range with category averages
       parameters:
         - name: pet_id
@@ -1350,6 +1520,8 @@ paths:
                 $ref: '#/components/schemas/NutritionRangeSummary'
         '400':
           $ref: '#/components/responses/BadRequest'
+        '403':
+          $ref: '#/components/responses/Forbidden'
         '401':
           $ref: '#/components/responses/Unauthorized'
 
@@ -1358,6 +1530,7 @@ paths:
       tags:
         - Nutrition Analytics
       summary: Get best fluid day
+      x-required-scope: api_read
       description: Get the best historical day of fluid intake with a cumulative fluid curve for visualization
       parameters:
         - name: pet_id
@@ -1383,6 +1556,8 @@ paths:
                 $ref: '#/components/schemas/BestFluidDay'
         '400':
           $ref: '#/components/responses/BadRequest'
+        '403':
+          $ref: '#/components/responses/Forbidden'
         '401':
           $ref: '#/components/responses/Unauthorized'
 
@@ -1393,8 +1568,19 @@ components:
       scheme: bearer
       description: |
         Bearer authentication with either:
-        - OIDC JWT token (format: standard JWT)
-        - API token with `pm_api_` prefix (format: pm_api_<token>)
+        - OIDC JWT token (format: standard JWT) — full access, no scope restrictions
+        - API token with `pm_api_` prefix — access controlled by the token's scope set
+
+        **API token scopes:**
+        | Scope | Access granted |
+        |---|---|
+        | `all` | Full access — equivalent to OIDC |
+        | `api_read` | All GET endpoints |
+        | `api_write` | All POST / PATCH / DELETE endpoints |
+        | `mcp` | MCP tool endpoint (`/mcp`) |
+
+        A token may hold multiple scopes (e.g. `["api_read", "mcp"]`).
+        The scope required by each endpoint is shown in the `x-required-scope` field.
 
   responses:
     BadRequest:
@@ -1406,6 +1592,13 @@ components:
 
     Unauthorized:
       description: Authentication required or invalid credentials
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+
+    Forbidden:
+      description: Token does not have the required scope for this endpoint
       content:
         application/json:
           schema:
@@ -2154,6 +2347,10 @@ components:
         current:
           type: boolean
           description: Whether this token is authenticating the current request
+        scopes:
+          type: array
+          items: { type: string }
+          description: "Granted scopes. Valid values: all, api_read, api_write, mcp"
         created_by:
           type: string
           nullable: true
@@ -2171,6 +2368,7 @@ components:
         - id
         - active
         - current
+        - scopes
         - created_at
 
     ApiTokenCreated:
@@ -2186,6 +2384,10 @@ components:
         token:
           type: string
           description: Raw token value (only shown at creation)
+        scopes:
+          type: array
+          items: { type: string }
+          description: Granted scopes
         created_at:
           type: string
           format: date-time
@@ -2193,6 +2395,7 @@ components:
       required:
         - id
         - token
+        - scopes
         - created_at
 
     CreateApiToken:
@@ -2202,6 +2405,23 @@ components:
           type: string
           nullable: true
           description: Human-readable alias for the token
+        scopes:
+          type: array
+          items:
+            type: string
+            enum: [all, api_read, api_write, mcp]
+          description: "Scopes to grant. Defaults to [all] when omitted."
+
+    UpdateApiTokenScopes:
+      type: object
+      required: [scopes]
+      properties:
+        scopes:
+          type: array
+          items:
+            type: string
+            enum: [all, api_read, api_write, mcp]
+          description: "New scope set. Valid values: all, api_read, api_write, mcp"
 
     EliminationEventType:
       type: string

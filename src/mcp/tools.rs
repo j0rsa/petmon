@@ -439,6 +439,20 @@ fn tool_list() -> Value {
                 }
             },
 
+            // ── API token scopes ─────────────────────────────────────────────
+            {
+                "name": "api-tokens/scopes/update",
+                "description": "Update the scopes on an existing API token. Valid scopes: all, api_read, api_write, mcp.",
+                "inputSchema": {
+                    "type": "object",
+                    "required": ["id", "scopes"],
+                    "properties": {
+                        "id":     { "type": "string", "description": "Token ID" },
+                        "scopes": { "type": "array", "items": { "type": "string", "enum": ["all", "api_read", "api_write", "mcp"] } }
+                    }
+                }
+            },
+
             // ── Weight records ───────────────────────────────────────────────
             {
                 "name": "weight/records/list",
@@ -838,6 +852,39 @@ pub async fn dispatch(
                     "records": today_records
                 },
                 "trend_7d": trend
+            }))
+        }
+
+        // ── API token scopes ──────────────────────────────────────────────────
+        "api-tokens/scopes/update" => {
+            use crate::domain::settings::{is_valid_scope, UpdateApiTokenScopes};
+            let id = params["id"]
+                .as_str()
+                .ok_or_else(|| AppError::BadRequest("id required".to_string()))?;
+            let scopes: Vec<String> = params["scopes"]
+                .as_array()
+                .ok_or_else(|| AppError::BadRequest("scopes must be an array".to_string()))?
+                .iter()
+                .map(|v| {
+                    v.as_str()
+                        .ok_or_else(|| AppError::BadRequest("scope must be a string".to_string()))
+                        .map(str::to_owned)
+                })
+                .collect::<AppResult<Vec<_>>>()?;
+            for s in &scopes {
+                if !is_valid_scope(s) {
+                    return Err(AppError::BadRequest(format!("unknown scope '{s}'")));
+                }
+            }
+            let req = UpdateApiTokenScopes { scopes };
+            let token = crate::repo::api_tokens::update_scopes(pool, id, req).await?;
+            let scopes = token.scopes_vec();
+            Ok(json!({
+                "id": token.id,
+                "alias": token.alias,
+                "active": token.active,
+                "scopes": scopes,
+                "created_at": token.created_at,
             }))
         }
 

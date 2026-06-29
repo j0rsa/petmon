@@ -6,8 +6,10 @@ use crate::domain::elimination::{
 use crate::error::AppResult;
 use crate::services::elimination_record_service;
 use actix_web::{delete, get, patch, post, web, HttpResponse};
+use petmon_macros::require_scope;
 
 #[get("")]
+#[require_scope("api_read")]
 pub async fn list_records(
     state: web::Data<AppState>,
     query: web::Query<EliminationRecordFilters>,
@@ -17,6 +19,7 @@ pub async fn list_records(
 }
 
 #[post("")]
+#[require_scope("api_write")]
 pub async fn create_record(
     state: web::Data<AppState>,
     body: web::Json<CreateEliminationRecord>,
@@ -27,6 +30,7 @@ pub async fn create_record(
 }
 
 #[get("/{id}")]
+#[require_scope("api_read")]
 pub async fn get_record(
     state: web::Data<AppState>,
     id: web::Path<String>,
@@ -36,6 +40,7 @@ pub async fn get_record(
 }
 
 #[patch("/{id}")]
+#[require_scope("api_write")]
 pub async fn update_record(
     state: web::Data<AppState>,
     id: web::Path<String>,
@@ -46,6 +51,7 @@ pub async fn update_record(
 }
 
 #[delete("/{id}")]
+#[require_scope("api_write")]
 pub async fn delete_record(
     state: web::Data<AppState>,
     id: web::Path<String>,
@@ -55,6 +61,7 @@ pub async fn delete_record(
 }
 
 #[post("/with-weight")]
+#[require_scope("api_write")]
 pub async fn create_record_with_weight(
     state: web::Data<AppState>,
     body: web::Json<CreateEliminationWithWeight>,

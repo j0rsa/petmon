@@ -41,7 +41,7 @@ export const withMemoryRouter: Decorator = (Story, { parameters }) => (
 export const withLayoutData: Decorator = (Story) => {
   const client = makeMockClient();
   client.setQueryData(['pets'], mockPets);
-  client.setQueryData(['me'], { subject: 'dev', email: null, name: 'Dev', display_name: 'Dev', kind: 'dev' });
+  client.setQueryData(['me'], { subject: 'dev', email: null, name: 'Dev', display_name: 'Dev', kind: 'dev', scopes: [] });
   client.setQueryData(['app-info'], mockAppInfo);
   client.setQueryData(['settings-display'], mockDisplaySettings);
   return (
@@ -57,7 +57,7 @@ export function withSelectedPet(petId = mockPetId): Decorator {
   return function SelectedPetDecorator(Story) {
     const client = makeMockClient();
     client.setQueryData(['pets'], mockPets);
-    client.setQueryData(['me'], { subject: 'dev', email: null, name: 'Dev', display_name: 'Dev', kind: 'dev' });
+    client.setQueryData(['me'], { subject: 'dev', email: null, name: 'Dev', display_name: 'Dev', kind: 'dev', scopes: [] });
     client.setQueryData(['app-info'], mockAppInfo);
 
     return (
@@ -91,7 +91,7 @@ export function withNutritionDayPanel(date: string, petId: string, empty = false
   return function NutritionDayDecorator(Story) {
     const client = makeMockClient();
     client.setQueryData(['pets'], mockPets);
-    client.setQueryData(['me'], { subject: 'dev', email: null, name: 'Dev', display_name: 'Dev', kind: 'dev' });
+    client.setQueryData(['me'], { subject: 'dev', email: null, name: 'Dev', display_name: 'Dev', kind: 'dev', scopes: [] });
     client.setQueryData(['settings-display'], mockDisplaySettings);
     client.setQueryData(['app-info'], mockAppInfo);
     client.setQueryData(['day-summary', date, petId], empty ? { ...mockEmptyDaySummary, local_date: date } : { ...mockDaySummary, local_date: date });
@@ -130,7 +130,7 @@ export function withAnalyticsPage({
     const client = makeMockClient();
 
     client.setQueryData(['pets'], mockPets);
-    client.setQueryData(['me'], { subject: 'dev', email: null, name: 'Dev', display_name: 'Dev', kind: 'dev' });
+    client.setQueryData(['me'], { subject: 'dev', email: null, name: 'Dev', display_name: 'Dev', kind: 'dev', scopes: [] });
     client.setQueryData(['app-info'], mockAppInfo);
 
     // Pre-populate all period variants the page may request (7d, 14d, 30d, 90d)
@@ -176,7 +176,7 @@ export function withEliminationDayPanel(date: string, petId: string, empty = fal
   return function EliminationDayDecorator(Story) {
     const client = makeMockClient();
     client.setQueryData(['pets'], mockPets);
-    client.setQueryData(['me'], { subject: 'dev', email: null, name: 'Dev', display_name: 'Dev', kind: 'dev' });
+    client.setQueryData(['me'], { subject: 'dev', email: null, name: 'Dev', display_name: 'Dev', kind: 'dev', scopes: [] });
     client.setQueryData(['settings-display'], mockDisplaySettings);
     client.setQueryData(['app-info'], mockAppInfo);
     client.setQueryData(['elimination-records-day', date, petId], empty ? [] : mockEliminationRecords.map((r) => ({ ...r, local_date: date })));
@@ -211,7 +211,7 @@ export function withEliminationAnalyticsPage({
   return function EliminationAnalyticsDecorator(Story) {
     const client = makeMockClient();
     client.setQueryData(['pets'], mockPets);
-    client.setQueryData(['me'], { subject: 'dev', email: null, name: 'Dev', display_name: 'Dev', kind: 'dev' });
+    client.setQueryData(['me'], { subject: 'dev', email: null, name: 'Dev', display_name: 'Dev', kind: 'dev', scopes: [] });
     client.setQueryData(['app-info'], mockAppInfo);
 
     const today = localToday();
@@ -254,7 +254,7 @@ export function withPetInfoPage(petId = mockPetId, withWeights = true): Decorato
     const client = makeMockClient();
     client.setQueryData(['pets'], mockPets);
     client.setQueryData(['pets', petId], mockPets.find((p) => p.id === petId) ?? mockPets[0]);
-    client.setQueryData(['me'], { subject: 'dev', email: null, name: 'Dev', display_name: 'Dev', kind: 'dev' });
+    client.setQueryData(['me'], { subject: 'dev', email: null, name: 'Dev', display_name: 'Dev', kind: 'dev', scopes: [] });
     client.setQueryData(['app-info'], mockAppInfo);
     client.setQueryData(['weight-records', petId], withWeights ? mockWeightRecords.map((r) => ({ ...r, pet_id: petId })) : []);
 
@@ -283,7 +283,7 @@ export function withHealthPage({ petId = mockPetId, loading = false, empty = fal
   return function HealthDecorator(Story) {
     const client = makeMockClient();
     client.setQueryData(['pets'], mockPets);
-    client.setQueryData(['me'], { subject: 'dev', email: null, name: 'Dev', display_name: 'Dev', kind: 'dev' });
+    client.setQueryData(['me'], { subject: 'dev', email: null, name: 'Dev', display_name: 'Dev', kind: 'dev', scopes: [] });
     client.setQueryData(['app-info'], mockAppInfo);
 
     if (loading) {

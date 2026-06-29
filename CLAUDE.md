@@ -6,7 +6,7 @@
 1. **Tests** — update or add integration tests in `tests/api_tests.rs` covering the changed behaviour.
 2. **API spec** — reflect any new/changed/removed endpoints or fields in `docs/openapi.yaml`.
 3. **MCP** — if the change adds or changes a capability a Claude agent might use, update `src/mcp/`.
-4. **DB migrations** — if the latest migration file has not been pushed to `main` yet (check with `git log origin/main..HEAD -- migrations/`), amend that existing file rather than creating a new one. Only create a new migration file when the previous one is already in `main`.
+4. **DB migrations** — check `git log origin/main..HEAD -- migrations/`. If that command returns a commit (migration not yet pushed), amend that existing file. If it returns nothing (all migrations already in `main`), create a new numbered migration file. Never amend a migration that is already in `main`.
 5. **CLAUDE.md** — if the change introduces a new pattern, constraint, or domain rule worth preserving, add it here.
 
 ### Touching frontend (`frontend/src/`)
@@ -15,10 +15,10 @@
 3. **CLAUDE.md** — if the change establishes a new UI convention or naming pattern, add it here.
 
 ### Touching anything
-- **Cargo version** — bump `version` in `Cargo.toml` following semver:
-  - patch (`0.x.y+1`) for bug fixes and minor UI tweaks
+- **Cargo version** — bump `version` in `Cargo.toml` following semver. **Always bump on every change, no exceptions:**
+  - patch (`0.x.y+1`) for bug fixes, minor UI tweaks, refactors
   - minor (`0.x+1.0`) for new features or new API endpoints
-  - **Skip the bump** if the version was already changed since the last push to `main` (check with `git log origin/main..HEAD -- Cargo.toml`).
+  - **Skip the bump only** if the version was already changed since the last push to `main` (check with `git log origin/main..HEAD -- Cargo.toml`). If that command returns a commit, the version was already bumped — don't bump again.
 
 ---
 

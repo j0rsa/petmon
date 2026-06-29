@@ -5,6 +5,7 @@ import { NoPetSelected } from '../components/NoPetSelected';
 import { useSelectedPet } from '../context/SelectedPetContext';
 import type { NutritionSchedule } from '../types';
 import { parseDecimal } from '../lib/numbers';
+import { usePermissions } from '../context/usePermissions';
 
 type ScheduleType = 'liquid' | 'food';
 
@@ -63,6 +64,7 @@ const DEFAULT_RULES: Record<ScheduleType, ScheduleRules> = {
 export default function SchedulesPage() {
   const queryClient = useQueryClient();
   const { selectedPetId, selectedPet, petsLoading } = useSelectedPet();
+  const { canWrite } = usePermissions();
   const [showCreate, setShowCreate] = useState(false);
   const [createForm, setCreateForm] = useState<CreateForm>({
     name: '',
@@ -110,14 +112,14 @@ export default function SchedulesPage() {
         <h2 style={{ fontSize: '1.1rem', fontWeight: 600, color: 'var(--text-strong)' }}>
           Feeding schedules for {selectedPet?.name ?? 'selected pet'}
         </h2>
-        {!showCreate && (
+        {!showCreate && canWrite && (
           <button className="button" type="button" onClick={() => setShowCreate(true)}>
             + new schedule
           </button>
         )}
       </div>
 
-      {showCreate && (
+      {showCreate && canWrite && (
         <div className="panel" style={{ gap: '1rem' }}>
           <div style={{ display: 'flex', gap: '0.75rem', alignItems: 'center', flexWrap: 'wrap' }}>
             {/* Name */}
@@ -196,13 +198,13 @@ export default function SchedulesPage() {
           No feeding schedules yet. Create one to get started.
         </div>
       ) : (
-        schedules.map((schedule) => <ScheduleCard key={schedule.id} schedule={schedule} />)
+        schedules.map((schedule) => <ScheduleCard key={schedule.id} schedule={schedule} canWrite={canWrite} />)
       )}
     </div>
   );
 }
 
-function ScheduleCard({ schedule }: { schedule: NutritionSchedule }) {
+function ScheduleCard({ schedule, canWrite }: { schedule: NutritionSchedule; canWrite: boolean }) {
   const queryClient = useQueryClient();
   const [rules, setRules] = useState<ScheduleRules>(() => parseRules(schedule));
   const [addRow, setAddRow] = useState<Partial<TimeWindow>>({ from: '08:00', to: '09:00', note: '' });
@@ -282,23 +284,27 @@ function ScheduleCard({ schedule }: { schedule: NutritionSchedule }) {
           <span className={`status-pill${schedule.active ? ' active' : ''}`}>
             {schedule.active ? 'Active' : 'Paused'}
           </span>
-          <button
-            className="button button-secondary"
-            type="button"
-            style={{ fontSize: '0.82rem', padding: '0.4rem 0.9rem' }}
-            onClick={() => saveRules(DEFAULT_RULES[rules.type])}
-          >
-            reset to default
-          </button>
-          <button
-            className="button button-danger"
-            type="button"
-            style={{ fontSize: '0.82rem', padding: '0.4rem 0.9rem' }}
-            disabled={deleteMutation.isPending}
-            onClick={() => { if (window.confirm(`Delete "${schedule.name}"?`)) deleteMutation.mutate(); }}
-          >
-            delete
-          </button>
+          {canWrite && (
+            <>
+              <button
+                className="button button-secondary"
+                type="button"
+                style={{ fontSize: '0.82rem', padding: '0.4rem 0.9rem' }}
+                onClick={() => saveRules(DEFAULT_RULES[rules.type])}
+              >
+                reset to default
+              </button>
+              <button
+                className="button button-danger"
+                type="button"
+                style={{ fontSize: '0.82rem', padding: '0.4rem 0.9rem' }}
+                disabled={deleteMutation.isPending}
+                onClick={() => { if (window.confirm(`Delete "${schedule.name}"?`)) deleteMutation.mutate(); }}
+              >
+                delete
+              </button>
+            </>
+          )}
         </div>
       </div>
 
@@ -327,12 +333,12 @@ function ScheduleCard({ schedule }: { schedule: NutritionSchedule }) {
               <button className="button button-secondary" type="button" style={{ padding: '0.4rem 0.8rem', fontSize: '0.82rem' }} onClick={() => { setEditingIndex(null); setEditRow(null); }}>cancel</button>
             </div>
           ) : (
-            <WindowRow key={index} window={win} unit={unit} onEdit={() => startEdit(index)} onDelete={() => deleteWindow(index)} />
+            <WindowRow key={index} window={win} unit={unit} onEdit={() => startEdit(index)} onDelete={() => deleteWindow(index)} canWrite={canWrite} />
           )
         )}
 
         {/* Add row */}
-        <div style={{ display: 'flex', gap: '0.5rem', padding: '0.75rem 1rem', alignItems: 'center', borderTop: rules.windows.length > 0 ? '1px solid var(--border-subtle)' : undefined, flexWrap: 'wrap' }}>
+        {canWrite && <div style={{ display: 'flex', gap: '0.5rem', padding: '0.75rem 1rem', alignItems: 'center', borderTop: rules.windows.length > 0 ? '1px solid var(--border-subtle)' : undefined, flexWrap: 'wrap' }}>
           <span style={{ fontSize: '0.82rem', color: 'var(--text-muted)', marginRight: '0.25rem' }}>add:</span>
           <input type="time" aria-label="From" value={addRow.from ?? '08:00'} onChange={(e) => setAddRow({ ...addRow, from: e.target.value })} style={{ width: 120 }} />
           <span style={{ color: 'var(--text-subtle)' }}>–</span>
@@ -343,13 +349,13 @@ function ScheduleCard({ schedule }: { schedule: NutritionSchedule }) {
           <button className="button" type="button" style={{ whiteSpace: 'nowrap' }} onClick={addWindow} disabled={saveMutation.isPending}>
             + add
           </button>
-        </div>
+        </div>}
       </div>
     </div>
   );
 }
 
-function WindowRow({ window: win, unit, onEdit, onDelete }: { window: TimeWindow; unit: string; onEdit: () => void; onDelete: () => void }) {
+function WindowRow({ window: win, unit, onEdit, onDelete, canWrite }: { window: TimeWindow; unit: string; onEdit: () => void; onDelete: () => void; canWrite: boolean }) {
   const amount = win.min === win.max ? `${win.min} ${unit}` : `${win.min}–${win.max} ${unit}`;
   return (
     <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', padding: '0.75rem 1rem', borderBottom: '1px solid var(--border-subtle)' }}>
@@ -358,8 +364,12 @@ function WindowRow({ window: win, unit, onEdit, onDelete }: { window: TimeWindow
       </span>
       <span style={{ fontWeight: 700, minWidth: 90, fontSize: '0.95rem' }}>{amount}</span>
       <span style={{ flex: 1, color: 'var(--text-muted)', fontSize: '0.88rem' }}>{win.note}</span>
-      <button type="button" onClick={onEdit} style={{ background: 'none', border: 'none', color: 'var(--text-subtle)', cursor: 'pointer', padding: '0.2rem 0.4rem', fontSize: '1rem' }} title="Edit">✏</button>
-      <button type="button" onClick={onDelete} style={{ background: 'none', border: 'none', color: 'var(--text-subtle)', cursor: 'pointer', padding: '0.2rem 0.4rem', fontSize: '1rem' }} title="Delete">✕</button>
+      {canWrite && (
+        <>
+          <button type="button" onClick={onEdit} style={{ background: 'none', border: 'none', color: 'var(--text-subtle)', cursor: 'pointer', padding: '0.2rem 0.4rem', fontSize: '1rem' }} title="Edit">✏</button>
+          <button type="button" onClick={onDelete} style={{ background: 'none', border: 'none', color: 'var(--text-subtle)', cursor: 'pointer', padding: '0.2rem 0.4rem', fontSize: '1rem' }} title="Delete">✕</button>
+        </>
+      )}
     </div>
   );
 }

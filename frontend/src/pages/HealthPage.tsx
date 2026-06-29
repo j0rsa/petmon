@@ -7,6 +7,7 @@ import type { CreateWeightRecord, WeightGranularity } from '../api/weight';
 import { NoPetSelected } from '../components/NoPetSelected';
 import { useSelectedPet } from '../context/SelectedPetContext';
 import { localToday, shiftDate } from '../lib/dates';
+import { usePermissions } from '../context/usePermissions';
 
 type PeriodLabel = '30d' | '90d' | '1y' | 'all';
 
@@ -35,6 +36,7 @@ function nowLocalDateTimeString(): string {
 export default function HealthPage() {
   const { selectedPetId, selectedPet, petsLoading } = useSelectedPet();
   const queryClient = useQueryClient();
+  const { canWrite } = usePermissions();
 
   const [period, setPeriod] = useState<PeriodLabel>('30d');
   const today = localToday();
@@ -179,7 +181,7 @@ export default function HealthPage() {
         )}
 
         {/* Log weight */}
-        <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap', alignItems: 'flex-end' }}>
+        {canWrite && <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap', alignItems: 'flex-end' }}>
           <div className="form-row" style={{ flex: '0 0 auto' }}>
             <label style={{ fontSize: '0.82rem' }}>Date &amp; time</label>
             <input
@@ -220,7 +222,7 @@ export default function HealthPage() {
           >
             {addMutation.isPending ? 'Saving…' : 'Log weight'}
           </button>
-        </div>
+        </div>}
       </section>
 
       {/* Records table */}
@@ -238,7 +240,7 @@ export default function HealthPage() {
                 <th>Date</th>
                 <th>Weight</th>
                 <th>Note</th>
-                <th></th>
+                {canWrite && <th></th>}
               </tr>
             </thead>
             <tbody>
@@ -249,17 +251,19 @@ export default function HealthPage() {
                   <td style={{ fontSize: '0.82rem', color: 'var(--text-muted)' }}>
                     {r.note ?? <span style={{ color: 'var(--text-subtle)' }}>—</span>}
                   </td>
-                  <td>
-                    <button
-                      className="button button-danger"
-                      type="button"
-                      style={{ padding: '0.2rem 0.6rem', fontSize: '0.78rem' }}
-                      disabled={deleteMutation.isPending && deleteMutation.variables === r.id}
-                      onClick={() => { if (window.confirm('Delete this weight entry?')) deleteMutation.mutate(r.id); }}
-                    >
-                      Delete
-                    </button>
-                  </td>
+                  {canWrite && (
+                    <td>
+                      <button
+                        className="button button-danger"
+                        type="button"
+                        style={{ padding: '0.2rem 0.6rem', fontSize: '0.78rem' }}
+                        disabled={deleteMutation.isPending && deleteMutation.variables === r.id}
+                        onClick={() => { if (window.confirm('Delete this weight entry?')) deleteMutation.mutate(r.id); }}
+                      >
+                        Delete
+                      </button>
+                    </td>
+                  )}
                 </tr>
               ))}
             </tbody>

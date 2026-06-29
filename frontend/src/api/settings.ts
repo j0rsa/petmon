@@ -48,11 +48,15 @@ export interface UpdateTelegramConfig {
   bot_token?: string | null;
 }
 
+export type ApiTokenScope = 'all' | 'api_read' | 'api_write' | 'mcp';
+export const API_TOKEN_SCOPES: ApiTokenScope[] = ['all', 'api_read', 'api_write', 'mcp'];
+
 export interface ApiTokenPublic {
   id: string;
   alias: string | null;
   active: boolean;
   current: boolean;
+  scopes: ApiTokenScope[];
   created_by: string | null;
   created_at: string;
   last_used_at: string | null;
@@ -62,11 +66,17 @@ export interface ApiTokenCreated {
   id: string;
   alias: string | null;
   token: string;
+  scopes: ApiTokenScope[];
   created_at: string;
 }
 
 export interface CreateApiToken {
   alias?: string;
+  scopes?: ApiTokenScope[];
+}
+
+export interface UpdateApiTokenScopes {
+  scopes: ApiTokenScope[];
 }
 
 export const settingsApi = {
@@ -81,4 +91,6 @@ export const settingsApi = {
   activateToken: (id: string) => api.post<void>(`/api-tokens/${id}/activate`, {}),
   deactivateToken: (id: string) => api.delete(`/api-tokens/${id}`),
   deleteToken: (id: string) => api.delete(`/api-tokens/${id}/permanent`),
+  updateTokenScopes: (id: string, body: UpdateApiTokenScopes) =>
+    api.patch<ApiTokenPublic>(`/api-tokens/${id}/scopes`, body),
 };

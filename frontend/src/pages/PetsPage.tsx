@@ -5,6 +5,7 @@ import { petsApi } from '../api/pets';
 import { PetAvatar } from '../components/pet/PetAvatar';
 import { getPetPhoto } from '../lib/petPhotoStorage';
 import { PET_SPECIES, PET_SPECIES_LABELS, PET_STATUSES, PET_STATUS_LABELS, type PetSpecies, type PetStatus } from '../types';
+import { usePermissions } from '../context/usePermissions';
 
 interface PetFormState {
   name: string;
@@ -31,6 +32,7 @@ function toPayload(form: PetFormState) {
 
 export default function PetsPage() {
   const queryClient = useQueryClient();
+  const { canWrite } = usePermissions();
   const [createForm, setCreateForm] = useState<PetFormState>(emptyForm);
   const [editingPetId, setEditingPetId] = useState<string | null>(null);
   const [editingForm, setEditingForm] = useState<PetFormState>(emptyForm);
@@ -71,15 +73,17 @@ export default function PetsPage() {
         </div>
       </section>
 
-      <section className="panel">
-        <div className="section-heading">
-          <div>
-            <p className="eyebrow">Add pet</p>
-            <h3>Create a new profile</h3>
+      {canWrite && (
+        <section className="panel">
+          <div className="section-heading">
+            <div>
+              <p className="eyebrow">Add pet</p>
+              <h3>Create a new profile</h3>
+            </div>
           </div>
-        </div>
-        <PetForm form={createForm} setForm={setCreateForm} onSubmit={() => createMutation.mutate()} submitLabel={createMutation.isPending ? 'Saving…' : 'Add a pet'} />
-      </section>
+          <PetForm form={createForm} setForm={setCreateForm} onSubmit={() => createMutation.mutate()} submitLabel={createMutation.isPending ? 'Saving…' : 'Add a pet'} />
+        </section>
+      )}
 
       {petsQuery.isLoading ? (
         <div className="loading-state">Loading pets…</div>
@@ -127,33 +131,37 @@ export default function PetsPage() {
                     <Link className="button" to={`/pets/${pet.id}`}>
                       Profile
                     </Link>
-                    <button
-                      className="button button-secondary"
-                      type="button"
-                      onClick={() => {
-                        setEditingPetId(pet.id);
-                        setEditingForm({
-                          name: pet.name,
-                          species: pet.species,
-                          status: pet.status,
-                          feeding_notes: pet.feeding_notes ?? '',
-                        });
-                      }}
-                    >
-                      Quick edit
-                    </button>
-                    <button
-                      className="button button-danger"
-                      type="button"
-                      onClick={() => {
-                        if (window.confirm(`Delete ${pet.name}?`)) {
-                          deleteMutation.mutate(pet.id);
-                        }
-                      }}
-                      disabled={deleteMutation.isPending}
-                    >
-                      Delete
-                    </button>
+                    {canWrite && (
+                      <>
+                        <button
+                          className="button button-secondary"
+                          type="button"
+                          onClick={() => {
+                            setEditingPetId(pet.id);
+                            setEditingForm({
+                              name: pet.name,
+                              species: pet.species,
+                              status: pet.status,
+                              feeding_notes: pet.feeding_notes ?? '',
+                            });
+                          }}
+                        >
+                          Quick edit
+                        </button>
+                        <button
+                          className="button button-danger"
+                          type="button"
+                          onClick={() => {
+                            if (window.confirm(`Delete ${pet.name}?`)) {
+                              deleteMutation.mutate(pet.id);
+                            }
+                          }}
+                          disabled={deleteMutation.isPending}
+                        >
+                          Delete
+                        </button>
+                      </>
+                    )}
                   </div>
                 </>
               )}

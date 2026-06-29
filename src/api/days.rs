@@ -2,6 +2,7 @@ use crate::auth::AppState;
 use crate::error::AppResult;
 use crate::services::day_service;
 use actix_web::{get, patch, web, HttpResponse};
+use petmon_macros::require_scope;
 use serde::Deserialize;
 use uuid::Uuid;
 
@@ -17,6 +18,7 @@ pub struct UpdateNoteBody {
 }
 
 #[get("/{date}")]
+#[require_scope("api_read")]
 pub async fn get_day(
     state: web::Data<AppState>,
     date: web::Path<String>,
@@ -27,6 +29,7 @@ pub async fn get_day(
 }
 
 #[patch("/{date}/note")]
+#[require_scope("api_write")]
 pub async fn update_day_note(
     state: web::Data<AppState>,
     date: web::Path<String>,

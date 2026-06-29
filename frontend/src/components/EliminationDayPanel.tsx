@@ -1,5 +1,6 @@
 import { forwardRef, useImperativeHandle, useMemo, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
+import { usePermissions } from '../context/usePermissions';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import {
   eliminationApi,
@@ -229,9 +230,10 @@ interface RecordRowProps {
   savingPaused: boolean;
   deleting: boolean;
   deletingPaused: boolean;
+  canWrite: boolean;
 }
 
-function RecordRow({ record, onSave, onDelete, saving, savingPaused, deleting, deletingPaused }: RecordRowProps) {
+function RecordRow({ record, onSave, onDelete, saving, savingPaused, deleting, deletingPaused, canWrite }: RecordRowProps) {
   const formatTime = useFormatTime();
   const [editing, setEditing] = useState(false);
   const [time, setTime] = useState('');
@@ -328,19 +330,21 @@ function RecordRow({ record, onSave, onDelete, saving, savingPaused, deleting, d
           {record.subtype ? record.subtype : ''}
           {record.duration_seconds != null ? ` ${fmtDurationSecs(record.duration_seconds)}` : ''}
         </span>
-        <div className="entry-row-actions">
-          <button className="icon-button" type="button" title="Edit" aria-label="Edit" onClick={startEdit}>✎</button>
-          <button
-            className="icon-button icon-button-danger"
-            type="button"
-            title="Delete"
-            aria-label="Delete"
-            disabled={deleting}
-            onClick={() => { if (window.confirm('Delete this record?')) onDelete(record.id); }}
-          >
-            {deletingPaused ? '⏸' : '✕'}
-          </button>
-        </div>
+        {canWrite && (
+          <div className="entry-row-actions">
+            <button className="icon-button" type="button" title="Edit" aria-label="Edit" onClick={startEdit}>✎</button>
+            <button
+              className="icon-button icon-button-danger"
+              type="button"
+              title="Delete"
+              aria-label="Delete"
+              disabled={deleting}
+              onClick={() => { if (window.confirm('Delete this record?')) onDelete(record.id); }}
+            >
+              {deletingPaused ? '⏸' : '✕'}
+            </button>
+          </div>
+        )}
       </div>
       {record.note && (
         <p className="entry-record-note">{record.note}</p>
@@ -358,6 +362,7 @@ interface EliminationDayPanelProps {
 
 export function EliminationDayPanel({ date, petId }: EliminationDayPanelProps) {
   const queryClient = useQueryClient();
+  const { canWrite } = usePermissions();
   const [noteDraft, setNoteDraft] = useState('');
   const [noteSaved, setNoteSaved] = useState(false);
   const addRowRef = useRef<AddRowHandle>(null);
@@ -474,23 +479,26 @@ export function EliminationDayPanel({ date, petId }: EliminationDayPanelProps) {
                 deletingPaused={deleteMutation.isPaused && deleteMutation.variables === record.id}
                 onSave={(id, payload) => updateMutation.mutate({ id, payload })}
                 onDelete={(id) => deleteMutation.mutate(id)}
+                canWrite={canWrite}
               />
             ))}
           </div>
         )}
 
-        <AddRow
-          ref={addRowRef}
-          date={date}
-          petId={petId}
-          saving={createMutation.isPending}
-          isPaused={createMutation.isPaused}
-          onSave={(payload) => createMutation.mutate(payload)}
-        />
+        {canWrite && (
+          <AddRow
+            ref={addRowRef}
+            date={date}
+            petId={petId}
+            saving={createMutation.isPending}
+            isPaused={createMutation.isPaused}
+            onSave={(payload) => createMutation.mutate(payload)}
+          />
+        )}
       </div>
 
       {/* Day note */}
-      <div className="day-note-block">
+      {canWrite && <div className="day-note-block">
         <label htmlFor={`elim-day-note-${date}`}>Day note</label>
         <textarea
           id={`elim-day-note-${date}`}
@@ -509,7 +517,7 @@ export function EliminationDayPanel({ date, petId }: EliminationDayPanelProps) {
         >
           {noteSaved ? 'Saved' : 'Save note'}
         </button>
-      </div>
+      </div>}
     </section>
   );
 }

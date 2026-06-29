@@ -1,6 +1,10 @@
+[workspace]
+members = [".", "petmon-macros"]
+resolver = "2"
+
 [package]
 name = "petmon"
-version = "0.6.0"
+version = "0.7.0"
 edition = "2021"
 default-run = "petmon"
 
@@ -13,6 +17,7 @@ name = "seed-demo"
 path = "src/bin/seed_demo.rs"
 
 [dependencies]
+petmon-macros = { path = "petmon-macros" }
 actix-web = "4"
 actix-files = "0.6"
 tokio = { version = "1", features = ["full"] }

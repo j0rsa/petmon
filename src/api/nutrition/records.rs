@@ -6,8 +6,10 @@ use crate::domain::nutrition_record::{
 use crate::error::AppResult;
 use crate::services::nutrition_record_service;
 use actix_web::{delete, get, patch, post, web, HttpResponse};
+use petmon_macros::require_scope;
 
 #[get("")]
+#[require_scope("api_read")]
 pub async fn list_records(
     state: web::Data<AppState>,
     query: web::Query<NutritionRecordFilters>,
@@ -17,6 +19,7 @@ pub async fn list_records(
 }
 
 #[post("")]
+#[require_scope("api_write")]
 pub async fn create_record(
     state: web::Data<AppState>,
     body: web::Json<CreateNutritionRecord>,
@@ -27,6 +30,7 @@ pub async fn create_record(
 }
 
 #[post("/batch")]
+#[require_scope("api_write")]
 pub async fn batch_create_records(
     state: web::Data<AppState>,
     body: web::Json<BatchCreateNutritionRecords>,
@@ -41,6 +45,7 @@ pub async fn batch_create_records(
 }
 
 #[get("/{id}")]
+#[require_scope("api_read")]
 pub async fn get_record(
     state: web::Data<AppState>,
     id: web::Path<String>,
@@ -50,6 +55,7 @@ pub async fn get_record(
 }
 
 #[patch("/{id}")]
+#[require_scope("api_write")]
 pub async fn update_record(
     state: web::Data<AppState>,
     id: web::Path<String>,
@@ -60,6 +66,7 @@ pub async fn update_record(
 }
 
 #[delete("/{id}")]
+#[require_scope("api_write")]
 pub async fn delete_record(
     state: web::Data<AppState>,
     id: web::Path<String>,

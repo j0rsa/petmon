@@ -2180,7 +2180,7 @@ checksum = "9b4f627cb1b25917193a259e49bdad08f671f8d9708acfd5fe0a8c1455d87220"
 
 [[package]]
 name = "petmon"
-version = "0.6.0"
+version = "0.7.0"
 dependencies = [
  "actix-files",
  "actix-web",
@@ -2197,6 +2197,7 @@ dependencies = [
  "opentelemetry",
  "opentelemetry-otlp",
  "opentelemetry_sdk",
+ "petmon-macros",
  "rand 0.8.6",
  "reqwest 0.12.28",
  "rust-embed",
@@ -2212,6 +2213,15 @@ dependencies = [
  "tracing-subscriber",
  "urlencoding",
  "uuid",
+]
+
+[[package]]
+name = "petmon-macros"
+version = "0.1.0"
+dependencies = [
+ "proc-macro2",
+ "quote",
+ "syn",
 ]
 
 [[package]]

@@ -58,15 +58,15 @@ function ChipWrapper({ me }: { me: object }) {
 
 export const UserChipOidc: StoryObj = {
   name: 'UserChip — OIDC user with version',
-  render: () => <ChipWrapper me={{ subject: 'sub-123', email: 'alice@example.com', name: 'Alice', display_name: 'Alice', kind: 'oidc' }} />,
+  render: () => <ChipWrapper me={{ subject: 'sub-123', email: 'alice@example.com', name: 'Alice', display_name: 'Alice', kind: 'oidc', scopes: [] }} />,
 };
 
 export const UserChipApiToken: StoryObj = {
   name: 'UserChip — API token user',
-  render: () => <ChipWrapper me={{ subject: 'mobile-app', email: null, name: null, display_name: 'mobile-app', kind: 'api_token' }} />,
+  render: () => <ChipWrapper me={{ subject: 'mobile-app', email: null, name: null, display_name: 'mobile-app', kind: 'api_token', scopes: ['api_read'] }} />,
 };
 
 export const UserChipDev: StoryObj = {
   name: 'UserChip — dev mode (no sign out)',
-  render: () => <ChipWrapper me={{ subject: 'dev', email: null, name: 'Dev', display_name: 'Dev', kind: 'dev' }} />,
+  render: () => <ChipWrapper me={{ subject: 'dev', email: null, name: 'Dev', display_name: 'Dev', kind: 'dev', scopes: [] }} />,
 };

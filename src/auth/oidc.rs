@@ -165,6 +165,7 @@ impl OidcValidator {
             email: claims.email,
             name: claims.name,
             kind: IdentityKind::Oidc,
+            scopes: std::collections::HashSet::new(),
         })
     }
 

@@ -703,7 +703,7 @@ pre {
 
   .content {
     padding: 1rem;
-    padding-top: calc(1rem + 5rem);
+    padding-top: calc(1rem + 5rem + env(safe-area-inset-top));
     padding-bottom: calc(5rem + env(safe-area-inset-bottom));
   }
 

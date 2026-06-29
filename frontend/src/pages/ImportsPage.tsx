@@ -6,10 +6,12 @@ import { useSelectedPet } from '../context/SelectedPetContext';
 import { dedupeCreateRecords, parseTelegramNutritionLog, toCreateNutritionRecords } from '../lib/parseTelegramNutritionLog';
 import { CATEGORY_LABELS } from '../types';
 import type { CreateNutritionRecord } from '../types';
+import { usePermissions } from '../context/usePermissions';
 
 export default function ImportsPage() {
   const queryClient = useQueryClient();
   const { selectedPetId, selectedPet, petsLoading } = useSelectedPet();
+  const { canWrite } = usePermissions();
   const [rawText, setRawText] = useState('');
   const [previewRecords, setPreviewRecords] = useState<CreateNutritionRecord[] | null>(null);
 
@@ -51,6 +53,14 @@ export default function ImportsPage() {
 
   if (!selectedPetId) {
     return <NoPetSelected />;
+  }
+
+  if (!canWrite) {
+    return (
+      <div className="page-stack">
+        <div className="empty-state">Importing records requires write access. Your API token does not have the <code>api_write</code> scope.</div>
+      </div>
+    );
   }
 
   return (

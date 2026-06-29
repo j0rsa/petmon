@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { usePermissions } from '../context/usePermissions';
 import { Link, useParams } from 'react-router-dom';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 import { petsApi } from '../api/pets';
@@ -16,6 +17,7 @@ export default function PetInfoPage() {
   const { id = '' } = useParams();
   const { setSelectedPetId } = useSelectedPet();
   const queryClient = useQueryClient();
+  const { canWrite } = usePermissions();
   const [editing, setEditing] = useState(false);
   const [form, setForm] = useState(petToFormState({ name: '', species: 'cat', status: 'active' }));
   const [photoUrl, setPhotoUrl] = useState<string | undefined>();
@@ -87,7 +89,7 @@ export default function PetInfoPage() {
           <Link className="button button-secondary" to="/pets">
             All pets
           </Link>
-          {!editing && (
+          {!editing && canWrite && (
             <button className="button" type="button" onClick={() => setEditing(true)}>
               Edit profile
             </button>

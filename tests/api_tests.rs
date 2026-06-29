@@ -1,6 +1,7 @@
 use actix_web::{test, web, App};
 use petmon::auth::AppState;
 use petmon::{api, assets, mcp, middleware};
+use sha2::{Digest, Sha256};
 use sqlx::SqlitePool;
 
 async fn setup_pool() -> SqlitePool {
@@ -896,4 +897,332 @@ async fn weight_summary_raw_returns_one_bucket_per_record() {
     );
     assert_eq!(buckets[0]["count"].as_i64(), Some(1));
     assert_eq!(buckets[0]["avg_kg"].as_f64(), Some(4.1));
+}
+
+// ── API token scopes ──────────────────────────────────────────────────────────
+
+#[actix_web::test]
+async fn api_token_created_with_default_all_scope() {
+    let (app, _state) = build_dev_app!();
+    let req = test::TestRequest::post()
+        .uri("/api/v1/api-tokens")
+        .set_json(serde_json::json!({ "alias": "test-token" }))
+        .to_request();
+    let resp = test::call_service(&app, req).await;
+    assert_eq!(resp.status(), 201);
+    let body: serde_json::Value = test::read_body_json(resp).await;
+    assert_eq!(
+        body["scopes"].as_array().map(|a| a.len()),
+        Some(1),
+        "default scopes should be [all]"
+    );
+    assert_eq!(body["scopes"][0].as_str(), Some("all"));
+}
+
+#[actix_web::test]
+async fn api_token_created_with_explicit_scopes() {
+    let (app, _state) = build_dev_app!();
+    let req = test::TestRequest::post()
+        .uri("/api/v1/api-tokens")
+        .set_json(serde_json::json!({
+            "alias": "read-only",
+            "scopes": ["api_read", "mcp"]
+        }))
+        .to_request();
+    let resp = test::call_service(&app, req).await;
+    assert_eq!(resp.status(), 201);
+    let body: serde_json::Value = test::read_body_json(resp).await;
+    let scopes: Vec<&str> = body["scopes"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(|v| v.as_str().unwrap())
+        .collect();
+    assert!(scopes.contains(&"api_read"));
+    assert!(scopes.contains(&"mcp"));
+    assert!(!scopes.contains(&"api_write"));
+}
+
+#[actix_web::test]
+async fn api_token_scopes_update_patch() {
+    let (app, _state) = build_dev_app!();
+
+    // Create a token
+    let create_resp: serde_json::Value = test::read_body_json(
+        test::call_service(
+            &app,
+            test::TestRequest::post()
+                .uri("/api/v1/api-tokens")
+                .set_json(serde_json::json!({ "alias": "patch-test" }))
+                .to_request(),
+        )
+        .await,
+    )
+    .await;
+    let token_id = create_resp["id"].as_str().unwrap();
+
+    // Patch scopes
+    let req = test::TestRequest::patch()
+        .uri(&format!("/api/v1/api-tokens/{token_id}/scopes"))
+        .set_json(serde_json::json!({ "scopes": ["api_read"] }))
+        .to_request();
+    let resp = test::call_service(&app, req).await;
+    assert_eq!(resp.status(), 200, "PATCH scopes must return 200");
+    let body: serde_json::Value = test::read_body_json(resp).await;
+    assert_eq!(
+        body["scopes"].as_array().map(|a| a.len()),
+        Some(1),
+        "should have exactly one scope after patch"
+    );
+    assert_eq!(body["scopes"][0].as_str(), Some("api_read"));
+
+    // Verify list reflects the change
+    let list_resp: serde_json::Value = test::read_body_json(
+        test::call_service(
+            &app,
+            test::TestRequest::get()
+                .uri("/api/v1/api-tokens")
+                .to_request(),
+        )
+        .await,
+    )
+    .await;
+    let token = list_resp
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|t| t["id"].as_str() == Some(token_id))
+        .expect("token must appear in list");
+    assert_eq!(token["scopes"][0].as_str(), Some("api_read"));
+}
+
+#[actix_web::test]
+async fn api_token_scopes_patch_rejects_unknown_scope() {
+    let (app, _state) = build_dev_app!();
+    let create_resp: serde_json::Value = test::read_body_json(
+        test::call_service(
+            &app,
+            test::TestRequest::post()
+                .uri("/api/v1/api-tokens")
+                .set_json(serde_json::json!({ "alias": "bad-scope-test" }))
+                .to_request(),
+        )
+        .await,
+    )
+    .await;
+    let token_id = create_resp["id"].as_str().unwrap();
+
+    let req = test::TestRequest::patch()
+        .uri(&format!("/api/v1/api-tokens/{token_id}/scopes"))
+        .set_json(serde_json::json!({ "scopes": ["admin"] }))
+        .to_request();
+    let resp = test::call_service(&app, req).await;
+    assert_eq!(resp.status(), 400, "unknown scope must be rejected");
+}
+
+// ── Scope enforcement ─────────────────────────────────────────────────────────
+// These tests run against a non-dev app so RequireAuth is active.
+// Each test seeds a token with specific scopes and asserts HTTP 200 or 403.
+
+fn sha256_hex(raw: &str) -> String {
+    let mut hasher = Sha256::new();
+    hasher.update(raw.as_bytes());
+    format!("{:x}", hasher.finalize())
+}
+
+/// Seeds a token with the given raw value and scopes, returns the raw token string.
+async fn seed_token(pool: &SqlitePool, raw: &str, scopes: &str) {
+    let hash = sha256_hex(raw);
+    sqlx::query(
+        "INSERT INTO api_tokens (id, token_hash, alias, scopes, created_at, last_used_at, active) \
+         VALUES (?, ?, ?, ?, datetime('now'), NULL, 1)",
+    )
+    .bind(uuid::Uuid::new_v4().to_string())
+    .bind(&hash)
+    .bind(raw)
+    .bind(scopes)
+    .execute(pool)
+    .await
+    .unwrap();
+}
+
+/// GET /pets with an api_read token → 200
+#[actix_web::test]
+async fn scope_api_read_permits_get_pets() {
+    let pool = setup_pool().await;
+    let raw = "pm_api_read_test_000000000000000000000000000000000000000000000000000000";
+    seed_token(&pool, raw, "api_read").await;
+    let state = web::Data::new(AppState::new(pool, false, None, None));
+    let app = build_app!(state);
+    let resp = test::call_service(
+        &app,
+        test::TestRequest::get()
+            .uri("/api/v1/pets")
+            .insert_header(("Authorization", format!("Bearer {raw}")))
+            .to_request(),
+    )
+    .await;
+    assert_eq!(
+        resp.status(),
+        200,
+        "api_read token must be able to GET /pets"
+    );
+}
+
+/// POST /pets with an api_read token → 403
+#[actix_web::test]
+async fn scope_api_read_denies_post_pets() {
+    let pool = setup_pool().await;
+    let raw = "pm_api_read_only_000000000000000000000000000000000000000000000000000000";
+    seed_token(&pool, raw, "api_read").await;
+    let state = web::Data::new(AppState::new(pool, false, None, None));
+    let app = build_app!(state);
+    let resp = test::call_service(
+        &app,
+        test::TestRequest::post()
+            .uri("/api/v1/pets")
+            .insert_header(("Authorization", format!("Bearer {raw}")))
+            .set_json(serde_json::json!({ "name": "Test", "species": "cat" }))
+            .to_request(),
+    )
+    .await;
+    assert_eq!(
+        resp.status(),
+        403,
+        "api_read token must be denied POST /pets"
+    );
+}
+
+/// POST /pets with an api_write token → 201
+#[actix_web::test]
+async fn scope_api_write_permits_post_pets() {
+    let pool = setup_pool().await;
+    let raw = "pm_api_write_test_00000000000000000000000000000000000000000000000000000";
+    seed_token(&pool, raw, "api_write").await;
+    let state = web::Data::new(AppState::new(pool, false, None, None));
+    let app = build_app!(state);
+    let resp = test::call_service(
+        &app,
+        test::TestRequest::post()
+            .uri("/api/v1/pets")
+            .insert_header(("Authorization", format!("Bearer {raw}")))
+            .set_json(serde_json::json!({ "name": "Test", "species": "cat" }))
+            .to_request(),
+    )
+    .await;
+    assert_eq!(
+        resp.status(),
+        201,
+        "api_write token must be able to POST /pets"
+    );
+}
+
+/// GET /pets with an api_write token → 403 (write-only cannot read)
+#[actix_web::test]
+async fn scope_api_write_denies_get_pets() {
+    let pool = setup_pool().await;
+    let raw = "pm_api_write_only_0000000000000000000000000000000000000000000000000000";
+    seed_token(&pool, raw, "api_write").await;
+    let state = web::Data::new(AppState::new(pool, false, None, None));
+    let app = build_app!(state);
+    let resp = test::call_service(
+        &app,
+        test::TestRequest::get()
+            .uri("/api/v1/pets")
+            .insert_header(("Authorization", format!("Bearer {raw}")))
+            .to_request(),
+    )
+    .await;
+    assert_eq!(
+        resp.status(),
+        403,
+        "api_write token must be denied GET /pets"
+    );
+}
+
+/// GET /pets with an all token → 200
+#[actix_web::test]
+async fn scope_all_permits_get_pets() {
+    let pool = setup_pool().await;
+    let raw = "pm_api_all_token_000000000000000000000000000000000000000000000000000000";
+    seed_token(&pool, raw, "all").await;
+    let state = web::Data::new(AppState::new(pool, false, None, None));
+    let app = build_app!(state);
+    let resp = test::call_service(
+        &app,
+        test::TestRequest::get()
+            .uri("/api/v1/pets")
+            .insert_header(("Authorization", format!("Bearer {raw}")))
+            .to_request(),
+    )
+    .await;
+    assert_eq!(
+        resp.status(),
+        200,
+        "all-scope token must be able to GET /pets"
+    );
+}
+
+/// POST /pets with an all token → 201
+#[actix_web::test]
+async fn scope_all_permits_post_pets() {
+    let pool = setup_pool().await;
+    let raw = "pm_api_all_write_00000000000000000000000000000000000000000000000000000";
+    seed_token(&pool, raw, "all").await;
+    let state = web::Data::new(AppState::new(pool, false, None, None));
+    let app = build_app!(state);
+    let resp = test::call_service(
+        &app,
+        test::TestRequest::post()
+            .uri("/api/v1/pets")
+            .insert_header(("Authorization", format!("Bearer {raw}")))
+            .set_json(serde_json::json!({ "name": "AllPet", "species": "cat" }))
+            .to_request(),
+    )
+    .await;
+    assert_eq!(
+        resp.status(),
+        201,
+        "all-scope token must be able to POST /pets"
+    );
+}
+
+/// POST /mcp with a mcp-scoped token → 200 (tool list)
+#[actix_web::test]
+async fn scope_mcp_permits_mcp_endpoint() {
+    let pool = setup_pool().await;
+    let raw = "pm_api_mcp_token_000000000000000000000000000000000000000000000000000000";
+    seed_token(&pool, raw, "mcp").await;
+    let state = web::Data::new(AppState::new(pool, false, None, None));
+    let app = build_full_app!(state);
+    let resp = test::call_service(
+        &app,
+        test::TestRequest::post()
+            .uri("/mcp")
+            .insert_header(("Authorization", format!("Bearer {raw}")))
+            .set_json(serde_json::json!({ "jsonrpc": "2.0", "id": 1, "method": "tools/list", "params": null }))
+            .to_request(),
+    )
+    .await;
+    assert_eq!(resp.status(), 200, "mcp-scoped token must reach /mcp");
+}
+
+/// POST /mcp with an api_read token → 403
+#[actix_web::test]
+async fn scope_api_read_denies_mcp_endpoint() {
+    let pool = setup_pool().await;
+    let raw = "pm_api_read_nomcp_00000000000000000000000000000000000000000000000000000";
+    seed_token(&pool, raw, "api_read").await;
+    let state = web::Data::new(AppState::new(pool, false, None, None));
+    let app = build_full_app!(state);
+    let resp = test::call_service(
+        &app,
+        test::TestRequest::post()
+            .uri("/mcp")
+            .insert_header(("Authorization", format!("Bearer {raw}")))
+            .set_json(serde_json::json!({ "jsonrpc": "2.0", "id": 1, "method": "tools/list", "params": null }))
+            .to_request(),
+    )
+    .await;
+    assert_eq!(resp.status(), 403, "api_read token must be denied /mcp");
 }

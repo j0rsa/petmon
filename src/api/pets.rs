@@ -3,15 +3,18 @@ use crate::domain::pet::{CreatePet, UpdatePet};
 use crate::error::AppResult;
 use crate::services::pet_service;
 use actix_web::{delete, get, patch, post, web, HttpResponse};
+use petmon_macros::require_scope;
 use uuid::Uuid;
 
 #[get("")]
+#[require_scope("api_read")]
 pub async fn list_pets(state: web::Data<AppState>) -> AppResult<HttpResponse> {
     let pets = pet_service::list(&state.pool).await?;
     Ok(HttpResponse::Ok().json(pets))
 }
 
 #[post("")]
+#[require_scope("api_write")]
 pub async fn create_pet(
     state: web::Data<AppState>,
     body: web::Json<CreatePet>,
@@ -21,12 +24,14 @@ pub async fn create_pet(
 }
 
 #[get("/{id}")]
+#[require_scope("api_read")]
 pub async fn get_pet(state: web::Data<AppState>, id: web::Path<Uuid>) -> AppResult<HttpResponse> {
     let pet = pet_service::get(&state.pool, *id).await?;
     Ok(HttpResponse::Ok().json(pet))
 }
 
 #[patch("/{id}")]
+#[require_scope("api_write")]
 pub async fn update_pet(
     state: web::Data<AppState>,
     id: web::Path<Uuid>,
@@ -37,6 +42,7 @@ pub async fn update_pet(
 }
 
 #[delete("/{id}")]
+#[require_scope("api_write")]
 pub async fn delete_pet(
     state: web::Data<AppState>,
     id: web::Path<Uuid>,

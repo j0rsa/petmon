@@ -108,6 +108,7 @@ where
                             .clone()
                             .or_else(|| api_token.created_by.clone())
                             .unwrap_or_else(|| api_token.id.clone());
+                        let scopes = api_token.scopes_vec().into_iter().collect();
                         let identity = Identity {
                             subject: display.clone(),
                             email: None,
@@ -115,6 +116,7 @@ where
                             kind: crate::auth::identity::IdentityKind::ApiToken {
                                 token_id: api_token.id,
                             },
+                            scopes,
                         };
                         req.extensions_mut().insert(identity);
                         let res = service.call(req).await?;

@@ -1,7 +1,7 @@
 use chrono::Utc;
 use sqlx::SqlitePool;
 
-use crate::domain::settings::{ApiToken, ApiTokenCreated, CreateApiToken};
+use crate::domain::settings::{ApiToken, ApiTokenCreated, CreateApiToken, UpdateApiTokenScopes};
 use crate::error::{AppError, AppResult};
 
 use rand::Rng;
@@ -20,7 +20,7 @@ fn hash_token(raw: &str) -> String {
 
 pub async fn list(pool: &SqlitePool) -> AppResult<Vec<ApiToken>> {
     Ok(sqlx::query_as::<_, ApiToken>(
-        "SELECT id, alias, token_hash, active, created_by, created_at, last_used_at
+        "SELECT id, alias, token_hash, active, scopes, created_by, created_at, last_used_at
          FROM api_tokens ORDER BY created_at DESC",
     )
     .fetch_all(pool)
@@ -36,13 +36,14 @@ pub async fn create(
     let token = ApiToken::new(req, hash);
 
     sqlx::query(
-        "INSERT INTO api_tokens (id, alias, token_hash, active, created_by, created_at)
-         VALUES (?, ?, ?, ?, ?, ?)",
+        "INSERT INTO api_tokens (id, alias, token_hash, active, scopes, created_by, created_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?)",
     )
     .bind(&token.id)
     .bind(&token.alias)
     .bind(&token.token_hash)
     .bind(token.active)
+    .bind(&token.scopes)
     .bind(&token.created_by)
     .bind(&token.created_at)
     .execute(pool)
@@ -52,6 +53,7 @@ pub async fn create(
         id: token.id.clone(),
         alias: token.alias.clone(),
         token: raw,
+        scopes: token.scopes_vec(),
         created_at: token.created_at.clone(),
     };
 
@@ -82,6 +84,31 @@ pub async fn deactivate(pool: &SqlitePool, id: &str) -> AppResult<()> {
     Ok(())
 }
 
+pub async fn update_scopes(
+    pool: &SqlitePool,
+    id: &str,
+    req: UpdateApiTokenScopes,
+) -> AppResult<ApiToken> {
+    let scopes_str = req.scopes.join(",");
+    let rows = sqlx::query("UPDATE api_tokens SET scopes = ? WHERE id = ?")
+        .bind(&scopes_str)
+        .bind(id)
+        .execute(pool)
+        .await?
+        .rows_affected();
+    if rows == 0 {
+        return Err(AppError::NotFound(format!("API token '{id}' not found")));
+    }
+    sqlx::query_as::<_, ApiToken>(
+        "SELECT id, alias, token_hash, active, scopes, created_by, created_at, last_used_at
+         FROM api_tokens WHERE id = ?",
+    )
+    .bind(id)
+    .fetch_optional(pool)
+    .await?
+    .ok_or_else(|| AppError::NotFound(format!("API token '{id}' not found")))
+}
+
 pub async fn delete(pool: &SqlitePool, id: &str) -> AppResult<()> {
     let result = sqlx::query("DELETE FROM api_tokens WHERE id = ? AND active = 0")
         .bind(id)
@@ -107,7 +134,7 @@ pub async fn has_active_tokens(pool: &SqlitePool) -> bool {
 pub async fn find_by_hash(pool: &SqlitePool, raw_token: &str) -> AppResult<Option<ApiToken>> {
     let hash = hash_token(raw_token);
     let token = sqlx::query_as::<_, ApiToken>(
-        "SELECT id, alias, token_hash, active, created_by, created_at, last_used_at
+        "SELECT id, alias, token_hash, active, scopes, created_by, created_at, last_used_at
          FROM api_tokens WHERE token_hash = ? AND active = 1",
     )
     .bind(&hash)

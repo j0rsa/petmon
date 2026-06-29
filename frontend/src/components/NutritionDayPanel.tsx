@@ -1,5 +1,6 @@
 import { forwardRef, useEffect, useImperativeHandle, useMemo, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
+import { usePermissions } from '../context/usePermissions';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { nutritionAnalyticsApi } from '../api/analytics';
 import { daysApi } from '../api/days';
@@ -132,9 +133,10 @@ interface RecordRowProps {
   savingPaused: boolean;
   deleting: boolean;
   deletingPaused: boolean;
+  canWrite: boolean;
 }
 
-function RecordRow({ record, onSave, onDelete, saving, savingPaused, deleting, deletingPaused }: RecordRowProps) {
+function RecordRow({ record, onSave, onDelete, saving, savingPaused, deleting, deletingPaused, canWrite }: RecordRowProps) {
   const formatTime = useFormatTime();
   const [editing, setEditing] = useState(false);
   const [time, setTime] = useState('');
@@ -203,19 +205,21 @@ function RecordRow({ record, onSave, onDelete, saving, savingPaused, deleting, d
         <span className="entry-time">{formatTime(record.occurred_at)}</span>
         <CategoryBadge category={record.category} />
         <span className="entry-amount">{record.amount} {record.unit ?? ''}</span>
-        <div className="entry-row-actions">
-          <button className="icon-button" type="button" title="Edit" aria-label="Edit" onClick={startEdit}>✎</button>
-          <button
-            className="icon-button icon-button-danger"
-            type="button"
-            title="Delete"
-            aria-label="Delete"
-            disabled={deleting}
-            onClick={() => { if (window.confirm('Delete this record?')) onDelete(record.id); }}
-          >
-            {deletingPaused ? '⏸' : '✕'}
-          </button>
-        </div>
+        {canWrite && (
+          <div className="entry-row-actions">
+            <button className="icon-button" type="button" title="Edit" aria-label="Edit" onClick={startEdit}>✎</button>
+            <button
+              className="icon-button icon-button-danger"
+              type="button"
+              title="Delete"
+              aria-label="Delete"
+              disabled={deleting}
+              onClick={() => { if (window.confirm('Delete this record?')) onDelete(record.id); }}
+            >
+              {deletingPaused ? '⏸' : '✕'}
+            </button>
+          </div>
+        )}
       </div>
     </div>
   );
@@ -230,6 +234,7 @@ interface NutritionDayPanelProps {
 
 export function NutritionDayPanel({ date, petId }: NutritionDayPanelProps) {
   const queryClient = useQueryClient();
+  const { canWrite } = usePermissions();
   const [noteDraft, setNoteDraft] = useState('');
   const { show_water_card } = useDisplaySettings();
   const addRowRef = useRef<AddRowHandle>(null);
@@ -393,41 +398,46 @@ export function NutritionDayPanel({ date, petId }: NutritionDayPanelProps) {
                 deletingPaused={deleteMutation.isPaused && deleteMutation.variables === record.id}
                 onSave={(id, payload) => updateMutation.mutate({ id, payload })}
                 onDelete={(id) => deleteMutation.mutate(id)}
+                canWrite={canWrite}
               />
             ))}
           </div>
         )}
 
-        <AddRow
-          ref={addRowRef}
-          date={date}
-          petId={petId}
-          saving={createMutation.isPending}
-          isPaused={createMutation.isPaused}
-          onSave={(payload) => createMutation.mutate(payload)}
-        />
+        {canWrite && (
+          <AddRow
+            ref={addRowRef}
+            date={date}
+            petId={petId}
+            saving={createMutation.isPending}
+            isPaused={createMutation.isPaused}
+            onSave={(payload) => createMutation.mutate(payload)}
+          />
+        )}
       </div>
 
       {records.length > 0 && <ExportPanel records={records} />}
 
-      <div className="day-note-block">
-        <label htmlFor={`day-note-${date}`}>Day note</label>
-        <textarea
-          id={`day-note-${date}`}
-          rows={3}
-          value={noteDraft}
-          onChange={(e) => setNoteDraft(e.target.value)}
-          placeholder="Notes for caregivers"
-        />
-        <button
-          className="button button-secondary button-compact"
-          type="button"
-          onClick={() => noteMutation.mutate()}
-          disabled={noteMutation.isPending}
-        >
-          {noteMutation.isPending ? 'Saving…' : 'Save note'}
-        </button>
-      </div>
+      {canWrite && (
+        <div className="day-note-block">
+          <label htmlFor={`day-note-${date}`}>Day note</label>
+          <textarea
+            id={`day-note-${date}`}
+            rows={3}
+            value={noteDraft}
+            onChange={(e) => setNoteDraft(e.target.value)}
+            placeholder="Notes for caregivers"
+          />
+          <button
+            className="button button-secondary button-compact"
+            type="button"
+            onClick={() => noteMutation.mutate()}
+            disabled={noteMutation.isPending}
+          >
+            {noteMutation.isPending ? 'Saving…' : 'Save note'}
+          </button>
+        </div>
+      )}
     </section>
   );
 }

@@ -266,6 +266,7 @@ export const mockApiTokens: ApiTokenPublic[] = [
     alias: 'mobile-app',
     active: true,
     current: true,
+    scopes: ['all'],
     created_by: 'admin',
     created_at: '2025-01-10T09:00:00Z',
     last_used_at: '2025-06-01T14:22:00Z',
@@ -275,6 +276,7 @@ export const mockApiTokens: ApiTokenPublic[] = [
     alias: null,
     active: true,
     current: false,
+    scopes: ['api_read', 'mcp'],
     created_by: null,
     created_at: '2025-03-15T11:30:00Z',
     last_used_at: null,
@@ -284,6 +286,7 @@ export const mockApiTokens: ApiTokenPublic[] = [
     alias: 'old-script',
     active: false,
     current: false,
+    scopes: ['api_write'],
     created_by: 'admin',
     created_at: '2024-11-01T08:00:00Z',
     last_used_at: '2024-12-20T10:00:00Z',
@@ -294,6 +297,7 @@ export const mockCreatedToken: ApiTokenCreated = {
   id: 'tok-new',
   alias: 'my-device',
   token: 'pm_api_a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2',
+  scopes: ['all'],
   created_at: '2026-06-17T12:00:00Z',
 };
 

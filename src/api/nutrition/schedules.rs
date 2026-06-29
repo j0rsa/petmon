@@ -3,6 +3,7 @@ use crate::domain::nutrition_schedule::{CreateNutritionSchedule, UpdateNutrition
 use crate::error::AppResult;
 use crate::services::nutrition_schedule_service;
 use actix_web::{delete, get, patch, post, web, HttpResponse};
+use petmon_macros::require_scope;
 use serde::Deserialize;
 use uuid::Uuid;
 
@@ -12,6 +13,7 @@ pub struct ScheduleQuery {
 }
 
 #[get("")]
+#[require_scope("api_read")]
 pub async fn list_schedules(
     state: web::Data<AppState>,
     query: web::Query<ScheduleQuery>,
@@ -21,6 +23,7 @@ pub async fn list_schedules(
 }
 
 #[post("")]
+#[require_scope("api_write")]
 pub async fn create_schedule(
     state: web::Data<AppState>,
     body: web::Json<CreateNutritionSchedule>,
@@ -30,6 +33,7 @@ pub async fn create_schedule(
 }
 
 #[get("/{id}")]
+#[require_scope("api_read")]
 pub async fn get_schedule(
     state: web::Data<AppState>,
     id: web::Path<String>,
@@ -39,6 +43,7 @@ pub async fn get_schedule(
 }
 
 #[patch("/{id}")]
+#[require_scope("api_write")]
 pub async fn update_schedule(
     state: web::Data<AppState>,
     id: web::Path<String>,
@@ -49,6 +54,7 @@ pub async fn update_schedule(
 }
 
 #[delete("/{id}")]
+#[require_scope("api_write")]
 pub async fn delete_schedule(
     state: web::Data<AppState>,
     id: web::Path<String>,

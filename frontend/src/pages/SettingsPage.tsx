@@ -1,9 +1,12 @@
 import { useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { settingsApi } from '../api/settings';
-import type { ApiTokenCreated, ApiTokenPublic, DisplaySettings, OidcConfigPublic, TelegramConfigPublic } from '../api/settings';
+import type { ApiTokenCreated, ApiTokenPublic, ApiTokenScope, DisplaySettings, OidcConfigPublic, TelegramConfigPublic } from '../api/settings';
+import { API_TOKEN_SCOPES } from '../api/settings';
 import { infoApi } from '../api/info';
 import { deriveDeviceAlias, getStoredToken, storeToken } from '../lib/auth';
+import { TagInput } from '../components/TagInput';
+import { usePermissions } from '../context/usePermissions';
 
 export default function SettingsPage() {
   const { data: info } = useQuery({ queryKey: ['app-info'], queryFn: infoApi.get, staleTime: Infinity, retry: false });
@@ -341,10 +344,12 @@ function TelegramSection() {
 
 function ApiTokensSection() {
   const queryClient = useQueryClient();
+  const { canWrite } = usePermissions();
   const { data: tokens, isLoading } = useQuery({ queryKey: ['api-tokens'], queryFn: settingsApi.listTokens });
   const { data: oidc } = useQuery({ queryKey: ['settings-oidc'], queryFn: settingsApi.getOidc });
 
   const [alias, setAlias] = useState('');
+  const [newScopes, setNewScopes] = useState<ApiTokenScope[]>(['all']);
   const [justCreated, setJustCreated] = useState<ApiTokenCreated | null>(null);
   const [copied, setCopied] = useState(false);
   const [deviceAlias, setDeviceAlias] = useState(() => deriveDeviceAlias());
@@ -354,12 +359,19 @@ function ApiTokensSection() {
   const usingApiToken = getStoredToken()?.startsWith('pm_api_') ?? false;
 
   const createMutation = useMutation({
-    mutationFn: () => settingsApi.createToken({ alias: alias || undefined }),
+    mutationFn: () => settingsApi.createToken({ alias: alias || undefined, scopes: newScopes }),
     onSuccess: (created) => {
       setJustCreated(created);
       setAlias('');
+      setNewScopes(['all']);
       queryClient.invalidateQueries({ queryKey: ['api-tokens'] });
     },
+  });
+
+  const updateScopesMutation = useMutation({
+    mutationFn: ({ id, scopes }: { id: string; scopes: ApiTokenScope[] }) =>
+      settingsApi.updateTokenScopes(id, { scopes }),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['api-tokens'] }),
   });
 
   const rememberMutation = useMutation({
@@ -404,7 +416,7 @@ function ApiTokensSection() {
       </div>
 
       {/* Remember this device — shown when using OIDC and OIDC is enabled */}
-      {oidcEnabled && !usingApiToken && (
+      {canWrite && oidcEnabled && !usingApiToken && (
         <div style={{ background: 'var(--surface-raised)', border: '1px solid var(--border)', borderRadius: 12, padding: '1rem', display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
           <div>
             <p style={{ fontSize: '0.88rem', fontWeight: 600, marginBottom: '0.25rem' }}>Remember this device</p>
@@ -472,17 +484,26 @@ function ApiTokensSection() {
       )}
 
       {/* Create form */}
-      {oidcEnabled && (
+      {canWrite && oidcEnabled && (
         <div className="form-grid">
           <div className="form-row">
             <label>Alias (optional)</label>
             <input placeholder="e.g. mobile-app" value={alias} onChange={(e) => setAlias(e.target.value)} />
           </div>
+          <div className="form-row">
+            <label>Scopes</label>
+            <TagInput
+              value={newScopes}
+              options={API_TOKEN_SCOPES}
+              onChange={(v) => setNewScopes(v as ApiTokenScope[])}
+              placeholder="Add scope…"
+            />
+          </div>
           <div className="form-row form-row-full">
             <button
               className="button"
               type="button"
-              disabled={createMutation.isPending}
+              disabled={createMutation.isPending || newScopes.length === 0}
               onClick={() => createMutation.mutate()}
             >
               {createMutation.isPending ? 'Creating…' : '+ Create token'}
@@ -501,6 +522,7 @@ function ApiTokensSection() {
           <thead>
             <tr>
               <th>Alias</th>
+              <th>Scopes</th>
               <th>Created by</th>
               <th>Created</th>
               <th>Last used</th>
@@ -513,12 +535,15 @@ function ApiTokensSection() {
               <TokenRow
                 key={token.id}
                 token={token}
+                canWrite={canWrite}
                 onActivate={() => activateMutation.mutate(token.id)}
                 activating={activateMutation.isPending && activateMutation.variables === token.id}
                 onDeactivate={() => deactivateMutation.mutate(token.id)}
                 deactivating={deactivateMutation.isPending && deactivateMutation.variables === token.id}
                 onDelete={() => deleteMutation.mutate(token.id)}
                 deleting={deleteMutation.isPending && deleteMutation.variables === token.id}
+                onUpdateScopes={(scopes) => updateScopesMutation.mutate({ id: token.id, scopes })}
+                updatingScopes={updateScopesMutation.isPending && updateScopesMutation.variables?.id === token.id}
               />
             ))}
           </tbody>
@@ -528,15 +553,32 @@ function ApiTokensSection() {
   );
 }
 
-function TokenRow({ token, onActivate, activating, onDeactivate, deactivating, onDelete, deleting }: {
+function TokenRow({ token, canWrite, onActivate, activating, onDeactivate, deactivating, onDelete, deleting, onUpdateScopes, updatingScopes }: {
   token: ApiTokenPublic;
+  canWrite: boolean;
   onActivate: () => void;
   activating: boolean;
   onDeactivate: () => void;
   deactivating: boolean;
   onDelete: () => void;
   deleting: boolean;
+  onUpdateScopes: (scopes: ApiTokenScope[]) => void;
+  updatingScopes: boolean;
 }) {
+  const [editingScopes, setEditingScopes] = useState(false);
+  const [scopesDraft, setScopesDraft] = useState<ApiTokenScope[]>(token.scopes);
+
+  function startScopeEdit() {
+    setScopesDraft(token.scopes);
+    setEditingScopes(true);
+  }
+
+  function commitScopes() {
+    if (scopesDraft.length === 0) return;
+    onUpdateScopes(scopesDraft);
+    setEditingScopes(false);
+  }
+
   return (
     <tr style={{ opacity: token.active ? 1 : 0.5, borderLeft: token.current ? '2px solid var(--accent)' : undefined }}>
       <td style={{ fontFamily: 'monospace', fontSize: '0.88rem' }}>
@@ -549,47 +591,102 @@ function TokenRow({ token, onActivate, activating, onDeactivate, deactivating, o
           )}
         </span>
       </td>
+      <td>
+        {editingScopes ? (
+          <div style={{ display: 'flex', gap: '0.4rem', alignItems: 'center', minWidth: 220 }}>
+            <div style={{ flex: 1 }}>
+              <TagInput
+                value={scopesDraft}
+                options={API_TOKEN_SCOPES}
+                onChange={(v) => setScopesDraft(v as ApiTokenScope[])}
+                placeholder="Add scope…"
+                disabled={updatingScopes}
+              />
+            </div>
+            <button
+              className="button button-secondary"
+              type="button"
+              style={{ padding: '0.25rem 0.6rem', fontSize: '0.78rem', whiteSpace: 'nowrap' }}
+              disabled={updatingScopes || scopesDraft.length === 0}
+              onClick={commitScopes}
+            >
+              {updatingScopes ? '…' : 'Save'}
+            </button>
+            <button
+              className="button button-secondary"
+              type="button"
+              style={{ padding: '0.25rem 0.6rem', fontSize: '0.78rem' }}
+              onClick={() => setEditingScopes(false)}
+            >
+              ✕
+            </button>
+          </div>
+        ) : (
+          <div style={{ display: 'flex', gap: '0.3rem', flexWrap: 'wrap', alignItems: 'center' }}>
+            {token.scopes.map((s) => (
+              <span
+                key={s}
+                style={{ fontFamily: 'monospace', fontSize: '0.72rem', background: 'var(--surface-raised)', border: '1px solid var(--border-subtle)', borderRadius: 4, padding: '0.1rem 0.4rem' }}
+              >
+                {s}
+              </span>
+            ))}
+            <button
+              className="icon-button"
+              type="button"
+              title="Edit scopes"
+              aria-label="Edit scopes"
+              style={{ fontSize: '0.78rem', opacity: 0.6 }}
+              onClick={startScopeEdit}
+            >
+              ✎
+            </button>
+          </div>
+        )}
+      </td>
       <td style={{ fontSize: '0.88rem' }}>{token.created_by ?? <span style={{ color: 'var(--text-subtle)' }}>—</span>}</td>
       <td style={{ fontSize: '0.82rem', color: 'var(--text-muted)' }}>{token.created_at.slice(0, 10)}</td>
       <td style={{ fontSize: '0.82rem', color: 'var(--text-muted)' }}>{token.last_used_at ? token.last_used_at.slice(0, 10) : <span style={{ color: 'var(--text-subtle)' }}>never</span>}</td>
       <td><span className={`status-pill${token.active ? ' active' : ''}`}>{token.active ? 'Active' : 'Inactive'}</span></td>
-      <td>
-        <div style={{ display: 'flex', gap: '0.4rem' }}>
-          {token.active && (
-            <button
-              className="button button-danger"
-              type="button"
-              style={{ padding: '0.3rem 0.75rem', fontSize: '0.82rem' }}
-              disabled={deactivating}
-              onClick={() => { if (window.confirm(`Deactivate token "${token.alias ?? token.id}"?`)) onDeactivate(); }}
-            >
-              {deactivating ? '…' : 'Deactivate'}
-            </button>
-          )}
-          {!token.active && (
-            <>
-              <button
-                className="button button-secondary"
-                type="button"
-                style={{ padding: '0.3rem 0.75rem', fontSize: '0.82rem' }}
-                disabled={activating}
-                onClick={onActivate}
-              >
-                {activating ? '…' : 'Activate'}
-              </button>
+      {canWrite && (
+        <td>
+          <div style={{ display: 'flex', gap: '0.4rem' }}>
+            {token.active && (
               <button
                 className="button button-danger"
                 type="button"
                 style={{ padding: '0.3rem 0.75rem', fontSize: '0.82rem' }}
-                disabled={deleting}
-                onClick={() => { if (window.confirm(`Permanently delete token "${token.alias ?? token.id}"? This cannot be undone.`)) onDelete(); }}
+                disabled={deactivating}
+                onClick={() => { if (window.confirm(`Deactivate token "${token.alias ?? token.id}"?`)) onDeactivate(); }}
               >
-                {deleting ? '…' : 'Delete'}
+                {deactivating ? '…' : 'Deactivate'}
               </button>
-            </>
-          )}
-        </div>
-      </td>
+            )}
+            {!token.active && (
+              <>
+                <button
+                  className="button button-secondary"
+                  type="button"
+                  style={{ padding: '0.3rem 0.75rem', fontSize: '0.82rem' }}
+                  disabled={activating}
+                  onClick={onActivate}
+                >
+                  {activating ? '…' : 'Activate'}
+                </button>
+                <button
+                  className="button button-danger"
+                  type="button"
+                  style={{ padding: '0.3rem 0.75rem', fontSize: '0.82rem' }}
+                  disabled={deleting}
+                  onClick={() => { if (window.confirm(`Permanently delete token "${token.alias ?? token.id}"? This cannot be undone.`)) onDelete(); }}
+                >
+                  {deleting ? '…' : 'Delete'}
+                </button>
+              </>
+            )}
+          </div>
+        </td>
+      )}
     </tr>
   );
 }

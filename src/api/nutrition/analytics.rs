@@ -2,6 +2,7 @@ use crate::auth::AppState;
 use crate::error::AppResult;
 use crate::services::nutrition_analytics_service;
 use actix_web::{get, web, HttpResponse};
+use petmon_macros::require_scope;
 use serde::Deserialize;
 use uuid::Uuid;
 
@@ -14,6 +15,7 @@ pub struct AnalyticsQuery {
 }
 
 #[get("/daily-totals")]
+#[require_scope("api_read")]
 pub async fn daily_totals(
     state: web::Data<AppState>,
     query: web::Query<AnalyticsQuery>,
@@ -30,6 +32,7 @@ pub async fn daily_totals(
 }
 
 #[get("/range-summary")]
+#[require_scope("api_read")]
 pub async fn range_summary(
     state: web::Data<AppState>,
     query: web::Query<AnalyticsQuery>,
@@ -52,6 +55,7 @@ pub struct BestFluidDayQuery {
 }
 
 #[get("/best-fluid-day")]
+#[require_scope("api_read")]
 pub async fn best_fluid_day(
     state: web::Data<AppState>,
     query: web::Query<BestFluidDayQuery>,

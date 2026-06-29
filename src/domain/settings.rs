@@ -200,12 +200,38 @@ impl UpdateDisplaySettings {
 
 // ── API tokens ────────────────────────────────────────────────────────────────
 
+pub const ALL_SCOPES: &[&str] = &["all", "api_read", "api_write", "mcp"];
+
+/// Validates a scope string — must be one of the known scope values.
+pub fn is_valid_scope(s: &str) -> bool {
+    ALL_SCOPES.contains(&s)
+}
+
+/// Parse comma-separated scopes string into a vec, validating each entry.
+pub fn parse_scopes(raw: &str) -> Result<Vec<String>, String> {
+    let scopes: Vec<String> = raw
+        .split(',')
+        .map(|s| s.trim().to_string())
+        .filter(|s| !s.is_empty())
+        .collect();
+    if scopes.is_empty() {
+        return Err("at least one scope is required".to_string());
+    }
+    for s in &scopes {
+        if !is_valid_scope(s) {
+            return Err(format!("unknown scope '{s}'"));
+        }
+    }
+    Ok(scopes)
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize, sqlx::FromRow)]
 pub struct ApiToken {
     pub id: String,
     pub alias: Option<String>,
     pub token_hash: String,
     pub active: bool,
+    pub scopes: String,
     pub created_by: Option<String>,
     pub created_at: String,
     pub last_used_at: Option<String>,
@@ -219,6 +245,7 @@ pub struct ApiTokenPublic {
     pub active: bool,
     /// True when this token is the one authenticating the current request.
     pub current: bool,
+    pub scopes: Vec<String>,
     pub created_by: Option<String>,
     pub created_at: String,
     pub last_used_at: Option<String>,
@@ -230,28 +257,49 @@ pub struct ApiTokenCreated {
     pub id: String,
     pub alias: Option<String>,
     pub token: String,
+    pub scopes: Vec<String>,
     pub created_at: String,
 }
 
 #[derive(Debug, Deserialize)]
 pub struct CreateApiToken {
     pub alias: Option<String>,
+    /// Defaults to ["all"] when omitted.
+    pub scopes: Option<Vec<String>>,
     /// Set by the server from the caller's Identity — not accepted from the request body.
     #[serde(skip_deserializing)]
     pub created_by: Option<String>,
 }
 
+#[derive(Debug, Deserialize)]
+pub struct UpdateApiTokenScopes {
+    pub scopes: Vec<String>,
+}
+
 impl ApiToken {
     pub fn new(req: CreateApiToken, token_hash: String) -> Self {
         let now = Utc::now().to_rfc3339();
+        let scopes = req
+            .scopes
+            .map(|v| v.join(","))
+            .unwrap_or_else(|| "all".to_string());
         ApiToken {
             id: Uuid::new_v4().to_string(),
             alias: req.alias,
             token_hash,
             active: true,
+            scopes,
             created_by: req.created_by,
             created_at: now,
             last_used_at: None,
         }
+    }
+
+    pub fn scopes_vec(&self) -> Vec<String> {
+        self.scopes
+            .split(',')
+            .map(|s| s.trim().to_string())
+            .filter(|s| !s.is_empty())
+            .collect()
     }
 }

@@ -3,9 +3,11 @@ use crate::domain::weight::{CreateWeightRecord, WeightGranularity, WeightRecordF
 use crate::error::{AppError, AppResult};
 use crate::services::weight_service;
 use actix_web::{delete, get, post, web, HttpResponse};
+use petmon_macros::require_scope;
 use serde::Deserialize;
 
 #[get("")]
+#[require_scope("api_read")]
 pub async fn list_records(
     state: web::Data<AppState>,
     query: web::Query<WeightRecordFilters>,
@@ -15,6 +17,7 @@ pub async fn list_records(
 }
 
 #[post("")]
+#[require_scope("api_write")]
 pub async fn create_record(
     state: web::Data<AppState>,
     body: web::Json<CreateWeightRecord>,
@@ -24,6 +27,7 @@ pub async fn create_record(
 }
 
 #[delete("/{id}")]
+#[require_scope("api_write")]
 pub async fn delete_record(
     state: web::Data<AppState>,
     id: web::Path<String>,
@@ -40,6 +44,7 @@ pub struct StatsQuery {
 }
 
 #[get("/stats")]
+#[require_scope("api_read")]
 pub async fn stats(
     state: web::Data<AppState>,
     query: web::Query<StatsQuery>,
@@ -61,6 +66,7 @@ pub struct SummaryQuery {
 }
 
 #[get("/summary")]
+#[require_scope("api_read")]
 pub async fn summary(
     state: web::Data<AppState>,
     query: web::Query<SummaryQuery>,

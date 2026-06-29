@@ -8,6 +8,8 @@ pub enum AppError {
     NotFound(String),
     #[error("Bad request: {0}")]
     BadRequest(String),
+    #[error("Forbidden: {0}")]
+    Forbidden(String),
     #[error("Database error: {0}")]
     Database(#[from] sqlx::Error),
     #[error("Internal error: {0}")]
@@ -33,6 +35,7 @@ impl actix_web::ResponseError for AppError {
                 "BAD_REQUEST",
                 None,
             ),
+            AppError::Forbidden(_) => (actix_web::http::StatusCode::FORBIDDEN, "FORBIDDEN", None),
             AppError::Database(e) => {
                 tracing::error!(error = %e, "database error");
                 (

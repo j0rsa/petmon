@@ -86,6 +86,8 @@ pub struct MeResponse {
     pub name: Option<String>,
     pub display_name: String,
     pub kind: &'static str,
+    /// Granted scopes. Empty for OIDC/Dev (treat as full access on the FE).
+    pub scopes: Vec<String>,
 }
 
 #[get("/auth/me")]
@@ -102,12 +104,16 @@ pub async fn me(req: HttpRequest) -> AppResult<HttpResponse> {
         crate::auth::identity::IdentityKind::Dev => "dev",
     };
 
+    let mut scopes: Vec<String> = identity.scopes.clone().into_iter().collect();
+    scopes.sort();
+
     Ok(HttpResponse::Ok().json(MeResponse {
         display_name: identity.display_name().to_string(),
         subject: identity.subject,
         email: identity.email,
         name: identity.name,
         kind,
+        scopes,
     }))
 }
 

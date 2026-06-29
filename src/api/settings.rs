@@ -1,4 +1,5 @@
-use actix_web::{delete, get, post, web, HttpMessage, HttpRequest, HttpResponse};
+use actix_web::{delete, get, patch, post, web, HttpMessage, HttpRequest, HttpResponse};
+use petmon_macros::require_scope;
 
 use crate::auth::{
     identity::{Identity, IdentityKind},
@@ -6,7 +7,8 @@ use crate::auth::{
 };
 use crate::domain::settings::{
     ApiTokenPublic, CreateApiToken, DisplaySettings, OidcConfig, OidcConfigPublic, TelegramConfig,
-    TelegramConfigPublic, UpdateDisplaySettings, UpdateOidcConfig, UpdateTelegramConfig,
+    TelegramConfigPublic, UpdateApiTokenScopes, UpdateDisplaySettings, UpdateOidcConfig,
+    UpdateTelegramConfig,
 };
 use crate::error::{AppError, AppResult};
 use crate::repo::{api_tokens, settings};
@@ -14,12 +16,14 @@ use crate::repo::{api_tokens, settings};
 // ── OIDC ─────────────────────────────────────────────────────────────────────
 
 #[get("/oidc")]
+#[require_scope("api_read")]
 pub async fn get_oidc(state: web::Data<AppState>) -> AppResult<HttpResponse> {
     let cfg: OidcConfig = settings::get(&state.pool, "oidc").await?;
     Ok(HttpResponse::Ok().json(OidcConfigPublic::from(cfg)))
 }
 
 #[post("/oidc")]
+#[require_scope("api_write")]
 pub async fn update_oidc(
     state: web::Data<AppState>,
     body: web::Json<UpdateOidcConfig>,
@@ -37,12 +41,14 @@ pub async fn update_oidc(
 // ── Display settings ─────────────────────────────────────────────────────────
 
 #[get("/display")]
+#[require_scope("api_read")]
 pub async fn get_display(state: web::Data<AppState>) -> AppResult<HttpResponse> {
     let cfg: DisplaySettings = settings::get(&state.pool, "display").await?;
     Ok(HttpResponse::Ok().json(cfg))
 }
 
 #[post("/display")]
+#[require_scope("api_write")]
 pub async fn update_display(
     state: web::Data<AppState>,
     body: web::Json<UpdateDisplaySettings>,
@@ -56,12 +62,14 @@ pub async fn update_display(
 // ── Telegram ──────────────────────────────────────────────────────────────────
 
 #[get("/telegram")]
+#[require_scope("api_read")]
 pub async fn get_telegram(state: web::Data<AppState>) -> AppResult<HttpResponse> {
     let cfg: TelegramConfig = settings::get(&state.pool, "telegram").await?;
     Ok(HttpResponse::Ok().json(TelegramConfigPublic::from(cfg)))
 }
 
 #[post("/telegram")]
+#[require_scope("api_write")]
 pub async fn update_telegram(
     state: web::Data<AppState>,
     body: web::Json<UpdateTelegramConfig>,
@@ -75,6 +83,7 @@ pub async fn update_telegram(
 // ── API tokens ────────────────────────────────────────────────────────────────
 
 #[get("")]
+#[require_scope("api_read")]
 pub async fn list_tokens(req: HttpRequest, state: web::Data<AppState>) -> AppResult<HttpResponse> {
     let tokens = api_tokens::list(&state.pool).await?;
 
@@ -90,11 +99,13 @@ pub async fn list_tokens(req: HttpRequest, state: web::Data<AppState>) -> AppRes
         .into_iter()
         .map(|t| {
             let is_current = current_token_id.as_deref() == Some(t.id.as_str());
+            let scopes = t.scopes_vec();
             ApiTokenPublic {
                 id: t.id,
                 alias: t.alias,
                 active: t.active,
                 current: is_current,
+                scopes,
                 created_by: t.created_by,
                 created_at: t.created_at,
                 last_used_at: t.last_used_at,
@@ -106,6 +117,7 @@ pub async fn list_tokens(req: HttpRequest, state: web::Data<AppState>) -> AppRes
 }
 
 #[post("")]
+#[require_scope("api_write")]
 pub async fn create_token(
     req: HttpRequest,
     state: web::Data<AppState>,
@@ -143,6 +155,7 @@ pub async fn create_token(
 }
 
 #[post("/{id}/activate")]
+#[require_scope("api_write")]
 pub async fn activate_token(
     state: web::Data<AppState>,
     path: web::Path<String>,
@@ -152,6 +165,7 @@ pub async fn activate_token(
 }
 
 #[delete("/{id}")]
+#[require_scope("api_write")]
 pub async fn deactivate_token(
     state: web::Data<AppState>,
     path: web::Path<String>,
@@ -161,12 +175,46 @@ pub async fn deactivate_token(
 }
 
 #[delete("/{id}/permanent")]
+#[require_scope("api_write")]
 pub async fn delete_token(
     state: web::Data<AppState>,
     path: web::Path<String>,
 ) -> AppResult<HttpResponse> {
     api_tokens::delete(&state.pool, &path.into_inner()).await?;
     Ok(HttpResponse::NoContent().finish())
+}
+
+#[patch("/{id}/scopes")]
+#[require_scope("api_write")]
+pub async fn update_token_scopes(
+    state: web::Data<AppState>,
+    path: web::Path<String>,
+    body: web::Json<UpdateApiTokenScopes>,
+) -> AppResult<HttpResponse> {
+    let req = body.into_inner();
+    // Validate each scope value
+    for s in &req.scopes {
+        if !crate::domain::settings::is_valid_scope(s) {
+            return Err(AppError::BadRequest(format!("unknown scope '{s}'")));
+        }
+    }
+    if req.scopes.is_empty() {
+        return Err(AppError::BadRequest(
+            "at least one scope is required".to_string(),
+        ));
+    }
+    let token = api_tokens::update_scopes(&state.pool, &path.into_inner(), req).await?;
+    let scopes = token.scopes_vec();
+    Ok(HttpResponse::Ok().json(ApiTokenPublic {
+        id: token.id,
+        alias: token.alias,
+        active: token.active,
+        current: false,
+        scopes,
+        created_by: token.created_by,
+        created_at: token.created_at,
+        last_used_at: token.last_used_at,
+    }))
 }
 
 pub fn configure(cfg: &mut web::ServiceConfig) {
@@ -188,6 +236,7 @@ pub fn configure_api_tokens(cfg: &mut web::ServiceConfig) {
             .service(create_token)
             .service(activate_token)
             .service(deactivate_token)
-            .service(delete_token),
+            .service(delete_token)
+            .service(update_token_scopes),
     );
 }

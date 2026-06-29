@@ -1,7 +1,9 @@
 use actix_web::{post, web, HttpResponse};
+use petmon_macros::require_scope;
 use serde::{Deserialize, Serialize};
 
 use crate::auth::AppState;
+use crate::error::AppResult;
 
 #[derive(Debug, Deserialize)]
 pub struct McpRequest {
@@ -54,15 +56,23 @@ impl McpResponse {
 }
 
 #[post("")]
+#[require_scope("mcp")]
 #[tracing::instrument(name = "mcp_request", skip(state, body), fields(method = tracing::field::Empty))]
-pub async fn mcp_handler(state: web::Data<AppState>, body: web::Json<McpRequest>) -> HttpResponse {
+pub async fn mcp_handler(
+    state: web::Data<AppState>,
+    body: web::Json<McpRequest>,
+) -> AppResult<HttpResponse> {
     let req = body.into_inner();
     let id = req.id.clone();
 
     tracing::Span::current().record("method", req.method.as_str());
 
     if req.jsonrpc != "2.0" {
-        return HttpResponse::Ok().json(McpResponse::err(id, -32600, "Invalid JSON-RPC version"));
+        return Ok(HttpResponse::Ok().json(McpResponse::err(
+            id,
+            -32600,
+            "Invalid JSON-RPC version",
+        )));
     }
 
     // Resource methods are handled separately from tool dispatch
@@ -119,19 +129,20 @@ pub async fn mcp_handler(state: web::Data<AppState>, body: web::Json<McpRequest>
         _ => super::tools::dispatch(&state.pool, &req.method, req.params, state.timezone).await,
     };
 
-    match result {
+    Ok(match result {
         Ok(result) => HttpResponse::Ok().json(McpResponse::ok(id, result)),
         Err(e) => {
             let (code, msg) = match e {
                 crate::error::AppError::NotFound(m) => (-32001, m),
                 crate::error::AppError::BadRequest(m) => (-32602, m),
+                crate::error::AppError::Forbidden(m) => (-32603, format!("Forbidden: {m}")),
                 crate::error::AppError::Validation { message, .. } => (-32602, message),
                 crate::error::AppError::Database(e) => (-32603, format!("Database error: {e}")),
                 crate::error::AppError::Internal(m) => (-32603, m),
             };
             HttpResponse::Ok().json(McpResponse::err(id, code, &msg))
         }
-    }
+    })
 }
 
 pub fn configure(cfg: &mut web::ServiceConfig) {
