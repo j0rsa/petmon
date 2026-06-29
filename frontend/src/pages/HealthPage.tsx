@@ -158,8 +158,9 @@ export default function HealthPage() {
               <Tooltip
                 contentStyle={{ background: 'var(--surface)', border: '1px solid var(--border-subtle)', borderRadius: 8, fontSize: 12 }}
                 formatter={(v, name) => {
-                  if (name === 'Min' || name === 'Max') return [`${(+v).toFixed(2)} kg`, name];
-                  return [`${(+v).toFixed(2)} kg`, granularity === 'raw' ? 'Weight' : 'Avg'];
+                  const kg = Number(v ?? 0).toFixed(2);
+                  if (name === 'Min' || name === 'Max') return [`${kg} kg`, name];
+                  return [`${kg} kg`, granularity === 'raw' ? 'Weight' : 'Avg'];
                 }}
               />
               {granularity !== 'raw' && (

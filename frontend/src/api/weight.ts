@@ -72,7 +72,7 @@ export const weightApi = {
     api.get<WeightStats>(`/health/weight/stats?pet_id=${encodeURIComponent(petId)}&date_from=${dateFrom}&date_to=${dateTo}`),
   summary: (filters: WeightSummaryFilters) =>
     api.get<WeightSummaryBucket[]>(
-      `/health/weight/summary${toQueryString(filters as Record<string, string | undefined>)}`,
+      `/health/weight/summary${toQueryString(filters as unknown as Record<string, string | undefined>)}`,
     ),
   create: (data: CreateWeightRecord) => api.post<WeightRecord>('/health/weight', data),
   delete: (id: string) => api.delete(`/health/weight/${id}`),
