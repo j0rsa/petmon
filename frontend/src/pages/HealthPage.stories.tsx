@@ -17,6 +17,16 @@ export const WithWeightHistory: Story = {
   decorators: [withHealthPage()],
 };
 
+/** Multiple weigh-ins on the same day — chart shows distinct X-axis points per measurement. */
+export const MultiplePerDay: Story = {
+  decorators: [withHealthPage()],
+};
+
+/** Year of weekly-bucketed measurements — shows min/max range lines on the chart. */
+export const LongHistory: Story = {
+  decorators: [withHealthPage({ longHistory: true })],
+};
+
 /** No measurements recorded yet. */
 export const Empty: Story = {
   decorators: [withHealthPage({ empty: true })],

@@ -104,6 +104,7 @@ export default function EliminationAnalyticsPage() {
         defecation: row?.defecation ?? 0,
         vomit: row?.vomit ?? 0,
         general: row?.general ?? 0,
+        toiletVisits: (row?.urination ?? 0) + (row?.defecation ?? 0) + (row?.general ?? 0),
         avgDuration: row?.avgDuration ?? null,
       });
     }
@@ -120,7 +121,7 @@ export default function EliminationAnalyticsPage() {
 
   // Regression trend lines
   const visitTrend = useMemo(
-    () => linReg(dailyData.map((d) => d.total)),
+    () => linReg(dailyData.map((d) => d.toiletVisits)),
     [dailyData],
   );
   const durationTrend = useMemo(
@@ -242,10 +243,10 @@ export default function EliminationAnalyticsPage() {
                     contentStyle={{ background: 'var(--surface)', border: '1px solid var(--border-subtle)', borderRadius: 8, fontFamily: 'monospace', fontSize: 12 }}
                   />
                   <Legend wrapperStyle={{ fontFamily: 'monospace', fontSize: 12 }} />
-                  <Bar dataKey="urination"  name="Urination"  stackId="day" fill={EVENT_TYPE_COLORS.urination}  radius={[0, 0, 0, 0]} />
-                  <Bar dataKey="defecation" name="Defecation" stackId="day" fill={EVENT_TYPE_COLORS.defecation} radius={[0, 0, 0, 0]} />
-                  <Bar dataKey="vomit"      name="Vomit"      stackId="day" fill={EVENT_TYPE_COLORS.vomit}      radius={[0, 0, 0, 0]} />
-                  <Bar dataKey="general"    name="General"    stackId="day" fill={EVENT_TYPE_COLORS.general}    radius={[4, 4, 0, 0]} />
+                  <Bar dataKey="urination"  name="Wee"     stackId="day" fill={EVENT_TYPE_COLORS.urination}  radius={[0, 0, 0, 0]} />
+                  <Bar dataKey="defecation" name="Poop"    stackId="day" fill={EVENT_TYPE_COLORS.defecation} radius={[0, 0, 0, 0]} />
+                  <Bar dataKey="vomit"      name="Vomit"   stackId="day" fill={EVENT_TYPE_COLORS.vomit}      radius={[0, 0, 0, 0]} />
+                  <Bar dataKey="general"    name="General" stackId="day" fill={EVENT_TYPE_COLORS.general}    radius={[4, 4, 0, 0]} />
                 </BarChart>
               </ResponsiveContainer>
             </div>
@@ -266,7 +267,7 @@ export default function EliminationAnalyticsPage() {
                     contentStyle={{ background: 'var(--surface)', border: '1px solid var(--border-subtle)', borderRadius: 8, fontFamily: 'monospace', fontSize: 12 }}
                   />
                   {stats && <ReferenceLine y={stats.median} stroke="var(--text-subtle)" strokeDasharray="5 4" label={{ value: `median ${stats.median.toFixed(1)}`, fill: 'var(--text-subtle)', fontSize: 10, position: 'insideTopRight' }} />}
-                  <Line type="monotone" dataKey="total" name="visits" stroke="var(--accent)" strokeWidth={2} dot={{ r: 3, fill: 'var(--accent)', strokeWidth: 0 }} activeDot={{ r: 5 }} connectNulls />
+                  <Line type="monotone" dataKey="toiletVisits" name="visits" stroke="var(--accent)" strokeWidth={2} dot={{ r: 3, fill: 'var(--accent)', strokeWidth: 0 }} activeDot={{ r: 5 }} connectNulls />
                   {visitTrend && <Line type="linear" dataKey="visitTrend" name="visitTrend" stroke="var(--text-muted)" strokeWidth={1.5} strokeDasharray="4 3" dot={false} activeDot={false} legendType="none" />}
                 </LineChart>
               </ResponsiveContainer>

@@ -156,3 +156,45 @@ pub async fn delete(pool: &SqlitePool, id: &str) -> AppResult<()> {
     }
     Ok(())
 }
+
+#[tracing::instrument(skip(pool))]
+pub async fn summary(
+    pool: &SqlitePool,
+    pet_id: &str,
+    date_from: Option<&str>,
+    date_to: &str,
+    granularity: &crate::domain::weight::WeightGranularity,
+) -> AppResult<Vec<crate::domain::weight::WeightSummaryBucket>> {
+    use crate::domain::weight::WeightGranularity;
+    let pet_uuid = Uuid::parse_str(pet_id)
+        .map_err(|_| AppError::BadRequest(format!("invalid pet_id: {pet_id}")))?;
+
+    let mut conditions = String::from("pet_id = ? AND local_date <= ?");
+    if date_from.is_some() {
+        conditions.push_str(" AND local_date >= ?");
+    }
+
+    let sql = match granularity {
+        WeightGranularity::Raw => format!(
+            "SELECT measured_at AS bucket, weight_kg AS avg_kg, weight_kg AS min_kg, weight_kg AS max_kg, CAST(1 AS INTEGER) AS count \
+             FROM weight_records WHERE {conditions} ORDER BY measured_at ASC"
+        ),
+        WeightGranularity::Daily => format!(
+            "SELECT local_date AS bucket, AVG(weight_kg) AS avg_kg, MIN(weight_kg) AS min_kg, MAX(weight_kg) AS max_kg, CAST(COUNT(*) AS INTEGER) AS count \
+             FROM weight_records WHERE {conditions} GROUP BY local_date ORDER BY bucket ASC"
+        ),
+        WeightGranularity::Weekly => format!(
+            "SELECT DATE(local_date, '-' || CAST(((CAST(strftime('%w', local_date) AS INTEGER) + 6) % 7) AS TEXT) || ' days') AS bucket, \
+             AVG(weight_kg) AS avg_kg, MIN(weight_kg) AS min_kg, MAX(weight_kg) AS max_kg, CAST(COUNT(*) AS INTEGER) AS count \
+             FROM weight_records WHERE {conditions} GROUP BY 1 ORDER BY 1 ASC"
+        ),
+    };
+
+    let mut q =
+        sqlx::query_as::<_, crate::domain::weight::WeightSummaryBucket>(sqlx::AssertSqlSafe(sql));
+    q = q.bind(pet_uuid).bind(date_to);
+    if let Some(from) = date_from {
+        q = q.bind(from);
+    }
+    Ok(q.fetch_all(pool).await?)
+}

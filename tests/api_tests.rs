@@ -814,3 +814,86 @@ async fn weight_records_returns_json_not_spa() {
         "health/weight must return JSON, got: {ct}"
     );
 }
+
+// ── Weight summary ────────────────────────────────────────────────────────────
+
+#[actix_web::test]
+async fn weight_summary_daily_aggregates_multiple_records_per_day() {
+    let (app, _state) = build_dev_app!();
+    let pet_id = api_create_pet!(&app, "SummaryDailyTest");
+
+    for (time, kg) in [("09:00:00", 4.2_f64), ("17:30:00", 4.3_f64)] {
+        let req = test::TestRequest::post()
+            .uri("/api/v1/health/weight")
+            .set_json(serde_json::json!({
+                "pet_id": pet_id,
+                "measured_at": format!("2026-06-15T{time}"),
+                "weight_kg": kg,
+            }))
+            .to_request();
+        let resp = test::call_service(&app, req).await;
+        assert_eq!(resp.status(), 201);
+    }
+
+    let req = test::TestRequest::get()
+        .uri(&format!(
+            "/api/v1/health/weight/summary?pet_id={pet_id}&date_from=2026-06-15&date_to=2026-06-15&granularity=daily"
+        ))
+        .to_request();
+    let resp = test::call_service(&app, req).await;
+    assert_eq!(resp.status(), 200);
+    let body: serde_json::Value = test::read_body_json(resp).await;
+    let buckets = body.as_array().expect("expected array");
+    assert_eq!(
+        buckets.len(),
+        1,
+        "daily granularity must produce one bucket per day"
+    );
+    let b = &buckets[0];
+    assert_eq!(b["bucket"].as_str(), Some("2026-06-15"));
+    assert_eq!(b["count"].as_i64(), Some(2));
+    let avg = b["avg_kg"].as_f64().unwrap();
+    assert!((avg - 4.25).abs() < 0.001, "avg should be 4.25, got {avg}");
+    assert_eq!(b["min_kg"].as_f64(), Some(4.2));
+    assert_eq!(b["max_kg"].as_f64(), Some(4.3));
+}
+
+#[actix_web::test]
+async fn weight_summary_raw_returns_one_bucket_per_record() {
+    let (app, _state) = build_dev_app!();
+    let pet_id = api_create_pet!(&app, "SummaryRawTest");
+
+    for (time, kg) in [
+        ("09:00:00", 4.1_f64),
+        ("12:00:00", 4.15_f64),
+        ("18:00:00", 4.2_f64),
+    ] {
+        let req = test::TestRequest::post()
+            .uri("/api/v1/health/weight")
+            .set_json(serde_json::json!({
+                "pet_id": pet_id,
+                "measured_at": format!("2026-06-20T{time}"),
+                "weight_kg": kg,
+            }))
+            .to_request();
+        let resp = test::call_service(&app, req).await;
+        assert_eq!(resp.status(), 201);
+    }
+
+    let req = test::TestRequest::get()
+        .uri(&format!(
+            "/api/v1/health/weight/summary?pet_id={pet_id}&date_from=2026-06-20&date_to=2026-06-20&granularity=raw"
+        ))
+        .to_request();
+    let resp = test::call_service(&app, req).await;
+    assert_eq!(resp.status(), 200);
+    let body: serde_json::Value = test::read_body_json(resp).await;
+    let buckets = body.as_array().expect("expected array");
+    assert_eq!(
+        buckets.len(),
+        3,
+        "raw granularity must return one bucket per record"
+    );
+    assert_eq!(buckets[0]["count"].as_i64(), Some(1));
+    assert_eq!(buckets[0]["avg_kg"].as_f64(), Some(4.1));
+}

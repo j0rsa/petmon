@@ -477,6 +477,20 @@ fn tool_list() -> Value {
                     "properties": { "id": { "type": "string" } }
                 }
             },
+            {
+                "name": "weight/summary",
+                "description": "Get aggregated weight history bucketed by granularity. Use raw for ≤30d windows, daily for ≤90d, weekly for longer periods. Returns avg/min/max per bucket for chart rendering.",
+                "inputSchema": {
+                    "type": "object",
+                    "required": ["pet_id", "date_to"],
+                    "properties": {
+                        "pet_id":      { "type": "string", "format": "uuid" },
+                        "date_from":   { "type": "string", "format": "date" },
+                        "date_to":     { "type": "string", "format": "date" },
+                        "granularity": { "type": "string", "enum": ["raw", "daily", "weekly"], "default": "daily" }
+                    }
+                }
+            },
 
             // ── Health context ───────────────────────────────────────────────
             {
@@ -846,6 +860,22 @@ pub async fn dispatch(
                 .ok_or_else(|| AppError::BadRequest("id required".to_string()))?;
             weight_service::delete(pool, id).await?;
             Ok(json!({ "deleted": true }))
+        }
+        "weight/summary" => {
+            let pet_id = params["pet_id"]
+                .as_str()
+                .ok_or_else(|| AppError::BadRequest("pet_id required".to_string()))?;
+            let date_to = params["date_to"]
+                .as_str()
+                .ok_or_else(|| AppError::BadRequest("date_to required".to_string()))?;
+            let date_from = params["date_from"].as_str();
+            let granularity: crate::domain::weight::WeightGranularity = params["granularity"]
+                .as_str()
+                .and_then(|s| serde_json::from_value(serde_json::Value::String(s.to_owned())).ok())
+                .unwrap_or_default();
+            let buckets =
+                weight_service::summary(pool, pet_id, date_from, date_to, &granularity).await?;
+            Ok(json!(buckets))
         }
 
         // ── Health context ────────────────────────────────────────────────────

@@ -25,6 +25,9 @@ import {
   mockTelegramConfigured,
   mockTelegramEmpty,
   mockWeightRecords,
+  mockWeightSummaryRaw,
+  mockWeightSummaryDaily,
+  mockWeightSummaryWeekly,
 } from './fixtures';
 
 /** Single router wrapper — use `parameters.route` per story to set the active path. */
@@ -273,9 +276,10 @@ interface WithHealthPageOptions {
   petId?: string;
   loading?: boolean;
   empty?: boolean;
+  longHistory?: boolean;
 }
 
-export function withHealthPage({ petId = mockPetId, loading = false, empty = false }: WithHealthPageOptions = {}): Decorator {
+export function withHealthPage({ petId = mockPetId, loading = false, empty = false, longHistory = false }: WithHealthPageOptions = {}): Decorator {
   return function HealthDecorator(Story) {
     const client = makeMockClient();
     client.setQueryData(['pets'], mockPets);
@@ -285,11 +289,24 @@ export function withHealthPage({ petId = mockPetId, loading = false, empty = fal
     if (loading) {
       const pending = () => new Promise(() => {});
       client.setQueryDefaults(['weight-records', petId], { queryFn: pending });
+      client.setQueryDefaults(['weight-summary'], { queryFn: pending });
     } else {
       client.setQueryData(
         ['weight-records', petId],
         empty ? [] : mockWeightRecords.map((r) => ({ ...r, pet_id: petId })),
       );
+
+      const todayStr = localToday();
+      const rawFrom = shiftDate(todayStr, -29);
+      const dailyFrom = shiftDate(todayStr, -89);
+      const yearFrom = shiftDate(todayStr, -364);
+      const summaryData = (buckets: typeof mockWeightSummaryRaw) =>
+        empty ? [] : buckets.map((b) => ({ ...b }));
+
+      client.setQueryData(['weight-summary', rawFrom, todayStr, 'raw', petId], summaryData(mockWeightSummaryRaw));
+      client.setQueryData(['weight-summary', dailyFrom, todayStr, 'daily', petId], summaryData(mockWeightSummaryDaily));
+      client.setQueryData(['weight-summary', yearFrom, todayStr, 'weekly', petId], summaryData(longHistory ? mockWeightSummaryWeekly : mockWeightSummaryDaily));
+      client.setQueryData(['weight-summary', 'all', todayStr, 'weekly', petId], summaryData(mockWeightSummaryWeekly));
     }
 
     return (

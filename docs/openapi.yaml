@@ -870,6 +870,47 @@ paths:
         '401':
           $ref: '#/components/responses/Unauthorized'
 
+  /health/weight/summary:
+    get:
+      tags:
+        - Weight Records
+      summary: Get aggregated weight history
+      description: |
+        Returns weight records bucketed by granularity. Use this for charts with large datasets.
+        - `raw`: one bucket per individual measurement (for short windows, ≤30d)
+        - `daily`: one bucket per calendar day with avg/min/max (for medium windows, ≤90d)
+        - `weekly`: one bucket per week (Monday-aligned) with avg/min/max (for long windows)
+      parameters:
+        - name: pet_id
+          in: query
+          required: true
+          schema: { type: string, format: uuid }
+        - name: date_from
+          in: query
+          required: false
+          schema: { type: string, format: date }
+        - name: date_to
+          in: query
+          required: true
+          schema: { type: string, format: date }
+        - name: granularity
+          in: query
+          required: false
+          schema: { type: string, enum: [raw, daily, weekly], default: daily }
+      responses:
+        '200':
+          description: List of weight summary buckets
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/WeightSummaryBucket'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
   /health/weight/{id}:
     delete:
       tags:
@@ -2477,6 +2518,27 @@ components:
       required:
         - pet_id
         - weight_kg
+
+    WeightSummaryBucket:
+      type: object
+      description: Aggregated weight data for a time bucket
+      required: [bucket, avg_kg, min_kg, max_kg, count]
+      properties:
+        bucket:
+          type: string
+          description: Bucket identifier — ISO datetime for raw, YYYY-MM-DD for daily/weekly
+        avg_kg:
+          type: number
+          format: double
+        min_kg:
+          type: number
+          format: double
+        max_kg:
+          type: number
+          format: double
+        count:
+          type: integer
+          format: int64
 
     WeightStats:
       type: object

@@ -1,5 +1,5 @@
 use crate::auth::AppState;
-use crate::domain::weight::{CreateWeightRecord, WeightRecordFilters};
+use crate::domain::weight::{CreateWeightRecord, WeightGranularity, WeightRecordFilters};
 use crate::error::{AppError, AppResult};
 use crate::services::weight_service;
 use actix_web::{delete, get, post, web, HttpResponse};
@@ -52,9 +52,38 @@ pub async fn stats(
     Ok(HttpResponse::Ok().json(s))
 }
 
+#[derive(Deserialize)]
+pub struct SummaryQuery {
+    pub pet_id: String,
+    pub date_from: Option<String>,
+    pub date_to: String,
+    pub granularity: Option<WeightGranularity>,
+}
+
+#[get("/summary")]
+pub async fn summary(
+    state: web::Data<AppState>,
+    query: web::Query<SummaryQuery>,
+) -> AppResult<HttpResponse> {
+    if query.pet_id.is_empty() {
+        return Err(AppError::BadRequest("pet_id required".to_string()));
+    }
+    let granularity = query.granularity.clone().unwrap_or_default();
+    let buckets = weight_service::summary(
+        &state.pool,
+        &query.pet_id,
+        query.date_from.as_deref(),
+        &query.date_to,
+        &granularity,
+    )
+    .await?;
+    Ok(HttpResponse::Ok().json(buckets))
+}
+
 pub fn configure(cfg: &mut web::ServiceConfig) {
     cfg.service(list_records)
         .service(create_record)
         .service(stats)
+        .service(summary)
         .service(delete_record);
 }

@@ -40,3 +40,21 @@ pub struct WeightRecordFilters {
     pub limit: Option<i64>,
     pub offset: Option<i64>,
 }
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Default)]
+#[serde(rename_all = "snake_case")]
+pub enum WeightGranularity {
+    Raw,
+    #[default]
+    Daily,
+    Weekly,
+}
+
+#[derive(Debug, Serialize, sqlx::FromRow)]
+pub struct WeightSummaryBucket {
+    pub bucket: String,
+    pub avg_kg: f64,
+    pub min_kg: f64,
+    pub max_kg: f64,
+    pub count: i64,
+}

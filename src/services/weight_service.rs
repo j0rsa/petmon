@@ -47,3 +47,14 @@ pub async fn stats(
 pub async fn delete(pool: &SqlitePool, id: &str) -> AppResult<()> {
     weight_records::delete(pool, id).await
 }
+
+#[tracing::instrument(skip(pool))]
+pub async fn summary(
+    pool: &SqlitePool,
+    pet_id: &str,
+    date_from: Option<&str>,
+    date_to: &str,
+    granularity: &crate::domain::weight::WeightGranularity,
+) -> AppResult<Vec<crate::domain::weight::WeightSummaryBucket>> {
+    weight_records::summary(pool, pet_id, date_from, date_to, granularity).await
+}
