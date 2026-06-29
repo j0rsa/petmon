@@ -12,6 +12,7 @@ export interface TagInputProps {
 
 export function TagInput({ value, options, onChange, placeholder = 'Add…', disabled = false }: TagInputProps) {
   const [query, setQuery] = useState('');
+  const [isFocused, setIsFocused] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
 
   const remaining = options.filter((o) => !value.includes(o));
@@ -95,6 +96,8 @@ export function TagInput({ value, options, onChange, placeholder = 'Add…', dis
             value={query}
             onChange={(e) => setQuery(e.target.value)}
             onKeyDown={handleKeyDown}
+            onFocus={() => setIsFocused(true)}
+            onBlur={() => setIsFocused(false)}
             placeholder={value.length === 0 ? placeholder : ''}
             style={{
               border: 'none',
@@ -105,7 +108,7 @@ export function TagInput({ value, options, onChange, placeholder = 'Add…', dis
               padding: '0.1rem 0',
             }}
           />
-          {(query || filtered.length > 0) && filtered.length > 0 && (
+          {isFocused && filtered.length > 0 && (
             <ul
               style={{
                 position: 'absolute',
