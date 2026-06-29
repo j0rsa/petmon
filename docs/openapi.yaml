@@ -2291,6 +2291,18 @@ components:
           type: string
           nullable: true
           description: OAuth2 client ID (used by the frontend for PKCE flow)
+        groups_claim:
+          type: string
+          nullable: true
+          description: JWT claim name containing group membership (default "groups"; use "groups" for PocketID/Keycloak)
+        full_access_group:
+          type: string
+          nullable: true
+          description: Group value granting full access. If null, any authenticated OIDC user gets full access.
+        readonly_group:
+          type: string
+          nullable: true
+          description: Group value granting api_read scope only.
       required:
         - enabled
 
@@ -2306,6 +2318,18 @@ components:
         client_id:
           type: string
           nullable: true
+        groups_claim:
+          type: string
+          nullable: true
+          description: JWT claim name for groups. Pass null to clear (reverts to "groups" default).
+        full_access_group:
+          type: string
+          nullable: true
+          description: Group for full access. Pass null to remove restriction (all OIDC users get full access).
+        readonly_group:
+          type: string
+          nullable: true
+          description: Group for read-only access. Pass null to disable.
 
     TelegramConfigPublic:
       type: object

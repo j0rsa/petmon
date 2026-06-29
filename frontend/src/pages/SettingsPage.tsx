@@ -173,8 +173,18 @@ function OidcSection() {
   const [enabled, setEnabled] = useState<boolean | null>(null);
   const [issuerUrl, setIssuerUrl] = useState('');
   const [clientId, setClientId] = useState('');
+  const [groupsClaim, setGroupsClaim] = useState('');
+  const [fullAccessGroup, setFullAccessGroup] = useState('');
+  const [readonlyGroup, setReadonlyGroup] = useState('');
 
-  const current = data ?? ({ enabled: false, issuer_url: null, client_id: null } as OidcConfigPublic);
+  const current = data ?? ({
+    enabled: false,
+    issuer_url: null,
+    client_id: null,
+    groups_claim: 'groups',
+    full_access_group: null,
+    readonly_group: null,
+  } as OidcConfigPublic);
   const effectiveEnabled = enabled ?? current.enabled;
 
   const mutation = useMutation({
@@ -182,11 +192,18 @@ function OidcSection() {
       enabled: effectiveEnabled,
       ...(issuerUrl ? { issuer_url: issuerUrl } : {}),
       ...(clientId ? { client_id: clientId } : {}),
+      ...(groupsClaim ? { groups_claim: groupsClaim } : {}),
+      // Send explicit null to clear; empty string means "don't change"
+      ...(fullAccessGroup !== '' ? { full_access_group: fullAccessGroup || null } : {}),
+      ...(readonlyGroup !== '' ? { readonly_group: readonlyGroup || null } : {}),
     }),
     onSuccess: (updated) => {
       queryClient.setQueryData(['settings-oidc'], updated);
       setIssuerUrl('');
       setClientId('');
+      setGroupsClaim('');
+      setFullAccessGroup('');
+      setReadonlyGroup('');
       setEnabled(null);
     },
   });
@@ -228,6 +245,47 @@ function OidcSection() {
             <span style={{ fontSize: '0.78rem', color: 'var(--text-subtle)' }}>current: {current.client_id}</span>
           )}
         </div>
+
+        <div className="form-row">
+          <label>Groups claim</label>
+          <input
+            placeholder={current.groups_claim ?? 'groups'}
+            value={groupsClaim}
+            onChange={(e) => setGroupsClaim(e.target.value)}
+          />
+          {!groupsClaim && (
+            <span style={{ fontSize: '0.78rem', color: 'var(--text-subtle)' }}>
+              current: <code>{current.groups_claim ?? 'groups'}</code> — JWT claim name containing group membership
+            </span>
+          )}
+        </div>
+        <div className="form-row">
+          <label>Full access group</label>
+          <input
+            placeholder="e.g. petmon-admins"
+            value={fullAccessGroup}
+            onChange={(e) => setFullAccessGroup(e.target.value)}
+          />
+          <span style={{ fontSize: '0.78rem', color: 'var(--text-subtle)' }}>
+            {current.full_access_group
+              ? <>current: <code>{current.full_access_group}</code> — leave blank to keep, clear with a space</>
+              : 'Leave blank → any OIDC user gets full access'}
+          </span>
+        </div>
+        <div className="form-row">
+          <label>Read-only group</label>
+          <input
+            placeholder="e.g. petmon-viewers"
+            value={readonlyGroup}
+            onChange={(e) => setReadonlyGroup(e.target.value)}
+          />
+          <span style={{ fontSize: '0.78rem', color: 'var(--text-subtle)' }}>
+            {current.readonly_group
+              ? <>current: <code>{current.readonly_group}</code> — members get api_read only</>
+              : 'Optional — members get api_read scope only'}
+          </span>
+        </div>
+
         <div className="form-row" style={{ justifyContent: 'flex-end', flexDirection: 'row', alignItems: 'center', gap: '1rem', gridColumn: '1 / -1' }}>
           <label className="checkbox-row" style={{ paddingTop: 0 }}>
             <input

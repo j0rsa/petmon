@@ -5,12 +5,18 @@ use uuid::Uuid;
 // ── OIDC ─────────────────────────────────────────────────────────────────────
 
 /// Stored in app_settings where key = 'oidc'.
-#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct OidcConfig {
     pub enabled: bool,
     /// OIDC issuer URL used for autodiscovery (/.well-known/openid-configuration)
     pub issuer_url: Option<String>,
     pub client_id: Option<String>,
+    /// JWT claim name that contains group membership (default: "groups")
+    pub groups_claim: Option<String>,
+    /// Group value granting full access. If None, any authenticated OIDC user gets full access.
+    pub full_access_group: Option<String>,
+    /// Group value granting api_read scope only.
+    pub readonly_group: Option<String>,
 }
 
 /// What GET /settings/oidc returns.
@@ -19,6 +25,22 @@ pub struct OidcConfigPublic {
     pub enabled: bool,
     pub issuer_url: Option<String>,
     pub client_id: Option<String>,
+    pub groups_claim: Option<String>,
+    pub full_access_group: Option<String>,
+    pub readonly_group: Option<String>,
+}
+
+impl Default for OidcConfig {
+    fn default() -> Self {
+        OidcConfig {
+            enabled: false,
+            issuer_url: None,
+            client_id: None,
+            groups_claim: Some("groups".to_string()),
+            full_access_group: None,
+            readonly_group: None,
+        }
+    }
 }
 
 impl From<OidcConfig> for OidcConfigPublic {
@@ -27,6 +49,9 @@ impl From<OidcConfig> for OidcConfigPublic {
             enabled: c.enabled,
             issuer_url: c.issuer_url,
             client_id: c.client_id,
+            groups_claim: c.groups_claim,
+            full_access_group: c.full_access_group,
+            readonly_group: c.readonly_group,
         }
     }
 }
@@ -36,6 +61,10 @@ pub struct UpdateOidcConfig {
     pub enabled: Option<bool>,
     pub issuer_url: Option<String>,
     pub client_id: Option<String>,
+    /// Pass `null` to clear; omit to keep existing.
+    pub groups_claim: Option<Option<String>>,
+    pub full_access_group: Option<Option<String>>,
+    pub readonly_group: Option<Option<String>>,
 }
 
 impl UpdateOidcConfig {
@@ -44,6 +73,9 @@ impl UpdateOidcConfig {
             enabled: self.enabled.unwrap_or(existing.enabled),
             issuer_url: self.issuer_url.or(existing.issuer_url),
             client_id: self.client_id.or(existing.client_id),
+            groups_claim: self.groups_claim.unwrap_or(existing.groups_claim),
+            full_access_group: self.full_access_group.unwrap_or(existing.full_access_group),
+            readonly_group: self.readonly_group.unwrap_or(existing.readonly_group),
         }
     }
 }

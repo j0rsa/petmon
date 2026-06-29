@@ -242,12 +242,18 @@ export const mockOidcEmpty: OidcConfigPublic = {
   enabled: false,
   issuer_url: null,
   client_id: null,
+  groups_claim: 'groups',
+  full_access_group: null,
+  readonly_group: null,
 };
 
 export const mockOidcConfigured: OidcConfigPublic = {
   enabled: true,
   issuer_url: 'https://sso.example.com',
   client_id: 'petmon-app',
+  groups_claim: 'groups',
+  full_access_group: 'petmon-admins',
+  readonly_group: 'petmon-viewers',
 };
 
 export const mockTelegramEmpty: TelegramConfigPublic = {

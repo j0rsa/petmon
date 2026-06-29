@@ -4,12 +4,21 @@ export interface OidcConfigPublic {
   enabled: boolean;
   issuer_url: string | null;
   client_id: string | null;
+  groups_claim: string | null;
+  full_access_group: string | null;
+  readonly_group: string | null;
 }
 
 export interface UpdateOidcConfig {
   enabled?: boolean;
   issuer_url?: string | null;
   client_id?: string | null;
+  /** Pass null to clear (reverts to "groups" default). */
+  groups_claim?: string | null;
+  /** Pass null to remove restriction (all OIDC users get full access). */
+  full_access_group?: string | null;
+  /** Pass null to disable read-only group. */
+  readonly_group?: string | null;
 }
 
 export interface DisplaySettings {

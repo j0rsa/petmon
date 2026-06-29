@@ -2,7 +2,7 @@ use arc_swap::ArcSwap;
 use jsonwebtoken::{decode, decode_header, Algorithm, DecodingKey, Validation};
 use openidconnect::{core::CoreProviderMetadata, reqwest::async_http_client, IssuerUrl};
 use serde::Deserialize;
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::sync::Arc;
 use tokio::sync::Mutex;
 
@@ -44,6 +44,12 @@ struct CachedJwks {
 pub struct OidcValidator {
     issuer_url: String,
     client_id: String,
+    /// JWT claim name for groups (default "groups")
+    groups_claim: String,
+    /// Group that grants full access. None = any authenticated user gets full access.
+    full_access_group: Option<String>,
+    /// Group that grants api_read scope only.
+    readonly_group: Option<String>,
     jwks: ArcSwap<Option<Arc<CachedJwks>>>,
     refresh_lock: Mutex<()>,
 }
@@ -56,9 +62,53 @@ impl OidcValidator {
         Some(OidcValidator {
             issuer_url: cfg.issuer_url.clone()?,
             client_id: cfg.client_id.clone()?,
+            groups_claim: cfg
+                .groups_claim
+                .clone()
+                .unwrap_or_else(|| "groups".to_string()),
+            full_access_group: cfg.full_access_group.clone(),
+            readonly_group: cfg.readonly_group.clone(),
             jwks: ArcSwap::new(Arc::new(None)),
             refresh_lock: Mutex::new(()),
         })
+    }
+
+    /// Extract group strings from the named claim in a decoded JWT value map.
+    fn extract_groups(&self, raw: &serde_json::Value) -> Vec<String> {
+        let claim = raw
+            .get(&self.groups_claim)
+            .unwrap_or(&serde_json::Value::Null);
+        match claim {
+            serde_json::Value::Array(arr) => arr
+                .iter()
+                .filter_map(|v| v.as_str().map(str::to_owned))
+                .collect(),
+            serde_json::Value::String(s) => vec![s.clone()],
+            _ => vec![],
+        }
+    }
+
+    /// Resolve scopes from a group list given the configured group mappings.
+    fn resolve_scopes(&self, groups: &[String]) -> Result<HashSet<String>, String> {
+        match &self.full_access_group {
+            None => {
+                // No group restriction configured — full access for any authenticated user.
+                Ok(HashSet::new()) // empty = full access (OIDC path)
+            }
+            Some(full_group) => {
+                if groups.contains(full_group) {
+                    return Ok(HashSet::new()); // full access
+                }
+                if let Some(ro_group) = &self.readonly_group {
+                    if groups.contains(ro_group) {
+                        let mut s = HashSet::new();
+                        s.insert("api_read".to_string());
+                        return Ok(s);
+                    }
+                }
+                Err("user is not a member of any authorised group".to_string())
+            }
+        }
     }
 
     async fn load_jwks(&self) -> Result<Arc<CachedJwks>, String> {
@@ -156,16 +206,25 @@ impl OidcValidator {
         validation.set_audience(&[&self.client_id]);
         validation.set_issuer(&[&self.issuer_url]);
 
-        let token_data = decode::<StandardClaims>(raw_token, &decoding_key, &validation)
+        // Decode into a raw JSON map so we can read the configurable groups claim.
+        let raw_data = decode::<serde_json::Value>(raw_token, &decoding_key, &validation)
             .map_err(|e| format!("JWT verification failed: {e}"))?;
 
-        let claims = token_data.claims;
+        // Also decode typed claims for structured fields.
+        let typed: StandardClaims = serde_json::from_value(raw_data.claims.clone())
+            .map_err(|e| format!("JWT claims parse failed: {e}"))?;
+
+        let groups = self.extract_groups(&raw_data.claims);
+        let scopes = self
+            .resolve_scopes(&groups)
+            .map_err(|e| format!("access denied: {e}"))?;
+
         Ok(Identity {
-            subject: claims.sub,
-            email: claims.email,
-            name: claims.name,
+            subject: typed.sub,
+            email: typed.email,
+            name: typed.name,
             kind: IdentityKind::Oidc,
-            scopes: std::collections::HashSet::new(),
+            scopes,
         })
     }
 

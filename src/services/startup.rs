@@ -29,6 +29,10 @@ pub async fn sync_oidc_from_env(pool: &SqlitePool) {
         enabled: enabled.unwrap_or(existing.enabled),
         issuer_url: issuer_url.or(existing.issuer_url),
         client_id: client_id.or(existing.client_id),
+        // Group fields are not configurable via env — keep whatever is in the DB.
+        groups_claim: existing.groups_claim,
+        full_access_group: existing.full_access_group,
+        readonly_group: existing.readonly_group,
     };
 
     match settings::upsert(pool, "oidc", &merged).await {
