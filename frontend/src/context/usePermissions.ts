@@ -13,8 +13,11 @@ export interface Permissions {
 }
 
 function scopesToPermissions(scopes: string[], kind: string): Permissions {
-  // OIDC and dev identities always have full access regardless of scopes.
-  if (kind === 'oidc' || kind === 'dev') {
+  if (kind === 'dev') {
+    return { loaded: true, canRead: true, canWrite: true, canMcp: true };
+  }
+  // Empty scopes = full access (unconstrained OIDC or all-scope token).
+  if (scopes.length === 0) {
     return { loaded: true, canRead: true, canWrite: true, canMcp: true };
   }
   const s = new Set(scopes);

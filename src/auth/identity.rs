@@ -8,7 +8,7 @@ pub struct Identity {
     /// `name` claim from the OIDC JWT, if present.
     pub name: Option<String>,
     pub kind: IdentityKind,
-    /// Granted scopes. Empty for OIDC/Dev (treated as full access). HashSet for O(1) lookup.
+    /// Granted scopes. Empty means full access (no restriction). HashSet for O(1) lookup.
     pub scopes: HashSet<String>,
 }
 
@@ -43,13 +43,16 @@ impl Identity {
 
     /// Returns true if this identity is permitted to use `required_scope`.
     ///
-    /// - OIDC and Dev identities always pass (no scope restriction).
-    /// - API token identities pass when their scopes contain `"all"` or `required_scope`.
+    /// - Dev identities always pass.
+    /// - OIDC and API token identities with an empty scopes set have full access.
+    /// - Otherwise scopes must contain `"all"` or `required_scope`.
     pub fn has_scope(&self, required_scope: &str) -> bool {
         match self.kind {
-            IdentityKind::Oidc | IdentityKind::Dev => true,
-            IdentityKind::ApiToken { .. } => {
-                self.scopes.contains("all") || self.scopes.contains(required_scope)
+            IdentityKind::Dev => true,
+            IdentityKind::Oidc | IdentityKind::ApiToken { .. } => {
+                self.scopes.is_empty()
+                    || self.scopes.contains("all")
+                    || self.scopes.contains(required_scope)
             }
         }
     }

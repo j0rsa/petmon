@@ -61,21 +61,20 @@ pub struct UpdateOidcConfig {
     pub enabled: Option<bool>,
     pub issuer_url: Option<String>,
     pub client_id: Option<String>,
-    /// Pass `null` to clear; omit to keep existing.
-    pub groups_claim: Option<Option<String>>,
-    pub full_access_group: Option<Option<String>>,
-    pub readonly_group: Option<Option<String>>,
+    pub groups_claim: Option<String>,
+    pub full_access_group: Option<String>,
+    pub readonly_group: Option<String>,
 }
 
 impl UpdateOidcConfig {
     pub fn apply(self, existing: OidcConfig) -> OidcConfig {
         OidcConfig {
             enabled: self.enabled.unwrap_or(existing.enabled),
-            issuer_url: self.issuer_url.or(existing.issuer_url),
-            client_id: self.client_id.or(existing.client_id),
-            groups_claim: self.groups_claim.unwrap_or(existing.groups_claim),
-            full_access_group: self.full_access_group.unwrap_or(existing.full_access_group),
-            readonly_group: self.readonly_group.unwrap_or(existing.readonly_group),
+            issuer_url: self.issuer_url,
+            client_id: self.client_id,
+            groups_claim: self.groups_claim,
+            full_access_group: self.full_access_group,
+            readonly_group: self.readonly_group,
         }
     }
 }

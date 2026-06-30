@@ -6,7 +6,7 @@ export interface MeResponse {
   name: string | null;
   display_name: string;
   kind: 'oidc' | 'api_token' | 'dev';
-  /** Granted scopes. Empty for oidc/dev — treat as full access. */
+  /** Granted scopes. Empty means full access (no restriction). */
   scopes: string[];
 }
 

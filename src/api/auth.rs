@@ -86,7 +86,7 @@ pub struct MeResponse {
     pub name: Option<String>,
     pub display_name: String,
     pub kind: &'static str,
-    /// Granted scopes. Empty for OIDC/Dev (treat as full access on the FE).
+    /// Granted scopes. Empty means full access (no restriction).
     pub scopes: Vec<String>,
 }
 
