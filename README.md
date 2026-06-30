@@ -271,8 +271,9 @@ Stories live next to each component (`*.stories.tsx`). Coverage: all major compo
 Logs are emitted as JSON to stdout. `/api/v1/health` spans are suppressed from traces.
 
 ```bash
-RUST_LOG=petmon=debug     # verbose app logs
-RUST_LOG=debug            # everything including deps
+RUST_LOG=petmon=info                          # default — info and above for app code
+RUST_LOG=petmon=debug                         # verbose app logs
+RUST_LOG=debug                                # everything including deps (very noisy)
 ```
 
 Distributed tracing with Jaeger:
@@ -281,6 +282,53 @@ Distributed tracing with Jaeger:
 docker run -d --name jaeger -p 4317:4317 -p 16686:16686 jaegertracing/all-in-one:latest
 OTEL_EXPORTER_OTLP_ENDPOINT=http://localhost:4317 cargo run
 # UI: http://localhost:16686
+```
+
+### Troubleshooting
+
+**OIDC group mapping not working?**
+
+Users may land on the wrong scope (e.g. read-only user gets full access) if:
+- The JWT uses a different claim name than `groups_claim` in your config
+- The group value in the JWT doesn't exactly match `full_access_group` / `readonly_group`
+
+Enable targeted debug logging for the OIDC auth module only — keeps everything
+else at `info` so the output stays readable:
+
+```bash
+RUST_LOG=petmon=info,petmon::auth::oidc=debug cargo run
+```
+
+On each login you will see two `DEBUG` lines:
+
+```
+OIDC token verified — resolving scopes from groups
+  sub=alice  groups_claim="groups"  groups=["petmon-admins"]
+  full_access_group=Some("petmon-admins")  readonly_group=Some("petmon-viewers")
+  raw_claim_value=Some(Array [String("petmon-admins")])
+
+OIDC scope resolution complete
+  sub=alice  resolved_scopes={}   ← empty = full access
+```
+
+Key things to check in the first line:
+- `groups` — what was actually extracted from the token (check spelling and case)
+- `raw_claim_value` — the raw JSON value under that claim key; `None` means the claim
+  is absent entirely — the claim name is wrong
+- `resolved_scopes` — `{}` means full access; `{"api_read"}` means read-only; if you
+  expected read-only but see `{}`, the user's group name matches `full_access_group`
+
+For Docker / HA deployments set the env var in your run config:
+
+```yaml
+# docker-compose.yml
+environment:
+  RUST_LOG: "petmon=info,petmon::auth::oidc=debug"
+
+# Home Assistant add-on options
+env_vars:
+  - name: RUST_LOG
+    value: "petmon=info,petmon::auth::oidc=debug"
 ```
 
 ## CI/CD

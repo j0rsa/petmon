@@ -215,9 +215,26 @@ impl OidcValidator {
             .map_err(|e| format!("JWT claims parse failed: {e}"))?;
 
         let groups = self.extract_groups(&raw_data.claims);
+
+        tracing::debug!(
+            sub = %typed.sub,
+            groups_claim = %self.groups_claim,
+            groups = ?groups,
+            full_access_group = ?self.full_access_group,
+            readonly_group = ?self.readonly_group,
+            raw_claim_value = ?raw_data.claims.get(&self.groups_claim),
+            "OIDC token verified — resolving scopes from groups",
+        );
+
         let scopes = self
             .resolve_scopes(&groups)
             .map_err(|e| format!("access denied: {e}"))?;
+
+        tracing::debug!(
+            sub = %typed.sub,
+            resolved_scopes = ?scopes,
+            "OIDC scope resolution complete",
+        );
 
         Ok(Identity {
             subject: typed.sub,
