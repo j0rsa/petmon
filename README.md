@@ -256,6 +256,8 @@ make story
 
 Stories live next to each component (`*.stories.tsx`). Coverage: all major components + Nutrition, Elimination, Health, Settings, and Analytics pages.
 
+On each PR, CI publishes Storybook to [Chromatic](https://www.chromatic.com/) and comments with a preview link. Add a repo secret named `CHROMATIC_PROJECT_TOKEN` (from your Chromatic project → Manage → Configure).
+
 ### Makefile targets
 
 | Target | Description |
