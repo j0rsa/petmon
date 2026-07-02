@@ -10,43 +10,52 @@ import { storybookTest } from '@storybook/addon-vitest/vitest-plugin';
 import { playwright } from '@vitest/browser-playwright';
 const dirname = typeof __dirname !== 'undefined' ? __dirname : path.dirname(fileURLToPath(import.meta.url));
 
+const isStorybookBuild =
+  process.env.STORYBOOK === 'true' ||
+  process.env.npm_lifecycle_event === 'build-storybook' ||
+  process.env.npm_lifecycle_event === 'storybook';
+
 // More info at: https://storybook.js.org/docs/next/writing-tests/integrations/vitest-addon
 export default defineConfig({
   plugins: [
     react(),
-    VitePWA({
-      registerType: 'prompt',
-      workbox: {
-        skipWaiting: true,
-        clientsClaim: true,
-        navigateFallback: '/index.html',
-        navigateFallbackDenylist: [/^\/api/, /^\/mcp/],
-      },
-      includeAssets: ['favicon.svg', 'icons/*.png'],
-      manifest: {
-        name: 'Petmon',
-        short_name: 'Petmon',
-        description: 'Pet monitoring app',
-        theme_color: '#1e1e1c',
-        background_color: '#1c1c1a',
-        display: 'standalone',
-        orientation: 'portrait',
-        scope: '/',
-        start_url: '/',
-        icons: [
-          { src: 'icons/72x72.png',   sizes: '72x72',   type: 'image/png' },
-          { src: 'icons/96x96.png',   sizes: '96x96',   type: 'image/png' },
-          { src: 'icons/128x128.png', sizes: '128x128', type: 'image/png' },
-          { src: 'icons/144x144.png', sizes: '144x144', type: 'image/png' },
-          { src: 'icons/152x152.png', sizes: '152x152', type: 'image/png' },
-          { src: 'icons/180x180.png', sizes: '180x180', type: 'image/png' },
-          { src: 'icons/192x192.png', sizes: '192x192', type: 'image/png' },
-          { src: 'icons/384x384.png', sizes: '384x384', type: 'image/png' },
-          { src: 'icons/512x512.png', sizes: '512x512', type: 'image/png' },
-          { src: 'icons/maskable-512x512.png', sizes: '512x512', type: 'image/png', purpose: 'maskable' },
-        ],
-      },
-    }),
+    ...(isStorybookBuild
+      ? []
+      : [
+          VitePWA({
+            registerType: 'prompt',
+            workbox: {
+              skipWaiting: true,
+              clientsClaim: true,
+              navigateFallback: '/index.html',
+              navigateFallbackDenylist: [/^\/api/, /^\/mcp/],
+            },
+            includeAssets: ['favicon.svg', 'icons/*.png'],
+            manifest: {
+              name: 'Petmon',
+              short_name: 'Petmon',
+              description: 'Pet monitoring app',
+              theme_color: '#1e1e1c',
+              background_color: '#1c1c1a',
+              display: 'standalone',
+              orientation: 'portrait',
+              scope: '/',
+              start_url: '/',
+              icons: [
+                { src: 'icons/72x72.png',   sizes: '72x72',   type: 'image/png' },
+                { src: 'icons/96x96.png',   sizes: '96x96',   type: 'image/png' },
+                { src: 'icons/128x128.png', sizes: '128x128', type: 'image/png' },
+                { src: 'icons/144x144.png', sizes: '144x144', type: 'image/png' },
+                { src: 'icons/152x152.png', sizes: '152x152', type: 'image/png' },
+                { src: 'icons/180x180.png', sizes: '180x180', type: 'image/png' },
+                { src: 'icons/192x192.png', sizes: '192x192', type: 'image/png' },
+                { src: 'icons/384x384.png', sizes: '384x384', type: 'image/png' },
+                { src: 'icons/512x512.png', sizes: '512x512', type: 'image/png' },
+                { src: 'icons/maskable-512x512.png', sizes: '512x512', type: 'image/png', purpose: 'maskable' },
+              ],
+            },
+          }),
+        ]),
   ],
   server: {
     proxy: {

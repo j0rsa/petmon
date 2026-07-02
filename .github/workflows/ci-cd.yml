@@ -201,6 +201,7 @@ jobs:
     name: Backend (test)
     runs-on: ubuntu-latest
     needs: backend-check
+    if: always() && needs.backend-check.result == 'success'
     permissions:
       checks: write
     steps:
@@ -237,6 +238,7 @@ jobs:
     name: Backend amd64 (build)
     runs-on: ubuntu-latest
     needs: backend-test
+    if: always() && needs.backend-test.result == 'success'
     steps:
       - uses: actions/checkout@v4.2.2
 
@@ -270,6 +272,7 @@ jobs:
     name: Backend arm64 (build)
     runs-on: ubuntu-24.04-arm
     needs: backend-test
+    if: always() && needs.backend-test.result == 'success'
     steps:
       - uses: actions/checkout@v4.2.2
 
@@ -303,7 +306,12 @@ jobs:
     name: Docker multiarch image
     runs-on: ubuntu-latest
     needs: [frontend, backend-amd64, backend-arm64, version-check]
-    if: always() && !failure() && !cancelled()
+    if: |
+      always() &&
+      needs.frontend.result == 'success' &&
+      needs.backend-amd64.result == 'success' &&
+      needs.backend-arm64.result == 'success' &&
+      !cancelled()
     # Only publish on main branch pushes; PRs still build to validate Dockerfile
     permissions:
       contents: read
