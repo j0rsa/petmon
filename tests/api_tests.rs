@@ -922,7 +922,10 @@ async fn health_state_records_crud() {
     let created: serde_json::Value = test::read_body_json(resp).await;
     let record_id = created["id"].as_str().unwrap().to_string();
     assert_eq!(created["level"].as_str(), Some("ok"));
-    assert_eq!(created["note"].as_str(), Some("Seemed fine after breakfast"));
+    assert_eq!(
+        created["note"].as_str(),
+        Some("Seemed fine after breakfast")
+    );
     assert_eq!(created["local_date"].as_str(), Some("2026-06-15"));
 
     let req = test::TestRequest::get()

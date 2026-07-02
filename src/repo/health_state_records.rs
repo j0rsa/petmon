@@ -1,6 +1,6 @@
 use crate::domain::health_state::{
-    CreateHealthStateRecord, HealthStatePayload, HealthStateRecord,
-    HealthStateRecordFilters, RECORD_TYPE,
+    CreateHealthStateRecord, HealthStatePayload, HealthStateRecord, HealthStateRecordFilters,
+    RECORD_TYPE,
 };
 use crate::error::{AppError, AppResult};
 use chrono::Utc;
@@ -120,10 +120,10 @@ pub async fn create(
     let source_type = req.source_type.unwrap_or_else(|| "manual".to_string());
     let pet_id = Uuid::parse_str(&req.pet_id)
         .map_err(|_| AppError::BadRequest(format!("invalid pet_id: {}", req.pet_id)))?;
-    let payload_json = serde_json::to_string(&HealthStatePayload {
-        level: req.level,
-    })
-    .map_err(|err| AppError::Internal(format!("failed to encode health state payload: {err}")))?;
+    let payload_json =
+        serde_json::to_string(&HealthStatePayload { level: req.level }).map_err(|err| {
+            AppError::Internal(format!("failed to encode health state payload: {err}"))
+        })?;
 
     sqlx::query(
         "INSERT INTO health_records
