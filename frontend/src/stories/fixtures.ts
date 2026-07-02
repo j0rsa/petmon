@@ -5,6 +5,7 @@ import type { AppInfo } from '../api/info';
 import type { ApiTokenCreated, ApiTokenPublic, DisplaySettings, OidcConfigPublic, TelegramConfigPublic } from '../api/settings';
 import type { EliminationRecord, EliminationDailySummary, EliminationRangeSummary } from '../api/elimination';
 import type { WeightRecord, WeightSummaryBucket } from '../api/weight';
+import type { HealthStateRecord } from '../api/healthState';
 
 export const mockPetId = '550e8400-e29b-41d4-a716-446655440000';
 
@@ -430,4 +431,39 @@ export const mockWeightSummaryWeekly: WeightSummaryBucket[] = [
   { bucket: '2024-05-27', avg_kg: 4.20, min_kg: 4.18, max_kg: 4.22, count: 2 },
   { bucket: '2024-06-03', avg_kg: 4.15, min_kg: 4.15, max_kg: 4.15, count: 1 },
   { bucket: '2024-06-10', avg_kg: 4.20, min_kg: 4.18, max_kg: 4.22, count: 2 },
+];
+
+// ── Health state fixtures ─────────────────────────────────────────────────────
+
+export const mockHealthStateRecords: HealthStateRecord[] = [
+  {
+    id: 'hs-01',
+    pet_id: mockPetId,
+    occurred_at: '2024-06-10T09:00:00',
+    local_date: '2024-06-10',
+    level: 'good',
+    note: 'Playful and eating well',
+    source_type: 'manual',
+    created_at: '2024-06-10T09:00:00',
+  },
+  {
+    id: 'hs-02',
+    pet_id: mockPetId,
+    occurred_at: '2024-06-14T18:00:00',
+    local_date: '2024-06-14',
+    level: 'ok',
+    note: null,
+    source_type: 'manual',
+    created_at: '2024-06-14T18:00:00',
+  },
+  {
+    id: 'hs-03',
+    pet_id: mockPetId,
+    occurred_at: '2024-06-15T10:30:00',
+    local_date: '2024-06-15',
+    level: 'amazing',
+    note: 'Great energy after walk',
+    source_type: 'manual',
+    created_at: '2024-06-15T10:30:00',
+  },
 ];

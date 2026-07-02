@@ -98,6 +98,7 @@ async fn main() -> anyhow::Result<()> {
                     .configure(api::nutrition::configure)
                     .configure(api::elimination::configure)
                     .configure(api::weight::configure)
+                    .configure(api::health_state::configure)
                     .configure(api::days::configure)
                     .configure(api::notes::configure)
                     .configure(api::settings::configure)

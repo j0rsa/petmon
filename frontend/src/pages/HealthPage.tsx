@@ -5,6 +5,7 @@ import { weightApi } from '../api/weight';
 import { parseDecimal } from '../lib/numbers';
 import type { CreateWeightRecord, WeightGranularity } from '../api/weight';
 import { NoPetSelected } from '../components/NoPetSelected';
+import { HealthStatePanel } from '../components/health/HealthStatePanel';
 import { useSelectedPet } from '../context/SelectedPetContext';
 import { localToday, shiftDate } from '../lib/dates';
 import { usePermissions } from '../context/usePermissions';
@@ -124,6 +125,8 @@ export default function HealthPage() {
           </span>
         )}
       </section>
+
+      <HealthStatePanel petId={selectedPetId} />
 
       {/* Weight chart */}
       <section className="panel">

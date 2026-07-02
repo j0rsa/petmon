@@ -1628,3 +1628,99 @@ pre {
   white-space: nowrap;
   width: auto;
 }
+
+/* ── Health state picker ─────────────────────────────────────────────────── */
+
+.health-state-picker {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-template-rows: auto auto;
+  gap: 0.5rem;
+  max-width: 18rem;
+}
+
+.health-state-picker__option {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0.25rem;
+  min-height: 4.5rem;
+  padding: 0.55rem 0.35rem;
+  border: 1px solid var(--border-subtle);
+  border-radius: 14px;
+  background: var(--surface-raised, var(--surface));
+  color: var(--text);
+  cursor: pointer;
+  transition: border-color 0.15s ease, transform 0.15s ease, box-shadow 0.15s ease;
+}
+
+.health-state-picker__option:hover:not(:disabled) {
+  border-color: var(--accent);
+  transform: translateY(-1px);
+}
+
+.health-state-picker__option--selected {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 1px var(--accent);
+  background: color-mix(in srgb, var(--accent) 12%, var(--surface));
+}
+
+.health-state-picker__option:disabled {
+  cursor: default;
+  opacity: 0.85;
+}
+
+.health-state-picker__option--top-left {
+  grid-column: 1;
+  grid-row: 1;
+}
+
+.health-state-picker__option--top-right {
+  grid-column: 3;
+  grid-row: 1;
+}
+
+.health-state-picker__option--mid-left {
+  grid-column: 1;
+  grid-row: 2;
+}
+
+.health-state-picker__option--center {
+  grid-column: 2;
+  grid-row: 2;
+}
+
+.health-state-picker__option--mid-right {
+  grid-column: 3;
+  grid-row: 2;
+}
+
+.health-state-picker__emoji {
+  font-size: 1.75rem;
+  line-height: 1;
+}
+
+.health-state-picker__label {
+  font-size: 0.72rem;
+  color: var(--text-muted);
+  text-align: center;
+}
+
+.health-state-picker__summary {
+  grid-column: 1 / -1;
+  margin: 0;
+  font-size: 0.82rem;
+}
+
+.health-state-latest {
+  font-size: 2rem;
+  line-height: 1;
+}
+
+.health-state-record {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  font-size: 0.88rem;
+}
