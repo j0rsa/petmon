@@ -3,7 +3,6 @@ import type { HealthStateRecord } from '../api/healthState';
 import {
   buildHealthStateSummary,
   healthStateScore,
-  levelFromScore,
   median,
   weekStart,
 } from './healthStateChart';
