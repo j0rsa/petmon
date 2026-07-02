@@ -1,6 +1,7 @@
 import type { ComponentType } from 'react';
 import type { Meta, StoryObj } from '@storybook/react-vite';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { localToday, shiftDate } from '../../lib/dates';
 import { mockHealthStateRecords, mockPetId } from '../../stories/fixtures';
 import { HealthStatePanel } from './HealthStatePanel';
 
@@ -15,6 +16,18 @@ const meta = {
 export default meta;
 type Story = StoryObj<typeof meta>;
 
+function seedHealthStateQueries(
+  client: QueryClient,
+  records: typeof mockHealthStateRecords,
+  petId = mockPetId,
+) {
+  const today = localToday();
+  const dateFrom = shiftDate(today, -29);
+  client.setQueryData(['health-state-records', petId], records);
+  client.setQueryData(['health-state-chart', petId, dateFrom, today, 'daily'], records);
+  client.setQueryData(['health-state-chart', petId, 'all', today, 'weekly'], records);
+}
+
 function withHealthStateRecords(records: typeof mockHealthStateRecords, loading = false) {
   return function Decorator(StoryComponent: ComponentType) {
     const client = new QueryClient({
@@ -26,8 +39,11 @@ function withHealthStateRecords(records: typeof mockHealthStateRecords, loading 
       client.setQueryDefaults(['health-state-records', mockPetId], {
         queryFn: () => new Promise(() => {}),
       });
+      client.setQueryDefaults(['health-state-chart', mockPetId], {
+        queryFn: () => new Promise(() => {}),
+      });
     } else {
-      client.setQueryData(['health-state-records', mockPetId], records);
+      seedHealthStateQueries(client, records);
     }
     client.setQueryData(['me'], {
       subject: 'dev',
@@ -45,7 +61,7 @@ function withHealthStateRecords(records: typeof mockHealthStateRecords, loading 
   };
 }
 
-/** Panel with recent check-ins and optional notes. */
+/** Panel with chart, recent check-ins, and optional notes. */
 export const WithHistory: Story = {
   decorators: [withHealthStateRecords(mockHealthStateRecords)],
 };

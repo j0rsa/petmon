@@ -435,35 +435,32 @@ export const mockWeightSummaryWeekly: WeightSummaryBucket[] = [
 
 // ── Health state fixtures ─────────────────────────────────────────────────────
 
+function mockHealthStateRecord(
+  id: string,
+  daysAgo: number,
+  time: string,
+  level: HealthStateRecord['level'],
+  note: string | null,
+): HealthStateRecord {
+  const local_date = shiftDate(localToday(), -daysAgo);
+  const occurred_at = `${local_date}T${time}`;
+  return {
+    id,
+    pet_id: mockPetId,
+    occurred_at,
+    local_date,
+    level,
+    note,
+    source_type: 'manual',
+    created_at: occurred_at,
+  };
+}
+
 export const mockHealthStateRecords: HealthStateRecord[] = [
-  {
-    id: 'hs-01',
-    pet_id: mockPetId,
-    occurred_at: '2024-06-10T09:00:00',
-    local_date: '2024-06-10',
-    level: 'good',
-    note: 'Playful and eating well',
-    source_type: 'manual',
-    created_at: '2024-06-10T09:00:00',
-  },
-  {
-    id: 'hs-02',
-    pet_id: mockPetId,
-    occurred_at: '2024-06-14T18:00:00',
-    local_date: '2024-06-14',
-    level: 'ok',
-    note: null,
-    source_type: 'manual',
-    created_at: '2024-06-14T18:00:00',
-  },
-  {
-    id: 'hs-03',
-    pet_id: mockPetId,
-    occurred_at: '2024-06-15T10:30:00',
-    local_date: '2024-06-15',
-    level: 'amazing',
-    note: 'Great energy after walk',
-    source_type: 'manual',
-    created_at: '2024-06-15T10:30:00',
-  },
+  mockHealthStateRecord('hs-01', 7, '09:00:00', 'poor', 'Quiet morning'),
+  mockHealthStateRecord('hs-01b', 7, '19:00:00', 'good', 'Picked up in the evening'),
+  mockHealthStateRecord('hs-02', 5, '09:00:00', 'good', 'Playful and eating well'),
+  mockHealthStateRecord('hs-03', 1, '18:00:00', 'ok', null),
+  mockHealthStateRecord('hs-04', 0, '10:30:00', 'amazing', 'Great energy after walk'),
+  mockHealthStateRecord('hs-04b', 0, '20:00:00', 'good', 'Settled well overnight'),
 ];
