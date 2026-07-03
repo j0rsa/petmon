@@ -39,45 +39,64 @@ fn row_to_record(row: HealthStateRow) -> AppResult<HealthStateRecord> {
     })
 }
 
+pub const DEFAULT_RECENT_LIMIT: i64 = 10;
+
 #[tracing::instrument(skip(pool, filters))]
 pub async fn list(
     pool: &SqlitePool,
     filters: &HealthStateRecordFilters,
 ) -> AppResult<Vec<HealthStateRecord>> {
+    let has_date_range = filters.date_from.is_some() || filters.date_to.is_some();
+    let limit = filters.limit.or_else(|| {
+        if has_date_range {
+            None
+        } else {
+            Some(DEFAULT_RECENT_LIMIT)
+        }
+    });
+    let order_desc = !has_date_range;
+
+    let mut effective = filters.clone();
+    effective.limit = limit;
+
     let mut query = String::from(
         "SELECT id, pet_id, occurred_at, local_date, note, payload_json, source_type, created_at
          FROM health_records WHERE record_type = ?",
     );
 
-    if filters.pet_id.is_some() {
+    if effective.pet_id.is_some() {
         query.push_str(" AND pet_id = ?");
     }
-    if filters.date_from.is_some() {
+    if effective.date_from.is_some() {
         query.push_str(" AND local_date >= ?");
     }
-    if filters.date_to.is_some() {
+    if effective.date_to.is_some() {
         query.push_str(" AND local_date <= ?");
     }
-    query.push_str(" ORDER BY occurred_at ASC");
-    if let Some(limit) = filters.limit {
+    query.push_str(if order_desc {
+        " ORDER BY occurred_at DESC"
+    } else {
+        " ORDER BY occurred_at ASC"
+    });
+    if let Some(limit) = effective.limit {
         query.push_str(&format!(" LIMIT {}", limit.max(0)));
     }
-    if let Some(offset) = filters.offset {
+    if let Some(offset) = effective.offset {
         query.push_str(&format!(" OFFSET {}", offset.max(0)));
     }
 
     let mut q = sqlx::query_as::<_, HealthStateRow>(sqlx::AssertSqlSafe(query)).bind(RECORD_TYPE);
-    if let Some(pet_id_str) = &filters.pet_id {
+    if let Some(pet_id_str) = &effective.pet_id {
         if let Ok(uuid) = Uuid::parse_str(pet_id_str) {
             q = q.bind(uuid);
         } else {
             q = q.bind(pet_id_str);
         }
     }
-    if let Some(from) = &filters.date_from {
+    if let Some(from) = &effective.date_from {
         q = q.bind(from);
     }
-    if let Some(to) = &filters.date_to {
+    if let Some(to) = &effective.date_to {
         q = q.bind(to);
     }
 

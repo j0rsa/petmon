@@ -951,6 +951,52 @@ async fn health_state_records_crud() {
 }
 
 #[actix_web::test]
+async fn health_state_list_defaults_to_last_ten_without_date_filter() {
+    let (app, _state) = build_dev_app!();
+    let pet_id = api_create_pet!(&app, "HealthStateLimitTest");
+
+    for hour in 0..12 {
+        let req = test::TestRequest::post()
+            .uri("/api/v1/health/state")
+            .set_json(serde_json::json!({
+                "pet_id": pet_id,
+                "level": "ok",
+                "occurred_at": format!("2026-06-15T{:02}:00:00", hour)
+            }))
+            .to_request();
+        let resp = test::call_service(&app, req).await;
+        assert_eq!(resp.status(), 201);
+    }
+
+    let req = test::TestRequest::get()
+        .uri(&format!("/api/v1/health/state?pet_id={pet_id}"))
+        .to_request();
+    let resp = test::call_service(&app, req).await;
+    assert_eq!(resp.status(), 200);
+    let list: serde_json::Value = test::read_body_json(resp).await;
+    let records = list.as_array().expect("expected array");
+    assert_eq!(records.len(), 10);
+    assert_eq!(
+        records[0]["occurred_at"].as_str(),
+        Some("2026-06-15T11:00:00")
+    );
+    assert_eq!(
+        records[9]["occurred_at"].as_str(),
+        Some("2026-06-15T02:00:00")
+    );
+
+    let req = test::TestRequest::get()
+        .uri(&format!(
+            "/api/v1/health/state?pet_id={pet_id}&date_from=2026-06-15&date_to=2026-06-15"
+        ))
+        .to_request();
+    let resp = test::call_service(&app, req).await;
+    assert_eq!(resp.status(), 200);
+    let list: serde_json::Value = test::read_body_json(resp).await;
+    assert_eq!(list.as_array().unwrap().len(), 12);
+}
+
+#[actix_web::test]
 async fn health_state_records_returns_json_not_spa() {
     let pool = setup_pool().await;
     let state = web::Data::new(AppState::new(pool, true, None, None));

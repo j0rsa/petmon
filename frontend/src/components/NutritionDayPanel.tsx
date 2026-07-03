@@ -87,37 +87,49 @@ const AddRow = forwardRef<AddRowHandle, AddRowProps>(function AddRow(
   }
 
   return (
-    <div className="entry-add-row">
-      <TimeInput value={time} onChange={setTime} />
-      <select
-        className="entry-inline-input entry-inline-select"
-        aria-label="Category"
-        value={category}
-        onChange={(e) => setCategory(e.target.value)}
-      >
-        {CATEGORIES.map((cat) => (
-          <option key={cat} value={cat}>{CATEGORY_LABELS[cat]}</option>
-        ))}
-      </select>
-      <input
-        ref={amountRef}
-        className="entry-inline-input entry-inline-amount"
-        type="text"
-          inputMode="decimal"
-        aria-label="Amount"
-        placeholder="amount"
-        value={amount}
-        onChange={(e) => setAmount(e.target.value)}
-        onKeyDown={(e) => { if (e.key === 'Enter') handleAdd(); }}
-      />
-      <span className="entry-unit-hint">{unitFor(category)}</span>
+    <div className="record-entry-form">
+      <div className="form-row" style={{ flex: '0 0 auto' }}>
+        <label style={{ fontSize: '0.82rem' }}>Time</label>
+        <TimeInput value={time} onChange={setTime} />
+      </div>
+      <div className="form-row" style={{ flex: '0 0 auto' }}>
+        <label style={{ fontSize: '0.82rem' }}>Category</label>
+        <select
+          className="entry-inline-input entry-inline-select"
+          aria-label="Category"
+          value={category}
+          onChange={(e) => setCategory(e.target.value)}
+        >
+          {CATEGORIES.map((cat) => (
+            <option key={cat} value={cat}>{CATEGORY_LABELS[cat]}</option>
+          ))}
+        </select>
+      </div>
+      <div className="form-row" style={{ flex: '0 0 auto' }}>
+        <label style={{ fontSize: '0.82rem' }}>Amount</label>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
+          <input
+            ref={amountRef}
+            className="entry-inline-input entry-inline-amount"
+            type="text"
+            inputMode="decimal"
+            aria-label="Amount"
+            placeholder="0"
+            value={amount}
+            onChange={(e) => setAmount(e.target.value)}
+            onKeyDown={(e) => { if (e.key === 'Enter') handleAdd(); }}
+          />
+          <span className="entry-unit-hint">{unitFor(category)}</span>
+        </div>
+      </div>
       <button
-        className="button button-secondary button-compact"
+        className="button"
         type="button"
         disabled={saving || !amount}
         onClick={handleAdd}
+        style={{ alignSelf: 'flex-end' }}
       >
-        {isPaused ? '⏸ offline' : saving ? '…' : '+ add'}
+        {isPaused ? 'Offline…' : saving ? 'Saving…' : 'Log intake'}
       </button>
     </div>
   );
@@ -384,6 +396,17 @@ export function NutritionDayPanel({ date, petId }: NutritionDayPanelProps) {
           <span className="muted-text">{records.length} logged</span>
         </div>
 
+        {canWrite && (
+          <AddRow
+            ref={addRowRef}
+            date={date}
+            petId={petId}
+            saving={createMutation.isPending}
+            isPaused={createMutation.isPaused}
+            onSave={(payload) => createMutation.mutate(payload)}
+          />
+        )}
+
         {records.length === 0 ? (
           <div className="empty-state compact-empty">No records for this day yet.</div>
         ) : (
@@ -402,17 +425,6 @@ export function NutritionDayPanel({ date, petId }: NutritionDayPanelProps) {
               />
             ))}
           </div>
-        )}
-
-        {canWrite && (
-          <AddRow
-            ref={addRowRef}
-            date={date}
-            petId={petId}
-            saving={createMutation.isPending}
-            isPaused={createMutation.isPaused}
-            onSave={(payload) => createMutation.mutate(payload)}
-          />
         )}
       </div>
 
@@ -471,17 +483,20 @@ function ExportPanel({ records }: { records: NutritionRecord[] }) {
   }
 
   return (
-    <div className="day-note-block">
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-        <label>Export as Telegram log</label>
+    <details className="export-telegram-details">
+      <summary className="export-telegram-summary">
+        <span>Export as Telegram log</span>
         <button
           className="button button-secondary button-compact"
           type="button"
-          onClick={handleCopy}
+          onClick={(e) => {
+            e.preventDefault();
+            handleCopy();
+          }}
         >
           {copied ? 'Copied!' : 'Copy'}
         </button>
-      </div>
+      </summary>
       <textarea
         rows={Math.min(records.length * 2 + 1, 10)}
         readOnly
@@ -489,6 +504,6 @@ function ExportPanel({ records }: { records: NutritionRecord[] }) {
         style={{ fontFamily: 'monospace', fontSize: '0.82rem', color: 'var(--text-muted)' }}
         onFocus={(e) => e.target.select()}
       />
-    </div>
+    </details>
   );
 }

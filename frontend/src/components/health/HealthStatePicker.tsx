@@ -1,5 +1,5 @@
 import type { HealthStateLevel } from '../../lib/healthState';
-import { HEALTH_STATE_OPTIONS, healthStateLabel } from '../../lib/healthState';
+import { HEALTH_STATE_OPTIONS } from '../../lib/healthState';
 
 export interface HealthStatePickerProps {
   value: HealthStateLevel | null;
@@ -40,11 +40,6 @@ export function HealthStatePicker({
           </button>
         );
       })}
-      {value && (
-        <p className="health-state-picker__summary muted-text">
-          Selected: <strong>{healthStateLabel(value)}</strong>
-        </p>
-      )}
     </div>
   );
 }

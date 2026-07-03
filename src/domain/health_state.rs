@@ -63,7 +63,7 @@ pub struct CreateHealthStateRecord {
     pub source_type: Option<String>,
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, Clone)]
 pub struct HealthStateRecordFilters {
     pub pet_id: Option<String>,
     pub date_from: Option<String>,
