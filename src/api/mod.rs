@@ -2,6 +2,7 @@ pub mod auth;
 pub mod days;
 pub mod elimination;
 pub mod health;
+pub mod health_state;
 pub mod info;
 pub mod notes;
 pub mod nutrition;

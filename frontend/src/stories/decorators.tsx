@@ -28,6 +28,7 @@ import {
   mockWeightSummaryRaw,
   mockWeightSummaryDaily,
   mockWeightSummaryWeekly,
+  mockHealthStateRecords,
 } from './fixtures';
 
 /** Single router wrapper — use `parameters.route` per story to set the active path. */
@@ -290,6 +291,8 @@ export function withHealthPage({ petId = mockPetId, loading = false, empty = fal
       const pending = () => new Promise(() => {});
       client.setQueryDefaults(['weight-records', petId], { queryFn: pending });
       client.setQueryDefaults(['weight-summary'], { queryFn: pending });
+      client.setQueryDefaults(['health-state-records', petId], { queryFn: pending });
+      client.setQueryDefaults(['health-state-chart', petId], { queryFn: pending });
     } else {
       client.setQueryData(
         ['weight-records', petId],
@@ -307,6 +310,17 @@ export function withHealthPage({ petId = mockPetId, loading = false, empty = fal
       client.setQueryData(['weight-summary', dailyFrom, todayStr, 'daily', petId], summaryData(mockWeightSummaryDaily));
       client.setQueryData(['weight-summary', yearFrom, todayStr, 'weekly', petId], summaryData(longHistory ? mockWeightSummaryWeekly : mockWeightSummaryDaily));
       client.setQueryData(['weight-summary', 'all', todayStr, 'weekly', petId], summaryData(mockWeightSummaryWeekly));
+
+      client.setQueryData(
+        ['health-state-records', petId],
+        empty ? [] : mockHealthStateRecords.map((r) => ({ ...r, pet_id: petId })),
+      );
+
+      const chartRecords = empty ? [] : mockHealthStateRecords.map((r) => ({ ...r, pet_id: petId }));
+      client.setQueryData(['health-state-chart', petId, rawFrom, todayStr, 'daily'], chartRecords);
+      client.setQueryData(['health-state-chart', petId, dailyFrom, todayStr, 'daily'], chartRecords);
+      client.setQueryData(['health-state-chart', petId, yearFrom, todayStr, 'weekly'], chartRecords);
+      client.setQueryData(['health-state-chart', petId, 'all', todayStr, 'weekly'], chartRecords);
     }
 
     return (

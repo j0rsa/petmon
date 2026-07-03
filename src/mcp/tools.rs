@@ -1,6 +1,7 @@
 use crate::domain::elimination::{
     CreateEliminationRecord, EliminationRecordFilters, UpdateEliminationRecord,
 };
+use crate::domain::health_state::{CreateHealthStateRecord, HealthStateRecordFilters};
 use crate::domain::nutrition_record::BatchCreateNutritionRecords;
 use crate::domain::nutrition_record::{
     CreateNutritionRecord, NutritionRecordFilters, UpdateNutritionRecord,
@@ -10,7 +11,7 @@ use crate::domain::pet::{CreatePet, UpdatePet};
 use crate::domain::weight::{CreateWeightRecord, WeightRecordFilters};
 use crate::error::{AppError, AppResult};
 use crate::services::{
-    day_service, elimination_analytics_service, elimination_record_service,
+    day_service, elimination_analytics_service, elimination_record_service, health_state_service,
     nutrition_analytics_service, nutrition_record_service, nutrition_schedule_service, pet_service,
     weight_service,
 };
@@ -506,10 +507,51 @@ fn tool_list() -> Value {
                 }
             },
 
+            // ── Overall health state (wellbeing check-ins) ───────────────────
+            {
+                "name": "health/state/list",
+                "description": "List overall wellbeing check-ins for a pet. Without date_from/date_to returns the last 10 records (newest first). With a date range returns all matches (oldest first) for charting.",
+                "inputSchema": {
+                    "type": "object",
+                    "properties": {
+                        "pet_id":    { "type": "string", "format": "uuid" },
+                        "date_from": { "type": "string", "format": "date" },
+                        "date_to":   { "type": "string", "format": "date" },
+                        "limit":     { "type": "integer" },
+                        "offset":    { "type": "integer" }
+                    }
+                }
+            },
+            {
+                "name": "health/state/create",
+                "description": "Log an overall wellbeing check-in. Levels: terrible, poor, ok, good, amazing.",
+                "inputSchema": {
+                    "type": "object",
+                    "required": ["pet_id", "level"],
+                    "properties": {
+                        "pet_id":      { "type": "string", "format": "uuid" },
+                        "level":       { "type": "string", "enum": ["terrible", "poor", "ok", "good", "amazing"] },
+                        "occurred_at": { "type": "string", "description": "Naive local datetime YYYY-MM-DDTHH:MM:SS. Defaults to now." },
+                        "local_date":  { "type": "string", "format": "date" },
+                        "note":        { "type": "string", "description": "Optional caregiver note (energy, appetite, mood, etc.)" },
+                        "source_type": { "type": "string" }
+                    }
+                }
+            },
+            {
+                "name": "health/state/delete",
+                "description": "Delete a wellbeing check-in by ID.",
+                "inputSchema": {
+                    "type": "object",
+                    "required": ["id"],
+                    "properties": { "id": { "type": "string" } }
+                }
+            },
+
             // ── Health context ───────────────────────────────────────────────
             {
                 "name": "pets/health-context",
-                "description": "Returns a complete health context for a single pet in one call: pet profile, the last 10 weight records (most recent first), and a 30-day weight stats summary (latest_kg, avg_kg, count). Weight is not included in the pet profile — use stats_30d.latest_kg for the current weight. Answers 'what does the pet weigh now?', 'is the weight stable?', 'has it changed recently?' without additional tool calls.",
+                "description": "Returns a complete health context for a single pet in one call: pet profile, the last 10 weight records (most recent first), 30-day weight stats (latest_kg, avg_kg, count), and the last 10 overall wellbeing check-ins (level + optional note, most recent first). Weight is not included in the pet profile — use stats_30d.latest_kg for current weight. Use recent_state_checks to answer 'how has the pet been feeling?' and read any caregiver notes. Levels: terrible, poor, ok, good, amazing.",
                 "inputSchema": {
                     "type": "object",
                     "required": ["pet_id"],
@@ -925,6 +967,27 @@ pub async fn dispatch(
             Ok(json!(buckets))
         }
 
+        // ── Overall health state ──────────────────────────────────────────────
+        "health/state/list" => {
+            let filters: HealthStateRecordFilters =
+                serde_json::from_value(params).map_err(|e| AppError::BadRequest(e.to_string()))?;
+            let records = health_state_service::list(pool, filters).await?;
+            Ok(json!(records))
+        }
+        "health/state/create" => {
+            let req: CreateHealthStateRecord =
+                serde_json::from_value(params).map_err(|e| AppError::BadRequest(e.to_string()))?;
+            let record = health_state_service::create(pool, req, timezone).await?;
+            Ok(json!(record))
+        }
+        "health/state/delete" => {
+            let id = params["id"]
+                .as_str()
+                .ok_or_else(|| AppError::BadRequest("id required".to_string()))?;
+            health_state_service::delete(pool, id).await?;
+            Ok(json!({ "deleted": true }))
+        }
+
         // ── Health context ────────────────────────────────────────────────────
         "pets/health-context" => {
             let pet_id = require_uuid(&params, "pet_id")?;
@@ -933,7 +996,7 @@ pub async fn dispatch(
             let thirty_days_ago =
                 (Utc::now().date_naive() - chrono::Duration::days(29)).to_string();
 
-            let (pet, recent_weights, stats) = tokio::try_join!(
+            let (pet, recent_weights, stats, recent_state_checks) = tokio::try_join!(
                 pet_service::get(pool, pet_id),
                 weight_service::list(
                     pool,
@@ -946,12 +1009,33 @@ pub async fn dispatch(
                     }
                 ),
                 weight_service::stats(pool, &pet_id_str, &thirty_days_ago, &today),
+                health_state_service::list(
+                    pool,
+                    HealthStateRecordFilters {
+                        pet_id: Some(pet_id_str.clone()),
+                        date_from: None,
+                        date_to: None,
+                        limit: None,
+                        offset: None,
+                    },
+                ),
             )?;
+
+            let latest_state = recent_state_checks.first().map(|record| {
+                json!({
+                    "level": record.level,
+                    "note": record.note,
+                    "occurred_at": record.occurred_at,
+                    "local_date": record.local_date,
+                })
+            });
 
             Ok(json!({
                 "pet": pet,
                 "recent_weights": recent_weights,
-                "stats_30d": stats
+                "stats_30d": stats,
+                "latest_state": latest_state,
+                "recent_state_checks": recent_state_checks,
             }))
         }
 

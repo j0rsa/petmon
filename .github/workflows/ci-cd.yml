@@ -93,6 +93,91 @@ jobs:
           retention-days: 1
 
   # ─────────────────────────────────────────────
+  # Stream 1b: Storybook publish (Chromatic)
+  # Requires CHROMATIC_PROJECT_TOKEN repo secret.
+  # ─────────────────────────────────────────────
+  chromatic:
+    name: Storybook (Chromatic)
+    runs-on: ubuntu-latest
+    needs: frontend
+    if: always() && needs.frontend.result == 'success'
+    permissions:
+      contents: read
+      pull-requests: write
+    defaults:
+      run:
+        working-directory: frontend
+    steps:
+      - uses: actions/checkout@v4.2.2
+        with:
+          fetch-depth: 0
+
+      - uses: actions/setup-node@v4.4.0
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Publish to Chromatic
+        id: chromatic
+        uses: chromaui/action@v13
+        with:
+          projectToken: ${{ secrets.CHROMATIC_PROJECT_TOKEN }}
+          workingDir: frontend
+          buildScriptName: build-storybook
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Update PR description with Storybook preview
+        if: github.event_name == 'pull_request' && steps.chromatic.outputs.storybookUrl != ''
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const markerStart = '<!-- chromatic-storybook-preview -->';
+            const markerEnd = '<!-- /chromatic-storybook-preview -->';
+            const storybookUrl = '${{ steps.chromatic.outputs.storybookUrl }}';
+            const buildUrl = '${{ steps.chromatic.outputs.buildUrl }}';
+            const sha = '${{ github.event.pull_request.head.sha }}';
+            const section = [
+              markerStart,
+              '## Storybook preview',
+              '',
+              `- [View Storybook](${storybookUrl})`,
+              `- [View Chromatic build](${buildUrl})`,
+              '',
+              `_Updated for commit ${sha}._`,
+              markerEnd,
+            ].join('\n');
+
+            const { data: pr } = await github.rest.pulls.get({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              pull_number: context.issue.number,
+            });
+
+            let body = pr.body ?? '';
+            const startIdx = body.indexOf(markerStart);
+            const endIdx = body.indexOf(markerEnd);
+
+            if (startIdx !== -1 && endIdx !== -1 && endIdx > startIdx) {
+              body =
+                body.slice(0, startIdx) +
+                section +
+                body.slice(endIdx + markerEnd.length);
+            } else {
+              body = `${body.trimEnd()}\n\n${section}`;
+            }
+
+            await github.rest.pulls.update({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              pull_number: context.issue.number,
+              body,
+            });
+
+  # ─────────────────────────────────────────────
   # Version guard (main push only)
   # ─────────────────────────────────────────────
   version-check:
@@ -164,6 +249,7 @@ jobs:
     name: Backend (test)
     runs-on: ubuntu-latest
     needs: backend-check
+    if: always() && needs.backend-check.result == 'success'
     permissions:
       checks: write
     steps:
@@ -200,6 +286,7 @@ jobs:
     name: Backend amd64 (build)
     runs-on: ubuntu-latest
     needs: backend-test
+    if: always() && needs.backend-test.result == 'success'
     steps:
       - uses: actions/checkout@v4.2.2
 
@@ -233,6 +320,7 @@ jobs:
     name: Backend arm64 (build)
     runs-on: ubuntu-24.04-arm
     needs: backend-test
+    if: always() && needs.backend-test.result == 'success'
     steps:
       - uses: actions/checkout@v4.2.2
 
@@ -266,13 +354,25 @@ jobs:
     name: Docker multiarch image
     runs-on: ubuntu-latest
     needs: [frontend, backend-amd64, backend-arm64, version-check]
-    if: always() && !failure() && !cancelled()
-    # Only publish on main branch pushes; PRs still build to validate Dockerfile
+    if: |
+      always() &&
+      needs.frontend.result == 'success' &&
+      needs.backend-amd64.result == 'success' &&
+      needs.backend-arm64.result == 'success' &&
+      !cancelled()
+    # Main pushes publish v<version>, latest, and sha-*. PRs publish pr-<number>-<version> only.
     permissions:
       contents: read
       packages: write
     steps:
       - uses: actions/checkout@v4.2.2
+
+      - name: Extract app version
+        id: ver
+        run: |
+          VERSION=$(grep '^version' Cargo.toml | head -1 | sed 's/.*"\(.*\)".*/\1/')
+          echo "version=${VERSION}" >> "$GITHUB_OUTPUT"
+          echo "Detected version: ${VERSION}"
 
       - name: Download amd64 binary
         uses: actions/download-artifact@v4.3.0
@@ -298,7 +398,7 @@ jobs:
       - uses: docker/setup-buildx-action@v3
 
       - name: Log in to GHCR
-        if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+        if: github.event_name == 'push' || github.event_name == 'pull_request'
         uses: docker/login-action@v3
         with:
           registry: ${{ env.REGISTRY }}
@@ -311,8 +411,9 @@ jobs:
         with:
           images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
           tags: |
-            type=raw,value=v${{ needs.version-check.outputs.version }},enable=${{ github.ref == 'refs/heads/main' && github.event_name == 'push' }}
-            type=sha,prefix=sha-,format=short
+            type=raw,value=v${{ steps.ver.outputs.version }},enable=${{ github.ref == 'refs/heads/main' && github.event_name == 'push' }}
+            type=sha,prefix=pr-${{ github.event.pull_request.number }}-${{ steps.ver.outputs.version }}-,format=short,enable=${{ github.event_name == 'pull_request' }}
+            type=sha,prefix=sha-,format=short,enable=${{ github.ref == 'refs/heads/main' && github.event_name == 'push' }}
             type=raw,value=latest,enable=${{ github.ref == 'refs/heads/main' && github.event_name == 'push' }}
 
       - name: Build and push multiarch image
@@ -321,7 +422,7 @@ jobs:
           context: .
           file: Dockerfile
           platforms: linux/amd64,linux/arm64
-          push: ${{ github.ref == 'refs/heads/main' && github.event_name == 'push' }}
+          push: ${{ github.event_name == 'pull_request' || (github.ref == 'refs/heads/main' && github.event_name == 'push') }}
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
           cache-from: type=gha

@@ -1474,6 +1474,92 @@ pre {
   border-top: 1px solid var(--border-subtle);
 }
 
+.record-entry-form {
+  display: grid;
+  width: 100%;
+  gap: 0.75rem;
+  align-items: end;
+  margin-top: 0.75rem;
+}
+
+.record-entry-form--health {
+  grid-template-columns: minmax(17rem, 1.15fr) minmax(0, 2fr) auto;
+}
+
+.record-entry-form--nutrition {
+  grid-template-columns: minmax(7.5rem, 1fr) minmax(0, 2fr) minmax(9rem, 1fr) auto;
+}
+
+.record-entry-form .form-row {
+  min-width: 0;
+}
+
+.record-entry-form .form-row label {
+  font-size: 0.82rem;
+}
+
+.record-entry-form input,
+.record-entry-form select,
+.record-entry-form .entry-inline-input {
+  width: 100%;
+  min-height: 2.75rem;
+  box-sizing: border-box;
+  font-size: inherit;
+  padding: 0.8rem 0.9rem;
+  border-radius: 12px;
+  border: 1px solid var(--border);
+  background: var(--input-bg);
+  color: var(--input-text);
+}
+
+.record-entry-form .record-entry-amount-wrap {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+}
+
+.record-entry-form .record-entry-amount-wrap input {
+  flex: 1;
+  min-width: 0;
+}
+
+.record-entry-form .entry-unit-hint {
+  flex-shrink: 0;
+}
+
+.record-entry-form .button {
+  white-space: nowrap;
+}
+
+.export-telegram-details {
+  margin-top: 0.75rem;
+  border-top: 1px solid var(--border-subtle);
+  padding-top: 0.75rem;
+}
+
+.export-telegram-summary {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 0.75rem;
+  cursor: pointer;
+  font-size: 0.88rem;
+  color: var(--text);
+  list-style: none;
+}
+
+.export-telegram-summary::-webkit-details-marker {
+  display: none;
+}
+
+.export-telegram-details[open] .export-telegram-summary {
+  margin-bottom: 0.5rem;
+}
+
+.export-telegram-details textarea {
+  width: 100%;
+}
+
 .entry-row-editing {
   background: var(--surface-inset);
   border-radius: 10px;
@@ -1584,6 +1670,11 @@ pre {
     gap: 0.35rem;
   }
 
+  .record-entry-form--health,
+  .record-entry-form--nutrition {
+    grid-template-columns: 1fr;
+  }
+
   .pet-info-page .pet-info-card {
     grid-template-columns: 1fr;
     justify-items: center;
@@ -1627,4 +1718,68 @@ pre {
   cursor: pointer;
   white-space: nowrap;
   width: auto;
+}
+
+/* ── Health state picker ─────────────────────────────────────────────────── */
+
+.health-state-picker {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 0.5rem;
+  max-width: 100%;
+}
+
+.health-state-picker__option {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0.25rem;
+  min-height: 4.5rem;
+  padding: 0.55rem 0.35rem;
+  border: 1px solid var(--border-subtle);
+  border-radius: 14px;
+  background: var(--surface-raised, var(--surface));
+  color: var(--text);
+  cursor: pointer;
+  transition: border-color 0.15s ease, transform 0.15s ease, box-shadow 0.15s ease;
+}
+
+.health-state-picker__option:hover:not(:disabled) {
+  border-color: var(--accent);
+  transform: translateY(-1px);
+}
+
+.health-state-picker__option--selected {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 1px var(--accent);
+  background: color-mix(in srgb, var(--accent) 12%, var(--surface));
+}
+
+.health-state-picker__option:disabled {
+  cursor: default;
+  opacity: 0.85;
+}
+
+.health-state-picker__emoji {
+  font-size: 1.75rem;
+  line-height: 1;
+}
+
+.health-state-picker__label {
+  font-size: 0.72rem;
+  color: var(--text-muted);
+  text-align: center;
+}
+
+.health-state-latest {
+  font-size: 2rem;
+  line-height: 1;
+}
+
+.health-state-record {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  font-size: 0.88rem;
 }
