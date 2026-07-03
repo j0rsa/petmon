@@ -122,12 +122,28 @@ jobs:
         run: npm ci
 
       - name: Publish to Chromatic
+        id: chromatic
         uses: chromaui/action@v13
         with:
           projectToken: ${{ secrets.CHROMATIC_PROJECT_TOKEN }}
           workingDir: frontend
           buildScriptName: build-storybook
           token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Comment Storybook preview on PR
+        if: github.event_name == 'pull_request' && steps.chromatic.outputs.storybookUrl != ''
+        uses: peter-evans/create-or-update-comment@v4
+        with:
+          issue-number: ${{ github.event.pull_request.number }}
+          body-includes: '<!-- chromatic-storybook-preview -->'
+          body: |
+            <!-- chromatic-storybook-preview -->
+            ## Storybook preview
+
+            - [View Storybook](${{ steps.chromatic.outputs.storybookUrl }})
+            - [View Chromatic build](${{ steps.chromatic.outputs.buildUrl }})
+
+            _Updated for commit ${{ github.event.pull_request.head.sha }}._
 
   # ─────────────────────────────────────────────
   # Version guard (main push only)
