@@ -348,7 +348,7 @@ version-check ──► frontend ───────────────�
 | `backend-check` | `cargo fmt` + `cargo clippy` |
 | `backend-test` | `cargo nextest` |
 | `backend-amd64/arm64` | musl release builds |
-| `docker` | Multiarch image → GHCR tagged `v<version>`, `sha-<short>`, `latest` |
+| `docker` | Multiarch image → GHCR tagged `v<version>`, `sha-<short>`, `latest` on main; `pr-<number>-<version>` on PRs |
 
 To release: bump `version` in `Cargo.toml` and push to main.
 
