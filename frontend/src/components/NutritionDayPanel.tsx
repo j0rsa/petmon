@@ -87,15 +87,14 @@ const AddRow = forwardRef<AddRowHandle, AddRowProps>(function AddRow(
   }
 
   return (
-    <div className="record-entry-form">
-      <div className="form-row" style={{ flex: '0 0 auto' }}>
-        <label style={{ fontSize: '0.82rem' }}>Time</label>
+    <div className="record-entry-form record-entry-form--nutrition">
+      <div className="form-row">
+        <label>Time</label>
         <TimeInput value={time} onChange={setTime} />
       </div>
-      <div className="form-row" style={{ flex: '0 0 auto' }}>
-        <label style={{ fontSize: '0.82rem' }}>Category</label>
+      <div className="form-row">
+        <label>Category</label>
         <select
-          className="entry-inline-input entry-inline-select"
           aria-label="Category"
           value={category}
           onChange={(e) => setCategory(e.target.value)}
@@ -105,12 +104,11 @@ const AddRow = forwardRef<AddRowHandle, AddRowProps>(function AddRow(
           ))}
         </select>
       </div>
-      <div className="form-row" style={{ flex: '0 0 auto' }}>
-        <label style={{ fontSize: '0.82rem' }}>Amount</label>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
+      <div className="form-row">
+        <label>Amount</label>
+        <div className="record-entry-amount-wrap">
           <input
             ref={amountRef}
-            className="entry-inline-input entry-inline-amount"
             type="text"
             inputMode="decimal"
             aria-label="Amount"
@@ -127,7 +125,6 @@ const AddRow = forwardRef<AddRowHandle, AddRowProps>(function AddRow(
         type="button"
         disabled={saving || !amount}
         onClick={handleAdd}
-        style={{ alignSelf: 'flex-end' }}
       >
         {isPaused ? 'Offline…' : saving ? 'Saving…' : 'Log intake'}
       </button>

@@ -1475,11 +1475,60 @@ pre {
 }
 
 .record-entry-form {
-  display: flex;
-  gap: 0.5rem;
-  flex-wrap: wrap;
-  align-items: flex-end;
+  display: grid;
+  width: 100%;
+  gap: 0.75rem;
+  align-items: end;
   margin-top: 0.75rem;
+}
+
+.record-entry-form--health {
+  grid-template-columns: minmax(17rem, 1.15fr) minmax(0, 2fr) auto;
+}
+
+.record-entry-form--nutrition {
+  grid-template-columns: minmax(7.5rem, 1fr) minmax(0, 2fr) minmax(9rem, 1fr) auto;
+}
+
+.record-entry-form .form-row {
+  min-width: 0;
+}
+
+.record-entry-form .form-row label {
+  font-size: 0.82rem;
+}
+
+.record-entry-form input,
+.record-entry-form select,
+.record-entry-form .entry-inline-input {
+  width: 100%;
+  min-height: 2.75rem;
+  box-sizing: border-box;
+  font-size: inherit;
+  padding: 0.8rem 0.9rem;
+  border-radius: 12px;
+  border: 1px solid var(--border);
+  background: var(--input-bg);
+  color: var(--input-text);
+}
+
+.record-entry-form .record-entry-amount-wrap {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+}
+
+.record-entry-form .record-entry-amount-wrap input {
+  flex: 1;
+  min-width: 0;
+}
+
+.record-entry-form .entry-unit-hint {
+  flex-shrink: 0;
+}
+
+.record-entry-form .button {
+  white-space: nowrap;
 }
 
 .export-telegram-details {
@@ -1619,6 +1668,11 @@ pre {
 
   .entry-add-row {
     gap: 0.35rem;
+  }
+
+  .record-entry-form--health,
+  .record-entry-form--nutrition {
+    grid-template-columns: 1fr;
   }
 
   .pet-info-page .pet-info-card {

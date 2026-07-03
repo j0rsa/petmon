@@ -148,18 +148,17 @@ export function HealthStatePanel({ petId }: HealthStatePanelProps) {
           <>
             <HealthStatePicker value={level} onChange={setLevel} disabled={addMutation.isPending} />
 
-            <div className="record-entry-form">
-              <div className="form-row" style={{ flex: '0 0 auto' }}>
-                <label style={{ fontSize: '0.82rem' }}>Date &amp; time</label>
+            <div className="record-entry-form record-entry-form--health">
+              <div className="form-row">
+                <label>Date &amp; time</label>
                 <input
                   type="datetime-local"
                   value={occurredAt}
                   onChange={(e) => setOccurredAt(e.target.value)}
-                  style={{ width: '13rem' }}
                 />
               </div>
-              <div className="form-row" style={{ flex: '1 1 140px' }}>
-                <label style={{ fontSize: '0.82rem' }}>Note (optional)</label>
+              <div className="form-row">
+                <label>Note (optional)</label>
                 <input
                   type="text"
                   placeholder="Energy, appetite, mood…"
@@ -173,7 +172,6 @@ export function HealthStatePanel({ petId }: HealthStatePanelProps) {
                 type="button"
                 disabled={addMutation.isPending || !level}
                 onClick={handleAdd}
-                style={{ alignSelf: 'flex-end' }}
               >
                 {addMutation.isPending ? 'Saving…' : 'Log health'}
               </button>
