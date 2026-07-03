@@ -47,12 +47,10 @@ pub async fn list(
     filters: &HealthStateRecordFilters,
 ) -> AppResult<Vec<HealthStateRecord>> {
     let has_date_range = filters.date_from.is_some() || filters.date_to.is_some();
-    let limit = filters.limit.or_else(|| {
-        if has_date_range {
-            None
-        } else {
-            Some(DEFAULT_RECENT_LIMIT)
-        }
+    let limit = filters.limit.or(if has_date_range {
+        None
+    } else {
+        Some(DEFAULT_RECENT_LIMIT)
     });
     let order_desc = !has_date_range;
 
