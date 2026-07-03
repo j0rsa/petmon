@@ -6,14 +6,17 @@ import { registerSW } from 'virtual:pwa-register';
 import App from './App';
 import ErrorBoundary from './components/ErrorBoundary';
 import { DisplaySettingsProvider } from './context/DisplaySettingsProvider';
+import { setPwaUpdateHandler } from './lib/pwaCache';
 import './index.css';
 
-registerSW({
+const updateSW = registerSW({
   onNeedRefresh() {
     window.dispatchEvent(new Event('pwa-update-available'));
   },
   onOfflineReady() {},
 });
+
+setPwaUpdateHandler(updateSW);
 
 const queryClient = new QueryClient({
   defaultOptions: {
