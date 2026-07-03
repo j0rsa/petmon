@@ -1633,10 +1633,9 @@ pre {
 
 .health-state-picker {
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  grid-template-rows: auto auto;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
   gap: 0.5rem;
-  max-width: 18rem;
+  max-width: 100%;
 }
 
 .health-state-picker__option {
@@ -1669,31 +1668,6 @@ pre {
 .health-state-picker__option:disabled {
   cursor: default;
   opacity: 0.85;
-}
-
-.health-state-picker__option--top-left {
-  grid-column: 1;
-  grid-row: 1;
-}
-
-.health-state-picker__option--top-right {
-  grid-column: 3;
-  grid-row: 1;
-}
-
-.health-state-picker__option--mid-left {
-  grid-column: 1;
-  grid-row: 2;
-}
-
-.health-state-picker__option--center {
-  grid-column: 2;
-  grid-row: 2;
-}
-
-.health-state-picker__option--mid-right {
-  grid-column: 3;
-  grid-row: 2;
 }
 
 .health-state-picker__emoji {

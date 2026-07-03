@@ -1,9 +1,5 @@
 import type { HealthStateLevel } from '../../lib/healthState';
-import {
-  HEALTH_STATE_OPTIONS,
-  healthStateLabel,
-  healthStateSlotClass,
-} from '../../lib/healthState';
+import { HEALTH_STATE_OPTIONS, healthStateLabel } from '../../lib/healthState';
 
 export interface HealthStatePickerProps {
   value: HealthStateLevel | null;
@@ -33,7 +29,6 @@ export function HealthStatePicker({
             disabled={disabled}
             className={[
               'health-state-picker__option',
-              healthStateSlotClass(option.slot),
               selected ? 'health-state-picker__option--selected' : '',
             ].filter(Boolean).join(' ')}
             onClick={() => onChange(option.level)}

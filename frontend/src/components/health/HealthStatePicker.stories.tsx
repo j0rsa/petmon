@@ -15,7 +15,7 @@ const meta = {
   },
   decorators: [
     (Story) => (
-      <div style={{ maxWidth: 320 }}>
+      <div style={{ maxWidth: 560 }}>
         <Story />
       </div>
     ),
@@ -30,7 +30,7 @@ function PickerDemo({ initial = null, disabled = false }: { initial?: HealthStat
   return <HealthStatePicker value={value} onChange={setValue} disabled={disabled} />;
 }
 
-/** Default picker — OK sits in the centre, Amazing top-right, Terrible on the left. */
+/** Default picker — five options in a single row, Terrible on the left through to Amazing on the right. */
 export const Default: Story = {
   render: () => <PickerDemo />,
 };

@@ -5,17 +5,14 @@ import {
   compareHealthStateLevels,
   healthStateEmoji,
   healthStateLabel,
-  healthStateSlotClass,
 } from './healthState';
 
 describe('HEALTH_STATE_OPTIONS', () => {
-  it('defines five unique levels in the expected layout slots', () => {
+  it('defines five unique levels in left-to-right order', () => {
     expect(HEALTH_STATE_OPTIONS).toHaveLength(5);
     const levels = HEALTH_STATE_OPTIONS.map((option) => option.level);
     expect(new Set(levels).size).toBe(5);
-    expect(HEALTH_STATE_OPTIONS.find((option) => option.slot === 'center')?.level).toBe('ok');
-    expect(HEALTH_STATE_OPTIONS.find((option) => option.slot === 'top-right')?.level).toBe('amazing');
-    expect(HEALTH_STATE_OPTIONS.find((option) => option.slot === 'mid-left')?.level).toBe('terrible');
+    expect(levels).toEqual(['terrible', 'poor', 'ok', 'good', 'amazing']);
   });
 });
 
@@ -32,13 +29,6 @@ describe('healthStateEmoji', () => {
     for (const level of HEALTH_STATE_LEVELS) {
       expect(healthStateEmoji(level)).toMatch(/\p{Extended_Pictographic}/u);
     }
-  });
-});
-
-describe('healthStateSlotClass', () => {
-  it('maps slots to BEM modifier classes', () => {
-    expect(healthStateSlotClass('center')).toBe('health-state-picker__option--center');
-    expect(healthStateSlotClass('top-right')).toBe('health-state-picker__option--top-right');
   });
 });
 
