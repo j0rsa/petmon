@@ -127,6 +127,12 @@ petmon exposes a **stateless JSON-RPC 2.0** MCP endpoint at `POST /mcp`, protect
 
 `weight/records/list`, `weight/records/create`, `weight/records/delete`
 
+`health/state/list`, `health/state/create`, `health/state/delete`
+
+### Wellbeing levels
+
+When creating health state records, use `level`: `terrible`, `poor`, `ok`, `good`, `amazing`. Optional `note` for caregiver observations.
+
 ### Event types for toileting
 
 When creating elimination records, use `event_type`:

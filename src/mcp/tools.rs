@@ -1,7 +1,7 @@
 use crate::domain::elimination::{
     CreateEliminationRecord, EliminationRecordFilters, UpdateEliminationRecord,
 };
-use crate::domain::health_state::HealthStateRecordFilters;
+use crate::domain::health_state::{CreateHealthStateRecord, HealthStateRecordFilters};
 use crate::domain::nutrition_record::BatchCreateNutritionRecords;
 use crate::domain::nutrition_record::{
     CreateNutritionRecord, NutritionRecordFilters, UpdateNutritionRecord,
@@ -507,6 +507,47 @@ fn tool_list() -> Value {
                 }
             },
 
+            // ── Overall health state (wellbeing check-ins) ───────────────────
+            {
+                "name": "health/state/list",
+                "description": "List overall wellbeing check-ins for a pet. Without date_from/date_to returns the last 10 records (newest first). With a date range returns all matches (oldest first) for charting.",
+                "inputSchema": {
+                    "type": "object",
+                    "properties": {
+                        "pet_id":    { "type": "string", "format": "uuid" },
+                        "date_from": { "type": "string", "format": "date" },
+                        "date_to":   { "type": "string", "format": "date" },
+                        "limit":     { "type": "integer" },
+                        "offset":    { "type": "integer" }
+                    }
+                }
+            },
+            {
+                "name": "health/state/create",
+                "description": "Log an overall wellbeing check-in. Levels: terrible, poor, ok, good, amazing.",
+                "inputSchema": {
+                    "type": "object",
+                    "required": ["pet_id", "level"],
+                    "properties": {
+                        "pet_id":      { "type": "string", "format": "uuid" },
+                        "level":       { "type": "string", "enum": ["terrible", "poor", "ok", "good", "amazing"] },
+                        "occurred_at": { "type": "string", "description": "Naive local datetime YYYY-MM-DDTHH:MM:SS. Defaults to now." },
+                        "local_date":  { "type": "string", "format": "date" },
+                        "note":        { "type": "string", "description": "Optional caregiver note (energy, appetite, mood, etc.)" },
+                        "source_type": { "type": "string" }
+                    }
+                }
+            },
+            {
+                "name": "health/state/delete",
+                "description": "Delete a wellbeing check-in by ID.",
+                "inputSchema": {
+                    "type": "object",
+                    "required": ["id"],
+                    "properties": { "id": { "type": "string" } }
+                }
+            },
+
             // ── Health context ───────────────────────────────────────────────
             {
                 "name": "pets/health-context",
@@ -924,6 +965,27 @@ pub async fn dispatch(
             let buckets =
                 weight_service::summary(pool, pet_id, date_from, date_to, &granularity).await?;
             Ok(json!(buckets))
+        }
+
+        // ── Overall health state ──────────────────────────────────────────────
+        "health/state/list" => {
+            let filters: HealthStateRecordFilters =
+                serde_json::from_value(params).map_err(|e| AppError::BadRequest(e.to_string()))?;
+            let records = health_state_service::list(pool, filters).await?;
+            Ok(json!(records))
+        }
+        "health/state/create" => {
+            let req: CreateHealthStateRecord =
+                serde_json::from_value(params).map_err(|e| AppError::BadRequest(e.to_string()))?;
+            let record = health_state_service::create(pool, req, timezone).await?;
+            Ok(json!(record))
+        }
+        "health/state/delete" => {
+            let id = params["id"]
+                .as_str()
+                .ok_or_else(|| AppError::BadRequest("id required".to_string()))?;
+            health_state_service::delete(pool, id).await?;
+            Ok(json!({ "deleted": true }))
         }
 
         // ── Health context ────────────────────────────────────────────────────
