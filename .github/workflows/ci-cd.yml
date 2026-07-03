@@ -130,25 +130,30 @@ jobs:
           buildScriptName: build-storybook
           token: ${{ secrets.GITHUB_TOKEN }}
 
+      - name: Find Storybook preview comment
+        if: github.event_name == 'pull_request' && steps.chromatic.outputs.storybookUrl != ''
+        id: chromatic-comment
+        uses: peter-evans/find-comment@v3
+        with:
+          issue-number: ${{ github.event.pull_request.number }}
+          comment-author: github-actions[bot]
+          body-includes: '<!-- chromatic-storybook-preview -->'
+
       - name: Comment Storybook preview on PR
         if: github.event_name == 'pull_request' && steps.chromatic.outputs.storybookUrl != ''
-        uses: actions/github-script@v7
+        uses: peter-evans/create-or-update-comment@v4
         with:
-          script: |
-            const storybookUrl = '${{ steps.chromatic.outputs.storybookUrl }}';
-            const buildUrl = '${{ steps.chromatic.outputs.buildUrl }}';
-            const sha = '${{ github.event.pull_request.head.sha }}'.slice(0, 7);
-            await github.rest.issues.createComment({
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              issue_number: context.issue.number,
-              body: [
-                `## Storybook preview (\`${sha}\`)`,
-                '',
-                `- [View Storybook](${storybookUrl})`,
-                `- [View Chromatic build](${buildUrl})`,
-              ].join('\n'),
-            });
+          comment-id: ${{ steps.chromatic-comment.outputs.comment-id }}
+          issue-number: ${{ github.event.pull_request.number }}
+          edit-mode: replace
+          body: |
+            <!-- chromatic-storybook-preview -->
+            ## Storybook preview
+
+            - [View Storybook](${{ steps.chromatic.outputs.storybookUrl }})
+            - [View Chromatic build](${{ steps.chromatic.outputs.buildUrl }})
+
+            _Updated for commit ${{ github.event.pull_request.head.sha }}._
 
   # ─────────────────────────────────────────────
   # Version guard (main push only)
