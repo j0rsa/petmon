@@ -390,7 +390,7 @@ jobs:
           images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
           tags: |
             type=raw,value=v${{ steps.ver.outputs.version }},enable=${{ github.ref == 'refs/heads/main' && github.event_name == 'push' }}
-            type=raw,value=pr-${{ github.event.pull_request.number }}-${{ steps.ver.outputs.version }},enable=${{ github.event_name == 'pull_request' }}
+            type=sha,prefix=pr-${{ github.event.pull_request.number }}-${{ steps.ver.outputs.version }}-,format=short,enable=${{ github.event_name == 'pull_request' }}
             type=sha,prefix=sha-,format=short,enable=${{ github.ref == 'refs/heads/main' && github.event_name == 'push' }}
             type=raw,value=latest,enable=${{ github.ref == 'refs/heads/main' && github.event_name == 'push' }}
 
