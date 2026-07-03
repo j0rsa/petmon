@@ -130,30 +130,52 @@ jobs:
           buildScriptName: build-storybook
           token: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Find Storybook preview comment
+      - name: Update PR description with Storybook preview
         if: github.event_name == 'pull_request' && steps.chromatic.outputs.storybookUrl != ''
-        id: chromatic-comment
-        uses: peter-evans/find-comment@v3
+        uses: actions/github-script@v7
         with:
-          issue-number: ${{ github.event.pull_request.number }}
-          comment-author: github-actions[bot]
-          body-includes: '<!-- chromatic-storybook-preview -->'
+          script: |
+            const markerStart = '<!-- chromatic-storybook-preview -->';
+            const markerEnd = '<!-- /chromatic-storybook-preview -->';
+            const storybookUrl = '${{ steps.chromatic.outputs.storybookUrl }}';
+            const buildUrl = '${{ steps.chromatic.outputs.buildUrl }}';
+            const sha = '${{ github.event.pull_request.head.sha }}';
+            const section = [
+              markerStart,
+              '## Storybook preview',
+              '',
+              `- [View Storybook](${storybookUrl})`,
+              `- [View Chromatic build](${buildUrl})`,
+              '',
+              `_Updated for commit ${sha}._`,
+              markerEnd,
+            ].join('\n');
 
-      - name: Comment Storybook preview on PR
-        if: github.event_name == 'pull_request' && steps.chromatic.outputs.storybookUrl != ''
-        uses: peter-evans/create-or-update-comment@v4
-        with:
-          comment-id: ${{ steps.chromatic-comment.outputs.comment-id }}
-          issue-number: ${{ github.event.pull_request.number }}
-          edit-mode: replace
-          body: |
-            <!-- chromatic-storybook-preview -->
-            ## Storybook preview
+            const { data: pr } = await github.rest.pulls.get({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              pull_number: context.issue.number,
+            });
 
-            - [View Storybook](${{ steps.chromatic.outputs.storybookUrl }})
-            - [View Chromatic build](${{ steps.chromatic.outputs.buildUrl }})
+            let body = pr.body ?? '';
+            const startIdx = body.indexOf(markerStart);
+            const endIdx = body.indexOf(markerEnd);
 
-            _Updated for commit ${{ github.event.pull_request.head.sha }}._
+            if (startIdx !== -1 && endIdx !== -1 && endIdx > startIdx) {
+              body =
+                body.slice(0, startIdx) +
+                section +
+                body.slice(endIdx + markerEnd.length);
+            } else {
+              body = `${body.trimEnd()}\n\n${section}`;
+            }
+
+            await github.rest.pulls.update({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              pull_number: context.issue.number,
+              body,
+            });
 
   # ─────────────────────────────────────────────
   # Version guard (main push only)
