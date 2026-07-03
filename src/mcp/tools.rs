@@ -1012,7 +1012,7 @@ pub async fn dispatch(
                 health_state_service::list(
                     pool,
                     HealthStateRecordFilters {
-                        pet_id: Some(pet_id_str),
+                        pet_id: Some(pet_id_str.clone()),
                         date_from: None,
                         date_to: None,
                         limit: None,
