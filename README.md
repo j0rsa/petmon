@@ -109,7 +109,7 @@ petmon exposes a **stateless JSON-RPC 2.0** MCP endpoint at `POST /mcp`, protect
 |------|---------|
 | `pets/nutrition-context` | Pet profile + today's nutrition summary + active schedules + 7-day trend |
 | `pets/elimination-context` | Pet profile + today's wee/poop/vomit counts + 7-day trend |
-| `pets/health-context` | Pet profile + last 10 weight records + 30-day stats |
+| `pets/health-context` | Pet profile + last 10 weight records + 30-day stats + last 10 wellbeing check-ins (level + notes) |
 
 **Individual tools:**
 
