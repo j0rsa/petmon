@@ -10,6 +10,7 @@ import {
   type UpdateEliminationRecord,
 } from '../api/elimination';
 import { TimeInput } from './TimeInput';
+import { EliminationDayChart } from './EliminationDayChart';
 import { nowTimeString, isoFromDateAndTime } from '../lib/time';
 import { localToday } from '../lib/dates';
 import { useFormatTime, useFormatDate } from '../context/useDisplaySettings';
@@ -61,11 +62,10 @@ interface DurationInputProps {
 function DurationInput({ digits, onChange }: DurationInputProps) {
   return (
     <input
-      className="entry-inline-input entry-inline-time"
-      style={{ width: '4.5rem', textAlign: 'center', fontVariantNumeric: 'tabular-nums' }}
       type="text"
       inputMode="numeric"
       aria-label="Duration (MM:SS)"
+      style={{ textAlign: 'center', fontVariantNumeric: 'tabular-nums' }}
       value={digitsToDisplay(digits)}
       onKeyDown={(e) => {
         if (e.key === 'Backspace') {
@@ -119,6 +119,39 @@ function TypeBadge({ eventType }: { eventType: EliminationEventType }) {
   );
 }
 
+// ── Categorize last general visit ─────────────────────────────────────────────
+
+interface CategorizeBarProps {
+  onCategorize: (eventType: 'urination' | 'defecation') => void;
+  pending: boolean;
+}
+
+function CategorizeBar({ onCategorize, pending }: CategorizeBarProps) {
+  return (
+    <div className="categorize-last-visit">
+      <span className="categorize-last-visit-label">Last visit uncategorized — was it:</span>
+      <div className="categorize-last-visit-actions">
+        <button
+          className="button categorize-button categorize-button-wee"
+          type="button"
+          disabled={pending}
+          onClick={() => onCategorize('urination')}
+        >
+          Wee
+        </button>
+        <button
+          className="button categorize-button categorize-button-poop"
+          type="button"
+          disabled={pending}
+          onClick={() => onCategorize('defecation')}
+        >
+          Poop
+        </button>
+      </div>
+    </div>
+  );
+}
+
 // ── Add row ──────────────────────────────────────────────────────────────────
 
 interface AddRowProps {
@@ -168,54 +201,60 @@ const AddRow = forwardRef<AddRowHandle, AddRowProps>(function AddRow(
   }
 
   return (
-    <div className="entry-add-row" style={{ flexDirection: 'column', alignItems: 'stretch', gap: '0.65rem' }}>
-      <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap', alignItems: 'center' }}>
+    <div className="record-entry-form record-entry-form--elimination">
+      <div className="form-row">
+        <label>Time</label>
         <TimeInput value={time} onChange={setTime} />
-        <select
-          className="entry-inline-input entry-inline-select"
-          aria-label="Event type"
-          value={eventType}
-          onChange={(e) => { setEventType(e.target.value as EliminationEventType); setSubtype(''); }}
-        >
-          {EVENT_TYPES.map((t) => (
-            <option key={t} value={t}>{EVENT_TYPE_LABELS[t]}</option>
-          ))}
-        </select>
-        {availableSubtypes && (
+      </div>
+      <div className="form-row">
+        <label>Type</label>
+        <div className="record-entry-type-stack">
           <select
-            className="entry-inline-input entry-inline-select"
-            aria-label="Subtype"
-            value={subtype}
-            onChange={(e) => setSubtype(e.target.value)}
+            aria-label="Event type"
+            value={eventType}
+            onChange={(e) => { setEventType(e.target.value as EliminationEventType); setSubtype(''); }}
           >
-            <option value="">— subtype —</option>
-            {availableSubtypes.map((s) => (
-              <option key={s.value} value={s.value}>{s.label}</option>
+            {EVENT_TYPES.map((t) => (
+              <option key={t} value={t}>{EVENT_TYPE_LABELS[t]}</option>
             ))}
           </select>
-        )}
+          {availableSubtypes && (
+            <select
+              aria-label="Subtype"
+              value={subtype}
+              onChange={(e) => setSubtype(e.target.value)}
+            >
+              <option value="">— subtype —</option>
+              {availableSubtypes.map((s) => (
+                <option key={s.value} value={s.value}>{s.label}</option>
+              ))}
+            </select>
+          )}
+        </div>
+      </div>
+      <div className="form-row">
+        <label>Duration</label>
         <DurationInput digits={durationDigits} onChange={setDurationDigits} />
       </div>
-      <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap', alignItems: 'center' }}>
+      <div className="form-row">
+        <label>Note</label>
         <input
-          className="entry-inline-input"
-          style={{ flex: 1, minWidth: '10rem' }}
           type="text"
           aria-label="Note"
-          placeholder="note (optional)"
+          placeholder="Optional"
           value={note}
           onChange={(e) => setNote(e.target.value)}
           onKeyDown={(e) => { if (e.key === 'Enter') handleAdd(); }}
         />
-        <button
-          className="button button-secondary button-compact"
-          type="button"
-          disabled={saving}
-          onClick={handleAdd}
-        >
-          {isPaused ? '⏸ offline' : saving ? '…' : '+ add'}
-        </button>
       </div>
+      <button
+        className="button"
+        type="button"
+        disabled={saving}
+        onClick={handleAdd}
+      >
+        {isPaused ? 'Offline…' : saving ? 'Saving…' : 'Log visit'}
+      </button>
     </div>
   );
 });
@@ -387,6 +426,8 @@ export function EliminationDayPanel({ date, petId }: EliminationDayPanelProps) {
   const avgDurationSec = durRecords.length > 0
     ? durRecords.reduce((s, r) => s + (r.duration_seconds ?? 0), 0) / durRecords.length
     : null;
+  const latestRecord = records[0];
+  const showCategorizeBar = canWrite && latestRecord?.event_type === 'general';
 
   const createMutation = useMutation({
     mutationFn: (payload: CreateEliminationRecord) => eliminationApi.create(payload),
@@ -458,12 +499,34 @@ export function EliminationDayPanel({ date, petId }: EliminationDayPanelProps) {
         </article>
       </div>
 
+      {records.length > 0 && <EliminationDayChart records={records} />}
+
       {/* Entry list */}
       <div className="entries-section">
         <div className="entries-section-header">
           <span className="eyebrow">Entries</span>
           <span className="muted-text">{records.length} logged</span>
         </div>
+
+        {canWrite && (
+          <AddRow
+            ref={addRowRef}
+            date={date}
+            petId={petId}
+            saving={createMutation.isPending}
+            isPaused={createMutation.isPaused}
+            onSave={(payload) => createMutation.mutate(payload)}
+          />
+        )}
+
+        {showCategorizeBar && latestRecord && (
+          <CategorizeBar
+            pending={updateMutation.isPending && updateMutation.variables?.id === latestRecord.id}
+            onCategorize={(eventType) =>
+              updateMutation.mutate({ id: latestRecord.id, payload: { event_type: eventType } })
+            }
+          />
+        )}
 
         {records.length === 0 ? (
           <div className="empty-state compact-empty">No records for this day yet.</div>
@@ -483,17 +546,6 @@ export function EliminationDayPanel({ date, petId }: EliminationDayPanelProps) {
               />
             ))}
           </div>
-        )}
-
-        {canWrite && (
-          <AddRow
-            ref={addRowRef}
-            date={date}
-            petId={petId}
-            saving={createMutation.isPending}
-            isPaused={createMutation.isPaused}
-            onSave={(payload) => createMutation.mutate(payload)}
-          />
         )}
       </div>
 

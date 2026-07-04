@@ -173,14 +173,21 @@ export function withAnalyticsPageForPet(petId = mockPetId): Decorator {
 
 // ── Elimination decorators ───────────────────────────────────────────────────
 
-export function withEliminationDayPanel(date: string, petId: string, empty = false): Decorator {
+export function withEliminationDayPanel(
+  date: string,
+  petId: string,
+  empty = false,
+  options?: { recordsOverride?: typeof mockEliminationRecords },
+): Decorator {
   return function EliminationDayDecorator(Story) {
     const client = makeMockClient();
     client.setQueryData(['pets'], mockPets);
     client.setQueryData(['me'], { subject: 'dev', email: null, name: 'Dev', display_name: 'Dev', kind: 'dev', scopes: [] });
     client.setQueryData(['settings-display'], mockDisplaySettings);
     client.setQueryData(['app-info'], mockAppInfo);
-    client.setQueryData(['elimination-records-day', date, petId], empty ? [] : mockEliminationRecords.map((r) => ({ ...r, local_date: date })));
+    const records = options?.recordsOverride
+      ?? (empty ? [] : mockEliminationRecords.map((r) => ({ ...r, local_date: date })));
+    client.setQueryData(['elimination-records-day', date, petId], records);
 
     return (
       <MemoryRouter>

@@ -60,7 +60,7 @@ export default function HealthPage() {
 
   const weightsQuery = useQuery({
     queryKey: ['weight-records', selectedPetId],
-    queryFn: () => weightApi.list({ pet_id: selectedPetId! }),
+    queryFn: () => weightApi.list({ pet_id: selectedPetId!, limit: 10 }),
     enabled: Boolean(selectedPetId),
   });
 
