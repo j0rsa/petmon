@@ -922,7 +922,8 @@ paths:
         - name: limit
           in: query
           required: false
-          schema: { type: integer, format: int64, minimum: 1 }
+          description: Max records to return. Defaults to 10 when no date_from/date_to filter is set.
+          schema: { type: integer, format: int64, minimum: 1, default: 10 }
       responses:
         '200':
           description: List of weight records

@@ -9,6 +9,7 @@ import { HealthStatePanel } from '../components/health/HealthStatePanel';
 import { useSelectedPet } from '../context/SelectedPetContext';
 import { localToday, shiftDate } from '../lib/dates';
 import { usePermissions } from '../context/usePermissions';
+import { useFormatDate, useFormatTime } from '../context/useDisplaySettings';
 
 type PeriodLabel = '30d' | '90d' | '1y' | 'all';
 
@@ -38,6 +39,8 @@ export default function HealthPage() {
   const { selectedPetId, selectedPet, petsLoading } = useSelectedPet();
   const queryClient = useQueryClient();
   const { canWrite } = usePermissions();
+  const formatDate = useFormatDate();
+  const formatTime = useFormatTime();
 
   const [period, setPeriod] = useState<PeriodLabel>('30d');
   const today = localToday();
@@ -57,7 +60,7 @@ export default function HealthPage() {
 
   const weightsQuery = useQuery({
     queryKey: ['weight-records', selectedPetId],
-    queryFn: () => weightApi.list({ pet_id: selectedPetId!, limit: 90 }),
+    queryFn: () => weightApi.list({ pet_id: selectedPetId! }),
     enabled: Boolean(selectedPetId),
   });
 
@@ -89,10 +92,12 @@ export default function HealthPage() {
   if (petsLoading) return <div className="loading-state">Loading…</div>;
   if (!selectedPetId) return <NoPetSelected />;
 
-  const records = [...(weightsQuery.data ?? [])]
-    .filter((r) => r.local_date && r.weight_kg != null)
-    .sort((a, b) => a.measured_at.localeCompare(b.measured_at));
-  const latest = records[records.length - 1];
+  const records = (weightsQuery.data ?? []).filter((r) => r.local_date && r.weight_kg != null);
+  const latest = records[0];
+
+  function formatRecordWhen(measuredAt: string, localDate: string): string {
+    return `${formatDate(localDate, 'short')} ${formatTime(measuredAt)}`;
+  }
 
   const chartData = (summaryQuery.data ?? []).map((b) => ({
     bucket: formatBucket(b.bucket, granularity),
@@ -234,22 +239,23 @@ export default function HealthPage() {
           <div className="section-heading">
             <div>
               <p className="eyebrow">Measurements</p>
-              <h3>All records</h3>
+              <h3>Recent records</h3>
             </div>
+            <span className="muted-text" style={{ fontSize: '0.82rem' }}>Last {records.length}</span>
           </div>
           <table>
             <thead>
               <tr>
-                <th>Date</th>
+                <th>When</th>
                 <th>Weight</th>
                 <th>Note</th>
                 {canWrite && <th></th>}
               </tr>
             </thead>
             <tbody>
-              {[...records].reverse().map((r) => (
+              {records.map((r) => (
                 <tr key={r.id}>
-                  <td style={{ fontSize: '0.82rem', color: 'var(--text-muted)' }}>{r.local_date}</td>
+                  <td style={{ fontSize: '0.82rem', color: 'var(--text-muted)' }}>{formatRecordWhen(r.measured_at, r.local_date)}</td>
                   <td style={{ fontFamily: 'monospace', fontWeight: 600 }}>{r.weight_kg} kg</td>
                   <td style={{ fontSize: '0.82rem', color: 'var(--text-muted)' }}>
                     {r.note ?? <span style={{ color: 'var(--text-subtle)' }}>—</span>}
