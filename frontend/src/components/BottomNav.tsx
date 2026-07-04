@@ -1,9 +1,10 @@
 import { useState } from 'react';
-import { NavLink, Link, useMatch, useNavigate } from 'react-router-dom';
+import { Link, useMatch, useNavigate } from 'react-router-dom';
 import { LayoutDashboard, Utensils, PawPrint, Settings, ChevronRight } from 'lucide-react';
 import { useSelectedPet } from '../context/SelectedPetContext';
 import { resolvePetColor } from '../lib/petColors';
 import { PetAvatar } from './pet/PetAvatar';
+import { BottomNavLink } from './BottomNavLink';
 
 export function BottomNav() {
   const [petSheetOpen, setPetSheetOpen] = useState(false);
@@ -78,15 +79,15 @@ export function BottomNav() {
 
       {/* Bottom nav bar */}
       <nav className="bottom-nav" aria-label="Main navigation">
-        <NavLink to="/" end className={({ isActive }) => `bottom-nav-item${isActive ? ' active' : ''}`}>
+        <BottomNavLink to="/" end>
           <LayoutDashboard size={22} />
           <span>Overview</span>
-        </NavLink>
+        </BottomNavLink>
 
-        <NavLink to="/nutrition" className={({ isActive }) => `bottom-nav-item${isActive ? ' active' : ''}`}>
+        <BottomNavLink to="/nutrition">
           <Utensils size={22} />
           <span>Nutrition</span>
-        </NavLink>
+        </BottomNavLink>
 
         {/* Pet switcher tab */}
         <button
@@ -109,10 +110,10 @@ export function BottomNav() {
           <span>{selectedPet?.name ?? 'Pet'}</span>
         </button>
 
-        <NavLink to="/settings" className={({ isActive }) => `bottom-nav-item${isActive ? ' active' : ''}`}>
+        <BottomNavLink to="/settings">
           <Settings size={22} />
           <span>Settings</span>
-        </NavLink>
+        </BottomNavLink>
       </nav>
     </>
   );

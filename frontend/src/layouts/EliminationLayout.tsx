@@ -1,4 +1,5 @@
-import { NavLink, Outlet, useLocation } from 'react-router-dom';
+import { Outlet, useLocation } from 'react-router-dom';
+import { PillarTabLink } from '../components/PillarTabLink';
 
 const DATE_SEGMENT = /^\/elimination\/\d{4}-\d{2}-\d{2}$/;
 
@@ -15,17 +16,11 @@ export function EliminationLayout() {
     <div className="page-stack pillar-page">
       <div className="pillar-tab-bar">
         {tabs.map((tab) => {
-          if (tab.to === '/elimination') {
-            return (
-              <NavLink key={tab.to} to={tab.to} className={() => `pillar-tab${journalActive ? ' active' : ''}`}>
-                {tab.label}
-              </NavLink>
-            );
-          }
+          const active = tab.to === '/elimination' ? journalActive : pathname.startsWith(tab.to);
           return (
-            <NavLink key={tab.to} to={tab.to} className={({ isActive }) => `pillar-tab${isActive ? ' active' : ''}`}>
+            <PillarTabLink key={tab.to} to={tab.to} active={active}>
               {tab.label}
-            </NavLink>
+            </PillarTabLink>
           );
         })}
       </div>

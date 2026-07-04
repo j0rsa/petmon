@@ -4,7 +4,7 @@ resolver = "2"
 
 [package]
 name = "petmon"
-version = "0.8.8"
+version = "0.8.10"
 edition = "2021"
 default-run = "petmon"
 
