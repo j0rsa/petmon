@@ -90,7 +90,7 @@ const AddRow = forwardRef<AddRowHandle, AddRowProps>(function AddRow(
     <div className="record-entry-form record-entry-form--nutrition">
       <div className="form-row">
         <label>Time</label>
-        <TimeInput value={time} onChange={setTime} />
+        <TimeInput value={time} onChange={setTime} variant="form" />
       </div>
       <div className="form-row">
         <label>Category</label>

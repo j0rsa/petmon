@@ -1552,6 +1552,19 @@ pre {
   color: var(--input-text);
 }
 
+.record-entry-form input[type="time"] {
+  text-align: left;
+}
+
+.record-entry-form input[type="time"]::-webkit-datetime-edit-fields-wrapper {
+  padding: 0;
+}
+
+.record-entry-form input[type="time"]::-webkit-datetime-edit {
+  padding: 0;
+  margin: 0;
+}
+
 .record-entry-form .record-entry-amount-wrap {
   display: flex;
   align-items: center;
