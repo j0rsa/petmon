@@ -18,7 +18,7 @@ import { LiquidsIcon, WaterIcon, WetFoodIcon, TotalFluidIcon } from '../lib/metr
 import { highlightFromSummary, totalKnownFluidMl } from '../lib/nutritionMetrics';
 import { CATEGORIES, CATEGORY_LABELS } from '../types';
 import type { CreateNutritionRecord, NutritionRecord, UpdateNutritionRecord } from '../types';
-import { parseDecimal } from '../lib/numbers';
+import { parseAmountExpression, parseDecimal } from '../lib/numbers';
 
 const UNIT_FOR_CATEGORY: Record<string, string> = {
   wet_food: 'g',
@@ -72,8 +72,8 @@ const AddRow = forwardRef<AddRowHandle, AddRowProps>(function AddRow(
   }));
 
   function handleAdd() {
-    const n = parseDecimal(amount);
-    if (!amount || isNaN(n) || n <= 0) return;
+    const n = parseAmountExpression(amount);
+    if (!amount.trim() || isNaN(n) || n <= 0) return;
     onSave({
       pet_id: petId,
       occurred_at: isoFromDateAndTime(date, time),
@@ -112,7 +112,7 @@ const AddRow = forwardRef<AddRowHandle, AddRowProps>(function AddRow(
             type="text"
             inputMode="decimal"
             aria-label="Amount"
-            placeholder="0"
+            placeholder="130 or 450 - 320"
             value={amount}
             onChange={(e) => setAmount(e.target.value)}
             onKeyDown={(e) => { if (e.key === 'Enter') handleAdd(); }}
