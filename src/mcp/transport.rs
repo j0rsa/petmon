@@ -91,10 +91,16 @@ pub async fn mcp_handler(
         })),
         "notifications/initialized" => Ok(serde_json::json!(null)),
         "ping" => Ok(serde_json::json!({})),
-        "prompts/list" => Ok(serde_json::json!({ "prompts": [] })),
-        "prompts/get" => Err(crate::error::AppError::NotFound(
-            "No prompts available".to_string(),
-        )),
+        "prompts/list" => Ok(super::prompts::prompt_list()),
+        "prompts/get" => {
+            let params = req.params.unwrap_or_else(|| serde_json::json!({}));
+            let name = params
+                .get("name")
+                .and_then(|v| v.as_str())
+                .ok_or_else(|| crate::error::AppError::BadRequest("name required".to_string()))?;
+            let arguments = params.get("arguments");
+            super::prompts::get_prompt(name, arguments)
+        },
         "resources/templates/list" => Ok(serde_json::json!({ "resourceTemplates": [] })),
         "tools/call" => {
             let params = req.params.unwrap_or_else(|| serde_json::json!({}));

@@ -1373,9 +1373,9 @@ async fn scope_mcp_permits_mcp_endpoint() {
     assert_eq!(resp.status(), 200, "mcp-scoped token must reach /mcp");
 }
 
-/// POST /mcp prompts/list → empty prompts (MCP clients probe this during connect)
+/// POST /mcp prompts/list → recommended caregiver prompts
 #[actix_web::test]
-async fn mcp_prompts_list_returns_empty() {
+async fn mcp_prompts_list_returns_recommended_prompts() {
     let pool = setup_pool().await;
     let raw = "pm_api_mcp_prompts_000000000000000000000000000000000000000000000000000";
     seed_token(&pool, raw, "mcp").await;
@@ -1392,7 +1392,77 @@ async fn mcp_prompts_list_returns_empty() {
     .await;
     assert_eq!(resp.status(), 200);
     let body: serde_json::Value = test::read_body_json(resp).await;
-    assert_eq!(body["result"]["prompts"].as_array().map(|a| a.len()), Some(0));
+    let prompts = body["result"]["prompts"].as_array().expect("prompts array");
+    assert_eq!(prompts.len(), 6);
+    let names: Vec<_> = prompts
+        .iter()
+        .filter_map(|p| p["name"].as_str())
+        .collect();
+    assert!(names.contains(&"daily-summary"));
+    assert!(names.contains(&"health-check"));
+    assert!(names.contains(&"vet-handoff"));
+}
+
+#[actix_web::test]
+async fn mcp_prompts_get_renders_template() {
+    let pool = setup_pool().await;
+    let raw = "pm_api_mcp_prompts_get_0000000000000000000000000000000000000000000000000";
+    seed_token(&pool, raw, "mcp").await;
+    let state = web::Data::new(AppState::new(pool, false, None, None));
+    let app = build_full_app!(state);
+    let resp = test::call_service(
+        &app,
+        test::TestRequest::post()
+            .uri("/mcp")
+            .insert_header(("Authorization", format!("Bearer {raw}")))
+            .set_json(serde_json::json!({
+                "jsonrpc": "2.0",
+                "id": 1,
+                "method": "prompts/get",
+                "params": {
+                    "name": "health-check",
+                    "arguments": { "pet_name": "Mittens" }
+                }
+            }))
+            .to_request(),
+    )
+    .await;
+    assert_eq!(resp.status(), 200);
+    let body: serde_json::Value = test::read_body_json(resp).await;
+    let text = body["result"]["messages"][0]["content"]["text"]
+        .as_str()
+        .expect("prompt text");
+    assert!(text.contains("Mittens"));
+    assert!(text.contains("pets/health-context"));
+}
+
+#[actix_web::test]
+async fn mcp_prompts_get_unknown_prompt_not_found() {
+    let pool = setup_pool().await;
+    let raw = "pm_api_mcp_prompts_bad_00000000000000000000000000000000000000000000000000";
+    seed_token(&pool, raw, "mcp").await;
+    let state = web::Data::new(AppState::new(pool, false, None, None));
+    let app = build_full_app!(state);
+    let resp = test::call_service(
+        &app,
+        test::TestRequest::post()
+            .uri("/mcp")
+            .insert_header(("Authorization", format!("Bearer {raw}")))
+            .set_json(serde_json::json!({
+                "jsonrpc": "2.0",
+                "id": 1,
+                "method": "prompts/get",
+                "params": { "name": "does-not-exist", "arguments": {} }
+            }))
+            .to_request(),
+    )
+    .await;
+    assert_eq!(resp.status(), 200);
+    let body: serde_json::Value = test::read_body_json(resp).await;
+    assert!(body["error"]["message"]
+        .as_str()
+        .unwrap()
+        .contains("Unknown prompt"));
 }
 
 /// POST /mcp with an api_read token → 403
