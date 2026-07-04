@@ -100,7 +100,7 @@ pub async fn mcp_handler(
                 .ok_or_else(|| crate::error::AppError::BadRequest("name required".to_string()))?;
             let arguments = params.get("arguments");
             super::prompts::get_prompt(name, arguments)
-        },
+        }
         "resources/templates/list" => Ok(serde_json::json!({ "resourceTemplates": [] })),
         "tools/call" => {
             let params = req.params.unwrap_or_else(|| serde_json::json!({}));

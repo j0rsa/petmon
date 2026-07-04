@@ -1394,10 +1394,7 @@ async fn mcp_prompts_list_returns_recommended_prompts() {
     let body: serde_json::Value = test::read_body_json(resp).await;
     let prompts = body["result"]["prompts"].as_array().expect("prompts array");
     assert_eq!(prompts.len(), 6);
-    let names: Vec<_> = prompts
-        .iter()
-        .filter_map(|p| p["name"].as_str())
-        .collect();
+    let names: Vec<_> = prompts.iter().filter_map(|p| p["name"].as_str()).collect();
     assert!(names.contains(&"daily-summary"));
     assert!(names.contains(&"health-check"));
     assert!(names.contains(&"vet-handoff"));

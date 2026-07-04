@@ -187,8 +187,8 @@ pub fn prompt_list() -> Value {
 
 /// Render a prompt template for `prompts/get`.
 pub fn get_prompt(name: &str, arguments: Option<&Value>) -> AppResult<Value> {
-    let prompt = find_prompt(name)
-        .ok_or_else(|| AppError::NotFound(format!("Unknown prompt: {name}")))?;
+    let prompt =
+        find_prompt(name).ok_or_else(|| AppError::NotFound(format!("Unknown prompt: {name}")))?;
 
     let arguments = arguments.cloned().unwrap_or_else(|| json!({}));
 
