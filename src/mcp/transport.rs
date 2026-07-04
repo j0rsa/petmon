@@ -81,7 +81,8 @@ pub async fn mcp_handler(
             "protocolVersion": "2024-11-05",
             "capabilities": {
                 "tools": {},
-                "resources": {}
+                "resources": {},
+                "prompts": {}
             },
             "serverInfo": {
                 "name": "petmon",
@@ -90,6 +91,11 @@ pub async fn mcp_handler(
         })),
         "notifications/initialized" => Ok(serde_json::json!(null)),
         "ping" => Ok(serde_json::json!({})),
+        "prompts/list" => Ok(serde_json::json!({ "prompts": [] })),
+        "prompts/get" => Err(crate::error::AppError::NotFound(
+            "No prompts available".to_string(),
+        )),
+        "resources/templates/list" => Ok(serde_json::json!({ "resourceTemplates": [] })),
         "tools/call" => {
             let params = req.params.unwrap_or_else(|| serde_json::json!({}));
             let name = params

@@ -1373,6 +1373,28 @@ async fn scope_mcp_permits_mcp_endpoint() {
     assert_eq!(resp.status(), 200, "mcp-scoped token must reach /mcp");
 }
 
+/// POST /mcp prompts/list → empty prompts (MCP clients probe this during connect)
+#[actix_web::test]
+async fn mcp_prompts_list_returns_empty() {
+    let pool = setup_pool().await;
+    let raw = "pm_api_mcp_prompts_000000000000000000000000000000000000000000000000000";
+    seed_token(&pool, raw, "mcp").await;
+    let state = web::Data::new(AppState::new(pool, false, None, None));
+    let app = build_full_app!(state);
+    let resp = test::call_service(
+        &app,
+        test::TestRequest::post()
+            .uri("/mcp")
+            .insert_header(("Authorization", format!("Bearer {raw}")))
+            .set_json(serde_json::json!({ "jsonrpc": "2.0", "id": 1, "method": "prompts/list", "params": null }))
+            .to_request(),
+    )
+    .await;
+    assert_eq!(resp.status(), 200);
+    let body: serde_json::Value = test::read_body_json(resp).await;
+    assert_eq!(body["result"]["prompts"].as_array().map(|a| a.len()), Some(0));
+}
+
 /// POST /mcp with an api_read token → 403
 #[actix_web::test]
 async fn scope_api_read_denies_mcp_endpoint() {
