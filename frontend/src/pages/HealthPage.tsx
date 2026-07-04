@@ -134,7 +134,7 @@ export default function HealthPage() {
       <HealthStatePanel petId={selectedPetId} />
 
       {/* Weight chart */}
-      <section className="panel">
+      <section className="panel" id="weight">
         <div className="section-heading">
           <div>
             <p className="eyebrow">Weight</p>

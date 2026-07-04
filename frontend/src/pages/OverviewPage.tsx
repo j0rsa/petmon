@@ -4,6 +4,8 @@ import { nutritionAnalyticsApi } from '../api/analytics';
 import { daysApi } from '../api/days';
 import { eliminationApi } from '../api/elimination';
 import { weightApi } from '../api/weight';
+import { healthStateApi } from '../api/healthState';
+import { healthStateEmoji, healthStateLabel } from '../lib/healthState';
 import { NoPetSelected } from '../components/NoPetSelected';
 import { useSelectedPet } from '../context/SelectedPetContext';
 import { localToday, shiftDate } from '../lib/dates';
@@ -81,6 +83,12 @@ export default function OverviewPage() {
   const weightStatsQuery = useQuery({
     queryKey: ['weight-stats', selectedPetId, weightStatsFrom, today],
     queryFn: () => weightApi.stats(selectedPetId!, weightStatsFrom, today),
+    enabled: Boolean(selectedPetId),
+  });
+
+  const healthStateQuery = useQuery({
+    queryKey: ['health-state-records', selectedPetId],
+    queryFn: () => healthStateApi.list({ pet_id: selectedPetId! }),
     enabled: Boolean(selectedPetId),
   });
 
@@ -305,39 +313,65 @@ export default function OverviewPage() {
             <div className="section-heading">
               <div>
                 <p className="eyebrow">Health</p>
-                <h3>Weight</h3>
+                <h3>Latest</h3>
               </div>
-              <Link className="button button-secondary button-compact" to="/health">
-                Manage →
-              </Link>
             </div>
 
-            {weightStatsQuery.isLoading ? (
+            {weightStatsQuery.isLoading || healthStateQuery.isLoading ? (
               <p className="muted-text" style={{ fontSize: '0.88rem' }}>Loading…</p>
             ) : (() => {
-              const s = weightStatsQuery.data;
-              if (!s || s.latest_kg == null) {
-                return <p className="muted-text" style={{ fontSize: '0.88rem' }}>No weight recorded yet.</p>;
+              const latestState = healthStateQuery.data?.[0];
+              const weightStats = weightStatsQuery.data;
+              const hasState = Boolean(latestState);
+              const hasWeight = Boolean(weightStats?.latest_kg != null);
+
+              if (!hasState && !hasWeight) {
+                return <p className="muted-text" style={{ fontSize: '0.88rem' }}>No health records yet.</p>;
               }
-              const delta = s.avg_kg != null ? s.latest_kg - s.avg_kg : null;
+
+              const delta = weightStats?.avg_kg != null && weightStats.latest_kg != null
+                ? weightStats.latest_kg - weightStats.avg_kg
+                : null;
 
               return (
-                <div style={{ display: 'flex', alignItems: 'baseline', gap: '1rem', flexWrap: 'wrap' }}>
-                  <span style={{ fontFamily: 'monospace', fontSize: '2rem', color: 'var(--accent)' }}>
-                    {s.latest_kg.toFixed(2)}
-                    <span style={{ fontSize: '0.9rem', color: 'var(--text-muted)', marginLeft: '0.25rem' }}>kg</span>
-                  </span>
-                  {delta !== null && s.count >= 2 && (
-                    <span style={{ fontSize: '0.88rem', color: delta > 0.05 ? 'var(--error-text)' : delta < -0.05 ? 'var(--metric-water)' : 'var(--text-muted)' }}>
-                      {delta > 0 ? '▲' : delta < 0 ? '▼' : '='} {Math.abs(delta).toFixed(2)} kg vs 30d avg
-                    </span>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+                  {hasState && (
+                    <div style={{ display: 'flex', alignItems: 'baseline', gap: '0.75rem', flexWrap: 'wrap' }}>
+                      <span style={{ fontSize: '0.82rem', color: 'var(--text-muted)', minWidth: '6.5rem' }}>Overall state</span>
+                      <span style={{ fontSize: '1.4rem' }} aria-hidden="true">{healthStateEmoji(latestState!.level)}</span>
+                      <span style={{ fontSize: '0.88rem' }}>{healthStateLabel(latestState!.level)}</span>
+                      <span style={{ fontSize: '0.82rem', color: 'var(--text-subtle)', marginLeft: 'auto' }}>
+                        {formatDate(latestState!.local_date, 'short')}
+                      </span>
+                    </div>
                   )}
-                  <span style={{ fontSize: '0.82rem', color: 'var(--text-subtle)', marginLeft: 'auto' }}>
-                    {s.latest_date}
-                  </span>
+                  {hasWeight && (
+                    <div style={{ display: 'flex', alignItems: 'baseline', gap: '0.75rem', flexWrap: 'wrap' }}>
+                      <span style={{ fontSize: '0.82rem', color: 'var(--text-muted)', minWidth: '6.5rem' }}>Weight</span>
+                      <span style={{ fontFamily: 'monospace', fontSize: '1.65rem', color: 'var(--accent)' }}>
+                        {weightStats!.latest_kg!.toFixed(2)}
+                        <span style={{ fontSize: '0.82rem', color: 'var(--text-muted)', marginLeft: '0.25rem' }}>kg</span>
+                      </span>
+                      {delta !== null && weightStats!.count >= 2 && (
+                        <span style={{ fontSize: '0.88rem', color: delta > 0.05 ? 'var(--error-text)' : delta < -0.05 ? 'var(--metric-water)' : 'var(--text-muted)' }}>
+                          {delta > 0 ? '▲' : delta < 0 ? '▼' : '='} {Math.abs(delta).toFixed(2)} kg vs 30d avg
+                        </span>
+                      )}
+                      {weightStats!.latest_date && (
+                        <span style={{ fontSize: '0.82rem', color: 'var(--text-subtle)', marginLeft: 'auto' }}>
+                          {formatDate(weightStats!.latest_date!, 'short')}
+                        </span>
+                      )}
+                    </div>
+                  )}
                 </div>
               );
             })()}
+
+            <div className="pillar-links" style={{ gap: '0.5rem', marginTop: '0.25rem' }}>
+              <Link className="button button-secondary button-compact" to="/health#wellbeing">Overall state</Link>
+              <Link className="button button-secondary button-compact" to="/health#weight">Weight</Link>
+            </div>
           </section>
         </>
       )}
