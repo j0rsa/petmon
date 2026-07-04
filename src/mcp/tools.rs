@@ -457,7 +457,7 @@ fn tool_list() -> Value {
             // ── Weight records ───────────────────────────────────────────────
             {
                 "name": "weight/records/list",
-                "description": "List weight records for a pet.",
+                "description": "List weight records for a pet. Without date_from/date_to returns the last 10 records (newest first). With a date range returns all matches (oldest first) for charting.",
                 "inputSchema": {
                     "type": "object",
                     "properties": {

@@ -81,7 +81,8 @@ pub async fn mcp_handler(
             "protocolVersion": "2024-11-05",
             "capabilities": {
                 "tools": {},
-                "resources": {}
+                "resources": {},
+                "prompts": {}
             },
             "serverInfo": {
                 "name": "petmon",
@@ -90,6 +91,17 @@ pub async fn mcp_handler(
         })),
         "notifications/initialized" => Ok(serde_json::json!(null)),
         "ping" => Ok(serde_json::json!({})),
+        "prompts/list" => Ok(super::prompts::prompt_list()),
+        "prompts/get" => {
+            let params = req.params.unwrap_or_else(|| serde_json::json!({}));
+            let name = params
+                .get("name")
+                .and_then(|v| v.as_str())
+                .ok_or_else(|| crate::error::AppError::BadRequest("name required".to_string()))?;
+            let arguments = params.get("arguments");
+            super::prompts::get_prompt(name, arguments)
+        }
+        "resources/templates/list" => Ok(serde_json::json!({ "resourceTemplates": [] })),
         "tools/call" => {
             let params = req.params.unwrap_or_else(|| serde_json::json!({}));
             let name = params

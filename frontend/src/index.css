@@ -1490,6 +1490,46 @@ pre {
   grid-template-columns: minmax(7.5rem, 1fr) minmax(0, 2fr) minmax(9rem, 1fr) auto;
 }
 
+.record-entry-form--elimination {
+  grid-template-columns: minmax(7.5rem, 1fr) minmax(0, 1.4fr) minmax(5.5rem, 0.8fr) minmax(0, 2fr) auto;
+}
+
+.categorize-last-visit {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+  margin-top: 0.75rem;
+  padding: 0.75rem 0.9rem;
+  border-radius: 12px;
+  border: 1px solid var(--border-subtle);
+  background: var(--surface-muted, var(--surface));
+}
+
+.categorize-last-visit-label {
+  font-size: 0.82rem;
+  color: var(--text-muted);
+}
+
+.categorize-last-visit-actions {
+  display: flex;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+}
+
+.categorize-button-wee {
+  background: color-mix(in srgb, var(--metric-water) 18%, var(--surface));
+  border-color: color-mix(in srgb, var(--metric-water) 45%, var(--border));
+  color: var(--metric-water);
+}
+
+.categorize-button-poop {
+  background: color-mix(in srgb, var(--metric-wet) 18%, var(--surface));
+  border-color: color-mix(in srgb, var(--metric-wet) 45%, var(--border));
+  color: var(--metric-wet);
+}
+
 .record-entry-form .form-row {
   min-width: 0;
 }
@@ -1525,6 +1565,13 @@ pre {
 
 .record-entry-form .entry-unit-hint {
   flex-shrink: 0;
+}
+
+.record-entry-type-stack {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  min-width: 0;
 }
 
 .record-entry-form .button {
@@ -1671,7 +1718,8 @@ pre {
   }
 
   .record-entry-form--health,
-  .record-entry-form--nutrition {
+  .record-entry-form--nutrition,
+  .record-entry-form--elimination {
     grid-template-columns: 1fr;
   }
 

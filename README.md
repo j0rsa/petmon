@@ -111,6 +111,17 @@ petmon exposes a **stateless JSON-RPC 2.0** MCP endpoint at `POST /mcp`, protect
 | `pets/elimination-context` | Pet profile + today's wee/poop/vomit counts + 7-day trend |
 | `pets/health-context` | Pet profile + last 10 weight records + 30-day stats + last 10 wellbeing check-ins (level + notes) |
 
+**Prompts** (caregiver workflow templates — use via MCP `prompts/get`):
+
+| Prompt | Purpose |
+|--------|---------|
+| `daily-summary` | Full daily snapshot across nutrition, toileting, and health |
+| `nutrition-check` | Is intake on track today vs schedule and 7-day trend? |
+| `toileting-check` | Today's wee/poop/vomit and recent trends |
+| `health-check` | Weight trend and recent wellbeing check-ins |
+| `log-intake` | Log water, liquids, or food for a pet |
+| `vet-handoff` | Structured brief for a vet visit (default 14-day lookback) |
+
 **Individual tools:**
 
 `pets/list`, `pets/get`, `pets/create`, `pets/update`

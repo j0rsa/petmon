@@ -101,7 +101,8 @@ export function HealthStatePanel({ petId }: HealthStatePanelProps) {
 
   return (
     <>
-      <section className="panel">
+
+      <section className="panel" id="wellbeing">
         <div className="section-heading">
           <div>
             <p className="eyebrow">Wellbeing</p>
