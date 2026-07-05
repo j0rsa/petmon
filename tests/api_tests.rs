@@ -564,6 +564,7 @@ async fn nutrition_record_crud() {
             "category": "wet_food",
             "amount": 75,
             "unit": "g",
+            "note": "chicken pate",
             "occurred_at": "2026-06-01T08:00:00",
             "local_date": "2026-06-01"
         }))
@@ -576,6 +577,7 @@ async fn nutrition_record_crud() {
     assert_eq!(body["category"].as_str(), Some("wet_food"));
     assert_eq!(body["amount"].as_f64(), Some(75.0));
     assert_eq!(body["unit"].as_str(), Some("g"));
+    assert_eq!(body["note"].as_str(), Some("chicken pate"));
     assert_eq!(body["local_date"].as_str(), Some("2026-06-01"));
 
     // Read
@@ -590,7 +592,7 @@ async fn nutrition_record_crud() {
     // Update
     let req = test::TestRequest::patch()
         .uri(&format!("/api/v1/nutrition/records/{record_id}"))
-        .set_json(serde_json::json!({ "amount": 90 }))
+        .set_json(serde_json::json!({ "amount": 90, "note": "salmon pate" }))
         .to_request();
     let resp = test::call_service(&app, req).await;
     assert_eq!(resp.status(), 200);
@@ -600,6 +602,7 @@ async fn nutrition_record_crud() {
         Some(90.0),
         "amount must be updated"
     );
+    assert_eq!(body["note"].as_str(), Some("salmon pate"));
 
     // List — filter by pet_id and date
     let req = test::TestRequest::get()
