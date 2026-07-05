@@ -10,6 +10,7 @@ import { StatCard } from '../components/StatCard';
 import { useSelectedPet } from '../context/SelectedPetContext';
 import { localToday, shiftDate } from '../lib/dates';
 import { AlertIcon, ClockIcon, TrendUpIcon } from '../lib/metricIcons';
+import { linReg } from '../lib/linReg';
 
 const PERIODS = [
   { label: '7d',  days: 7  },
@@ -43,22 +44,6 @@ function fmtSec(sec: number) {
   const m = Math.floor(sec / 60);
   const s = Math.round(sec % 60);
   return m > 0 ? `${m}m ${s}s` : `${s}s`;
-}
-
-/** Least-squares linear regression over (index, value) pairs. Returns y-values at each index. */
-function linReg(values: (number | null)[]): number[] | null {
-  const pts = values
-    .map((y, x) => (y != null ? { x, y } : null))
-    .filter((p): p is { x: number; y: number } => p !== null);
-  const n = pts.length;
-  if (n < 2) return null;
-  const sumX = pts.reduce((s, p) => s + p.x, 0);
-  const sumY = pts.reduce((s, p) => s + p.y, 0);
-  const sumXY = pts.reduce((s, p) => s + p.x * p.y, 0);
-  const sumX2 = pts.reduce((s, p) => s + p.x * p.x, 0);
-  const slope = (n * sumXY - sumX * sumY) / (n * sumX2 - sumX * sumX);
-  const intercept = (sumY - slope * sumX) / n;
-  return values.map((_, i) => Math.max(0, parseFloat((intercept + slope * i).toFixed(2))));
 }
 
 export default function EliminationAnalyticsPage() {
@@ -121,11 +106,11 @@ export default function EliminationAnalyticsPage() {
 
   // Regression trend lines
   const visitTrend = useMemo(
-    () => linReg(dailyData.map((d) => d.toiletVisits)),
+    () => linReg(dailyData.map((d) => d.toiletVisits), { min: 0 }),
     [dailyData],
   );
   const durationTrend = useMemo(
-    () => linReg(dailyData.map((d) => d.avgDuration)),
+    () => linReg(dailyData.map((d) => d.avgDuration), { min: 0 }),
     [dailyData],
   );
 
