@@ -37,6 +37,15 @@ function nowLocalDateTimeString(): string {
   return `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}T${pad(now.getHours())}:${pad(now.getMinutes())}`;
 }
 
+function medianWeight(values: number[]): number | null {
+  if (values.length === 0) return null;
+  const sorted = [...values].sort((a, b) => a - b);
+  const mid = Math.floor(sorted.length / 2);
+  return sorted.length % 2 === 0
+    ? (sorted[mid - 1] + sorted[mid]) / 2
+    : sorted[mid];
+}
+
 export default function HealthPage() {
   const { selectedPetId, selectedPet, petsLoading } = useSelectedPet();
   const queryClient = useQueryClient();
@@ -106,6 +115,13 @@ export default function HealthPage() {
   }, [summaryQuery.data, granularity]);
 
   const hasWeightTrend = chartData.some((point) => point.trendKg != null);
+
+  const medianKg = useMemo(() => {
+    const values = (summaryQuery.data ?? [])
+      .map((b) => b.avg_kg)
+      .filter((v): v is number => v != null);
+    return medianWeight(values);
+  }, [summaryQuery.data]);
 
   if (petsLoading) return <div className="loading-state">Loading…</div>;
   if (!selectedPetId) return <NoPetSelected />;
@@ -178,10 +194,39 @@ export default function HealthPage() {
               <YAxis tick={{ fontSize: 11, fill: 'var(--text-muted)' }} domain={['auto', 'auto']} />
               <Tooltip
                 contentStyle={{ background: 'var(--surface)', border: '1px solid var(--border-subtle)', borderRadius: 8, fontSize: 12 }}
-                formatter={(v, name) => {
-                  const kg = Number(v ?? 0).toFixed(2);
-                  if (name === 'Min' || name === 'Max') return [`${kg} kg`, name];
-                  return [`${kg} kg`, granularity === 'raw' ? 'Weight' : 'Avg'];
+                content={({ active, payload, label }) => {
+                  if (!active || !payload?.length) return null;
+                  const weightEntry = payload.find((entry) => entry.dataKey === 'avgKg');
+                  const minEntry = payload.find((entry) => entry.dataKey === 'minKg');
+                  const maxEntry = payload.find((entry) => entry.dataKey === 'maxKg');
+                  const weightLabel = granularity === 'raw' ? 'Weight' : 'Avg';
+                  return (
+                    <div
+                      style={{
+                        background: 'var(--surface)',
+                        border: '1px solid var(--border-subtle)',
+                        borderRadius: 8,
+                        fontSize: 12,
+                        padding: '0.5rem 0.75rem',
+                      }}
+                    >
+                      <p style={{ margin: '0 0 4px', color: 'var(--text-muted)' }}>{label}</p>
+                      {weightEntry && (
+                        <p style={{ margin: 0 }}>
+                          {weightLabel}: {Number(weightEntry.value).toFixed(2)} kg
+                        </p>
+                      )}
+                      {medianKg != null && (
+                        <p style={{ margin: 0 }}>Median weight: {medianKg.toFixed(2)} kg</p>
+                      )}
+                      {minEntry && (
+                        <p style={{ margin: 0 }}>Min: {Number(minEntry.value).toFixed(2)} kg</p>
+                      )}
+                      {maxEntry && (
+                        <p style={{ margin: 0 }}>Max: {Number(maxEntry.value).toFixed(2)} kg</p>
+                      )}
+                    </div>
+                  );
                 }}
               />
               {granularity !== 'raw' && (
