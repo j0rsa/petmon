@@ -692,6 +692,12 @@ pre {
 
 /* ── Bottom nav (mobile / PWA) ────────────────────────────────── */
 
+#wellbeing,
+#weight {
+  scroll-margin-top: 0.5rem;
+  scroll-margin-bottom: calc(5rem + env(safe-area-inset-bottom));
+}
+
 .bottom-nav {
   display: none;
 }

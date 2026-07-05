@@ -1,3 +1,4 @@
+import { useMemo } from 'react';
 import { ComposedChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 import type { HealthStateGranularity, HealthStateSummaryBucket } from '../../lib/healthStateChart';
 import {
@@ -6,6 +7,7 @@ import {
   levelFromScore,
 } from '../../lib/healthStateChart';
 import { healthStateEmoji } from '../../lib/healthState';
+import { linReg } from '../../lib/linReg';
 
 const Y_TICKS = [1, 2, 3, 4, 5];
 
@@ -15,14 +17,23 @@ export interface HealthStateChartProps {
 }
 
 export function HealthStateChart({ buckets, granularity }: HealthStateChartProps) {
-  const chartData = buckets.map((bucket) => ({
-    bucket: formatHealthStateBucket(bucket.bucket, granularity),
-    medianScore: bucket.medianScore,
-    minScore: bucket.minScore,
-    maxScore: bucket.maxScore,
-    count: bucket.count,
-    medianLevel: bucket.medianLevel,
-  }));
+  const chartData = useMemo(() => {
+    const scoreTrend = linReg(
+      buckets.map((bucket) => bucket.medianScore),
+      { min: 1, max: 5 },
+    );
+    return buckets.map((bucket, i) => ({
+      bucket: formatHealthStateBucket(bucket.bucket, granularity),
+      medianScore: bucket.medianScore,
+      minScore: bucket.minScore,
+      maxScore: bucket.maxScore,
+      count: bucket.count,
+      medianLevel: bucket.medianLevel,
+      trendScore: scoreTrend?.[i] ?? null,
+    }));
+  }, [buckets, granularity]);
+
+  const scoreTrend = chartData.some((point) => point.trendScore != null);
 
   const showRange = granularity === 'daily' && chartData.some((point) => point.count > 1);
 
@@ -93,6 +104,19 @@ export function HealthStateChart({ buckets, granularity }: HealthStateChartProps
           strokeWidth={2}
           dot={{ r: 3 }}
         />
+        {scoreTrend && (
+          <Line
+            type="linear"
+            dataKey="trendScore"
+            name="trendScore"
+            stroke="var(--text-muted)"
+            strokeWidth={1.5}
+            strokeDasharray="4 3"
+            dot={false}
+            activeDot={false}
+            legendType="none"
+          />
+        )}
       </ComposedChart>
     </ResponsiveContainer>
   );

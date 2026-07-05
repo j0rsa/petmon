@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { ComposedChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 import { weightApi } from '../api/weight';
@@ -10,6 +10,8 @@ import { useSelectedPet } from '../context/SelectedPetContext';
 import { localToday, shiftDate } from '../lib/dates';
 import { usePermissions } from '../context/usePermissions';
 import { useFormatDate, useFormatTime } from '../context/useDisplaySettings';
+import { useScrollToHash } from '../hooks/useScrollToHash';
+import { linReg } from '../lib/linReg';
 
 type PeriodLabel = '30d' | '90d' | '1y' | 'all';
 
@@ -89,6 +91,22 @@ export default function HealthPage() {
     },
   });
 
+  useScrollToHash(summaryQuery.isLoading);
+
+  const chartData = useMemo(() => {
+    const buckets = summaryQuery.data ?? [];
+    const trendValues = linReg(buckets.map((b) => b.avg_kg));
+    return buckets.map((b, i) => ({
+      bucket: formatBucket(b.bucket, granularity),
+      avgKg: b.avg_kg,
+      minKg: b.min_kg,
+      maxKg: b.max_kg,
+      trendKg: trendValues?.[i] ?? null,
+    }));
+  }, [summaryQuery.data, granularity]);
+
+  const hasWeightTrend = chartData.some((point) => point.trendKg != null);
+
   if (petsLoading) return <div className="loading-state">Loading…</div>;
   if (!selectedPetId) return <NoPetSelected />;
 
@@ -98,13 +116,6 @@ export default function HealthPage() {
   function formatRecordWhen(measuredAt: string, localDate: string): string {
     return `${formatDate(localDate, 'short')} ${formatTime(measuredAt)}`;
   }
-
-  const chartData = (summaryQuery.data ?? []).map((b) => ({
-    bucket: formatBucket(b.bucket, granularity),
-    avgKg: b.avg_kg,
-    minKg: b.min_kg,
-    maxKg: b.max_kg,
-  }));
 
   function handleAdd() {
     const kg = parseDecimal(weightInput);
@@ -180,6 +191,19 @@ export default function HealthPage() {
                 </>
               )}
               <Line type="monotone" dataKey="avgKg" name={granularity === 'raw' ? 'Weight' : 'Avg'} stroke="var(--accent)" strokeWidth={2} dot={{ r: 3 }} />
+              {hasWeightTrend && (
+                <Line
+                  type="linear"
+                  dataKey="trendKg"
+                  name="trendKg"
+                  stroke="var(--text-muted)"
+                  strokeWidth={1.5}
+                  strokeDasharray="4 3"
+                  dot={false}
+                  activeDot={false}
+                  legendType="none"
+                />
+              )}
             </ComposedChart>
           </ResponsiveContainer>
         ) : (

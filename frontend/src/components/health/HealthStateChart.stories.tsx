@@ -31,7 +31,7 @@ const meta = {
 export default meta;
 type Story = StoryObj<typeof meta>;
 
-/** Daily median line with min/max range when multiple check-ins fall on the same day. */
+/** Daily median line with min/max range and dashed trend when multiple check-ins fall on the same day. */
 export const DailyMedian: Story = {};
 
 /** Weekly buckets for longer periods. */
