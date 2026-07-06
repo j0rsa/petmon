@@ -1618,16 +1618,6 @@ pre {
   min-width: 5.5rem;
 }
 
-.entry-row-actions--nutrition {
-  gap: 0.45rem;
-  flex-shrink: 0;
-}
-
-.entry-row-actions--nutrition .button {
-  min-height: 2.5rem;
-  min-width: 4.75rem;
-}
-
 .export-telegram-details {
   margin-top: 0.75rem;
   border-top: 1px solid var(--border-subtle);
@@ -1778,27 +1768,6 @@ pre {
   }
 
   .record-entry-form__actions .button {
-    flex: 1;
-    min-width: 0;
-  }
-
-  .entry-row-actions--nutrition {
-    justify-content: stretch;
-    width: 100%;
-  }
-
-  .entry-row:has(.entry-row-actions--nutrition) {
-    display: flex;
-    flex-wrap: wrap;
-    align-items: center;
-    gap: 0.45rem;
-  }
-
-  .entry-row:has(.entry-row-actions--nutrition) .entry-row-actions--nutrition {
-    flex: 1 1 100%;
-  }
-
-  .entry-row-actions--nutrition .button {
     flex: 1;
     min-width: 0;
   }

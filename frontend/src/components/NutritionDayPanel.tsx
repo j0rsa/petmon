@@ -263,17 +263,17 @@ function RecordRow({ record, onSave, onDelete, saving, savingPaused, deleting, d
         <CategoryBadge category={record.category} />
         <span className="entry-amount">{record.amount} {record.unit ?? ''}</span>
         {canWrite && (
-          <div className="entry-row-actions entry-row-actions--nutrition">
-            <button className="button button-secondary button-compact" type="button" onClick={startEdit}>
-              Edit
-            </button>
+          <div className="entry-row-actions">
+            <button className="icon-button" type="button" title="Edit" aria-label="Edit" onClick={startEdit}>✎</button>
             <button
-              className="button button-danger button-compact"
+              className="icon-button icon-button-danger"
               type="button"
+              title="Delete"
+              aria-label="Delete"
               disabled={deleting}
               onClick={() => { if (window.confirm('Delete this record?')) onDelete(record.id); }}
             >
-              {deletingPaused ? 'Offline…' : deleting ? 'Deleting…' : 'Delete'}
+              {deletingPaused ? '⏸' : '✕'}
             </button>
           </div>
         )}
