@@ -12,7 +12,10 @@ pub struct NutritionRecord {
     pub category: NutritionCategory,
     pub amount: f64,
     pub unit: Option<String>,
+    pub note: Option<String>,
     pub source_type: String,
+    #[serde(skip_serializing)]
+    pub telegram_message_id: Option<i64>,
     pub created_at: String,
     pub updated_at: String,
 }
@@ -26,6 +29,7 @@ pub struct CreateNutritionRecord {
     pub category: NutritionCategory,
     pub amount: f64,
     pub unit: Option<String>,
+    pub note: Option<String>,
     pub source_type: Option<String>,
 }
 
@@ -41,6 +45,7 @@ pub struct UpdateNutritionRecord {
     pub category: Option<NutritionCategory>,
     pub amount: Option<f64>,
     pub unit: Option<String>,
+    pub note: Option<Option<String>>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -109,7 +114,9 @@ impl NutritionRecord {
             category: req.category,
             amount: req.amount,
             unit: req.unit,
+            note: req.note,
             source_type: req.source_type.unwrap_or_else(|| "manual".to_string()),
+            telegram_message_id: None,
             created_at: now.clone(),
             updated_at: now,
         }

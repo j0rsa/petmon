@@ -41,7 +41,7 @@ export const mockPets: Pet[] = [
 // wet_food total: 15+16+17+13+12+16+20 = 109 g  → fluid from food ≈ 84 ml  → total ~178 ml
 export const mockNutritionRecords: NutritionRecord[] = [
   { id: 'rec-01', pet_id: mockPetId, occurred_at: '2024-06-15T03:12:00', local_date: '2024-06-15', category: 'liquids',  amount: 12, unit: 'ml', source_type: 'telegram', created_at: '2024-06-15T03:12:00', updated_at: '2024-06-15T03:12:00' },
-  { id: 'rec-02', pet_id: mockPetId, occurred_at: '2024-06-15T03:13:00', local_date: '2024-06-15', category: 'wet_food', amount: 15, unit: 'g',  source_type: 'telegram', created_at: '2024-06-15T03:13:00', updated_at: '2024-06-15T03:13:00' },
+  { id: 'rec-02', pet_id: mockPetId, occurred_at: '2024-06-15T03:13:00', local_date: '2024-06-15', category: 'wet_food', amount: 15, unit: 'g',  note: 'chicken pate', source_type: 'telegram', created_at: '2024-06-15T03:13:00', updated_at: '2024-06-15T03:13:00' },
   { id: 'rec-03', pet_id: mockPetId, occurred_at: '2024-06-15T05:40:00', local_date: '2024-06-15', category: 'liquids',  amount: 13, unit: 'ml', source_type: 'telegram', created_at: '2024-06-15T05:40:00', updated_at: '2024-06-15T05:40:00' },
   { id: 'rec-04', pet_id: mockPetId, occurred_at: '2024-06-15T05:40:00', local_date: '2024-06-15', category: 'wet_food', amount: 16, unit: 'g',  source_type: 'telegram', created_at: '2024-06-15T05:40:00', updated_at: '2024-06-15T05:40:00' },
   { id: 'rec-05', pet_id: mockPetId, occurred_at: '2024-06-15T08:16:00', local_date: '2024-06-15', category: 'liquids',  amount: 12, unit: 'ml', source_type: 'telegram', created_at: '2024-06-15T08:16:00', updated_at: '2024-06-15T08:16:00' },

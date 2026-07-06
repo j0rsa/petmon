@@ -104,7 +104,17 @@ pub async fn update(
             });
         }
     }
-    nutrition_records::update_record(pool, id, req).await
+    nutrition_records::update_record(pool, id, req).await?;
+    let record = nutrition_records::get_record(pool, id).await?;
+
+    let pool2 = pool.clone();
+    let record2 = record.clone();
+    tokio::spawn(
+        async move { telegram::notify_record_update(&pool2, &record2).await }
+            .instrument(tracing::Span::current()),
+    );
+
+    Ok(record)
 }
 
 #[tracing::instrument(skip(pool))]

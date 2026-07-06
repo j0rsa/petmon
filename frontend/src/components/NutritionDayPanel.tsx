@@ -62,11 +62,13 @@ const AddRow = forwardRef<AddRowHandle, AddRowProps>(function AddRow(
   const [time, setTime] = useState(nowTimeString);
   const [category, setCategory] = useState<string>('liquids');
   const [amount, setAmount] = useState('');
+  const [note, setNote] = useState('');
   const amountRef = useRef<HTMLInputElement>(null);
 
   useImperativeHandle(ref, () => ({
     clearForm() {
       setAmount('');
+      setNote('');
       amountRef.current?.focus();
     },
   }));
@@ -81,6 +83,7 @@ const AddRow = forwardRef<AddRowHandle, AddRowProps>(function AddRow(
       category,
       amount: n,
       unit: unitFor(category),
+      note: note.trim() || null,
     });
     // Form clears via ref.clearForm() called from createMutation.onSuccess,
     // so values are preserved while the mutation is paused offline.
@@ -120,6 +123,17 @@ const AddRow = forwardRef<AddRowHandle, AddRowProps>(function AddRow(
           <span className="entry-unit-hint">{unitFor(category)}</span>
         </div>
       </div>
+      <div className="form-row">
+        <label>Note</label>
+        <input
+          type="text"
+          aria-label="Note"
+          placeholder="note (optional)"
+          value={note}
+          onChange={(e) => setNote(e.target.value)}
+          onKeyDown={(e) => { if (e.key === 'Enter') handleAdd(); }}
+        />
+      </div>
       <button
         className="button"
         type="button"
@@ -151,11 +165,13 @@ function RecordRow({ record, onSave, onDelete, saving, savingPaused, deleting, d
   const [time, setTime] = useState('');
   const [category, setCategory] = useState('');
   const [amount, setAmount] = useState('');
+  const [note, setNote] = useState('');
 
   function startEdit() {
     setTime(timeFromIso(record.occurred_at));
     setCategory(record.category);
     setAmount(String(record.amount));
+    setNote(record.note ?? '');
     setEditing(true);
   }
 
@@ -166,6 +182,7 @@ function RecordRow({ record, onSave, onDelete, saving, savingPaused, deleting, d
       category,
       amount: parseDecimal(amount),
       unit: unitFor(category),
+      note: note.trim() || null,
     });
     setEditing(false);
   }
@@ -195,6 +212,15 @@ function RecordRow({ record, onSave, onDelete, saving, savingPaused, deleting, d
             onKeyDown={(e) => { if (e.key === 'Enter') commitEdit(); if (e.key === 'Escape') setEditing(false); }}
           />
           <span className="entry-unit-hint">{unitFor(category)}</span>
+          <input
+            className="entry-inline-input entry-inline-note"
+            type="text"
+            aria-label="Note"
+            placeholder="note (optional)"
+            value={note}
+            onChange={(e) => setNote(e.target.value)}
+            onKeyDown={(e) => { if (e.key === 'Enter') commitEdit(); if (e.key === 'Escape') setEditing(false); }}
+          />
           <div className="entry-row-actions">
             <button className="icon-button" type="button" title="Save" aria-label="Save" disabled={saving} onClick={commitEdit}>
               {savingPaused ? '⏸' : saving ? '…' : '✓'}
@@ -230,6 +256,9 @@ function RecordRow({ record, onSave, onDelete, saving, savingPaused, deleting, d
           </div>
         )}
       </div>
+      {record.note && (
+        <p className="entry-record-note">{record.note}</p>
+      )}
     </div>
   );
 }

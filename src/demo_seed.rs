@@ -388,6 +388,7 @@ fn record(
             .unwrap_or_else(|()| panic!("unknown nutrition category: {category}")),
         amount,
         unit: unit.map(str::to_string),
+        note: None,
         source_type: Some(if telegram {
             "telegram".to_string()
         } else {

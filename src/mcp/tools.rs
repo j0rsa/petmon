@@ -147,6 +147,7 @@ fn tool_list() -> Value {
                         "category":    { "type": "string", "enum": ["wet_food", "dry_food", "water", "liquids"] },
                         "amount":      { "type": "number" },
                         "unit":        { "type": "string" },
+                        "note":        { "type": "string", "description": "Optional note about this intake (food type, medication, etc.)" },
                         "source_type": { "type": "string" }
                     }
                 }
@@ -170,6 +171,7 @@ fn tool_list() -> Value {
                                     "category":    { "type": "string" },
                                     "amount":      { "type": "number" },
                                     "unit":        { "type": "string" },
+                                    "note":        { "type": "string" },
                                     "source_type": { "type": "string" }
                                 }
                             }
@@ -179,7 +181,7 @@ fn tool_list() -> Value {
             },
             {
                 "name": "nutrition/records/update",
-                "description": "Update a nutrition record.",
+                "description": "Update a nutrition record. Also updates the Telegram message if one was sent.",
                 "inputSchema": {
                     "type": "object",
                     "required": ["id"],
@@ -189,7 +191,8 @@ fn tool_list() -> Value {
                         "local_date":  { "type": "string", "format": "date" },
                         "category":    { "type": "string" },
                         "amount":      { "type": "number" },
-                        "unit":        { "type": "string" }
+                        "unit":        { "type": "string" },
+                        "note":        { "type": ["string", "null"], "description": "Optional note; pass null to clear" }
                     }
                 }
             },

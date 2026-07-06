@@ -1962,6 +1962,10 @@ components:
           type: string
           nullable: true
           description: Unit of measurement (ml, g, etc.)
+        note:
+          type: string
+          nullable: true
+          description: Optional note about this intake (food type, medication, etc.)
         source_type:
           type: string
           description: Source of the record (e.g., manual, telegram)
@@ -2010,6 +2014,10 @@ components:
           type: string
           nullable: true
           description: Unit of measurement
+        note:
+          type: string
+          nullable: true
+          description: Optional note about this intake
         source_type:
           type: string
           nullable: true
@@ -2038,6 +2046,9 @@ components:
           format: double
           nullable: true
         unit:
+          type: string
+          nullable: true
+        note:
           type: string
           nullable: true
 

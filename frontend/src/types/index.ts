@@ -41,6 +41,7 @@ export interface NutritionRecord {
   category: string;
   amount: number;
   unit?: string;
+  note?: string | null;
   source_type: string;
   created_at: string;
   updated_at: string;
@@ -53,6 +54,7 @@ export interface CreateNutritionRecord {
   category: string;
   amount: number;
   unit?: string;
+  note?: string | null;
 }
 
 export interface UpdateNutritionRecord {
@@ -61,6 +63,7 @@ export interface UpdateNutritionRecord {
   category?: string;
   amount?: number;
   unit?: string;
+  note?: string | null;
 }
 
 export interface NutritionDaySummary {

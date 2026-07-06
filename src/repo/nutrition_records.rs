@@ -5,14 +5,14 @@ use crate::error::{AppError, AppResult};
 use chrono::Utc;
 use sqlx::SqlitePool;
 
+const RECORD_SELECT: &str = "SELECT id, pet_id, occurred_at, local_date, category, amount, unit, note, source_type, telegram_message_id, created_at, updated_at FROM nutrition_records";
+
 #[tracing::instrument(skip(pool, filters))]
 pub async fn list_records(
     pool: &SqlitePool,
     filters: &NutritionRecordFilters,
 ) -> AppResult<Vec<NutritionRecord>> {
-    let mut query = String::from(
-        "SELECT id, pet_id, occurred_at, local_date, category, amount, unit, source_type, created_at, updated_at FROM nutrition_records WHERE 1=1",
-    );
+    let mut query = format!("{RECORD_SELECT} WHERE 1=1");
 
     if filters.pet_id.is_some() {
         query.push_str(" AND pet_id = ?");
@@ -59,13 +59,12 @@ pub async fn list_records(
 
 #[tracing::instrument(skip(pool))]
 pub async fn get_record(pool: &SqlitePool, id: &str) -> AppResult<NutritionRecord> {
-    sqlx::query_as::<_, NutritionRecord>(
-        "SELECT id, pet_id, occurred_at, local_date, category, amount, unit, source_type, created_at, updated_at FROM nutrition_records WHERE id = ?",
-    )
-    .bind(id)
-    .fetch_optional(pool)
-    .await?
-    .ok_or_else(|| AppError::NotFound(format!("Nutrition record {id} not found")))
+    let query = format!("{RECORD_SELECT} WHERE id = ?");
+    sqlx::query_as::<_, NutritionRecord>(sqlx::AssertSqlSafe(query))
+        .bind(id)
+        .fetch_optional(pool)
+        .await?
+        .ok_or_else(|| AppError::NotFound(format!("Nutrition record {id} not found")))
 }
 
 #[tracing::instrument(skip(pool, record), fields(id = %record.id, pet_id = %record.pet_id, category = %record.category))]
@@ -74,7 +73,7 @@ pub async fn create_record(
     record: NutritionRecord,
 ) -> AppResult<NutritionRecord> {
     sqlx::query(
-        "INSERT INTO nutrition_records (id, pet_id, occurred_at, local_date, category, amount, unit, source_type, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+        "INSERT INTO nutrition_records (id, pet_id, occurred_at, local_date, category, amount, unit, note, source_type, telegram_message_id, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
     )
     .bind(&record.id)
     .bind(record.pet_id)
@@ -83,7 +82,9 @@ pub async fn create_record(
     .bind(record.category)
     .bind(record.amount)
     .bind(&record.unit)
+    .bind(&record.note)
     .bind(&record.source_type)
+    .bind(record.telegram_message_id)
     .bind(&record.created_at)
     .bind(&record.updated_at)
     .execute(pool)
@@ -114,20 +115,47 @@ pub async fn update_record(
     if req.unit.is_some() {
         record.unit = req.unit;
     }
+    if let Some(note) = req.note {
+        record.note = note;
+    }
     record.updated_at = now;
     sqlx::query(
-        "UPDATE nutrition_records SET occurred_at=?, local_date=?, category=?, amount=?, unit=?, updated_at=? WHERE id=?",
+        "UPDATE nutrition_records SET occurred_at=?, local_date=?, category=?, amount=?, unit=?, note=?, updated_at=? WHERE id=?",
     )
     .bind(&record.occurred_at)
     .bind(&record.local_date)
     .bind(record.category)
     .bind(record.amount)
     .bind(&record.unit)
+    .bind(&record.note)
     .bind(&record.updated_at)
     .bind(id)
     .execute(pool)
     .await?;
     Ok(record)
+}
+
+#[tracing::instrument(skip(pool))]
+pub async fn set_telegram_message_id(
+    pool: &SqlitePool,
+    id: &str,
+    message_id: i64,
+) -> AppResult<()> {
+    let now = Utc::now().to_rfc3339();
+    let rows =
+        sqlx::query("UPDATE nutrition_records SET telegram_message_id=?, updated_at=? WHERE id=?")
+            .bind(message_id)
+            .bind(&now)
+            .bind(id)
+            .execute(pool)
+            .await?
+            .rows_affected();
+    if rows == 0 {
+        return Err(AppError::NotFound(format!(
+            "Nutrition record {id} not found"
+        )));
+    }
+    Ok(())
 }
 
 #[tracing::instrument(skip(pool))]
@@ -153,7 +181,7 @@ pub async fn create_records_batch(
     let mut tx = pool.begin().await?;
     for record in &records {
         sqlx::query(
-            "INSERT INTO nutrition_records (id, pet_id, occurred_at, local_date, category, amount, unit, source_type, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+            "INSERT INTO nutrition_records (id, pet_id, occurred_at, local_date, category, amount, unit, note, source_type, telegram_message_id, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
         )
         .bind(&record.id)
         .bind(record.pet_id)
@@ -162,7 +190,9 @@ pub async fn create_records_batch(
         .bind(record.category)
         .bind(record.amount)
         .bind(&record.unit)
+        .bind(&record.note)
         .bind(&record.source_type)
+        .bind(record.telegram_message_id)
         .bind(&record.created_at)
         .bind(&record.updated_at)
         .execute(&mut *tx)
