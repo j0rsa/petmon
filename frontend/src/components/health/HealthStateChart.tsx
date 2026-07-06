@@ -11,6 +11,12 @@ import { linReg } from '../../lib/linReg';
 
 const Y_TICKS = [1, 2, 3, 4, 5];
 
+const TOOLTIP_SERIES: { dataKey: string; label: string }[] = [
+  { dataKey: 'maxScore', label: 'Max' },
+  { dataKey: 'medianScore', label: 'Median' },
+  { dataKey: 'minScore', label: 'Min' },
+];
+
 export interface HealthStateChartProps {
   buckets: HealthStateSummaryBucket[];
   granularity: HealthStateGranularity;
@@ -54,20 +60,36 @@ export function HealthStateChart({ buckets, granularity }: HealthStateChartProps
           width={32}
         />
         <Tooltip
-          contentStyle={{
-            background: 'var(--surface)',
-            border: '1px solid var(--border-subtle)',
-            borderRadius: 8,
-            fontSize: 12,
-          }}
-          formatter={(value, name, item) => {
-            const score = Number(value ?? 0);
-            const count = item.payload.count as number;
-            if (name === 'Min' || name === 'Max') {
-              return [formatHealthStateScore(score), name];
-            }
-            const label = formatHealthStateScore(score);
-            return [count > 1 ? `${label} (${count} check-ins)` : label, 'Median'];
+          content={({ active, payload, label }) => {
+            if (!active || !payload?.length) return null;
+            const count = payload[0]?.payload?.count as number | undefined;
+            return (
+              <div
+                style={{
+                  background: 'var(--surface)',
+                  border: '1px solid var(--border-subtle)',
+                  borderRadius: 8,
+                  fontSize: 12,
+                  padding: '0.5rem 0.75rem',
+                }}
+              >
+                <p style={{ margin: '0 0 4px', color: 'var(--text-muted)' }}>{label}</p>
+                {TOOLTIP_SERIES.map(({ dataKey, label: seriesLabel }) => {
+                  const entry = payload.find((item) => item.dataKey === dataKey);
+                  if (entry?.value == null) return null;
+                  const formatted = formatHealthStateScore(Number(entry.value));
+                  const value =
+                    dataKey === 'medianScore' && count != null && count > 1
+                      ? `${formatted} (${count} check-ins)`
+                      : formatted;
+                  return (
+                    <p key={dataKey} style={{ margin: 0 }}>
+                      {seriesLabel}: {value}
+                    </p>
+                  );
+                })}
+              </div>
+            );
           }}
         />
         {showRange && (
@@ -108,7 +130,7 @@ export function HealthStateChart({ buckets, granularity }: HealthStateChartProps
           <Line
             type="linear"
             dataKey="trendScore"
-            name="trendScore"
+            name="Trend"
             stroke="var(--text-muted)"
             strokeWidth={1.5}
             strokeDasharray="4 3"
