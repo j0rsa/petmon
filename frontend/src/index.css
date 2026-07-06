@@ -1597,6 +1597,16 @@ pre {
   white-space: nowrap;
 }
 
+.record-entry-form--edit .record-entry-form__note {
+  grid-column: 1 / -1;
+}
+
+.entry-row-actions--form {
+  align-self: end;
+  justify-content: flex-end;
+  padding-bottom: 0.15rem;
+}
+
 .export-telegram-details {
   margin-top: 0.75rem;
   border-top: 1px solid var(--border-subtle);
@@ -1630,7 +1640,11 @@ pre {
   background: var(--surface-inset);
   border-radius: 10px;
   margin: 0 -0.4rem;
-  padding: 0.2rem 0.4rem;
+  padding: 0.55rem 0.4rem;
+}
+
+.entry-row-editing .record-entry-form {
+  margin-top: 0;
 }
 
 .entry-row-editing .entry-row {
