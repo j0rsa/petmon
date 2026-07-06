@@ -33,3 +33,14 @@ export const Interactive: Story = {
 export const WithAutoFocus: Story = {
   args: { value: '14:00', autoFocus: true },
 };
+
+export const FormVariant: Story = {
+  render: () => (
+    <div className="record-entry-form record-entry-form--nutrition" style={{ maxWidth: 320 }}>
+      <div className="form-row">
+        <label>Time</label>
+        <TimeInput value="17:01" onChange={() => {}} variant="form" />
+      </div>
+    </div>
+  ),
+};

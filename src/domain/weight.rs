@@ -32,7 +32,7 @@ pub struct WeightStats {
     pub count: i64,
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, Clone)]
 pub struct WeightRecordFilters {
     pub pet_id: Option<String>,
     pub date_from: Option<String>,

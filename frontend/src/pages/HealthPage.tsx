@@ -1,13 +1,17 @@
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { ComposedChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 import { weightApi } from '../api/weight';
 import { parseDecimal } from '../lib/numbers';
 import type { CreateWeightRecord, WeightGranularity } from '../api/weight';
 import { NoPetSelected } from '../components/NoPetSelected';
+import { HealthStatePanel } from '../components/health/HealthStatePanel';
 import { useSelectedPet } from '../context/SelectedPetContext';
 import { localToday, shiftDate } from '../lib/dates';
 import { usePermissions } from '../context/usePermissions';
+import { useFormatDate, useFormatTime } from '../context/useDisplaySettings';
+import { useScrollToHash } from '../hooks/useScrollToHash';
+import { linReg } from '../lib/linReg';
 
 type PeriodLabel = '30d' | '90d' | '1y' | 'all';
 
@@ -33,10 +37,21 @@ function nowLocalDateTimeString(): string {
   return `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}T${pad(now.getHours())}:${pad(now.getMinutes())}`;
 }
 
+function medianWeight(values: number[]): number | null {
+  if (values.length === 0) return null;
+  const sorted = [...values].sort((a, b) => a - b);
+  const mid = Math.floor(sorted.length / 2);
+  return sorted.length % 2 === 0
+    ? (sorted[mid - 1] + sorted[mid]) / 2
+    : sorted[mid];
+}
+
 export default function HealthPage() {
   const { selectedPetId, selectedPet, petsLoading } = useSelectedPet();
   const queryClient = useQueryClient();
   const { canWrite } = usePermissions();
+  const formatDate = useFormatDate();
+  const formatTime = useFormatTime();
 
   const [period, setPeriod] = useState<PeriodLabel>('30d');
   const today = localToday();
@@ -56,7 +71,7 @@ export default function HealthPage() {
 
   const weightsQuery = useQuery({
     queryKey: ['weight-records', selectedPetId],
-    queryFn: () => weightApi.list({ pet_id: selectedPetId!, limit: 90 }),
+    queryFn: () => weightApi.list({ pet_id: selectedPetId!, limit: 10 }),
     enabled: Boolean(selectedPetId),
   });
 
@@ -85,20 +100,38 @@ export default function HealthPage() {
     },
   });
 
+  useScrollToHash(summaryQuery.isLoading);
+
+  const chartData = useMemo(() => {
+    const buckets = summaryQuery.data ?? [];
+    const trendValues = linReg(buckets.map((b) => b.avg_kg));
+    return buckets.map((b, i) => ({
+      bucket: formatBucket(b.bucket, granularity),
+      avgKg: b.avg_kg,
+      minKg: b.min_kg,
+      maxKg: b.max_kg,
+      trendKg: trendValues?.[i] ?? null,
+    }));
+  }, [summaryQuery.data, granularity]);
+
+  const hasWeightTrend = chartData.some((point) => point.trendKg != null);
+
+  const medianKg = useMemo(() => {
+    const values = (summaryQuery.data ?? [])
+      .map((b) => b.avg_kg)
+      .filter((v): v is number => v != null);
+    return medianWeight(values);
+  }, [summaryQuery.data]);
+
   if (petsLoading) return <div className="loading-state">Loading…</div>;
   if (!selectedPetId) return <NoPetSelected />;
 
-  const records = [...(weightsQuery.data ?? [])]
-    .filter((r) => r.local_date && r.weight_kg != null)
-    .sort((a, b) => a.measured_at.localeCompare(b.measured_at));
-  const latest = records[records.length - 1];
+  const records = (weightsQuery.data ?? []).filter((r) => r.local_date && r.weight_kg != null);
+  const latest = records[0];
 
-  const chartData = (summaryQuery.data ?? []).map((b) => ({
-    bucket: formatBucket(b.bucket, granularity),
-    avgKg: b.avg_kg,
-    minKg: b.min_kg,
-    maxKg: b.max_kg,
-  }));
+  function formatRecordWhen(measuredAt: string, localDate: string): string {
+    return `${formatDate(localDate, 'short')} ${formatTime(measuredAt)}`;
+  }
 
   function handleAdd() {
     const kg = parseDecimal(weightInput);
@@ -125,8 +158,10 @@ export default function HealthPage() {
         )}
       </section>
 
+      <HealthStatePanel petId={selectedPetId} />
+
       {/* Weight chart */}
-      <section className="panel">
+      <section className="panel" id="weight">
         <div className="section-heading">
           <div>
             <p className="eyebrow">Weight</p>
@@ -159,10 +194,39 @@ export default function HealthPage() {
               <YAxis tick={{ fontSize: 11, fill: 'var(--text-muted)' }} domain={['auto', 'auto']} />
               <Tooltip
                 contentStyle={{ background: 'var(--surface)', border: '1px solid var(--border-subtle)', borderRadius: 8, fontSize: 12 }}
-                formatter={(v, name) => {
-                  const kg = Number(v ?? 0).toFixed(2);
-                  if (name === 'Min' || name === 'Max') return [`${kg} kg`, name];
-                  return [`${kg} kg`, granularity === 'raw' ? 'Weight' : 'Avg'];
+                content={({ active, payload, label }) => {
+                  if (!active || !payload?.length) return null;
+                  const weightEntry = payload.find((entry) => entry.dataKey === 'avgKg');
+                  const minEntry = payload.find((entry) => entry.dataKey === 'minKg');
+                  const maxEntry = payload.find((entry) => entry.dataKey === 'maxKg');
+                  const weightLabel = granularity === 'raw' ? 'Weight' : 'Avg';
+                  return (
+                    <div
+                      style={{
+                        background: 'var(--surface)',
+                        border: '1px solid var(--border-subtle)',
+                        borderRadius: 8,
+                        fontSize: 12,
+                        padding: '0.5rem 0.75rem',
+                      }}
+                    >
+                      <p style={{ margin: '0 0 4px', color: 'var(--text-muted)' }}>{label}</p>
+                      {weightEntry && (
+                        <p style={{ margin: 0 }}>
+                          {weightLabel}: {Number(weightEntry.value).toFixed(2)} kg
+                        </p>
+                      )}
+                      {medianKg != null && (
+                        <p style={{ margin: 0 }}>Median weight: {medianKg.toFixed(2)} kg</p>
+                      )}
+                      {minEntry && (
+                        <p style={{ margin: 0 }}>Min: {Number(minEntry.value).toFixed(2)} kg</p>
+                      )}
+                      {maxEntry && (
+                        <p style={{ margin: 0 }}>Max: {Number(maxEntry.value).toFixed(2)} kg</p>
+                      )}
+                    </div>
+                  );
                 }}
               />
               {granularity !== 'raw' && (
@@ -172,6 +236,19 @@ export default function HealthPage() {
                 </>
               )}
               <Line type="monotone" dataKey="avgKg" name={granularity === 'raw' ? 'Weight' : 'Avg'} stroke="var(--accent)" strokeWidth={2} dot={{ r: 3 }} />
+              {hasWeightTrend && (
+                <Line
+                  type="linear"
+                  dataKey="trendKg"
+                  name="trendKg"
+                  stroke="var(--text-muted)"
+                  strokeWidth={1.5}
+                  strokeDasharray="4 3"
+                  dot={false}
+                  activeDot={false}
+                  legendType="none"
+                />
+              )}
             </ComposedChart>
           </ResponsiveContainer>
         ) : (
@@ -231,22 +308,23 @@ export default function HealthPage() {
           <div className="section-heading">
             <div>
               <p className="eyebrow">Measurements</p>
-              <h3>All records</h3>
+              <h3>Recent records</h3>
             </div>
+            <span className="muted-text" style={{ fontSize: '0.82rem' }}>Last {records.length}</span>
           </div>
           <table>
             <thead>
               <tr>
-                <th>Date</th>
+                <th>When</th>
                 <th>Weight</th>
                 <th>Note</th>
                 {canWrite && <th></th>}
               </tr>
             </thead>
             <tbody>
-              {[...records].reverse().map((r) => (
+              {records.map((r) => (
                 <tr key={r.id}>
-                  <td style={{ fontSize: '0.82rem', color: 'var(--text-muted)' }}>{r.local_date}</td>
+                  <td style={{ fontSize: '0.82rem', color: 'var(--text-muted)' }}>{formatRecordWhen(r.measured_at, r.local_date)}</td>
                   <td style={{ fontFamily: 'monospace', fontWeight: 600 }}>{r.weight_kg} kg</td>
                   <td style={{ fontSize: '0.82rem', color: 'var(--text-muted)' }}>
                     {r.note ?? <span style={{ color: 'var(--text-subtle)' }}>—</span>}

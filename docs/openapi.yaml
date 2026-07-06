@@ -922,7 +922,8 @@ paths:
         - name: limit
           in: query
           required: false
-          schema: { type: integer, format: int64, minimum: 1 }
+          description: Max records to return. Defaults to 10 when no date_from/date_to filter is set.
+          schema: { type: integer, format: int64, minimum: 1, default: 10 }
       responses:
         '200':
           description: List of weight records
@@ -1055,6 +1056,90 @@ paths:
       responses:
         '204':
           description: Weight record deleted
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /health/state:
+    get:
+      tags:
+        - Health State
+      summary: List overall health state records
+      x-required-scope: api_read
+      parameters:
+        - name: pet_id
+          in: query
+          required: false
+          schema: { type: string, format: uuid }
+        - name: date_from
+          in: query
+          required: false
+          schema: { type: string, format: date }
+        - name: date_to
+          in: query
+          required: false
+          schema: { type: string, format: date }
+        - name: limit
+          in: query
+          required: false
+          description: Max records to return. Defaults to 10 when no date_from/date_to filter is set.
+          schema: { type: integer, format: int64, minimum: 1, default: 10 }
+      responses:
+        '200':
+          description: List of health state records
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/HealthStateRecord'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+    post:
+      tags:
+        - Health State
+      summary: Create overall health state record
+      x-required-scope: api_write
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateHealthStateRecord'
+      responses:
+        '201':
+          description: Health state record created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HealthStateRecord'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  /health/state/{id}:
+    delete:
+      tags:
+        - Health State
+      summary: Delete health state record
+      x-required-scope: api_write
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string }
+      responses:
+        '204':
+          description: Health state record deleted
         '403':
           $ref: '#/components/responses/Forbidden'
         '401':
@@ -2773,6 +2858,70 @@ components:
       required:
         - pet_id
         - weight_kg
+
+    HealthStateLevel:
+      type: string
+      enum: [terrible, poor, ok, good, amazing]
+
+    HealthStateRecord:
+      type: object
+      properties:
+        id:
+          type: string
+        pet_id:
+          type: string
+          format: uuid
+        occurred_at:
+          type: string
+          format: date-time
+          description: Naive local datetime (RFC3339, no Z suffix)
+        local_date:
+          type: string
+          format: date
+        level:
+          $ref: '#/components/schemas/HealthStateLevel'
+        note:
+          type: string
+          nullable: true
+        source_type:
+          type: string
+        created_at:
+          type: string
+          format: date-time
+      required:
+        - id
+        - pet_id
+        - occurred_at
+        - local_date
+        - level
+        - source_type
+        - created_at
+
+    CreateHealthStateRecord:
+      type: object
+      properties:
+        pet_id:
+          type: string
+          format: uuid
+        level:
+          $ref: '#/components/schemas/HealthStateLevel'
+        occurred_at:
+          type: string
+          format: date-time
+          nullable: true
+        local_date:
+          type: string
+          format: date
+          nullable: true
+        note:
+          type: string
+          nullable: true
+        source_type:
+          type: string
+          nullable: true
+      required:
+        - pet_id
+        - level
 
     WeightSummaryBucket:
       type: object

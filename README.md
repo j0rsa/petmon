@@ -109,7 +109,18 @@ petmon exposes a **stateless JSON-RPC 2.0** MCP endpoint at `POST /mcp`, protect
 |------|---------|
 | `pets/nutrition-context` | Pet profile + today's nutrition summary + active schedules + 7-day trend |
 | `pets/elimination-context` | Pet profile + today's wee/poop/vomit counts + 7-day trend |
-| `pets/health-context` | Pet profile + last 10 weight records + 30-day stats |
+| `pets/health-context` | Pet profile + last 10 weight records + 30-day stats + last 10 wellbeing check-ins (level + notes) |
+
+**Prompts** (caregiver workflow templates — use via MCP `prompts/get`):
+
+| Prompt | Purpose |
+|--------|---------|
+| `daily-summary` | Full daily snapshot across nutrition, toileting, and health |
+| `nutrition-check` | Is intake on track today vs schedule and 7-day trend? |
+| `toileting-check` | Today's wee/poop/vomit and recent trends |
+| `health-check` | Weight trend and recent wellbeing check-ins |
+| `log-intake` | Log water, liquids, or food for a pet |
+| `vet-handoff` | Structured brief for a vet visit (default 14-day lookback) |
 
 **Individual tools:**
 
@@ -126,6 +137,12 @@ petmon exposes a **stateless JSON-RPC 2.0** MCP endpoint at `POST /mcp`, protect
 `elimination/records/list`, `elimination/records/create`, `elimination/records/update`, `elimination/records/delete`, `elimination/analytics/range-summary`
 
 `weight/records/list`, `weight/records/create`, `weight/records/delete`
+
+`health/state/list`, `health/state/create`, `health/state/delete`
+
+### Wellbeing levels
+
+When creating health state records, use `level`: `terrible`, `poor`, `ok`, `good`, `amazing`. Optional `note` for caregiver observations.
 
 ### Event types for toileting
 
@@ -256,6 +273,8 @@ make story
 
 Stories live next to each component (`*.stories.tsx`). Coverage: all major components + Nutrition, Elimination, Health, Settings, and Analytics pages.
 
+On each PR, CI publishes Storybook to [Chromatic](https://www.chromatic.com/) and updates the PR description with preview links (between `<!-- chromatic-storybook-preview -->` markers). Add a repo secret named `CHROMATIC_PROJECT_TOKEN` (from your Chromatic project → Manage → Configure). For Chromatic’s own PR status checks and richer comments, finish GitHub App setup at [chromatic.com/setup](https://www.chromatic.com/setup) for your project.
+
 ### Makefile targets
 
 | Target | Description |
@@ -346,7 +365,7 @@ version-check ──► frontend ───────────────�
 | `backend-check` | `cargo fmt` + `cargo clippy` |
 | `backend-test` | `cargo nextest` |
 | `backend-amd64/arm64` | musl release builds |
-| `docker` | Multiarch image → GHCR tagged `v<version>`, `sha-<short>`, `latest` |
+| `docker` | Multiarch image → GHCR tagged `v<version>`, `sha-<short>`, `latest` on main; `pr-<number>-<version>-<short-sha>` on PRs |
 
 To release: bump `version` in `Cargo.toml` and push to main.
 

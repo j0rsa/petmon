@@ -5,6 +5,7 @@ import type { AppInfo } from '../api/info';
 import type { ApiTokenCreated, ApiTokenPublic, DisplaySettings, OidcConfigPublic, TelegramConfigPublic } from '../api/settings';
 import type { EliminationRecord, EliminationDailySummary, EliminationRangeSummary } from '../api/elimination';
 import type { WeightRecord, WeightSummaryBucket } from '../api/weight';
+import type { HealthStateRecord } from '../api/healthState';
 
 export const mockPetId = '550e8400-e29b-41d4-a716-446655440000';
 
@@ -430,4 +431,36 @@ export const mockWeightSummaryWeekly: WeightSummaryBucket[] = [
   { bucket: '2024-05-27', avg_kg: 4.20, min_kg: 4.18, max_kg: 4.22, count: 2 },
   { bucket: '2024-06-03', avg_kg: 4.15, min_kg: 4.15, max_kg: 4.15, count: 1 },
   { bucket: '2024-06-10', avg_kg: 4.20, min_kg: 4.18, max_kg: 4.22, count: 2 },
+];
+
+// ── Health state fixtures ─────────────────────────────────────────────────────
+
+function mockHealthStateRecord(
+  id: string,
+  daysAgo: number,
+  time: string,
+  level: HealthStateRecord['level'],
+  note: string | null,
+): HealthStateRecord {
+  const local_date = shiftDate(localToday(), -daysAgo);
+  const occurred_at = `${local_date}T${time}`;
+  return {
+    id,
+    pet_id: mockPetId,
+    occurred_at,
+    local_date,
+    level,
+    note,
+    source_type: 'manual',
+    created_at: occurred_at,
+  };
+}
+
+export const mockHealthStateRecords: HealthStateRecord[] = [
+  mockHealthStateRecord('hs-01', 7, '09:00:00', 'poor', 'Quiet morning'),
+  mockHealthStateRecord('hs-01b', 7, '19:00:00', 'good', 'Picked up in the evening'),
+  mockHealthStateRecord('hs-02', 5, '09:00:00', 'good', 'Playful and eating well'),
+  mockHealthStateRecord('hs-03', 1, '18:00:00', 'ok', null),
+  mockHealthStateRecord('hs-04', 0, '10:30:00', 'amazing', 'Great energy after walk'),
+  mockHealthStateRecord('hs-04b', 0, '20:00:00', 'good', 'Settled well overnight'),
 ];

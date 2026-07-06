@@ -18,7 +18,7 @@ import { LiquidsIcon, WaterIcon, WetFoodIcon, TotalFluidIcon } from '../lib/metr
 import { highlightFromSummary, totalKnownFluidMl } from '../lib/nutritionMetrics';
 import { CATEGORIES, CATEGORY_LABELS } from '../types';
 import type { CreateNutritionRecord, NutritionRecord, UpdateNutritionRecord } from '../types';
-import { parseDecimal } from '../lib/numbers';
+import { parseAmountExpression, parseDecimal } from '../lib/numbers';
 
 const UNIT_FOR_CATEGORY: Record<string, string> = {
   wet_food: 'g',
@@ -74,8 +74,8 @@ const AddRow = forwardRef<AddRowHandle, AddRowProps>(function AddRow(
   }));
 
   function handleAdd() {
-    const n = parseDecimal(amount);
-    if (!amount || isNaN(n) || n <= 0) return;
+    const n = parseAmountExpression(amount);
+    if (!amount.trim() || isNaN(n) || n <= 0) return;
     onSave({
       pet_id: petId,
       occurred_at: isoFromDateAndTime(date, time),
@@ -90,46 +90,57 @@ const AddRow = forwardRef<AddRowHandle, AddRowProps>(function AddRow(
   }
 
   return (
-    <div className="entry-add-row">
-      <TimeInput value={time} onChange={setTime} />
-      <select
-        className="entry-inline-input entry-inline-select"
-        aria-label="Category"
-        value={category}
-        onChange={(e) => setCategory(e.target.value)}
-      >
-        {CATEGORIES.map((cat) => (
-          <option key={cat} value={cat}>{CATEGORY_LABELS[cat]}</option>
-        ))}
-      </select>
-      <input
-        ref={amountRef}
-        className="entry-inline-input entry-inline-amount"
-        type="text"
-          inputMode="decimal"
-        aria-label="Amount"
-        placeholder="amount"
-        value={amount}
-        onChange={(e) => setAmount(e.target.value)}
-        onKeyDown={(e) => { if (e.key === 'Enter') handleAdd(); }}
-      />
-      <span className="entry-unit-hint">{unitFor(category)}</span>
-      <input
-        className="entry-inline-input entry-inline-note"
-        type="text"
-        aria-label="Note"
-        placeholder="note (optional)"
-        value={note}
-        onChange={(e) => setNote(e.target.value)}
-        onKeyDown={(e) => { if (e.key === 'Enter') handleAdd(); }}
-      />
+    <div className="record-entry-form record-entry-form--nutrition">
+      <div className="form-row">
+        <label>Time</label>
+        <TimeInput value={time} onChange={setTime} variant="form" />
+      </div>
+      <div className="form-row">
+        <label>Category</label>
+        <select
+          aria-label="Category"
+          value={category}
+          onChange={(e) => setCategory(e.target.value)}
+        >
+          {CATEGORIES.map((cat) => (
+            <option key={cat} value={cat}>{CATEGORY_LABELS[cat]}</option>
+          ))}
+        </select>
+      </div>
+      <div className="form-row">
+        <label>Amount</label>
+        <div className="record-entry-amount-wrap">
+          <input
+            ref={amountRef}
+            type="text"
+            inputMode="decimal"
+            aria-label="Amount"
+            placeholder="130 or 450 - 320"
+            value={amount}
+            onChange={(e) => setAmount(e.target.value)}
+            onKeyDown={(e) => { if (e.key === 'Enter') handleAdd(); }}
+          />
+          <span className="entry-unit-hint">{unitFor(category)}</span>
+        </div>
+      </div>
+      <div className="form-row">
+        <label>Note</label>
+        <input
+          type="text"
+          aria-label="Note"
+          placeholder="note (optional)"
+          value={note}
+          onChange={(e) => setNote(e.target.value)}
+          onKeyDown={(e) => { if (e.key === 'Enter') handleAdd(); }}
+        />
+      </div>
       <button
-        className="button button-secondary button-compact"
+        className="button"
         type="button"
         disabled={saving || !amount}
         onClick={handleAdd}
       >
-        {isPaused ? '⏸ offline' : saving ? '…' : '+ add'}
+        {isPaused ? 'Offline…' : saving ? 'Saving…' : 'Log intake'}
       </button>
     </div>
   );
@@ -411,6 +422,17 @@ export function NutritionDayPanel({ date, petId }: NutritionDayPanelProps) {
           <span className="muted-text">{records.length} logged</span>
         </div>
 
+        {canWrite && (
+          <AddRow
+            ref={addRowRef}
+            date={date}
+            petId={petId}
+            saving={createMutation.isPending}
+            isPaused={createMutation.isPaused}
+            onSave={(payload) => createMutation.mutate(payload)}
+          />
+        )}
+
         {records.length === 0 ? (
           <div className="empty-state compact-empty">No records for this day yet.</div>
         ) : (
@@ -429,17 +451,6 @@ export function NutritionDayPanel({ date, petId }: NutritionDayPanelProps) {
               />
             ))}
           </div>
-        )}
-
-        {canWrite && (
-          <AddRow
-            ref={addRowRef}
-            date={date}
-            petId={petId}
-            saving={createMutation.isPending}
-            isPaused={createMutation.isPaused}
-            onSave={(payload) => createMutation.mutate(payload)}
-          />
         )}
       </div>
 
@@ -498,17 +509,20 @@ function ExportPanel({ records }: { records: NutritionRecord[] }) {
   }
 
   return (
-    <div className="day-note-block">
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-        <label>Export as Telegram log</label>
+    <details className="export-telegram-details">
+      <summary className="export-telegram-summary">
+        <span>Export as Telegram log</span>
         <button
           className="button button-secondary button-compact"
           type="button"
-          onClick={handleCopy}
+          onClick={(e) => {
+            e.preventDefault();
+            handleCopy();
+          }}
         >
           {copied ? 'Copied!' : 'Copy'}
         </button>
-      </div>
+      </summary>
       <textarea
         rows={Math.min(records.length * 2 + 1, 10)}
         readOnly
@@ -516,6 +530,6 @@ function ExportPanel({ records }: { records: NutritionRecord[] }) {
         style={{ fontFamily: 'monospace', fontSize: '0.82rem', color: 'var(--text-muted)' }}
         onFocus={(e) => e.target.select()}
       />
-    </div>
+    </details>
   );
 }

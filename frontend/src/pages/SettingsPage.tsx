@@ -5,6 +5,7 @@ import type { ApiTokenCreated, ApiTokenPublic, ApiTokenScope, DisplaySettings, O
 import { API_TOKEN_SCOPES } from '../api/settings';
 import { infoApi } from '../api/info';
 import { deriveDeviceAlias, getStoredToken, storeToken } from '../lib/auth';
+import { clearPwaCachesAndReload, isPwaCacheSupported } from '../lib/pwaCache';
 import { TagInput } from '../components/TagInput';
 import { usePermissions } from '../context/usePermissions';
 
@@ -14,6 +15,7 @@ export default function SettingsPage() {
   return (
     <div className="page-stack">
       <DisplaySection />
+      <AppCacheSection />
       <OidcSection />
       <TelegramSection />
       <ApiTokensSection />
@@ -160,6 +162,59 @@ function DisplaySection() {
           {mutation.error instanceof Error ? mutation.error.message : 'Failed to save display settings.'}
         </div>
       )}
+    </section>
+  );
+}
+
+// ── App cache (PWA) ───────────────────────────────────────────────────────────
+
+function AppCacheSection() {
+  const [clearing, setClearing] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const supported = isPwaCacheSupported();
+
+  async function handleClearCache() {
+    if (!window.confirm('Clear cached app files and reload? You will stay signed in.')) return;
+
+    setClearing(true);
+    setError(null);
+    try {
+      await clearPwaCachesAndReload();
+    } catch (err) {
+      setClearing(false);
+      setError(err instanceof Error ? err.message : 'Failed to clear app cache.');
+    }
+  }
+
+  if (!supported) return null;
+
+  return (
+    <section className="panel">
+      <div className="section-heading">
+        <div>
+          <p className="eyebrow">App</p>
+          <h3>Cached files</h3>
+        </div>
+      </div>
+
+      <p style={{ fontSize: '0.88rem', color: 'var(--text-muted)' }}>
+        Petmon installs as a PWA and caches JavaScript, CSS, and icons via a service worker (Workbox).
+        If you see a partial update after a new version, clear the cache to fetch everything fresh.
+        This does not remove your sign-in or pet data.
+      </p>
+
+      <div className="form-row" style={{ justifyContent: 'flex-end' }}>
+        <button
+          className="button button-secondary"
+          type="button"
+          disabled={clearing}
+          onClick={handleClearCache}
+        >
+          {clearing ? 'Clearing…' : 'Clear cache and reload'}
+        </button>
+      </div>
+
+      {error && <div className="error-state">{error}</div>}
     </section>
   );
 }
