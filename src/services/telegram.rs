@@ -184,3 +184,30 @@ pub async fn notify_record_update(pool: &SqlitePool, record: &NutritionRecord) {
         }
     }
 }
+
+/// Fire-and-forget: delete the Telegram message for a removed record.
+#[tracing::instrument(skip(pool, record), fields(record_id = %record.id))]
+pub async fn notify_record_delete(pool: &SqlitePool, record: &NutritionRecord) {
+    let Some(message_id) = record.telegram_message_id else {
+        tracing::debug!(record_id = %record.id, "no telegram_message_id, skipping delete notification");
+        return;
+    };
+
+    let Some(ctx) = load_telegram_context(pool, record).await else {
+        return;
+    };
+
+    let payload = serde_json::json!({
+        "chat_id": ctx.chat_id,
+        "message_id": message_id,
+    });
+
+    match post_telegram(&ctx.bot_token, "deleteMessage", &payload).await {
+        Ok(_) => {
+            tracing::info!(pet = %ctx.pet_name, record_id = %record.id, "telegram message deleted");
+        }
+        Err(err) => {
+            tracing::warn!(%err, pet = %ctx.pet_name, record_id = %record.id, "telegram deleteMessage failed");
+        }
+    }
+}

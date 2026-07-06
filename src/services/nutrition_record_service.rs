@@ -119,5 +119,16 @@ pub async fn update(
 
 #[tracing::instrument(skip(pool))]
 pub async fn delete(pool: &SqlitePool, id: &str) -> AppResult<()> {
-    nutrition_records::delete_record(pool, id).await
+    let record = nutrition_records::get_record(pool, id).await?;
+    nutrition_records::delete_record(pool, id).await?;
+
+    if record.telegram_message_id.is_some() {
+        let pool2 = pool.clone();
+        tokio::spawn(
+            async move { telegram::notify_record_delete(&pool2, &record).await }
+                .instrument(tracing::Span::current()),
+        );
+    }
+
+    Ok(())
 }
