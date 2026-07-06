@@ -60,6 +60,22 @@ export const Editing: Story = {
   },
 };
 
+export const EditingNarrow: Story = {
+  ...Editing,
+  parameters: {
+    viewport: { defaultViewport: 'mobile1' },
+  },
+  decorators: [
+    (Story) => (
+      <div className="panel" style={{ maxWidth: 354 }}>
+        <div className="entry-rows">
+          <Story />
+        </div>
+      </div>
+    ),
+  ],
+};
+
 export const EditingWithDisplayBelow: Story = {
   render: (args) => (
     <>

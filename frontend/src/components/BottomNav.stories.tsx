@@ -1,6 +1,27 @@
-import type { Meta, StoryObj } from '@storybook/react-vite';
+import type { Decorator, Meta, StoryObj } from '@storybook/react-vite';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { MemoryRouter } from 'react-router-dom';
 import { BottomNav } from './BottomNav';
 import { withMemoryRouter, withSelectedPet } from '../stories/decorators';
+import { SelectedPetProvider } from '../context/SelectedPetContext';
+
+const withNoPets: Decorator = (Story, { parameters }) => {
+  const client = new QueryClient({ defaultOptions: { queries: { retry: false, staleTime: Infinity } } });
+  client.setQueryData(['pets'], []);
+  client.setQueryData(['me'], { subject: 'dev', email: null, name: 'Dev', display_name: 'Dev', kind: 'dev', scopes: [] });
+
+  localStorage.removeItem('pm_selected_pet_id');
+
+  return (
+    <MemoryRouter initialEntries={[typeof parameters.route === 'string' ? parameters.route : '/']}>
+      <QueryClientProvider client={client}>
+        <SelectedPetProvider>
+          <Story />
+        </SelectedPetProvider>
+      </QueryClientProvider>
+    </MemoryRouter>
+  );
+};
 
 const meta = {
   title: 'Navigation/BottomNav',
@@ -21,4 +42,8 @@ export const Default: Story = {};
 
 export const OnNutritionRoute: Story = {
   parameters: { route: '/nutrition' },
+};
+
+export const NoPets: Story = {
+  decorators: [withNoPets],
 };

@@ -830,6 +830,28 @@ pre {
   margin: 0 auto 1rem;
 }
 
+.bottom-nav-sheet-title {
+  padding: 0 1rem 0.75rem;
+}
+
+.bottom-nav-sheet-subtitle {
+  padding: 0 1rem;
+}
+
+.bottom-nav-empty {
+  padding: 0 1rem 1rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+}
+
+.bottom-nav-empty .button {
+  width: 100%;
+  display: inline-flex;
+  justify-content: center;
+  min-width: 0;
+}
+
 .bottom-nav-sheet-pet {
   display: flex;
   align-items: center;
@@ -852,6 +874,12 @@ pre {
 
 .bottom-nav-sheet-pet.selected {
   color: var(--accent);
+}
+
+.bottom-nav-sheet-footer-link {
+  color: var(--text-muted);
+  border-top: 1px solid var(--border-subtle);
+  margin-top: 0.25rem;
 }
 
 .bottom-nav-sheet-check {
@@ -1652,6 +1680,7 @@ pre {
   border-radius: 10px;
   margin: 0 -0.4rem;
   padding: 0.55rem 0.4rem;
+  min-width: 0;
 }
 
 .entry-row-editing .record-entry-form {
@@ -1763,8 +1792,13 @@ pre {
 
   .record-entry-form--health,
   .record-entry-form--nutrition,
-  .record-entry-form--elimination {
+  .record-entry-form--elimination,
+  .record-entry-form--nutrition.record-entry-form--edit {
     grid-template-columns: 1fr;
+  }
+
+  .record-entry-form__actions {
+    width: 100%;
   }
 
   .record-entry-form__actions .button {
