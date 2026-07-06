@@ -1,11 +1,11 @@
 import type { Decorator, Meta, StoryObj } from '@storybook/react-vite';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { MemoryRouter } from 'react-router-dom';
 import { BottomNav } from './BottomNav';
 import { withMemoryRouter, withSelectedPet } from '../stories/decorators';
 import { SelectedPetProvider } from '../context/SelectedPetContext';
 
-const withNoPets: Decorator = (Story, { parameters }) => {
+/** Overrides withSelectedPet fixtures — relies on meta withMemoryRouter for routing. */
+const withNoPets: Decorator = (Story) => {
   const client = new QueryClient({ defaultOptions: { queries: { retry: false, staleTime: Infinity } } });
   client.setQueryData(['pets'], []);
   client.setQueryData(['me'], { subject: 'dev', email: null, name: 'Dev', display_name: 'Dev', kind: 'dev', scopes: [] });
@@ -13,13 +13,11 @@ const withNoPets: Decorator = (Story, { parameters }) => {
   localStorage.removeItem('pm_selected_pet_id');
 
   return (
-    <MemoryRouter initialEntries={[typeof parameters.route === 'string' ? parameters.route : '/']}>
-      <QueryClientProvider client={client}>
-        <SelectedPetProvider>
-          <Story />
-        </SelectedPetProvider>
-      </QueryClientProvider>
-    </MemoryRouter>
+    <QueryClientProvider client={client}>
+      <SelectedPetProvider>
+        <Story />
+      </SelectedPetProvider>
+    </QueryClientProvider>
   );
 };
 
