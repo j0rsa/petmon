@@ -1,5 +1,5 @@
 import { type ReactNode, useSyncExternalStore } from 'react';
-import { NavLink } from 'react-router-dom';
+import { Link } from 'react-router-dom';
 import { handleActiveTabPress } from '../lib/activeTabPress';
 
 const mobileMq = window.matchMedia('(max-width: 768px)');
@@ -21,7 +21,7 @@ export function PillarTabLink({ to, active, children }: PillarTabLinkProps) {
   );
 
   return (
-    <NavLink
+    <Link
       to={to}
       className={`pillar-tab${active ? ' active' : ''}`}
       onClick={(event) => {
@@ -29,6 +29,6 @@ export function PillarTabLink({ to, active, children }: PillarTabLinkProps) {
       }}
     >
       {children}
-    </NavLink>
+    </Link>
   );
 }

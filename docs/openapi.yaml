@@ -2054,6 +2054,7 @@ components:
 
     NutritionScheduleRule:
       type: object
+      description: Legacy per-entry schedule rule (array format in older data)
       properties:
         category:
           type: string
@@ -2061,7 +2062,7 @@ components:
         target_amount:
           type: number
           format: double
-          description: Target amount
+          description: Target amount for this entry
         unit:
           type: string
           nullable: true
@@ -2074,6 +2075,49 @@ components:
           type: string
           nullable: true
           description: Additional notes
+
+    NutritionScheduleWindow:
+      type: object
+      properties:
+        from:
+          type: string
+          description: Window start time (HH:MM)
+        to:
+          type: string
+          description: Window end time (HH:MM)
+        min:
+          type: number
+          format: double
+          description: Minimum amount for this window
+        max:
+          type: number
+          format: double
+          description: Maximum amount for this window
+        note:
+          type: string
+          nullable: true
+          description: Optional note for this window
+      required:
+        - from
+        - to
+        - min
+        - max
+
+    NutritionScheduleRules:
+      type: object
+      description: Window-based feeding schedule. Daily targets are derived by summing window min/max values client-side.
+      properties:
+        type:
+          type: string
+          enum: [liquid, food]
+          description: Schedule type (liquids in ml or food in g)
+        windows:
+          type: array
+          items:
+            $ref: '#/components/schemas/NutritionScheduleWindow'
+      required:
+        - type
+        - windows
 
     NutritionSchedule:
       type: object
@@ -2093,7 +2137,7 @@ components:
           description: Whether the schedule is active
         rules_json:
           type: string
-          description: JSON-serialized array of NutritionScheduleRule objects
+          description: JSON-serialized schedule rules (window-based object or legacy array of NutritionScheduleRule)
         created_at:
           type: string
           format: date-time
@@ -2126,11 +2170,14 @@ components:
           nullable: true
           description: Active status (defaults to true)
         rules:
-          type: array
           nullable: true
-          description: Array of schedule rules
-          items:
-            $ref: '#/components/schemas/NutritionScheduleRule'
+          description: Window-based schedule rules
+          oneOf:
+            - $ref: '#/components/schemas/NutritionScheduleRules'
+            - type: array
+              description: Legacy array of per-entry rules
+              items:
+                $ref: '#/components/schemas/NutritionScheduleRule'
       required:
         - pet_id
         - name
@@ -2145,11 +2192,14 @@ components:
           type: boolean
           nullable: true
         rules:
-          type: array
           nullable: true
-          description: Array of schedule rules
-          items:
-            $ref: '#/components/schemas/NutritionScheduleRule'
+          description: Window-based schedule rules
+          oneOf:
+            - $ref: '#/components/schemas/NutritionScheduleRules'
+            - type: array
+              description: Legacy array of per-entry rules
+              items:
+                $ref: '#/components/schemas/NutritionScheduleRule'
 
     NutritionDailyTotal:
       type: object
@@ -2987,7 +3037,7 @@ tags:
   - name: Nutrition Records
     description: Nutrition intake records
   - name: Nutrition Schedules
-    description: Feeding schedules and targets
+    description: Feeding schedules and time windows
   - name: Nutrition Analytics
     description: Nutrition analytics and aggregations
   - name: Elimination Records

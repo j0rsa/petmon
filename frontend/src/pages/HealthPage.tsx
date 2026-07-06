@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react';
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { ComposedChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 import { weightApi } from '../api/weight';
 import { parseDecimal } from '../lib/numbers';
@@ -67,6 +67,7 @@ export default function HealthPage() {
       granularity,
     }),
     enabled: Boolean(selectedPetId),
+    placeholderData: keepPreviousData,
   });
 
   const weightsQuery = useQuery({
@@ -100,7 +101,7 @@ export default function HealthPage() {
     },
   });
 
-  useScrollToHash(summaryQuery.isLoading);
+  useScrollToHash(summaryQuery.isPending);
 
   const chartData = useMemo(() => {
     const buckets = summaryQuery.data ?? [];
@@ -184,9 +185,27 @@ export default function HealthPage() {
           ))}
         </div>
 
-        {summaryQuery.isLoading ? (
-          <div className="loading-state">Loading…</div>
+        {summaryQuery.isPending ? (
+          <div className="loading-state" style={{ minHeight: 200 }}>Loading…</div>
         ) : chartData.length >= 2 ? (
+          <div style={{ position: 'relative', minHeight: 200 }}>
+            {summaryQuery.isFetching && (
+              <div
+                style={{
+                  position: 'absolute',
+                  inset: 0,
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  background: 'color-mix(in srgb, var(--surface) 70%, transparent)',
+                  zIndex: 1,
+                  fontSize: '0.82rem',
+                  color: 'var(--text-muted)',
+                }}
+              >
+                Loading…
+              </div>
+            )}
           <ResponsiveContainer width="100%" height={200}>
             <ComposedChart data={chartData} margin={{ top: 4, right: 8, left: -20, bottom: 0 }}>
               <CartesianGrid strokeDasharray="3 3" stroke="var(--border-subtle)" />
@@ -251,6 +270,7 @@ export default function HealthPage() {
               )}
             </ComposedChart>
           </ResponsiveContainer>
+          </div>
         ) : (
           <p className="muted-text" style={{ fontSize: '0.88rem' }}>
             {chartData.length === 0 ? 'No measurements yet.' : 'Add at least 2 measurements to see a chart.'}

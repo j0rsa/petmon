@@ -36,9 +36,6 @@ interface ScheduleWindow {
 interface ParsedScheduleRules {
   type?: 'liquid' | 'food';
   windows?: ScheduleWindow[];
-  // old min_ml/max_ml keys kept for compatibility
-  target_min?: number;
-  target_max?: number;
 }
 
 export type FluidSeriesKey = 'liquids' | 'foodFluid' | 'total' | 'bestDay' | 'schedule';

@@ -19,16 +19,19 @@ interface TimeWindow {
 
 interface ScheduleRules {
   type: ScheduleType;
-  target_min?: number;
-  target_max?: number;
   windows: TimeWindow[];
 }
 
 interface CreateForm {
   name: string;
   type: ScheduleType;
-  target_min: string;
-  target_max: string;
+}
+
+function formatWindowTargetRange(windows: TimeWindow[], unit: string): string | null {
+  if (windows.length === 0) return null;
+  const min = windows.reduce((sum, w) => sum + w.min, 0);
+  const max = windows.reduce((sum, w) => sum + w.max, 0);
+  return `${min}–${max} ${unit} / day`;
 }
 
 function parseRules(schedule: NutritionSchedule): ScheduleRules {
@@ -36,8 +39,6 @@ function parseRules(schedule: NutritionSchedule): ScheduleRules {
     const parsed = JSON.parse(schedule.rules_json);
     return {
       type: parsed.type === 'food' ? 'food' : 'liquid',
-      target_min: parsed.target_min ?? parsed.target_min_ml,
-      target_max: parsed.target_max ?? parsed.target_max_ml,
       windows: Array.isArray(parsed.windows)
         ? parsed.windows.map((w: Record<string, unknown>) => ({
             from: w.from ?? '',
@@ -57,8 +58,8 @@ function parseRules(schedule: NutritionSchedule): ScheduleRules {
 const UNIT: Record<ScheduleType, string> = { liquid: 'ml', food: 'g' };
 
 const DEFAULT_RULES: Record<ScheduleType, ScheduleRules> = {
-  liquid: { type: 'liquid', target_min: 79, target_max: 109, windows: [] },
-  food: { type: 'food', target_min: 150, target_max: 200, windows: [] },
+  liquid: { type: 'liquid', windows: [] },
+  food: { type: 'food', windows: [] },
 };
 
 export default function SchedulesPage() {
@@ -69,8 +70,6 @@ export default function SchedulesPage() {
   const [createForm, setCreateForm] = useState<CreateForm>({
     name: '',
     type: 'liquid',
-    target_min: '',
-    target_max: '',
   });
 
   const schedulesQuery = useQuery({
@@ -82,9 +81,8 @@ export default function SchedulesPage() {
   const createMutation = useMutation({
     mutationFn: () => {
       const rules: ScheduleRules = {
-        ...DEFAULT_RULES[createForm.type],
-        target_min: createForm.target_min ? parseDecimal(createForm.target_min) : DEFAULT_RULES[createForm.type].target_min,
-        target_max: createForm.target_max ? parseDecimal(createForm.target_max) : DEFAULT_RULES[createForm.type].target_max,
+        type: createForm.type,
+        windows: [],
       };
       return nutritionSchedulesApi.create({
         pet_id: selectedPetId!,
@@ -94,7 +92,7 @@ export default function SchedulesPage() {
       });
     },
     onSuccess: async () => {
-      setCreateForm({ name: '', type: 'liquid', target_min: '', target_max: '' });
+      setCreateForm({ name: '', type: 'liquid' });
       setShowCreate(false);
       await queryClient.invalidateQueries({ queryKey: ['nutrition-schedules'] });
     },
@@ -104,7 +102,6 @@ export default function SchedulesPage() {
   if (!selectedPetId) return <NoPetSelected />;
 
   const schedules = schedulesQuery.data ?? [];
-  const unit = UNIT[createForm.type];
 
   return (
     <div className="page-stack">
@@ -145,31 +142,6 @@ export default function SchedulesPage() {
                   {t}
                 </button>
               ))}
-            </div>
-
-            {/* Target range */}
-            <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
-              <span style={{ fontSize: '0.82rem', color: 'var(--text-muted)', whiteSpace: 'nowrap' }}>target:</span>
-              <input
-                type="text"
-                inputMode="decimal"
-                aria-label={`Minimum target in ${unit}`}
-                placeholder={`min ${unit}`}
-                value={createForm.target_min}
-                onChange={(e) => setCreateForm((f) => ({ ...f, target_min: e.target.value }))}
-                style={{ width: 90 }}
-              />
-              <span style={{ color: 'var(--text-subtle)' }}>–</span>
-              <input
-                type="text"
-                inputMode="decimal"
-                aria-label={`Maximum target in ${unit}`}
-                placeholder={`max ${unit}`}
-                value={createForm.target_max}
-                onChange={(e) => setCreateForm((f) => ({ ...f, target_max: e.target.value }))}
-                style={{ width: 90 }}
-              />
-              <span style={{ fontSize: '0.82rem', color: 'var(--text-muted)' }}>{unit} / day</span>
             </div>
 
             <button
@@ -262,10 +234,7 @@ function ScheduleCard({ schedule, canWrite }: { schedule: NutritionSchedule; can
     setEditRow(null);
   }
 
-  const target =
-    rules.target_min != null && rules.target_max != null
-      ? `${rules.target_min}–${rules.target_max} ${unit} / day`
-      : null;
+  const target = formatWindowTargetRange(rules.windows, unit);
 
   return (
     <div className="panel" style={{ gap: '0.75rem' }}>
