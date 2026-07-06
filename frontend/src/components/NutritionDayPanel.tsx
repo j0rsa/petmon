@@ -425,10 +425,6 @@ export function NutritionDayPanel({ date, petId }: NutritionDayPanelProps) {
       {records.length > 0 && (
         <div className="day-charts-section">
           <div className="day-chart-block">
-            <p className="eyebrow chart-label">fluid intake over time</p>
-            <IntakeBarsChart records={records} />
-          </div>
-          <div className="day-chart-block">
             <p className="eyebrow chart-label">cumulative fluid by time of day</p>
             <CumulativeFluidChart
               records={records}
@@ -500,6 +496,13 @@ export function NutritionDayPanel({ date, petId }: NutritionDayPanelProps) {
             {noteMutation.isPending ? 'Saving…' : 'Save note'}
           </button>
         </div>
+      )}
+
+      {records.length > 0 && (
+        <section className="day-intake-chart-section">
+          <p className="eyebrow chart-label">fluid intake over time</p>
+          <IntakeBarsChart records={records} />
+        </section>
       )}
     </section>
   );

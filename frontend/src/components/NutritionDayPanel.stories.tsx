@@ -18,6 +18,13 @@ type Story = StoryObj<typeof meta>;
 
 export const WithRecords: Story = {
   decorators: [withNutritionDayPanel('2024-06-15', mockPetId)],
+  parameters: {
+    docs: {
+      description: {
+        story: 'Cumulative fluid chart sits above entries; fluid intake over time is in a separate section at the bottom, below Save note.',
+      },
+    },
+  },
 };
 
 export const EmptyDay: Story = {
