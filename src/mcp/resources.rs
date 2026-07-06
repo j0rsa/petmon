@@ -31,7 +31,7 @@ pub fn resource_list() -> Value {
             {
                 "uri": "petmon://pets/{id}/schedules",
                 "name": "Pet — active nutrition schedules",
-                "description": "Active feeding schedules for a pet, including rules and targets.",
+                "description": "Active feeding schedules for a pet, including time windows.",
                 "mimeType": "application/json"
             }
         ]

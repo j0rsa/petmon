@@ -17,14 +17,6 @@ export interface CumulativeFluidPoint extends TimePoint {
   schedule: number | null;
 }
 
-export interface NutritionScheduleRule {
-  category: string;
-  target_amount: number;
-  unit?: string;
-  time_of_day?: string;
-  notes?: string;
-}
-
 interface ScheduleWindow {
   from: string;
   to: string;
@@ -36,9 +28,6 @@ interface ScheduleWindow {
 interface ParsedScheduleRules {
   type?: 'liquid' | 'food';
   windows?: ScheduleWindow[];
-  // old min_ml/max_ml keys kept for compatibility
-  target_min?: number;
-  target_max?: number;
 }
 
 export type FluidSeriesKey = 'liquids' | 'foodFluid' | 'total' | 'bestDay' | 'schedule';

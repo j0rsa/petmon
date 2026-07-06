@@ -708,8 +708,6 @@ async fn seed_schedules(pool: &SqlitePool, demo_pets: &[Pet]) -> AppResult<usize
             true,
             serde_json::json!({
                 "type": "liquid",
-                "target_min": 79,
-                "target_max": 109,
                 "windows": [
                     { "from": "06:00", "to": "07:00", "min": 12, "max": 15, "note": "First morning liquid, gentle start" },
                     { "from": "08:30", "to": "09:30", "min": 12, "max": 15, "note": "Good second portion" },
@@ -729,8 +727,6 @@ async fn seed_schedules(pool: &SqlitePool, demo_pets: &[Pet]) -> AppResult<usize
             true,
             serde_json::json!({
                 "type": "food",
-                "target_min": 150,
-                "target_max": 170,
                 "windows": [
                     { "from": "08:00", "to": "08:30", "min": 75, "max": 85, "note": "Morning wet portion" },
                     { "from": "19:00", "to": "19:30", "min": 75, "max": 85, "note": "Evening wet portion" }
@@ -743,8 +739,6 @@ async fn seed_schedules(pool: &SqlitePool, demo_pets: &[Pet]) -> AppResult<usize
             true,
             serde_json::json!({
                 "type": "food",
-                "target_min": 370,
-                "target_max": 430,
                 "windows": [
                     { "from": "07:30", "to": "08:00", "min": 280, "max": 320, "note": "Morning meal" },
                     { "from": "18:00", "to": "18:30", "min": 90,  "max": 110, "note": "Evening dry food" }
@@ -761,7 +755,7 @@ async fn seed_schedules(pool: &SqlitePool, demo_pets: &[Pet]) -> AppResult<usize
                 name: name.to_string(),
                 active: Some(*active),
                 rules: Some(rules.clone()),
-            });
+            })?;
         nutrition_schedules::create_schedule(pool, schedule).await?;
     }
 

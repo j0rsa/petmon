@@ -20,7 +20,11 @@ pub async fn list_schedules(
     if let Some(pet_id) = pet_id {
         q = q.bind(pet_id);
     }
-    Ok(q.fetch_all(pool).await?)
+    Ok(q.fetch_all(pool)
+        .await?
+        .into_iter()
+        .map(NutritionSchedule::with_normalized_rules)
+        .collect())
 }
 
 pub async fn get_schedule(pool: &SqlitePool, id: &str) -> AppResult<NutritionSchedule> {
@@ -30,6 +34,7 @@ pub async fn get_schedule(pool: &SqlitePool, id: &str) -> AppResult<NutritionSch
     .bind(id)
     .fetch_optional(pool)
     .await?
+    .map(NutritionSchedule::with_normalized_rules)
     .ok_or_else(|| AppError::NotFound(format!("Nutrition schedule {id} not found")))
 }
 
@@ -67,7 +72,7 @@ pub async fn update_schedule(
         schedule.active = active;
     }
     if let Some(rules) = req.rules {
-        schedule.rules_json = rules.to_string();
+        schedule.rules_json = crate::domain::nutrition_schedule::normalize_rules_json(Some(rules))?;
     }
     schedule.updated_at = now;
     let active_i = if schedule.active { 1_i64 } else { 0_i64 };
@@ -81,7 +86,7 @@ pub async fn update_schedule(
     .bind(id)
     .execute(pool)
     .await?;
-    Ok(schedule)
+    Ok(schedule.with_normalized_rules())
 }
 
 pub async fn delete_schedule(pool: &SqlitePool, id: &str) -> AppResult<()> {
