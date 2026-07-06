@@ -223,14 +223,6 @@ function RecordRow({ record, onSave, onDelete, saving, savingPaused, deleting, d
               <span className="entry-unit-hint">{unitFor(category)}</span>
             </div>
           </div>
-          <div className="entry-row-actions entry-row-actions--form">
-            <button className="icon-button" type="button" title="Save" aria-label="Save" disabled={saving} onClick={commitEdit}>
-              {savingPaused ? '⏸' : saving ? '…' : '✓'}
-            </button>
-            <button className="icon-button" type="button" title="Cancel" aria-label="Cancel" onClick={() => setEditing(false)}>
-              ✕
-            </button>
-          </div>
           <div className="form-row record-entry-form__note">
             <label>Note</label>
             <input
@@ -241,6 +233,23 @@ function RecordRow({ record, onSave, onDelete, saving, savingPaused, deleting, d
               onChange={(e) => setNote(e.target.value)}
               onKeyDown={(e) => { if (e.key === 'Enter') commitEdit(); if (e.key === 'Escape') setEditing(false); }}
             />
+          </div>
+          <div className="record-entry-form__actions">
+            <button
+              className="button button-compact"
+              type="button"
+              disabled={saving}
+              onClick={commitEdit}
+            >
+              {savingPaused ? 'Offline…' : saving ? 'Saving…' : 'Save'}
+            </button>
+            <button
+              className="button button-secondary button-compact"
+              type="button"
+              onClick={() => setEditing(false)}
+            >
+              Cancel
+            </button>
           </div>
         </div>
       </div>
@@ -254,17 +263,17 @@ function RecordRow({ record, onSave, onDelete, saving, savingPaused, deleting, d
         <CategoryBadge category={record.category} />
         <span className="entry-amount">{record.amount} {record.unit ?? ''}</span>
         {canWrite && (
-          <div className="entry-row-actions">
-            <button className="icon-button" type="button" title="Edit" aria-label="Edit" onClick={startEdit}>✎</button>
+          <div className="entry-row-actions entry-row-actions--nutrition">
+            <button className="button button-secondary button-compact" type="button" onClick={startEdit}>
+              Edit
+            </button>
             <button
-              className="icon-button icon-button-danger"
+              className="button button-danger button-compact"
               type="button"
-              title="Delete"
-              aria-label="Delete"
               disabled={deleting}
               onClick={() => { if (window.confirm('Delete this record?')) onDelete(record.id); }}
             >
-              {deletingPaused ? '⏸' : '✕'}
+              {deletingPaused ? 'Offline…' : deleting ? 'Deleting…' : 'Delete'}
             </button>
           </div>
         )}
