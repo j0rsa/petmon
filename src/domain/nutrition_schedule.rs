@@ -28,29 +28,41 @@ pub struct UpdateNutritionSchedule {
     pub rules: Option<serde_json::Value>,
 }
 
-#[derive(Debug, Serialize, Deserialize, Clone)]
-pub struct NutritionScheduleRule {
-    pub category: String,
-    pub target_amount: f64,
-    pub unit: Option<String>,
-    pub time_of_day: Option<String>,
-    pub notes: Option<String>,
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum RulesJsonError {
+    LegacyArray,
+    NotObject,
 }
 
-/// Strip denormalized daily targets from schedule rules. Targets are derived
-/// client-side by summing per-window min/max amounts.
-pub fn normalize_rules_json(rules: Option<serde_json::Value>) -> String {
+pub fn default_rules_json() -> String {
+    r#"{"type":"liquid","windows":[]}"#.to_string()
+}
+
+/// Normalize schedule rules for storage. Rejects the legacy array format.
+pub fn normalize_rules_json(rules: Option<serde_json::Value>) -> Result<String, RulesJsonError> {
     let Some(mut value) = rules else {
-        return "[]".to_string();
+        return Ok(default_rules_json());
     };
+    if value.is_array() {
+        return Err(RulesJsonError::LegacyArray);
+    }
+    if !value.is_object() {
+        return Err(RulesJsonError::NotObject);
+    }
     strip_stored_targets(&mut value);
-    value.to_string()
+    Ok(value.to_string())
 }
 
 pub fn normalize_rules_json_str(rules_json: &str) -> String {
     let Ok(mut value) = serde_json::from_str::<serde_json::Value>(rules_json) else {
-        return rules_json.to_string();
+        return default_rules_json();
     };
+    if value.is_array() {
+        return default_rules_json();
+    }
+    if !value.is_object() {
+        return default_rules_json();
+    }
     strip_stored_targets(&mut value);
     value.to_string()
 }
@@ -65,26 +77,22 @@ fn strip_stored_targets(value: &mut serde_json::Value) {
 }
 
 impl NutritionSchedule {
-    pub fn new(req: CreateNutritionSchedule) -> Self {
+    pub fn new(req: CreateNutritionSchedule) -> Result<Self, RulesJsonError> {
         let now = Utc::now().to_rfc3339();
-        NutritionSchedule {
+        Ok(NutritionSchedule {
             id: Uuid::new_v4().to_string(),
             pet_id: req.pet_id,
             name: req.name,
             active: req.active.unwrap_or(true),
-            rules_json: normalize_rules_json(req.rules),
+            rules_json: normalize_rules_json(req.rules)?,
             created_at: now.clone(),
             updated_at: now,
-        }
+        })
     }
 
     pub fn with_normalized_rules(mut self) -> Self {
         self.rules_json = normalize_rules_json_str(&self.rules_json);
         self
-    }
-
-    pub fn rules(&self) -> Vec<NutritionScheduleRule> {
-        serde_json::from_str(&self.rules_json).unwrap_or_default()
     }
 }
 
@@ -103,7 +111,7 @@ mod tests {
             "target_max_ml": 120,
             "windows": [{ "from": "08:00", "to": "09:00", "min": 10, "max": 12 }]
         });
-        let normalized = normalize_rules_json(Some(raw));
+        let normalized = normalize_rules_json(Some(raw)).unwrap();
         let parsed: serde_json::Value = serde_json::from_str(&normalized).unwrap();
         assert_eq!(parsed["type"], "liquid");
         assert!(parsed.get("target_min").is_none());
@@ -114,9 +122,16 @@ mod tests {
     }
 
     #[test]
-    fn normalize_rules_json_leaves_arrays_untouched() {
+    fn normalize_rules_json_rejects_legacy_array() {
         let raw = json!([{ "category": "liquids", "target_amount": 10.0 }]);
-        let normalized = normalize_rules_json(Some(raw.clone()));
-        assert_eq!(normalized, raw.to_string());
+        assert_eq!(
+            normalize_rules_json(Some(raw)),
+            Err(RulesJsonError::LegacyArray)
+        );
+    }
+
+    #[test]
+    fn normalize_rules_json_defaults_when_missing() {
+        assert_eq!(normalize_rules_json(None).unwrap(), default_rules_json());
     }
 }

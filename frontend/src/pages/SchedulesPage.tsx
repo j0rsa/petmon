@@ -43,9 +43,8 @@ function parseRules(schedule: NutritionSchedule): ScheduleRules {
         ? parsed.windows.map((w: Record<string, unknown>) => ({
             from: w.from ?? '',
             to: w.to ?? '',
-            // support old min_ml/max_ml keys from existing seed data
-            min: w.min ?? w.min_ml ?? 0,
-            max: w.max ?? w.max_ml ?? 0,
+            min: w.min ?? 0,
+            max: w.max ?? 0,
             note: w.note ?? '',
           }))
         : [],

@@ -28,7 +28,7 @@ pub async fn create(
         });
     }
     pets::get_pet(pool, req.pet_id).await?;
-    let schedule = NutritionSchedule::new(req);
+    let schedule = NutritionSchedule::new(req)?;
     nutrition_schedules::create_schedule(pool, schedule).await
 }
 

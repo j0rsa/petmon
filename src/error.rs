@@ -70,3 +70,20 @@ impl actix_web::ResponseError for AppError {
 }
 
 pub type AppResult<T> = Result<T, AppError>;
+
+impl From<crate::domain::nutrition_schedule::RulesJsonError> for AppError {
+    fn from(err: crate::domain::nutrition_schedule::RulesJsonError) -> Self {
+        match err {
+            crate::domain::nutrition_schedule::RulesJsonError::LegacyArray => {
+                AppError::Validation {
+                    field: "rules".to_string(),
+                    message: "Legacy array schedule rules are no longer supported; use a window-based object".to_string(),
+                }
+            }
+            crate::domain::nutrition_schedule::RulesJsonError::NotObject => AppError::Validation {
+                field: "rules".to_string(),
+                message: "Schedule rules must be a window-based object".to_string(),
+            },
+        }
+    }
+}

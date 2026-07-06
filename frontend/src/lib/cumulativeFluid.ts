@@ -17,14 +17,6 @@ export interface CumulativeFluidPoint extends TimePoint {
   schedule: number | null;
 }
 
-export interface NutritionScheduleRule {
-  category: string;
-  target_amount: number;
-  unit?: string;
-  time_of_day?: string;
-  notes?: string;
-}
-
 interface ScheduleWindow {
   from: string;
   to: string;

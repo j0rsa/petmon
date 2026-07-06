@@ -72,7 +72,7 @@ pub async fn update_schedule(
         schedule.active = active;
     }
     if let Some(rules) = req.rules {
-        schedule.rules_json = crate::domain::nutrition_schedule::normalize_rules_json(Some(rules));
+        schedule.rules_json = crate::domain::nutrition_schedule::normalize_rules_json(Some(rules))?;
     }
     schedule.updated_at = now;
     let active_i = if schedule.active { 1_i64 } else { 0_i64 };

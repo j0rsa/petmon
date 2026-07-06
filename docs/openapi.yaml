@@ -2052,30 +2052,6 @@ components:
           type: string
           nullable: true
 
-    NutritionScheduleRule:
-      type: object
-      description: Legacy per-entry schedule rule (array format in older data)
-      properties:
-        category:
-          type: string
-          description: Nutrition category
-        target_amount:
-          type: number
-          format: double
-          description: Target amount for this entry
-        unit:
-          type: string
-          nullable: true
-          description: Unit of measurement
-        time_of_day:
-          type: string
-          nullable: true
-          description: Recommended time (e.g., HH:MM)
-        notes:
-          type: string
-          nullable: true
-          description: Additional notes
-
     NutritionScheduleWindow:
       type: object
       properties:
@@ -2137,7 +2113,7 @@ components:
           description: Whether the schedule is active
         rules_json:
           type: string
-          description: JSON-serialized schedule rules (window-based object or legacy array of NutritionScheduleRule)
+          description: JSON-serialized window-based schedule rules
         created_at:
           type: string
           format: date-time
@@ -2172,12 +2148,7 @@ components:
         rules:
           nullable: true
           description: Window-based schedule rules
-          oneOf:
-            - $ref: '#/components/schemas/NutritionScheduleRules'
-            - type: array
-              description: Legacy array of per-entry rules
-              items:
-                $ref: '#/components/schemas/NutritionScheduleRule'
+          $ref: '#/components/schemas/NutritionScheduleRules'
       required:
         - pet_id
         - name
@@ -2194,12 +2165,7 @@ components:
         rules:
           nullable: true
           description: Window-based schedule rules
-          oneOf:
-            - $ref: '#/components/schemas/NutritionScheduleRules'
-            - type: array
-              description: Legacy array of per-entry rules
-              items:
-                $ref: '#/components/schemas/NutritionScheduleRule'
+          $ref: '#/components/schemas/NutritionScheduleRules'
 
     NutritionDailyTotal:
       type: object

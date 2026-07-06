@@ -755,7 +755,7 @@ async fn seed_schedules(pool: &SqlitePool, demo_pets: &[Pet]) -> AppResult<usize
                 name: name.to_string(),
                 active: Some(*active),
                 rules: Some(rules.clone()),
-            });
+            })?;
         nutrition_schedules::create_schedule(pool, schedule).await?;
     }
 

@@ -704,6 +704,25 @@ async fn nutrition_schedule_rules_strip_stored_targets() {
     assert_eq!(rules["windows"].as_array().unwrap().len(), 2);
 }
 
+#[actix_web::test]
+async fn nutrition_schedule_rejects_legacy_array_rules() {
+    let (app, _state) = build_dev_app!();
+    let pet_id = api_create_pet!(&app, "ScheduleLegacyTest");
+
+    let req = test::TestRequest::post()
+        .uri("/api/v1/nutrition/schedules")
+        .set_json(serde_json::json!({
+            "pet_id": pet_id,
+            "name": "Legacy",
+            "rules": [
+                { "category": "liquids", "target_amount": 10.0 }
+            ]
+        }))
+        .to_request();
+    let resp = test::call_service(&app, req).await;
+    assert_eq!(resp.status(), 422);
+}
+
 // ── Elimination + weight combined ────────────────────────────────────────────
 
 /// POST /elimination/records/with-weight creates both records atomically and

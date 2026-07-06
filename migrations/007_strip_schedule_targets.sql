@@ -1,4 +1,7 @@
 -- Daily schedule targets are derived from per-window min/max amounts; drop stored copies.
+-- Remove legacy array-shaped schedule rules.
+DELETE FROM nutrition_schedules WHERE json_type(rules_json) = 'array';
+
 UPDATE nutrition_schedules
 SET rules_json = json_remove(
     json_remove(
