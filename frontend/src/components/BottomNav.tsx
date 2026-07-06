@@ -31,16 +31,15 @@ export function BottomNav() {
       {petSheetOpen && (
         <div className="bottom-nav-sheet">
           <div className="bottom-nav-sheet-handle" />
-          <p className="eyebrow" style={{ padding: '0 1rem 0.75rem' }}>Switch pet</p>
-          {petsLoading && <p className="muted-text" style={{ padding: '0 1rem' }}>Loading…</p>}
+          <p className="eyebrow bottom-nav-sheet-title">Switch pet</p>
+          {petsLoading && <p className="muted-text bottom-nav-sheet-subtitle">Loading…</p>}
           {!petsLoading && pets.length === 0 && (
-            <div style={{ padding: '0 1rem 1rem' }}>
+            <div className="bottom-nav-empty">
               <p className="muted-text">No pets yet.</p>
               <Link
-                className="button button-secondary button-compact"
+                className="button button-secondary"
                 to="/pets"
                 onClick={() => setPetSheetOpen(false)}
-                style={{ marginTop: '0.5rem' }}
               >
                 Add a pet
               </Link>
@@ -65,9 +64,8 @@ export function BottomNav() {
           {!petsLoading && (
             <Link
               to="/pets"
-              className="bottom-nav-sheet-pet"
+              className="bottom-nav-sheet-pet bottom-nav-sheet-footer-link"
               onClick={() => setPetSheetOpen(false)}
-              style={{ color: 'var(--text-muted)', borderTop: '1px solid var(--border-subtle)', marginTop: '0.25rem' }}
             >
               <PawPrint size={20} style={{ opacity: 0.6 }} />
               <span>Manage pets</span>

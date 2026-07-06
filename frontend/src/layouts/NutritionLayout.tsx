@@ -1,7 +1,8 @@
 import { Outlet, useLocation } from 'react-router-dom';
 import { PillarTabLink } from '../components/PillarTabLink';
+import { isPillarTabActive } from '../lib/pillarTabs';
 
-const DATE_SEGMENT = /^\/nutrition\/\d{4}-\d{2}-\d{2}$/;
+const JOURNAL_PATH = '/nutrition';
 
 const tabs = [
   { to: '/nutrition', label: 'Journal' },
@@ -12,13 +13,12 @@ const tabs = [
 
 export function NutritionLayout() {
   const { pathname } = useLocation();
-  const journalActive = pathname === '/nutrition' || DATE_SEGMENT.test(pathname);
 
   return (
     <div className="page-stack pillar-page">
       <div className="pillar-tab-bar">
         {tabs.map((tab) => {
-          const active = tab.to === '/nutrition' ? journalActive : pathname.startsWith(tab.to);
+          const active = isPillarTabActive(pathname, tab.to, JOURNAL_PATH);
           return (
             <PillarTabLink key={tab.to} to={tab.to} active={active}>
               {tab.label}
