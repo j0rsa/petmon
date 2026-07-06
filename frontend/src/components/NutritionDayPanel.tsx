@@ -157,15 +157,17 @@ interface RecordRowProps {
   deleting: boolean;
   deletingPaused: boolean;
   canWrite: boolean;
+  /** Storybook / tests: start in edit mode. */
+  defaultEditing?: boolean;
 }
 
-function RecordRow({ record, onSave, onDelete, saving, savingPaused, deleting, deletingPaused, canWrite }: RecordRowProps) {
+function RecordRow({ record, onSave, onDelete, saving, savingPaused, deleting, deletingPaused, canWrite, defaultEditing = false }: RecordRowProps) {
   const formatTime = useFormatTime();
-  const [editing, setEditing] = useState(false);
-  const [time, setTime] = useState('');
-  const [category, setCategory] = useState('');
-  const [amount, setAmount] = useState('');
-  const [note, setNote] = useState('');
+  const [editing, setEditing] = useState(defaultEditing);
+  const [time, setTime] = useState(() => (defaultEditing ? timeFromIso(record.occurred_at) : ''));
+  const [category, setCategory] = useState(() => (defaultEditing ? record.category : ''));
+  const [amount, setAmount] = useState(() => (defaultEditing ? String(record.amount) : ''));
+  const [note, setNote] = useState(() => (defaultEditing ? (record.note ?? '') : ''));
 
   function startEdit() {
     setTime(timeFromIso(record.occurred_at));
@@ -190,43 +192,63 @@ function RecordRow({ record, onSave, onDelete, saving, savingPaused, deleting, d
   if (editing) {
     return (
       <div className="entry-row-wrap entry-row-editing">
-        <div className="entry-row">
-          <TimeInput value={time} onChange={setTime} autoFocus />
-          <select
-            className="entry-inline-input entry-inline-select"
-            aria-label="Category"
-            value={category}
-            onChange={(e) => setCategory(e.target.value)}
-          >
-            {CATEGORIES.map((cat) => (
-              <option key={cat} value={cat}>{CATEGORY_LABELS[cat]}</option>
-            ))}
-          </select>
-          <input
-            className="entry-inline-input entry-inline-amount"
-            type="text"
-            inputMode="decimal"
-            aria-label="Amount"
-            value={amount}
-            onChange={(e) => setAmount(e.target.value)}
-            onKeyDown={(e) => { if (e.key === 'Enter') commitEdit(); if (e.key === 'Escape') setEditing(false); }}
-          />
-          <span className="entry-unit-hint">{unitFor(category)}</span>
-          <input
-            className="entry-inline-input entry-inline-note"
-            type="text"
-            aria-label="Note"
-            placeholder="note (optional)"
-            value={note}
-            onChange={(e) => setNote(e.target.value)}
-            onKeyDown={(e) => { if (e.key === 'Enter') commitEdit(); if (e.key === 'Escape') setEditing(false); }}
-          />
-          <div className="entry-row-actions">
-            <button className="icon-button" type="button" title="Save" aria-label="Save" disabled={saving} onClick={commitEdit}>
-              {savingPaused ? '⏸' : saving ? '…' : '✓'}
+        <div className="record-entry-form record-entry-form--nutrition record-entry-form--edit">
+          <div className="form-row">
+            <label>Time</label>
+            <TimeInput value={time} onChange={setTime} variant="form" autoFocus />
+          </div>
+          <div className="form-row">
+            <label>Category</label>
+            <select
+              aria-label="Category"
+              value={category}
+              onChange={(e) => setCategory(e.target.value)}
+            >
+              {CATEGORIES.map((cat) => (
+                <option key={cat} value={cat}>{CATEGORY_LABELS[cat]}</option>
+              ))}
+            </select>
+          </div>
+          <div className="form-row">
+            <label>Amount</label>
+            <div className="record-entry-amount-wrap">
+              <input
+                type="text"
+                inputMode="decimal"
+                aria-label="Amount"
+                value={amount}
+                onChange={(e) => setAmount(e.target.value)}
+                onKeyDown={(e) => { if (e.key === 'Enter') commitEdit(); if (e.key === 'Escape') setEditing(false); }}
+              />
+              <span className="entry-unit-hint">{unitFor(category)}</span>
+            </div>
+          </div>
+          <div className="form-row record-entry-form__note">
+            <label>Note</label>
+            <input
+              type="text"
+              aria-label="Note"
+              placeholder="note (optional)"
+              value={note}
+              onChange={(e) => setNote(e.target.value)}
+              onKeyDown={(e) => { if (e.key === 'Enter') commitEdit(); if (e.key === 'Escape') setEditing(false); }}
+            />
+          </div>
+          <div className="record-entry-form__actions">
+            <button
+              className="button button-compact"
+              type="button"
+              disabled={saving}
+              onClick={commitEdit}
+            >
+              {savingPaused ? 'Offline…' : saving ? 'Saving…' : 'Save'}
             </button>
-            <button className="icon-button" type="button" title="Cancel" aria-label="Cancel" onClick={() => setEditing(false)}>
-              ✕
+            <button
+              className="button button-secondary button-compact"
+              type="button"
+              onClick={() => setEditing(false)}
+            >
+              Cancel
             </button>
           </div>
         </div>
@@ -262,6 +284,9 @@ function RecordRow({ record, onSave, onDelete, saving, savingPaused, deleting, d
     </div>
   );
 }
+
+/** Exported for Storybook — inline nutrition record row with optional edit mode. */
+export const NutritionRecordRow = RecordRow;
 
 // ── Day panel ───────────────────────────────────────────────────────────────
 

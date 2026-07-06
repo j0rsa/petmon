@@ -1496,6 +1496,10 @@ pre {
   grid-template-columns: minmax(7.5rem, 1fr) minmax(0, 2fr) minmax(9rem, 1fr) auto;
 }
 
+.record-entry-form--nutrition.record-entry-form--edit {
+  grid-template-columns: minmax(7.5rem, 1fr) minmax(0, 2fr) minmax(9rem, 1fr);
+}
+
 .record-entry-form--elimination {
   grid-template-columns: minmax(7.5rem, 1fr) minmax(0, 1.4fr) minmax(5.5rem, 0.8fr) minmax(0, 2fr) auto;
 }
@@ -1597,6 +1601,23 @@ pre {
   white-space: nowrap;
 }
 
+.record-entry-form--edit .record-entry-form__note,
+.record-entry-form--edit .record-entry-form__actions {
+  grid-column: 1 / -1;
+}
+
+.record-entry-form__actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 0.55rem;
+  flex-wrap: wrap;
+}
+
+.record-entry-form__actions .button {
+  min-height: 2.75rem;
+  min-width: 5.5rem;
+}
+
 .export-telegram-details {
   margin-top: 0.75rem;
   border-top: 1px solid var(--border-subtle);
@@ -1630,7 +1651,11 @@ pre {
   background: var(--surface-inset);
   border-radius: 10px;
   margin: 0 -0.4rem;
-  padding: 0.2rem 0.4rem;
+  padding: 0.55rem 0.4rem;
+}
+
+.entry-row-editing .record-entry-form {
+  margin-top: 0;
 }
 
 .entry-row-editing .entry-row {
@@ -1740,6 +1765,11 @@ pre {
   .record-entry-form--nutrition,
   .record-entry-form--elimination {
     grid-template-columns: 1fr;
+  }
+
+  .record-entry-form__actions .button {
+    flex: 1;
+    min-width: 0;
   }
 
   .pet-info-page .pet-info-card {

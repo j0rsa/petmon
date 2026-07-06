@@ -198,7 +198,7 @@ fn tool_list() -> Value {
             },
             {
                 "name": "nutrition/records/delete",
-                "description": "Delete a nutrition record by ID.",
+                "description": "Delete a nutrition record by ID. Also deletes the Telegram message if one was sent.",
                 "inputSchema": {
                     "type": "object",
                     "required": ["id"],

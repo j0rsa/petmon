@@ -26,3 +26,5 @@ export const EmptyDay: Story = {
   },
   decorators: [withNutritionDayPanel('2024-06-16', mockPetId, true)],
 };
+
+/** See Nutrition/NutritionRecordRow for isolated display and editing states. */
