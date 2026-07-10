@@ -18,6 +18,16 @@ const CHART_LABELS: Record<EliminationEventType, string> = {
   vomit: 'Vomit',
 };
 
+const DEFAULT_DURATION_SECONDS = 30;
+
+function formatDurationTick(seconds: number): string {
+  if (seconds === 0) return '0';
+  if (seconds < 60) return `${seconds}s`;
+  const m = Math.floor(seconds / 60);
+  const s = seconds % 60;
+  return s === 0 ? `${m}m` : `${m}m${s}s`;
+}
+
 interface EliminationDayChartProps {
   records: EliminationRecord[];
 }
@@ -33,11 +43,11 @@ export function EliminationDayChart({ records }: EliminationDayChartProps) {
         for (const key of CHART_KEYS) {
           point[key] = 0;
         }
-        point[record.event_type] = 1;
+        point[record.event_type] = record.duration_seconds ?? DEFAULT_DURATION_SECONDS;
         return point;
       });
 
-    const present = CHART_KEYS.filter((key) => data.some((point) => point[key] === 1));
+    const present = CHART_KEYS.filter((key) => data.some((point) => (point[key] as number) > 0));
     return { chartData: data, presentTypes: present };
   }, [records]);
 
@@ -61,8 +71,9 @@ export function EliminationDayChart({ records }: EliminationDayChartProps) {
               <YAxis
                 stroke="var(--chart-axis)"
                 tick={{ fill: 'var(--chart-axis)', fontFamily: 'DM Mono, monospace', fontSize: 11 }}
+                tickFormatter={formatDurationTick}
                 allowDecimals={false}
-                width={28}
+                width={40}
               />
               <Tooltip
                 contentStyle={{
@@ -72,6 +83,11 @@ export function EliminationDayChart({ records }: EliminationDayChartProps) {
                   fontFamily: 'monospace',
                   fontSize: 12,
                 }}
+                // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                formatter={(value: any, name: any) => [
+                  typeof value === 'number' ? formatDurationTick(value) : String(value ?? ''),
+                  name,
+                ]}
               />
               <Legend wrapperStyle={{ fontFamily: 'monospace', fontSize: 12 }} />
               {presentTypes.map((key, index) => (
