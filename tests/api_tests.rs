@@ -636,6 +636,112 @@ async fn nutrition_record_crud() {
     assert_eq!(resp.status(), 404);
 }
 
+/// PATCH nutrition record with `note: null` must clear an existing note (issue #15).
+#[actix_web::test]
+async fn nutrition_record_patch_clears_note_when_null() {
+    let (app, _state) = build_dev_app!();
+    let pet_id = api_create_pet!(&app, "NutritionClearNote");
+
+    // Create a record with a note.
+    let req = test::TestRequest::post()
+        .uri("/api/v1/nutrition/records")
+        .set_json(serde_json::json!({
+            "pet_id": pet_id,
+            "category": "wet_food",
+            "amount": 75,
+            "unit": "g",
+            "note": "original note",
+            "occurred_at": "2026-06-01T08:00:00",
+            "local_date": "2026-06-01"
+        }))
+        .to_request();
+    let resp = test::call_service(&app, req).await;
+    assert_eq!(resp.status(), 201);
+    let body: serde_json::Value = test::read_body_json(resp).await;
+    let record_id = body["id"].as_str().unwrap().to_string();
+    assert_eq!(body["note"].as_str(), Some("original note"));
+
+    // PATCH with note: null — must clear the note.
+    let req = test::TestRequest::patch()
+        .uri(&format!("/api/v1/nutrition/records/{record_id}"))
+        .set_json(serde_json::json!({ "note": null }))
+        .to_request();
+    let resp = test::call_service(&app, req).await;
+    assert_eq!(resp.status(), 200);
+    let body: serde_json::Value = test::read_body_json(resp).await;
+    assert!(
+        body["note"].is_null(),
+        "note must be null after clearing, got: {}",
+        body["note"]
+    );
+
+    // PATCH without note key — must leave note unchanged (still null).
+    let req = test::TestRequest::patch()
+        .uri(&format!("/api/v1/nutrition/records/{record_id}"))
+        .set_json(serde_json::json!({ "amount": 80 }))
+        .to_request();
+    let resp = test::call_service(&app, req).await;
+    assert_eq!(resp.status(), 200);
+    let body: serde_json::Value = test::read_body_json(resp).await;
+    assert!(
+        body["note"].is_null(),
+        "note must remain null when not included in patch, got: {}",
+        body["note"]
+    );
+}
+
+/// PATCH elimination record with `note: null` must clear an existing note (issue #15).
+#[actix_web::test]
+async fn elimination_record_patch_clears_note_when_null() {
+    let (app, _state) = build_dev_app!();
+    let pet_id = api_create_pet!(&app, "EliminationClearNote");
+
+    // Create a record with a note.
+    let req = test::TestRequest::post()
+        .uri("/api/v1/elimination/records")
+        .set_json(serde_json::json!({
+            "pet_id": pet_id,
+            "event_type": "urination",
+            "note": "original note",
+            "occurred_at": "2026-06-01T09:00:00",
+            "local_date": "2026-06-01"
+        }))
+        .to_request();
+    let resp = test::call_service(&app, req).await;
+    assert_eq!(resp.status(), 201);
+    let body: serde_json::Value = test::read_body_json(resp).await;
+    let record_id = body["id"].as_str().unwrap().to_string();
+    assert_eq!(body["note"].as_str(), Some("original note"));
+
+    // PATCH with note: null — must clear the note.
+    let req = test::TestRequest::patch()
+        .uri(&format!("/api/v1/elimination/records/{record_id}"))
+        .set_json(serde_json::json!({ "note": null }))
+        .to_request();
+    let resp = test::call_service(&app, req).await;
+    assert_eq!(resp.status(), 200);
+    let body: serde_json::Value = test::read_body_json(resp).await;
+    assert!(
+        body["note"].is_null(),
+        "note must be null after clearing, got: {}",
+        body["note"]
+    );
+
+    // PATCH without note key — must leave note unchanged (still null).
+    let req = test::TestRequest::patch()
+        .uri(&format!("/api/v1/elimination/records/{record_id}"))
+        .set_json(serde_json::json!({ "event_type": "defecation" }))
+        .to_request();
+    let resp = test::call_service(&app, req).await;
+    assert_eq!(resp.status(), 200);
+    let body: serde_json::Value = test::read_body_json(resp).await;
+    assert!(
+        body["note"].is_null(),
+        "note must remain null when not included in patch, got: {}",
+        body["note"]
+    );
+}
+
 /// Schedule rules must not persist denormalized daily target_min/target_max fields.
 #[actix_web::test]
 async fn nutrition_schedule_rules_strip_stored_targets() {
