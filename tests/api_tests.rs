@@ -218,7 +218,7 @@ async fn sign_out_deletes_api_token() {
     );
     let me: serde_json::Value = test::read_body_json(resp).await;
     assert_eq!(me["kind"].as_str(), Some("api_token"));
-    assert_eq!(me["token_alias"].as_str(), Some("My Device"));
+    assert_eq!(me["display_name"].as_str(), Some("My Device"));
     assert_eq!(me["token_created_by"].as_str(), Some("Alice"));
 
     let resp = test::call_service(

@@ -60,7 +60,6 @@ export const ApiTokenUser: Story = {
         display_name: 'iPhone (iOS 18.7)',
         kind: 'api_token',
         scopes: ['api_read'],
-        token_alias: 'iPhone (iOS 18.7)',
         token_created_by: 'Alice',
       }}
     />

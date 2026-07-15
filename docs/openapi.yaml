@@ -1784,10 +1784,6 @@ components:
           items:
             type: string
           description: Granted scopes. Empty means full access (no restriction).
-        token_alias:
-          type: string
-          nullable: true
-          description: Alias of the API token session (api_token kind only)
         token_created_by:
           type: string
           nullable: true

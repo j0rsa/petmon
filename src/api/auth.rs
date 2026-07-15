@@ -92,9 +92,6 @@ pub struct MeResponse {
     pub kind: &'static str,
     /// Granted scopes. Empty means full access (no restriction).
     pub scopes: Vec<String>,
-    /// Alias of the API token used for this session (api_token kind only).
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub token_alias: Option<String>,
     /// Creator display name for the API token session (api_token kind only).
     #[serde(skip_serializing_if = "Option::is_none")]
     pub token_created_by: Option<String>,
@@ -124,7 +121,6 @@ pub async fn me(req: HttpRequest) -> AppResult<HttpResponse> {
         name: identity.name,
         kind,
         scopes,
-        token_alias: identity.token_alias,
         token_created_by: identity.token_created_by,
     }))
 }

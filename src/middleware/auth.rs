@@ -117,7 +117,6 @@ where
                                 token_id: api_token.id,
                             },
                             scopes,
-                            token_alias: api_token.alias.clone(),
                             token_created_by: api_token.created_by.clone(),
                         };
                         req.extensions_mut().insert(identity);
