@@ -6,9 +6,9 @@ use crate::auth::{
     identity::{Identity, IdentityKind},
     AppState,
 };
-use crate::repo::api_tokens;
 use crate::domain::settings::OidcConfig;
 use crate::error::{AppError, AppResult};
+use crate::repo::api_tokens;
 use crate::repo::settings;
 
 #[derive(Serialize)]

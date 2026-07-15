@@ -211,7 +211,11 @@ async fn sign_out_deletes_api_token() {
             .to_request(),
     )
     .await;
-    assert_eq!(resp.status(), 200, "token must authenticate before sign-out");
+    assert_eq!(
+        resp.status(),
+        200,
+        "token must authenticate before sign-out"
+    );
     let me: serde_json::Value = test::read_body_json(resp).await;
     assert_eq!(me["kind"].as_str(), Some("api_token"));
     assert_eq!(me["token_alias"].as_str(), Some("My Device"));
