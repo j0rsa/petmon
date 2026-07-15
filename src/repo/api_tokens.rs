@@ -109,6 +109,19 @@ pub async fn update_scopes(
     .ok_or_else(|| AppError::NotFound(format!("API token '{id}' not found")))
 }
 
+/// Permanently removes a token regardless of active state (used on sign-out).
+pub async fn delete_by_id(pool: &SqlitePool, id: &str) -> AppResult<()> {
+    let result = sqlx::query("DELETE FROM api_tokens WHERE id = ?")
+        .bind(id)
+        .execute(pool)
+        .await?;
+
+    if result.rows_affected() == 0 {
+        return Err(AppError::NotFound(format!("API token '{id}' not found")));
+    }
+    Ok(())
+}
+
 pub async fn delete(pool: &SqlitePool, id: &str) -> AppResult<()> {
     let result = sqlx::query("DELETE FROM api_tokens WHERE id = ? AND active = 0")
         .bind(id)

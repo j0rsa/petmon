@@ -66,6 +66,27 @@ paths:
         '401':
           $ref: '#/components/responses/Unauthorized'
 
+  /auth/sign-out:
+    post:
+      tags:
+        - Authentication
+      summary: Sign out of the current session
+      description: |
+        Ends the current session. When authenticated with a long-lived API token,
+        the token is permanently deleted from the server so it cannot be reused.
+        OIDC sessions are unaffected (the client clears its stored token).
+      responses:
+        '204':
+          description: Signed out successfully
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          description: API token not found (api_token sessions only)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
   /pets:
     get:
       tags:
@@ -1758,10 +1779,20 @@ components:
             - api_token
             - dev
           description: Authentication method used
+        scopes:
+          type: array
+          items:
+            type: string
+          description: Granted scopes. Empty means full access (no restriction).
+        token_created_by:
+          type: string
+          nullable: true
+          description: Creator display name for the API token session (api_token kind only)
       required:
         - subject
         - display_name
         - kind
+        - scopes
 
     PetSpecies:
       type: string
