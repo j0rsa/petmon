@@ -242,6 +242,8 @@ impl OidcValidator {
             name: typed.name,
             kind: IdentityKind::Oidc,
             scopes,
+            token_alias: None,
+            token_created_by: None,
         })
     }
 

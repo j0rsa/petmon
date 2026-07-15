@@ -10,6 +10,10 @@ pub struct Identity {
     pub kind: IdentityKind,
     /// Granted scopes. Empty means full access (no restriction). HashSet for O(1) lookup.
     pub scopes: HashSet<String>,
+    /// Human label for the current API token session, if any.
+    pub token_alias: Option<String>,
+    /// Creator display name snapshot for the current API token session, if any.
+    pub token_created_by: Option<String>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -30,6 +34,8 @@ impl Identity {
             name: Some("Dev".to_string()),
             kind: IdentityKind::Dev,
             scopes: HashSet::new(),
+            token_alias: None,
+            token_created_by: None,
         }
     }
 

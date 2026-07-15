@@ -63,7 +63,20 @@ export const UserChipOidc: StoryObj = {
 
 export const UserChipApiToken: StoryObj = {
   name: 'UserChip — API token user',
-  render: () => <ChipWrapper me={{ subject: 'mobile-app', email: null, name: null, display_name: 'mobile-app', kind: 'api_token', scopes: ['api_read'] }} />,
+  render: () => (
+    <ChipWrapper
+      me={{
+        subject: 'iPhone (iOS 18.7)',
+        email: null,
+        name: 'iPhone (iOS 18.7)',
+        display_name: 'iPhone (iOS 18.7)',
+        kind: 'api_token',
+        scopes: ['api_read'],
+        token_alias: 'iPhone (iOS 18.7)',
+        token_created_by: 'Alice',
+      }}
+    />
+  ),
 };
 
 export const UserChipDev: StoryObj = {

@@ -169,6 +169,87 @@ async fn mcp_endpoint_requires_auth() {
 }
 
 #[actix_web::test]
+async fn sign_out_deletes_api_token() {
+    let pool = setup_pool().await;
+    let raw = "pm_api_signout_test_0000000000000000000000000000000000000000000000";
+    let token_id = uuid::Uuid::new_v4().to_string();
+    let hash = {
+        let mut hasher = Sha256::new();
+        hasher.update(raw.as_bytes());
+        format!("{:x}", hasher.finalize())
+    };
+    sqlx::query(
+        "INSERT INTO api_tokens (id, token_hash, alias, scopes, created_by, created_at, last_used_at, active) \
+         VALUES (?, ?, ?, ?, ?, datetime('now'), NULL, 1)",
+    )
+    .bind(&token_id)
+    .bind(&hash)
+    .bind("My Device")
+    .bind("all")
+    .bind("Alice")
+    .execute(&pool)
+    .await
+    .unwrap();
+
+    // Keep auth configured after sign-out so invalid tokens return 401, not 503.
+    sqlx::query(
+        "INSERT INTO api_tokens (id, token_hash, alias, scopes, created_at, last_used_at, active) \
+         VALUES ('other-token', 'otherhash', 'other', 'all', datetime('now'), NULL, 1)",
+    )
+    .execute(&pool)
+    .await
+    .unwrap();
+
+    let state = web::Data::new(AppState::new(pool.clone(), false, None, None));
+    let app = build_app!(state);
+
+    let resp = test::call_service(
+        &app,
+        test::TestRequest::get()
+            .uri("/api/v1/auth/me")
+            .insert_header(("Authorization", format!("Bearer {raw}")))
+            .to_request(),
+    )
+    .await;
+    assert_eq!(resp.status(), 200, "token must authenticate before sign-out");
+    let me: serde_json::Value = test::read_body_json(resp).await;
+    assert_eq!(me["kind"].as_str(), Some("api_token"));
+    assert_eq!(me["token_alias"].as_str(), Some("My Device"));
+    assert_eq!(me["token_created_by"].as_str(), Some("Alice"));
+
+    let resp = test::call_service(
+        &app,
+        test::TestRequest::post()
+            .uri("/api/v1/auth/sign-out")
+            .insert_header(("Authorization", format!("Bearer {raw}")))
+            .to_request(),
+    )
+    .await;
+    assert_eq!(resp.status(), 204, "sign-out must return 204");
+
+    let count: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM api_tokens WHERE id = ?")
+        .bind(&token_id)
+        .fetch_one(&pool)
+        .await
+        .unwrap();
+    assert_eq!(count, 0, "sign-out must permanently delete the API token");
+
+    let resp = test::call_service(
+        &app,
+        test::TestRequest::get()
+            .uri("/api/v1/auth/me")
+            .insert_header(("Authorization", format!("Bearer {raw}")))
+            .to_request(),
+    )
+    .await;
+    assert_eq!(
+        resp.status(),
+        401,
+        "deleted token must no longer authenticate"
+    );
+}
+
+#[actix_web::test]
 async fn auth_info_is_public_at_full_app_level() {
     let pool = setup_pool().await;
     let state = web::Data::new(AppState::new(pool, false, None, None));

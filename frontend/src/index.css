@@ -981,8 +981,18 @@ pre {
 }
 
 .sidebar-user-name {
+  display: block;
   font-size: 0.88rem;
   color: var(--text-muted);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.sidebar-user-token-creator {
+  display: block;
+  font-size: 0.7rem;
+  color: var(--text-subtle);
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
