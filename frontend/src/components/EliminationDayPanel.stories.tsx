@@ -1,4 +1,5 @@
 import type { Meta, StoryObj } from '@storybook/react-vite';
+import { expect, fn, userEvent, waitFor, within } from 'storybook/test';
 import { mockPetId } from '../stories/fixtures';
 import { withEliminationDayPanel } from '../stories/decorators';
 import { EliminationDayPanel } from './EliminationDayPanel';
@@ -61,4 +62,96 @@ export const EmptyDay: Story = {
     date: '2024-06-16',
   },
   decorators: [withEliminationDayPanel('2024-06-16', mockPetId, true)],
+};
+
+const weeLatestRecords = [
+  {
+    id: 'elim-wee',
+    pet_id: mockPetId,
+    occurred_at: '2024-06-15T20:00:00',
+    local_date: '2024-06-15',
+    event_type: 'urination' as const,
+    subtype: null,
+    duration_seconds: 45,
+    note: null,
+    source_type: 'manual',
+    created_at: '2024-06-15T20:00:00',
+    updated_at: '2024-06-15T20:00:00',
+  },
+];
+
+/**
+ * Editing a visit must not accidentally create via the Log visit form.
+ * Mobile browsers often deliver a ghost click to whatever sits under a native
+ * <select> after it closes — previously that hit Log visit (default Wee).
+ */
+export const EditTypeDoesNotCreate: Story = {
+  decorators: [
+    withEliminationDayPanel('2024-06-15', mockPetId, false, {
+      recordsOverride: weeLatestRecords,
+    }),
+  ],
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    const fetchMock = fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+      const url = String(input);
+      const method = (init?.method ?? 'GET').toUpperCase();
+      if (method === 'PATCH' && url.includes('/elimination/records/elim-wee')) {
+        return new Response(
+          JSON.stringify({
+            ...weeLatestRecords[0],
+            event_type: 'general',
+            updated_at: '2024-06-15T20:01:00',
+          }),
+          { status: 200, headers: { 'Content-Type': 'application/json' } },
+        );
+      }
+      if (method === 'GET' && url.includes('/elimination/records')) {
+        return new Response(
+          JSON.stringify([{ ...weeLatestRecords[0], event_type: 'general' }]),
+          { status: 200, headers: { 'Content-Type': 'application/json' } },
+        );
+      }
+      return new Response(JSON.stringify({}), {
+        status: 200,
+        headers: { 'Content-Type': 'application/json' },
+      });
+    });
+    const originalFetch = window.fetch;
+    window.fetch = fetchMock as unknown as typeof fetch;
+
+    try {
+      await userEvent.click(canvas.getByRole('button', { name: 'Edit' }));
+      const logVisit = canvas.getByRole('button', { name: 'Editing…' });
+      await expect(logVisit).toBeDisabled();
+
+      const editTypeSelect = canvas
+        .getAllByLabelText('Event type')
+        .find((el) => !(el as HTMLSelectElement).disabled);
+      await expect(editTypeSelect).toBeTruthy();
+      await userEvent.selectOptions(editTypeSelect!, 'general');
+      // Simulate the ghost click that mobile browsers fire on dismiss of <select>.
+      // Disabled + pointer-events:none must keep this from creating a visit.
+      logVisit.click();
+
+      await userEvent.click(canvas.getByRole('button', { name: 'Save' }));
+
+      await waitFor(() => {
+        const writes = fetchMock.mock.calls.filter((call) => {
+          const method = String(call[1]?.method ?? 'GET').toUpperCase();
+          return method === 'POST' || method === 'PATCH';
+        });
+        expect(writes).toHaveLength(1);
+        expect(String(writes[0][1]?.method ?? '').toUpperCase()).toBe('PATCH');
+        expect(String(writes[0][0])).toContain('/elimination/records/elim-wee');
+        expect(String(writes[0][1]?.body ?? '')).toContain('"event_type":"general"');
+      });
+
+      await waitFor(() => {
+        expect(canvas.getByText('Last visit uncategorized — was it:')).toBeInTheDocument();
+      });
+    } finally {
+      window.fetch = originalFetch;
+    }
+  },
 };
