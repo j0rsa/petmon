@@ -64,7 +64,7 @@ export const Editing: Story = {
   parameters: {
     docs: {
       description: {
-        story: 'Edit time, category, amount, and note. Use Move to yesterday or Move to tomorrow to shift the record one day while keeping the same time and notes.',
+        story: 'Edit time, category, amount, and note. Use ⬅️🗓️ / ➡️🗓️ to shift the record one day while keeping the same time and notes.',
       },
     },
   },
