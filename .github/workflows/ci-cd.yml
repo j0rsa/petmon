@@ -130,8 +130,11 @@ jobs:
           buildScriptName: build-storybook
           token: ${{ secrets.GITHUB_TOKEN }}
 
+      # Best-effort: Chromatic already published and reports its own check.
+      # GitHub API 503s (unicorn) must not fail this job after a successful publish.
       - name: Update PR description with Storybook preview
         if: github.event_name == 'pull_request' && steps.chromatic.outputs.storybookUrl != ''
+        continue-on-error: true
         uses: actions/github-script@v7
         with:
           script: |
@@ -151,30 +154,50 @@ jobs:
               markerEnd,
             ].join('\n');
 
-            const { data: pr } = await github.rest.pulls.get({
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              pull_number: context.issue.number,
-            });
-
-            let body = pr.body ?? '';
-            const startIdx = body.indexOf(markerStart);
-            const endIdx = body.indexOf(markerEnd);
-
-            if (startIdx !== -1 && endIdx !== -1 && endIdx > startIdx) {
-              body =
-                body.slice(0, startIdx) +
-                section +
-                body.slice(endIdx + markerEnd.length);
-            } else {
-              body = `${body.trimEnd()}\n\n${section}`;
+            async function withRetry(fn, { attempts = 5, baseMs = 2000 } = {}) {
+              let lastError;
+              for (let i = 0; i < attempts; i++) {
+                try {
+                  return await fn();
+                } catch (error) {
+                  lastError = error;
+                  const status = error.status ?? error.response?.status;
+                  const retryable = status === 502 || status === 503 || status === 504;
+                  if (!retryable || i === attempts - 1) throw error;
+                  const delay = baseMs * 2 ** i;
+                  core.warning(`GitHub API ${status}; retry ${i + 1}/${attempts - 1} in ${delay}ms`);
+                  await new Promise((r) => setTimeout(r, delay));
+                }
+              }
+              throw lastError;
             }
 
-            await github.rest.pulls.update({
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              pull_number: context.issue.number,
-              body,
+            await withRetry(async () => {
+              const { data: pr } = await github.rest.pulls.get({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                pull_number: context.issue.number,
+              });
+
+              let body = pr.body ?? '';
+              const startIdx = body.indexOf(markerStart);
+              const endIdx = body.indexOf(markerEnd);
+
+              if (startIdx !== -1 && endIdx !== -1 && endIdx > startIdx) {
+                body =
+                  body.slice(0, startIdx) +
+                  section +
+                  body.slice(endIdx + markerEnd.length);
+              } else {
+                body = `${body.trimEnd()}\n\n${section}`;
+              }
+
+              await github.rest.pulls.update({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                pull_number: context.issue.number,
+                body,
+              });
             });
 
   # ─────────────────────────────────────────────
@@ -405,16 +428,37 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
+      # Local tag generation avoids docker/metadata-action GitHub API calls,
+      # which fail hard on transient 503 unicorn responses.
       - name: Extract metadata
         id: meta
-        uses: docker/metadata-action@v5
-        with:
-          images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
-          tags: |
-            type=raw,value=v${{ steps.ver.outputs.version }},enable=${{ github.ref == 'refs/heads/main' && github.event_name == 'push' }}
-            type=sha,prefix=pr-${{ github.event.pull_request.number }}-${{ steps.ver.outputs.version }}-,format=short,enable=${{ github.event_name == 'pull_request' }}
-            type=sha,prefix=sha-,format=short,enable=${{ github.ref == 'refs/heads/main' && github.event_name == 'push' }}
-            type=raw,value=latest,enable=${{ github.ref == 'refs/heads/main' && github.event_name == 'push' }}
+        run: |
+          set -euo pipefail
+          IMAGE="${REGISTRY}/${IMAGE_NAME}"
+          VERSION="${{ steps.ver.outputs.version }}"
+          if [ "${{ github.event_name }}" = "pull_request" ]; then
+            SHORT_SHA="$(printf '%.7s' '${{ github.event.pull_request.head.sha }}')"
+          else
+            SHORT_SHA="$(printf '%.7s' '${{ github.sha }}')"
+          fi
+
+          TAGS=()
+          if [ "${{ github.event_name }}" = "pull_request" ]; then
+            TAGS+=("${IMAGE}:pr-${{ github.event.pull_request.number }}-${VERSION}-${SHORT_SHA}")
+          elif [ "${{ github.ref }}" = "refs/heads/main" ] && [ "${{ github.event_name }}" = "push" ]; then
+            TAGS+=("${IMAGE}:v${VERSION}")
+            TAGS+=("${IMAGE}:sha-${SHORT_SHA}")
+            TAGS+=("${IMAGE}:latest")
+          fi
+
+          {
+            echo "tags<<EOF"
+            printf '%s\n' "${TAGS[@]}"
+            echo "EOF"
+          } >> "$GITHUB_OUTPUT"
+
+          echo "Image tags:"
+          printf '  %s\n' "${TAGS[@]}"
 
       - name: Build and push multiarch image
         uses: docker/build-push-action@v6
@@ -424,6 +468,5 @@ jobs:
           platforms: linux/amd64,linux/arm64
           push: ${{ github.event_name == 'pull_request' || (github.ref == 'refs/heads/main' && github.event_name == 'push') }}
           tags: ${{ steps.meta.outputs.tags }}
-          labels: ${{ steps.meta.outputs.labels }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
