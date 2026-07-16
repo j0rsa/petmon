@@ -80,6 +80,66 @@ const weeLatestRecords = [
   },
 ];
 
+/** Row edit open: Log visit becomes disabled “Editing…” so ghost-clicks cannot create. */
+export const Editing: Story = {
+  decorators: [
+    withEliminationDayPanel('2024-06-15', mockPetId, false, {
+      recordsOverride: weeLatestRecords,
+    }),
+  ],
+  parameters: {
+    docs: {
+      description: {
+        story:
+          'While a visit is being edited, Log visit is disabled and labeled “Editing…”. The categorize bar is also hidden until edit mode ends.',
+      },
+    },
+  },
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    await userEvent.click(canvas.getByRole('button', { name: 'Edit' }));
+    const logVisit = canvas.getByRole('button', { name: 'Editing…' });
+    await expect(logVisit).toBeDisabled();
+    const editTypeSelect = canvas
+      .getAllByLabelText('Event type')
+      .find((el) => !(el as HTMLSelectElement).disabled);
+    await expect(editTypeSelect).toBeTruthy();
+    await expect(canvas.queryByText('Last visit uncategorized — was it:')).not.toBeInTheDocument();
+  },
+};
+
+export const EditingNarrow: Story = {
+  ...Editing,
+  parameters: {
+    ...Editing.parameters,
+    viewport: { defaultViewport: 'mobile1' },
+  },
+};
+
+/**
+ * Uncategorized latest visit normally shows Wee/Poop — but not while that row is open for edit.
+ */
+export const EditingHidesCategorizeBar: Story = {
+  decorators: [
+    withEliminationDayPanel('2024-06-15', mockPetId, false, {
+      recordsOverride: [
+        {
+          ...weeLatestRecords[0],
+          id: 'elim-general',
+          event_type: 'general',
+        },
+      ],
+    }),
+  ],
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    await expect(canvas.getByText('Last visit uncategorized — was it:')).toBeInTheDocument();
+    await userEvent.click(canvas.getByRole('button', { name: 'Edit' }));
+    await expect(canvas.getByRole('button', { name: 'Editing…' })).toBeDisabled();
+    await expect(canvas.queryByText('Last visit uncategorized — was it:')).not.toBeInTheDocument();
+  },
+};
+
 /**
  * Editing a visit must not accidentally create via the Log visit form.
  * Mobile browsers often deliver a ghost click to whatever sits under a native
