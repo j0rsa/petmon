@@ -160,6 +160,8 @@ interface AddRowProps {
   onSave: (payload: CreateEliminationRecord) => void;
   saving: boolean;
   isPaused: boolean;
+  /** Block create while a row is being edited (avoids mobile select/save ghost-clicks). */
+  disabled?: boolean;
 }
 
 export interface AddRowHandle {
@@ -167,7 +169,7 @@ export interface AddRowHandle {
 }
 
 const AddRow = forwardRef<AddRowHandle, AddRowProps>(function AddRow(
-  { date, petId, onSave, saving, isPaused },
+  { date, petId, onSave, saving, isPaused, disabled = false },
   ref,
 ) {
   const [time, setTime] = useState(nowTimeString);
@@ -177,6 +179,7 @@ const AddRow = forwardRef<AddRowHandle, AddRowProps>(function AddRow(
   const [note, setNote] = useState('');
 
   const availableSubtypes = subtypesFor(eventType);
+  const controlsDisabled = saving || disabled;
 
   useImperativeHandle(ref, () => ({
     clearForm() {
@@ -188,6 +191,7 @@ const AddRow = forwardRef<AddRowHandle, AddRowProps>(function AddRow(
   }));
 
   function handleAdd() {
+    if (controlsDisabled) return;
     onSave({
       pet_id: petId,
       occurred_at: isoFromDateAndTime(date, time),
@@ -201,7 +205,13 @@ const AddRow = forwardRef<AddRowHandle, AddRowProps>(function AddRow(
   }
 
   return (
-    <div className="record-entry-form record-entry-form--elimination">
+    <div
+      className="record-entry-form record-entry-form--elimination"
+      // pointer-events:none so a ghost click after native <select> dismiss
+      // cannot land on Log visit while a row is being edited.
+      style={disabled ? { pointerEvents: 'none', opacity: 0.55 } : undefined}
+      aria-disabled={disabled || undefined}
+    >
       <div className="form-row">
         <label>Time</label>
         <TimeInput value={time} onChange={setTime} variant="form" />
@@ -212,6 +222,7 @@ const AddRow = forwardRef<AddRowHandle, AddRowProps>(function AddRow(
           <select
             aria-label="Event type"
             value={eventType}
+            disabled={controlsDisabled}
             onChange={(e) => { setEventType(e.target.value as EliminationEventType); setSubtype(''); }}
           >
             {EVENT_TYPES.map((t) => (
@@ -222,6 +233,7 @@ const AddRow = forwardRef<AddRowHandle, AddRowProps>(function AddRow(
             <select
               aria-label="Subtype"
               value={subtype}
+              disabled={controlsDisabled}
               onChange={(e) => setSubtype(e.target.value)}
             >
               <option value="">— subtype —</option>
@@ -243,6 +255,7 @@ const AddRow = forwardRef<AddRowHandle, AddRowProps>(function AddRow(
           aria-label="Note"
           placeholder="Optional"
           value={note}
+          disabled={controlsDisabled}
           onChange={(e) => setNote(e.target.value)}
           onKeyDown={(e) => { if (e.key === 'Enter') handleAdd(); }}
         />
@@ -250,10 +263,10 @@ const AddRow = forwardRef<AddRowHandle, AddRowProps>(function AddRow(
       <button
         className="button"
         type="button"
-        disabled={saving}
+        disabled={controlsDisabled}
         onClick={handleAdd}
       >
-        {isPaused ? 'Offline…' : saving ? 'Saving…' : 'Log visit'}
+        {disabled ? 'Editing…' : isPaused ? 'Offline…' : saving ? 'Saving…' : 'Log visit'}
       </button>
     </div>
   );
@@ -270,9 +283,20 @@ interface RecordRowProps {
   deleting: boolean;
   deletingPaused: boolean;
   canWrite: boolean;
+  onEditingChange?: (editing: boolean) => void;
 }
 
-function RecordRow({ record, onSave, onDelete, saving, savingPaused, deleting, deletingPaused, canWrite }: RecordRowProps) {
+function RecordRow({
+  record,
+  onSave,
+  onDelete,
+  saving,
+  savingPaused,
+  deleting,
+  deletingPaused,
+  canWrite,
+  onEditingChange,
+}: RecordRowProps) {
   const formatTime = useFormatTime();
   const [editing, setEditing] = useState(false);
   const [time, setTime] = useState('');
@@ -283,13 +307,18 @@ function RecordRow({ record, onSave, onDelete, saving, savingPaused, deleting, d
 
   const availableSubtypes = subtypesFor(eventType);
 
+  function setEditingState(next: boolean) {
+    setEditing(next);
+    onEditingChange?.(next);
+  }
+
   function startEdit() {
     setTime(record.occurred_at.slice(11, 16));
     setEventType(record.event_type);
     setSubtype(record.subtype ?? '');
     setDurationDigits(record.duration_seconds != null ? secsToDigits(record.duration_seconds) : '');
     setNote(record.note ?? '');
-    setEditing(true);
+    setEditingState(true);
   }
 
   function commitEdit() {
@@ -301,7 +330,7 @@ function RecordRow({ record, onSave, onDelete, saving, savingPaused, deleting, d
       duration_seconds: digitsToSecs(durationDigits),
       note: note.trim() || null,
     });
-    setEditing(false);
+    setEditingState(false);
   }
 
   if (editing) {
@@ -344,13 +373,13 @@ function RecordRow({ record, onSave, onDelete, saving, savingPaused, deleting, d
               placeholder="note (optional)"
               value={note}
               onChange={(e) => setNote(e.target.value)}
-              onKeyDown={(e) => { if (e.key === 'Enter') commitEdit(); if (e.key === 'Escape') setEditing(false); }}
+              onKeyDown={(e) => { if (e.key === 'Enter') commitEdit(); if (e.key === 'Escape') setEditingState(false); }}
             />
             <div className="entry-row-actions">
               <button className="icon-button" type="button" title="Save" aria-label="Save" disabled={saving} onClick={commitEdit}>
                 {savingPaused ? '⏸' : saving ? '…' : '✓'}
               </button>
-              <button className="icon-button" type="button" title="Cancel" aria-label="Cancel" onClick={() => setEditing(false)}>
+              <button className="icon-button" type="button" title="Cancel" aria-label="Cancel" onClick={() => setEditingState(false)}>
                 ✕
               </button>
             </div>
@@ -404,6 +433,7 @@ export function EliminationDayPanel({ date, petId }: EliminationDayPanelProps) {
   const { canWrite } = usePermissions();
   const [noteDraft, setNoteDraft] = useState('');
   const [noteSaved, setNoteSaved] = useState(false);
+  const [editingRecordId, setEditingRecordId] = useState<string | null>(null);
   const addRowRef = useRef<AddRowHandle>(null);
   const formatDate = useFormatDate();
 
@@ -515,11 +545,12 @@ export function EliminationDayPanel({ date, petId }: EliminationDayPanelProps) {
             petId={petId}
             saving={createMutation.isPending}
             isPaused={createMutation.isPaused}
+            disabled={editingRecordId != null || updateMutation.isPending}
             onSave={(payload) => createMutation.mutate(payload)}
           />
         )}
 
-        {showCategorizeBar && latestRecord && (
+        {showCategorizeBar && latestRecord && editingRecordId == null && (
           <CategorizeBar
             pending={updateMutation.isPending && updateMutation.variables?.id === latestRecord.id}
             onCategorize={(eventType) =>
@@ -542,6 +573,7 @@ export function EliminationDayPanel({ date, petId }: EliminationDayPanelProps) {
                 deletingPaused={deleteMutation.isPaused && deleteMutation.variables === record.id}
                 onSave={(id, payload) => updateMutation.mutate({ id, payload })}
                 onDelete={(id) => deleteMutation.mutate(id)}
+                onEditingChange={(editing) => setEditingRecordId(editing ? record.id : null)}
                 canWrite={canWrite}
               />
             ))}

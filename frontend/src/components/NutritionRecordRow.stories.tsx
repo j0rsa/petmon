@@ -64,9 +64,17 @@ export const Editing: Story = {
   parameters: {
     docs: {
       description: {
-        story: 'Edit time, category, amount, and note. Use Move to yesterday or Move to tomorrow to shift the record one day while keeping the same time and notes.',
+        story:
+          'Edit time, category, amount, and note. Move-day actions use compact captions ⬅️🗓️ / ➡️🗓️ (full “Move to yesterday/tomorrow” remains the accessible name).',
       },
     },
+  },
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    const yesterday = canvas.getByRole('button', { name: 'Move to yesterday' });
+    const tomorrow = canvas.getByRole('button', { name: 'Move to tomorrow' });
+    await expect(yesterday).toHaveTextContent('⬅️🗓️');
+    await expect(tomorrow).toHaveTextContent('➡️🗓️');
   },
 };
 
@@ -75,6 +83,13 @@ export const EditingSavingMoveDate: Story = {
     record: editingRecord,
     defaultEditing: true,
     saving: true,
+  },
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    await expect(canvas.getByRole('button', { name: 'Move to yesterday' })).toBeDisabled();
+    await expect(canvas.getByRole('button', { name: 'Move to tomorrow' })).toBeDisabled();
+    await expect(canvas.getByRole('button', { name: 'Move to yesterday' })).toHaveTextContent('⬅️🗓️');
+    await expect(canvas.getByRole('button', { name: 'Move to tomorrow' })).toHaveTextContent('➡️🗓️');
   },
 };
 
@@ -85,12 +100,32 @@ export const EditingSavingPausedMoveDate: Story = {
     saving: true,
     savingPaused: true,
   },
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    await expect(canvas.getByRole('button', { name: 'Move to yesterday' })).toHaveAttribute(
+      'title',
+      'Offline…',
+    );
+    await expect(canvas.getByRole('button', { name: 'Move to tomorrow' })).toHaveAttribute(
+      'title',
+      'Offline…',
+    );
+    await expect(canvas.getByRole('button', { name: 'Move to yesterday' })).toHaveTextContent('⬅️🗓️');
+  },
 };
 
+/** Mobile width: compact ⬅️🗓️ / ➡️🗓️ captions keep the edit action row usable. */
 export const EditingNarrow: Story = {
   ...Editing,
   parameters: {
+    ...Editing.parameters,
     viewport: { defaultViewport: 'mobile1' },
+    docs: {
+      description: {
+        story:
+          'Mobile edit form: move-day buttons stay compact (⬅️🗓️ / ➡️🗓️) instead of wrapping long “Move to yesterday/tomorrow” labels.',
+      },
+    },
   },
   decorators: [
     (Story) => (

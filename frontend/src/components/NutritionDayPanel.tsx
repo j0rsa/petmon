@@ -245,20 +245,24 @@ function RecordRow({ record, onSave, onDelete, saving, savingPaused, deleting, d
           </div>
           <div className="record-entry-form__actions">
             <button
-              className="button button-secondary button-compact"
+              className="button button-secondary button-compact record-entry-form__move-day"
               type="button"
               disabled={saving}
+              title={savingPaused ? 'Offline…' : 'Move to yesterday'}
+              aria-label="Move to yesterday"
               onClick={() => commitMoveDate(-1)}
             >
-              {savingPaused ? 'Offline…' : saving ? 'Saving…' : 'Move to yesterday'}
+              ⬅️🗓️
             </button>
             <button
-              className="button button-secondary button-compact"
+              className="button button-secondary button-compact record-entry-form__move-day"
               type="button"
               disabled={saving}
+              title={savingPaused ? 'Offline…' : 'Move to tomorrow'}
+              aria-label="Move to tomorrow"
               onClick={() => commitMoveDate(1)}
             >
-              {savingPaused ? 'Offline…' : saving ? 'Saving…' : 'Move to tomorrow'}
+              ➡️🗓️
             </button>
             <button
               className="button button-compact"
