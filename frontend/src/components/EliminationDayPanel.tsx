@@ -550,9 +550,9 @@ export function EliminationDayPanel({ date, petId }: EliminationDayPanelProps) {
           />
         )}
 
-        {showCategorizeBar && latestRecord && editingRecordId == null && !updateMutation.isPending && (
+        {showCategorizeBar && latestRecord && editingRecordId == null && (
           <CategorizeBar
-            pending={false}
+            pending={updateMutation.isPending && updateMutation.variables?.id === latestRecord.id}
             onCategorize={(eventType) =>
               updateMutation.mutate({ id: latestRecord.id, payload: { event_type: eventType } })
             }
