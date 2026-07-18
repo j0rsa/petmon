@@ -132,7 +132,7 @@ pub async fn mcp_handler(
                 .and_then(|v| v.as_str())
                 .map(str::to_owned);
             match uri {
-                Some(uri) => super::resources::read_resource(&state.pool, &uri).await,
+                Some(uri) => super::resources::read_resource(&state.pool, &uri, state.timezone).await,
                 None => Err(crate::error::AppError::BadRequest(
                     "uri required".to_string(),
                 )),

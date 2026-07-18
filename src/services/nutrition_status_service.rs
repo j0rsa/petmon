@@ -41,11 +41,13 @@ pub async fn get_status(
 
     let intake = accumulate_intake(&records, &as_of);
     let schedule = build_schedule_status(&schedules, at_minutes, intake.direct_liquid_ml);
+    let on_track = schedule.as_ref().map(|s| s.delta_ml >= 0.0);
 
     Ok(NutritionStatus {
         pet_id,
         local_date,
         as_of,
+        on_track,
         intake,
         schedule,
     })
@@ -143,5 +145,34 @@ fn build_schedule_status(
         daily_min_ml,
         daily_max_ml,
         delta_ml: direct_liquid_ml - expected_ml,
+    })
+}
+
+pub fn on_track_summary(status: &NutritionStatus) -> serde_json::Value {
+    use serde_json::json;
+
+    let summary = match (status.on_track, status.schedule.as_ref()) {
+        (Some(true), Some(schedule)) if schedule.delta_ml > 0.0 => format!(
+            "{:.0} ml ahead of the liquid schedule",
+            schedule.delta_ml
+        ),
+        (Some(true), Some(_)) => "On track with the liquid schedule".to_string(),
+        (Some(false), Some(schedule)) => format!(
+            "{:.0} ml behind the liquid schedule",
+            schedule.delta_ml.abs()
+        ),
+        (None, _) => "No liquid schedule configured".to_string(),
+        _ => "Unable to determine on-track status".to_string(),
+    };
+
+    json!({
+        "pet_id": status.pet_id,
+        "local_date": status.local_date,
+        "as_of": status.as_of,
+        "on_track": status.on_track,
+        "direct_liquid_ml": status.intake.direct_liquid_ml,
+        "expected_ml": status.schedule.as_ref().map(|schedule| schedule.expected_ml),
+        "delta_ml": status.schedule.as_ref().map(|schedule| schedule.delta_ml),
+        "summary": summary,
     })
 }

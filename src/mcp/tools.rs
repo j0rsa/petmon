@@ -248,13 +248,13 @@ fn tool_list() -> Value {
             // ── Nutrition context (high-level summary) ───────────────────────
             {
                 "name": "pets/nutrition-context",
-                "description": "Returns a complete nutrition context for a single pet in one call: pet profile, today's records and totals, active feeding schedule, and a 7-day trend summary. Use this as the starting point for any question about a pet's nutrition — it gives enough context to answer 'is the pet on track today?', 'what's missing vs the schedule?', and 'how does today compare to the past week?' without additional tool calls.",
+                "description": "Returns nutrition context for a single pet: profile, today's records, active schedules, 7-day trend, and a precomputed status block (on_track, cumulative intake vs schedule as of now). Prefer nutrition/on-track for a simple on-track yes/no; use this when you also need records, schedule windows, or weekly trend.",
                 "inputSchema": {
                     "type": "object",
                     "required": ["pet_id"],
                     "properties": {
                         "pet_id": { "type": "string", "format": "uuid", "description": "UUID of the pet" },
-                        "today":  { "type": "string", "format": "date", "description": "Override today's date (YYYY-MM-DD). Defaults to server UTC date." }
+                        "today":  { "type": "string", "format": "date", "description": "Override today's date (YYYY-MM-DD). Defaults to server timezone date." }
                     }
                 }
             },
@@ -302,7 +302,19 @@ fn tool_list() -> Value {
             },
             {
                 "name": "nutrition/status",
-                "description": "Get cumulative nutrition intake and liquid schedule expectations for a pet as of a point in time. When ts is omitted, uses the current server time.",
+                "description": "Get cumulative nutrition intake and liquid schedule expectations for a pet as of a point in time. Returns on_track, delta_ml, and expected_ml. When ts is omitted, uses the current server time.",
+                "inputSchema": {
+                    "type": "object",
+                    "required": ["pet_id"],
+                    "properties": {
+                        "pet_id": { "type": "string", "format": "uuid" },
+                        "ts":     { "type": "string", "description": "As-of timestamp (RFC3339 or YYYY-MM-DDTHH:MM:SS). Defaults to now." }
+                    }
+                }
+            },
+            {
+                "name": "nutrition/on-track",
+                "description": "Quick on-track check for a pet's liquid intake vs the active schedule as of now. Returns on_track (boolean|null), delta_ml, expected_ml, direct_liquid_ml, and a plain-language summary. Use this first for questions like 'is the pet still on track?'",
                 "inputSchema": {
                     "type": "object",
                     "required": ["pet_id"],
@@ -696,14 +708,16 @@ pub async fn dispatch(
             let today = params["today"]
                 .as_str()
                 .map(str::to_owned)
-                .unwrap_or_else(|| Utc::now().date_naive().to_string());
+                .unwrap_or_else(|| Utc::now().with_timezone(&timezone).date_naive().to_string());
             let week_from = {
                 let d = chrono::NaiveDate::parse_from_str(&today, "%Y-%m-%d")
                     .map_err(|_| AppError::BadRequest("invalid today date".to_string()))?;
                 (d - chrono::Duration::days(6)).to_string()
             };
+            let now_time = Utc::now().with_timezone(&timezone).format("%H:%M:%S").to_string();
+            let status_ts = format!("{today}T{now_time}");
 
-            let (pet, today_summary, schedules, trend) = tokio::try_join!(
+            let (pet, today_summary, schedules, trend, status) = tokio::try_join!(
                 pet_service::get(pool, pet_id),
                 day_service::get_day_summary(pool, &today, Some(pet_id)),
                 nutrition_schedule_service::list(pool, Some(pet_id)),
@@ -714,6 +728,7 @@ pub async fn dispatch(
                     Some(pet_id),
                     None
                 ),
+                nutrition_status_service::get_status(pool, pet_id, Some(&status_ts), timezone),
             )?;
 
             let active_schedules: Vec<_> = schedules.iter().filter(|s| s.active).collect();
@@ -721,6 +736,7 @@ pub async fn dispatch(
             Ok(json!({
                 "pet": pet,
                 "today": today,
+                "status": status,
                 "today_summary": today_summary,
                 "active_schedules": active_schedules,
                 "trend_7d": trend
@@ -773,6 +789,13 @@ pub async fn dispatch(
             let status =
                 nutrition_status_service::get_status(pool, pet_id, ts, timezone).await?;
             Ok(json!(status))
+        }
+        "nutrition/on-track" => {
+            let pet_id = require_uuid(&params, "pet_id")?;
+            let ts = params["ts"].as_str();
+            let status =
+                nutrition_status_service::get_status(pool, pet_id, ts, timezone).await?;
+            Ok(nutrition_status_service::on_track_summary(&status))
         }
 
         // ── Nutrition schedules ───────────────────────────────────────────────

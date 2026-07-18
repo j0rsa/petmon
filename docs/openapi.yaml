@@ -2311,6 +2311,10 @@ components:
         as_of:
           type: string
           description: Timestamp used for cumulative intake and schedule projection (YYYY-MM-DDTHH:MM:SS in configured timezone)
+        on_track:
+          type: boolean
+          nullable: true
+          description: True when direct liquid intake meets or exceeds schedule expectation; false when behind; null when no liquid schedule
         intake:
           $ref: '#/components/schemas/NutritionStatusIntake'
         schedule:
@@ -2321,6 +2325,7 @@ components:
         - pet_id
         - local_date
         - as_of
+        - on_track
         - intake
 
     NutritionStatusIntake:

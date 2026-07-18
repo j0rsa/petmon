@@ -107,7 +107,7 @@ petmon exposes a **stateless JSON-RPC 2.0** MCP endpoint at `POST /mcp`, protect
 
 | Tool | Returns |
 |------|---------|
-| `pets/nutrition-context` | Pet profile + today's nutrition summary + active schedules + 7-day trend |
+| `pets/nutrition-context` | Pet profile + precomputed on-track status + today's records + active schedules + 7-day trend |
 | `pets/elimination-context` | Pet profile + today's wee/poop/vomit counts + 7-day trend |
 | `pets/health-context` | Pet profile + last 10 weight records + 30-day stats + last 10 wellbeing check-ins (level + notes) |
 
@@ -116,7 +116,7 @@ petmon exposes a **stateless JSON-RPC 2.0** MCP endpoint at `POST /mcp`, protect
 | Prompt | Purpose |
 |--------|---------|
 | `daily-summary` | Full daily snapshot across nutrition, toileting, and health |
-| `nutrition-check` | Is intake on track today vs schedule and 7-day trend? |
+| `nutrition-check` | Is liquid intake on track right now vs schedule? (uses `nutrition/on-track`) |
 | `toileting-check` | Today's wee/poop/vomit and recent trends |
 | `health-check` | Weight trend and recent wellbeing check-ins |
 | `log-intake` | Log water, liquids, or food for a pet |
@@ -127,6 +127,8 @@ petmon exposes a **stateless JSON-RPC 2.0** MCP endpoint at `POST /mcp`, protect
 `pets/list`, `pets/get`, `pets/create`, `pets/update`
 
 `nutrition/records/list`, `nutrition/records/get`, `nutrition/records/create`, `nutrition/records/batch-create`, `nutrition/records/update`, `nutrition/records/delete`
+
+`nutrition/status`, `nutrition/on-track`
 
 `nutrition/analytics/daily-totals`, `nutrition/analytics/range-summary`, `nutrition/analytics/best-fluid-day`
 

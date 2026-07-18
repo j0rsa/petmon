@@ -8,6 +8,8 @@ pub struct NutritionStatus {
     pub pet_id: Uuid,
     pub local_date: String,
     pub as_of: String,
+    /// `true` when direct liquid intake meets or exceeds schedule expectation; `false` when behind; `null` when no liquid schedule.
+    pub on_track: Option<bool>,
     pub intake: NutritionStatusIntake,
     pub schedule: Option<NutritionStatusSchedule>,
 }

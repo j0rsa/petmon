@@ -970,6 +970,7 @@ async fn nutrition_status_as_of_timestamp() {
 
     assert_eq!(body["local_date"].as_str(), Some("2026-07-18"));
     assert_eq!(body["as_of"].as_str(), Some("2026-07-18T13:00:00"));
+    assert_eq!(body["on_track"].as_bool(), Some(false));
     assert_eq!(body["intake"]["liquids_ml"].as_f64(), Some(60.0));
     assert_eq!(body["intake"]["water_ml"].as_f64(), Some(20.0));
     assert_eq!(body["intake"]["direct_liquid_ml"].as_f64(), Some(80.0));
@@ -990,6 +991,81 @@ async fn nutrition_status_requires_pet_id() {
         .to_request();
     let resp = test::call_service(&app, req).await;
     assert_eq!(resp.status(), 400);
+}
+
+#[actix_web::test]
+async fn mcp_nutrition_on_track_returns_summary() {
+    let pool = setup_pool().await;
+    let raw = "pm_api_mcp_ontrack_000000000000000000000000000000000000000000000000";
+    seed_token(&pool, raw, "mcp").await;
+    let state = web::Data::new(AppState::new(pool, true, None, None));
+    let app = build_full_app!(state);
+
+    let create_pet = test::TestRequest::post()
+        .uri("/api/v1/pets")
+        .set_json(serde_json::json!({ "name": "McpOnTrack", "species": "cat" }))
+        .to_request();
+    let resp = test::call_service(&app, create_pet).await;
+    assert_eq!(resp.status(), 201);
+    let pet: serde_json::Value = test::read_body_json(resp).await;
+    let pet_id = pet["id"].as_str().unwrap();
+
+    let create_schedule = test::TestRequest::post()
+        .uri("/api/v1/nutrition/schedules")
+        .set_json(serde_json::json!({
+            "pet_id": pet_id,
+            "name": "Hydration",
+            "rules": {
+                "type": "liquid",
+                "windows": [
+                    { "from": "08:00", "to": "10:00", "min": 10, "max": 100 }
+                ]
+            }
+        }))
+        .to_request();
+    assert_eq!(test::call_service(&app, create_schedule).await.status(), 201);
+
+    let create_record = test::TestRequest::post()
+        .uri("/api/v1/nutrition/records")
+        .set_json(serde_json::json!({
+            "pet_id": pet_id,
+            "category": "liquids",
+            "amount": 120,
+            "unit": "ml",
+            "occurred_at": "2026-07-18T09:00:00",
+            "local_date": "2026-07-18"
+        }))
+        .to_request();
+    assert_eq!(test::call_service(&app, create_record).await.status(), 201);
+
+    let resp = test::call_service(
+        &app,
+        test::TestRequest::post()
+            .uri("/mcp")
+            .insert_header(("Authorization", format!("Bearer {raw}")))
+            .set_json(serde_json::json!({
+                "jsonrpc": "2.0",
+                "id": 1,
+                "method": "tools/call",
+                "params": {
+                    "name": "nutrition/on-track",
+                    "arguments": {
+                        "pet_id": pet_id,
+                        "ts": "2026-07-18T09:30:00"
+                    }
+                }
+            }))
+            .to_request(),
+    )
+    .await;
+    assert_eq!(resp.status(), 200);
+    let body: serde_json::Value = test::read_body_json(resp).await;
+    let text = body["result"]["content"][0]["text"].as_str().expect("tool text");
+    let summary: serde_json::Value = serde_json::from_str(text).expect("tool json");
+    assert_eq!(summary["on_track"].as_bool(), Some(true));
+    assert_eq!(summary["direct_liquid_ml"].as_f64(), Some(120.0));
+    assert_eq!(summary["expected_ml"].as_f64(), Some(100.0));
+    assert!(summary["summary"].as_str().unwrap().contains("ahead"));
 }
 
 // ── Elimination + weight combined ────────────────────────────────────────────
