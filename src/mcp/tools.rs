@@ -12,8 +12,8 @@ use crate::domain::weight::{CreateWeightRecord, WeightRecordFilters};
 use crate::error::{AppError, AppResult};
 use crate::services::{
     day_service, elimination_analytics_service, elimination_record_service, health_state_service,
-    nutrition_analytics_service, nutrition_record_service, nutrition_schedule_service, pet_service,
-    weight_service,
+    nutrition_analytics_service, nutrition_record_service, nutrition_schedule_service,
+    nutrition_status_service, pet_service, weight_service,
 };
 use chrono::Utc;
 use chrono_tz::Tz;
@@ -297,6 +297,18 @@ fn tool_list() -> Value {
                     "properties": {
                         "exclude_date": { "type": "string", "format": "date", "description": "Exclude this date (usually today)" },
                         "pet_id":       { "type": "string", "format": "uuid" }
+                    }
+                }
+            },
+            {
+                "name": "nutrition/status",
+                "description": "Get cumulative nutrition intake and liquid schedule expectations for a pet as of a point in time. When ts is omitted, uses the current server time.",
+                "inputSchema": {
+                    "type": "object",
+                    "required": ["pet_id"],
+                    "properties": {
+                        "pet_id": { "type": "string", "format": "uuid" },
+                        "ts":     { "type": "string", "description": "As-of timestamp (RFC3339 or YYYY-MM-DDTHH:MM:SS). Defaults to now." }
                     }
                 }
             },
@@ -754,6 +766,13 @@ pub async fn dispatch(
             let result =
                 nutrition_analytics_service::best_fluid_day(pool, pet_id, exclude_date).await?;
             Ok(json!(result))
+        }
+        "nutrition/status" => {
+            let pet_id = require_uuid(&params, "pet_id")?;
+            let ts = params["ts"].as_str();
+            let status =
+                nutrition_status_service::get_status(pool, pet_id, ts, timezone).await?;
+            Ok(json!(status))
         }
 
         // ── Nutrition schedules ───────────────────────────────────────────────

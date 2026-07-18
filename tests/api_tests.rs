@@ -914,6 +914,84 @@ async fn nutrition_schedule_rejects_legacy_array_rules() {
     assert_eq!(resp.status(), 422);
 }
 
+/// GET /nutrition/status returns cumulative intake and schedule expectations as of ts.
+#[actix_web::test]
+async fn nutrition_status_as_of_timestamp() {
+    let (app, _state) = build_dev_app!();
+    let pet_id = api_create_pet!(&app, "NutritionStatusTest");
+
+    let req = test::TestRequest::post()
+        .uri("/api/v1/nutrition/schedules")
+        .set_json(serde_json::json!({
+            "pet_id": pet_id,
+            "name": "Hydration",
+            "rules": {
+                "type": "liquid",
+                "windows": [
+                    { "from": "08:00", "to": "10:00", "min": 10, "max": 100, "note": "morning" },
+                    { "from": "12:00", "to": "14:00", "min": 20, "max": 50, "note": "midday" }
+                ]
+            }
+        }))
+        .to_request();
+    let resp = test::call_service(&app, req).await;
+    assert_eq!(resp.status(), 201);
+    let schedule: serde_json::Value = test::read_body_json(resp).await;
+    let schedule_id = schedule["id"].as_str().unwrap();
+
+    for (time, category, amount) in [
+        ("2026-07-18T08:30:00", "liquids", 60.0),
+        ("2026-07-18T11:00:00", "water", 20.0),
+        ("2026-07-18T15:00:00", "liquids", 999.0),
+    ] {
+        let req = test::TestRequest::post()
+            .uri("/api/v1/nutrition/records")
+            .set_json(serde_json::json!({
+                "pet_id": pet_id,
+                "category": category,
+                "amount": amount,
+                "unit": if category == "water" { "ml" } else { "ml" },
+                "occurred_at": time,
+                "local_date": "2026-07-18"
+            }))
+            .to_request();
+        let resp = test::call_service(&app, req).await;
+        assert_eq!(resp.status(), 201, "failed to create record at {time}");
+    }
+
+    let req = test::TestRequest::get()
+        .uri(&format!(
+            "/api/v1/nutrition/status?pet_id={pet_id}&ts=2026-07-18T13:00:00"
+        ))
+        .to_request();
+    let resp = test::call_service(&app, req).await;
+    assert_eq!(resp.status(), 200);
+    let body: serde_json::Value = test::read_body_json(resp).await;
+
+    assert_eq!(body["local_date"].as_str(), Some("2026-07-18"));
+    assert_eq!(body["as_of"].as_str(), Some("2026-07-18T13:00:00"));
+    assert_eq!(body["intake"]["liquids_ml"].as_f64(), Some(60.0));
+    assert_eq!(body["intake"]["water_ml"].as_f64(), Some(20.0));
+    assert_eq!(body["intake"]["direct_liquid_ml"].as_f64(), Some(80.0));
+
+    let schedule_body = &body["schedule"];
+    assert_eq!(schedule_body["schedule_id"].as_str(), Some(schedule_id));
+    assert_eq!(schedule_body["expected_ml"].as_f64(), Some(150.0));
+    assert_eq!(schedule_body["daily_min_ml"].as_f64(), Some(30.0));
+    assert_eq!(schedule_body["daily_max_ml"].as_f64(), Some(150.0));
+    assert_eq!(schedule_body["delta_ml"].as_f64(), Some(-70.0));
+}
+
+#[actix_web::test]
+async fn nutrition_status_requires_pet_id() {
+    let (app, _state) = build_dev_app!();
+    let req = test::TestRequest::get()
+        .uri("/api/v1/nutrition/status")
+        .to_request();
+    let resp = test::call_service(&app, req).await;
+    assert_eq!(resp.status(), 400);
+}
+
 // ── Elimination + weight combined ────────────────────────────────────────────
 
 /// POST /elimination/records/with-weight creates both records atomically and
