@@ -714,7 +714,10 @@ pub async fn dispatch(
                     .map_err(|_| AppError::BadRequest("invalid today date".to_string()))?;
                 (d - chrono::Duration::days(6)).to_string()
             };
-            let now_time = Utc::now().with_timezone(&timezone).format("%H:%M:%S").to_string();
+            let now_time = Utc::now()
+                .with_timezone(&timezone)
+                .format("%H:%M:%S")
+                .to_string();
             let status_ts = format!("{today}T{now_time}");
 
             let (pet, today_summary, schedules, trend, status) = tokio::try_join!(
@@ -786,15 +789,13 @@ pub async fn dispatch(
         "nutrition/status" => {
             let pet_id = require_uuid(&params, "pet_id")?;
             let ts = params["ts"].as_str();
-            let status =
-                nutrition_status_service::get_status(pool, pet_id, ts, timezone).await?;
+            let status = nutrition_status_service::get_status(pool, pet_id, ts, timezone).await?;
             Ok(json!(status))
         }
         "nutrition/on-track" => {
             let pet_id = require_uuid(&params, "pet_id")?;
             let ts = params["ts"].as_str();
-            let status =
-                nutrition_status_service::get_status(pool, pet_id, ts, timezone).await?;
+            let status = nutrition_status_service::get_status(pool, pet_id, ts, timezone).await?;
             Ok(nutrition_status_service::on_track_summary(&status))
         }
 

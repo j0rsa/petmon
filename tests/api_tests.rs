@@ -950,7 +950,7 @@ async fn nutrition_status_as_of_timestamp() {
                 "pet_id": pet_id,
                 "category": category,
                 "amount": amount,
-                "unit": if category == "water" { "ml" } else { "ml" },
+                "unit": "ml",
                 "occurred_at": time,
                 "local_date": "2026-07-18"
             }))
@@ -1023,7 +1023,10 @@ async fn mcp_nutrition_on_track_returns_summary() {
             }
         }))
         .to_request();
-    assert_eq!(test::call_service(&app, create_schedule).await.status(), 201);
+    assert_eq!(
+        test::call_service(&app, create_schedule).await.status(),
+        201
+    );
 
     let create_record = test::TestRequest::post()
         .uri("/api/v1/nutrition/records")
@@ -1060,7 +1063,9 @@ async fn mcp_nutrition_on_track_returns_summary() {
     .await;
     assert_eq!(resp.status(), 200);
     let body: serde_json::Value = test::read_body_json(resp).await;
-    let text = body["result"]["content"][0]["text"].as_str().expect("tool text");
+    let text = body["result"]["content"][0]["text"]
+        .as_str()
+        .expect("tool text");
     let summary: serde_json::Value = serde_json::from_str(text).expect("tool json");
     assert_eq!(summary["on_track"].as_bool(), Some(true));
     assert_eq!(summary["direct_liquid_ml"].as_f64(), Some(120.0));

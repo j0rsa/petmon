@@ -1,8 +1,8 @@
 use crate::domain::nutrition_record::{NutritionCategory, NutritionRecordFilters};
 use crate::domain::nutrition_schedule::NutritionSchedule;
 use crate::domain::nutrition_status::{
-    parse_liquid_schedule_windows, schedule_projection_at, NutritionStatus,
-    NutritionStatusIntake, NutritionStatusSchedule, WET_FOOD_FLUID_RATIO,
+    parse_liquid_schedule_windows, schedule_projection_at, NutritionStatus, NutritionStatusIntake,
+    NutritionStatusSchedule, WET_FOOD_FLUID_RATIO,
 };
 use crate::error::{AppError, AppResult};
 use crate::repo::{nutrition_records, nutrition_schedules, pets};
@@ -80,7 +80,10 @@ fn parse_ts(value: &str, timezone: Tz) -> AppResult<DateTime<Tz>> {
         .ok_or_else(|| AppError::BadRequest(format!("ambiguous local timestamp: {value}")))
 }
 
-fn accumulate_intake(records: &[crate::domain::nutrition_record::NutritionRecord], as_of: &str) -> NutritionStatusIntake {
+fn accumulate_intake(
+    records: &[crate::domain::nutrition_record::NutritionRecord],
+    as_of: &str,
+) -> NutritionStatusIntake {
     let mut liquids_ml = 0.0;
     let mut water_ml = 0.0;
     let mut wet_food_g = 0.0;
@@ -113,7 +116,7 @@ fn accumulate_intake(records: &[crate::domain::nutrition_record::NutritionRecord
     }
 }
 
-fn select_liquid_schedule<'a>(schedules: &'a [NutritionSchedule]) -> Option<&'a NutritionSchedule> {
+fn select_liquid_schedule(schedules: &[NutritionSchedule]) -> Option<&NutritionSchedule> {
     schedules
         .iter()
         .find(|schedule| schedule.active && schedule.rules_json.contains("\"type\":\"liquid\""))
@@ -135,8 +138,7 @@ fn build_schedule_status(
         return None;
     }
 
-    let (expected_ml, daily_min_ml, daily_max_ml) =
-        schedule_projection_at(&windows, at_minutes);
+    let (expected_ml, daily_min_ml, daily_max_ml) = schedule_projection_at(&windows, at_minutes);
 
     Some(NutritionStatusSchedule {
         schedule_id: schedule.id.clone(),
@@ -152,10 +154,9 @@ pub fn on_track_summary(status: &NutritionStatus) -> serde_json::Value {
     use serde_json::json;
 
     let summary = match (status.on_track, status.schedule.as_ref()) {
-        (Some(true), Some(schedule)) if schedule.delta_ml > 0.0 => format!(
-            "{:.0} ml ahead of the liquid schedule",
-            schedule.delta_ml
-        ),
+        (Some(true), Some(schedule)) if schedule.delta_ml > 0.0 => {
+            format!("{:.0} ml ahead of the liquid schedule", schedule.delta_ml)
+        }
         (Some(true), Some(_)) => "On track with the liquid schedule".to_string(),
         (Some(false), Some(schedule)) => format!(
             "{:.0} ml behind the liquid schedule",

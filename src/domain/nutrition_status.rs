@@ -79,10 +79,7 @@ pub fn window_midpoint_minutes(from: &str, to: &str) -> Option<i32> {
 
 /// Cumulative schedule expectation at a time-of-day, matching the frontend
 /// `buildScheduleCurve` midpoint stepping logic.
-pub fn schedule_projection_at(
-    windows: &[ScheduleWindow],
-    at_minutes: i32,
-) -> (f64, f64, f64) {
+pub fn schedule_projection_at(windows: &[ScheduleWindow], at_minutes: i32) -> (f64, f64, f64) {
     let daily_min_ml: f64 = windows.iter().map(|w| w.min).sum();
     let daily_max_ml: f64 = windows.iter().map(|w| w.max).sum();
 
@@ -125,10 +122,22 @@ mod tests {
             },
         ];
 
-        assert_eq!(schedule_projection_at(&windows, 8 * 60 + 59), (0.0, 30.0, 150.0));
-        assert_eq!(schedule_projection_at(&windows, 9 * 60), (100.0, 30.0, 150.0));
-        assert_eq!(schedule_projection_at(&windows, 12 * 60 + 59), (100.0, 30.0, 150.0));
-        assert_eq!(schedule_projection_at(&windows, 13 * 60), (150.0, 30.0, 150.0));
+        assert_eq!(
+            schedule_projection_at(&windows, 8 * 60 + 59),
+            (0.0, 30.0, 150.0)
+        );
+        assert_eq!(
+            schedule_projection_at(&windows, 9 * 60),
+            (100.0, 30.0, 150.0)
+        );
+        assert_eq!(
+            schedule_projection_at(&windows, 12 * 60 + 59),
+            (100.0, 30.0, 150.0)
+        );
+        assert_eq!(
+            schedule_projection_at(&windows, 13 * 60),
+            (150.0, 30.0, 150.0)
+        );
     }
 
     #[test]

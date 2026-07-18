@@ -3,7 +3,9 @@ use sqlx::SqlitePool;
 use uuid::Uuid;
 
 use crate::error::{AppError, AppResult};
-use crate::services::{day_service, nutrition_schedule_service, nutrition_status_service, pet_service};
+use crate::services::{
+    day_service, nutrition_schedule_service, nutrition_status_service, pet_service,
+};
 
 /// Static resource descriptors — returned by `resources/list`.
 pub fn resource_list() -> Value {
@@ -44,7 +46,11 @@ pub fn resource_list() -> Value {
 }
 
 /// Resolve a `petmon://` URI to its content.
-pub async fn read_resource(pool: &SqlitePool, uri: &str, timezone: chrono_tz::Tz) -> AppResult<Value> {
+pub async fn read_resource(
+    pool: &SqlitePool,
+    uri: &str,
+    timezone: chrono_tz::Tz,
+) -> AppResult<Value> {
     // petmon://pets
     if uri == "petmon://pets" {
         let pets = pet_service::list(pool).await?;
