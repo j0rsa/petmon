@@ -1,10 +1,11 @@
-use chrono::Utc;
 use serde_json::{json, Value};
 use sqlx::SqlitePool;
 use uuid::Uuid;
 
 use crate::error::{AppError, AppResult};
-use crate::services::{day_service, nutrition_schedule_service, pet_service};
+use crate::services::{
+    day_service, nutrition_schedule_service, nutrition_status_service, pet_service,
+};
 
 /// Static resource descriptors — returned by `resources/list`.
 pub fn resource_list() -> Value {
@@ -25,7 +26,13 @@ pub fn resource_list() -> Value {
             {
                 "uri": "petmon://pets/{id}/today",
                 "name": "Pet — today's nutrition summary",
-                "description": "Today's nutrition records, category totals, and day note for a pet.",
+                "description": "Today's nutrition records, category totals, and day note for a pet. For on-track status vs schedule, use petmon://pets/{id}/nutrition-status instead.",
+                "mimeType": "application/json"
+            },
+            {
+                "uri": "petmon://pets/{id}/nutrition-status",
+                "name": "Pet — nutrition on-track status",
+                "description": "Precomputed on-track status: cumulative liquid intake vs schedule expectation as of now, including on_track and delta_ml.",
                 "mimeType": "application/json"
             },
             {
@@ -39,7 +46,11 @@ pub fn resource_list() -> Value {
 }
 
 /// Resolve a `petmon://` URI to its content.
-pub async fn read_resource(pool: &SqlitePool, uri: &str) -> AppResult<Value> {
+pub async fn read_resource(
+    pool: &SqlitePool,
+    uri: &str,
+    timezone: chrono_tz::Tz,
+) -> AppResult<Value> {
     // petmon://pets
     if uri == "petmon://pets" {
         let pets = pet_service::list(pool).await?;
@@ -73,12 +84,23 @@ pub async fn read_resource(pool: &SqlitePool, uri: &str) -> AppResult<Value> {
             }))
         }
         Some("today") => {
-            let today = Utc::now().date_naive().to_string();
+            let today = chrono::Utc::now()
+                .with_timezone(&timezone)
+                .date_naive()
+                .to_string();
             let summary = day_service::get_day_summary(pool, &today, Some(pet_id)).await?;
             Ok(json!({
                 "uri": uri,
                 "mimeType": "application/json",
                 "text": serde_json::to_string_pretty(&summary).unwrap_or_default()
+            }))
+        }
+        Some("nutrition-status") => {
+            let status = nutrition_status_service::get_status(pool, pet_id, None, timezone).await?;
+            Ok(json!({
+                "uri": uri,
+                "mimeType": "application/json",
+                "text": serde_json::to_string_pretty(&status).unwrap_or_default()
             }))
         }
         Some("schedules") => {

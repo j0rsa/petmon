@@ -30,7 +30,7 @@ Using petmon MCP tools, prepare a caregiver-friendly daily summary for \"{pet_na
 1. Resolve the pet via pets/list if you only have the name.
 2. Call pets/nutrition-context, pets/elimination-context, and pets/health-context for that pet.
 3. Summarize in plain language (not clinical jargon):
-   - Nutrition: fluid/food logged today vs active schedule; how today compares to the 7-day trend
+   - Nutrition: use status.on_track from pets/nutrition-context (or nutrition/on-track); note weekly trend if relevant
    - Toileting: today's wee/poop/vomit counts; anything unusual in the 7-day trend
    - Health: latest weight and 30-day trend; recent wellbeing check-ins and notes
 4. Flag anything worth watching; keep it concise.",
@@ -47,8 +47,8 @@ Using petmon MCP tools, prepare a caregiver-friendly daily summary for \"{pet_na
 Using petmon MCP tools, check nutrition for \"{pet_name}\":
 
 1. Resolve the pet via pets/list if needed.
-2. Call pets/nutrition-context for that pet.
-3. Answer for a pet owner: Is intake on track today? What's missing vs the active schedule? How does today compare to the past week?
+2. Call nutrition/on-track for that pet (or pets/nutrition-context if you also need weekly trend or today's records).
+3. Answer for a pet owner using status.on_track / summary: Is intake on track right now? How far ahead or behind the liquid schedule? Only mention weekly comparison if you fetched nutrition-context.
 Use casual terms (wet food, water, liquids) in your reply.",
     },
     PromptDef {
@@ -113,7 +113,7 @@ Using petmon MCP tools, log nutrition for \"{pet_name}\":
    - category: {category}
    - amount: {amount}
    - unit: ml for water/liquids, g for wet_food/dry_food
-3. Confirm what was logged and show today's updated totals via pets/nutrition-context.",
+3. Confirm what was logged and show updated on-track status via nutrition/on-track.",
     },
     PromptDef {
         name: "vet-handoff",

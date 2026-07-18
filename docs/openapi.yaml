@@ -1531,6 +1531,48 @@ paths:
         '404':
           $ref: '#/components/responses/NotFound'
 
+  /nutrition/status:
+    get:
+      tags:
+        - Nutrition Analytics
+      summary: Get nutrition status
+      x-required-scope: api_read
+      description: |
+        Returns cumulative nutrition intake and liquid schedule expectations for a pet as of a point in time.
+        When `ts` is omitted, the server uses the current time in the configured timezone.
+        Cumulative intake includes only records on the local date of `ts` whose `occurred_at` is at or before `ts`.
+        Schedule expectations use the active liquid schedule and step up at each window midpoint, matching the cumulative fluid chart.
+      parameters:
+        - name: pet_id
+          in: query
+          required: true
+          description: Pet UUID
+          schema:
+            type: string
+            format: uuid
+        - name: ts
+          in: query
+          required: false
+          description: As-of timestamp for cumulative intake and schedule projection. RFC3339 or naive local `YYYY-MM-DDTHH:MM:SS`. Defaults to now.
+          schema:
+            type: string
+            format: date-time
+      responses:
+        '200':
+          description: Nutrition status with cumulative intake and schedule expectations
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/NutritionStatus'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
   /nutrition/analytics/daily-totals:
     get:
       tags:
@@ -2112,7 +2154,7 @@ components:
 
     NutritionScheduleRules:
       type: object
-      description: Window-based feeding schedule. Daily targets are derived by summing window min/max values client-side.
+      description: Window-based feeding schedule. Daily targets are derived by summing window min/max values. Time-of-day expectations are available from GET /nutrition/status.
       properties:
         type:
           type: string
@@ -2254,6 +2296,110 @@ components:
           type: string
           nullable: true
           description: Optional day note
+
+    NutritionStatus:
+      type: object
+      properties:
+        pet_id:
+          type: string
+          format: uuid
+          description: Pet UUID
+        local_date:
+          type: string
+          format: date
+          description: Local calendar date used for intake records
+        as_of:
+          type: string
+          description: Timestamp used for cumulative intake and schedule projection (YYYY-MM-DDTHH:MM:SS in configured timezone)
+        on_track:
+          type: boolean
+          nullable: true
+          description: True when direct liquid intake meets or exceeds schedule expectation; false when behind; null when no liquid schedule
+        intake:
+          $ref: '#/components/schemas/NutritionStatusIntake'
+        schedule:
+          nullable: true
+          allOf:
+            - $ref: '#/components/schemas/NutritionStatusSchedule'
+      required:
+        - pet_id
+        - local_date
+        - as_of
+        - on_track
+        - intake
+
+    NutritionStatusIntake:
+      type: object
+      properties:
+        liquids_ml:
+          type: number
+          format: double
+          description: Cumulative `liquids` category intake as of the timestamp
+        water_ml:
+          type: number
+          format: double
+          description: Cumulative `water` category intake as of the timestamp
+        direct_liquid_ml:
+          type: number
+          format: double
+          description: Cumulative direct liquid intake (`liquids` + `water`), comparable to the liquid schedule
+        wet_food_g:
+          type: number
+          format: double
+          description: Cumulative wet food intake in grams
+        wet_food_fluid_ml:
+          type: number
+          format: double
+          description: Estimated fluid from wet food (wet_food_g × 0.77, rounded)
+        dry_food_g:
+          type: number
+          format: double
+          description: Cumulative dry food intake in grams
+        total_known_fluid_ml:
+          type: number
+          format: double
+          description: Total known fluid (direct liquid + wet food fluid)
+      required:
+        - liquids_ml
+        - water_ml
+        - direct_liquid_ml
+        - wet_food_g
+        - wet_food_fluid_ml
+        - dry_food_g
+        - total_known_fluid_ml
+
+    NutritionStatusSchedule:
+      type: object
+      properties:
+        schedule_id:
+          type: string
+          description: Active liquid schedule ID
+        schedule_name:
+          type: string
+          description: Active liquid schedule name
+        expected_ml:
+          type: number
+          format: double
+          description: Cumulative schedule expectation as of the timestamp (sum of window max values whose midpoint has passed)
+        daily_min_ml:
+          type: number
+          format: double
+          description: Sum of all window min values for the day
+        daily_max_ml:
+          type: number
+          format: double
+          description: Sum of all window max values for the day
+        delta_ml:
+          type: number
+          format: double
+          description: direct_liquid_ml minus expected_ml
+      required:
+        - schedule_id
+        - schedule_name
+        - expected_ml
+        - daily_min_ml
+        - daily_max_ml
+        - delta_ml
       required:
         - local_date
         - records
