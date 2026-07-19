@@ -23,6 +23,13 @@ struct AvgDurationByTypeRow {
     avg_duration: Option<f64>,
 }
 
+#[derive(Default, Clone, Copy)]
+struct TypeAvgDurations {
+    urination: Option<f64>,
+    defecation: Option<f64>,
+    general: Option<f64>,
+}
+
 #[tracing::instrument(skip(pool))]
 pub async fn daily_summaries(
     pool: &SqlitePool,
@@ -96,16 +103,13 @@ pub async fn daily_summaries(
         }
     }
     let type_dur_rows = tq.fetch_all(pool).await?;
-    let mut avg_duration_by_date_type: BTreeMap<String, (Option<f64>, Option<f64>, Option<f64>)> =
-        BTreeMap::new();
+    let mut avg_duration_by_date_type: BTreeMap<String, TypeAvgDurations> = BTreeMap::new();
     for row in type_dur_rows {
-        let entry = avg_duration_by_date_type
-            .entry(row.local_date)
-            .or_insert((None, None, None));
+        let entry = avg_duration_by_date_type.entry(row.local_date).or_default();
         match row.event_type.as_str() {
-            "urination" => entry.0 = row.avg_duration,
-            "defecation" => entry.1 = row.avg_duration,
-            "general" => entry.2 = row.avg_duration,
+            "urination" => entry.urination = row.avg_duration,
+            "defecation" => entry.defecation = row.avg_duration,
+            "general" => entry.general = row.avg_duration,
             _ => {}
         }
     }
@@ -131,14 +135,10 @@ pub async fn daily_summaries(
         .map(|(local_date, (urination, defecation, vomit, general))| {
             let total_count = urination + defecation + vomit + general;
             let avg_duration_seconds = avg_duration_by_date.get(&local_date).copied();
-            let (
-                urination_avg_duration_seconds,
-                defecation_avg_duration_seconds,
-                general_avg_duration_seconds,
-            ) = avg_duration_by_date_type
+            let type_durations = avg_duration_by_date_type
                 .get(&local_date)
                 .copied()
-                .unwrap_or((None, None, None));
+                .unwrap_or_default();
             EliminationDailySummary {
                 local_date,
                 pet_id: pet_id_owned.clone(),
@@ -149,9 +149,9 @@ pub async fn daily_summaries(
                 general_count: general,
                 has_vomit: vomit > 0,
                 avg_duration_seconds,
-                urination_avg_duration_seconds,
-                defecation_avg_duration_seconds,
-                general_avg_duration_seconds,
+                urination_avg_duration_seconds: type_durations.urination,
+                defecation_avg_duration_seconds: type_durations.defecation,
+                general_avg_duration_seconds: type_durations.general,
             }
         })
         .collect();
