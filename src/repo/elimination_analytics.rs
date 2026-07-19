@@ -131,11 +131,14 @@ pub async fn daily_summaries(
         .map(|(local_date, (urination, defecation, vomit, general))| {
             let total_count = urination + defecation + vomit + general;
             let avg_duration_seconds = avg_duration_by_date.get(&local_date).copied();
-            let (urination_avg_duration_seconds, defecation_avg_duration_seconds, general_avg_duration_seconds) =
-                avg_duration_by_date_type
-                    .get(&local_date)
-                    .copied()
-                    .unwrap_or((None, None, None));
+            let (
+                urination_avg_duration_seconds,
+                defecation_avg_duration_seconds,
+                general_avg_duration_seconds,
+            ) = avg_duration_by_date_type
+                .get(&local_date)
+                .copied()
+                .unwrap_or((None, None, None));
             EliminationDailySummary {
                 local_date,
                 pet_id: pet_id_owned.clone(),

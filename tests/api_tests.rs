@@ -1239,9 +1239,18 @@ async fn elimination_range_summary_includes_per_type_avg_duration() {
     let body: serde_json::Value = test::read_body_json(resp).await;
     let summary = &body["daily_summaries"][0];
     assert_eq!(summary["local_date"].as_str(), Some(local_date));
-    assert_eq!(summary["urination_avg_duration_seconds"].as_f64(), Some(50.0));
-    assert_eq!(summary["defecation_avg_duration_seconds"].as_f64(), Some(90.0));
-    assert_eq!(summary["general_avg_duration_seconds"].as_f64(), Some(120.0));
+    assert_eq!(
+        summary["urination_avg_duration_seconds"].as_f64(),
+        Some(50.0)
+    );
+    assert_eq!(
+        summary["defecation_avg_duration_seconds"].as_f64(),
+        Some(90.0)
+    );
+    assert_eq!(
+        summary["general_avg_duration_seconds"].as_f64(),
+        Some(120.0)
+    );
     assert_eq!(summary["avg_duration_seconds"].as_f64(), Some(77.5));
 }
 
