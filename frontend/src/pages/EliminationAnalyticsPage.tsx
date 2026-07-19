@@ -70,7 +70,7 @@ export default function EliminationAnalyticsPage() {
   const dailyData = useMemo(() => {
     const summaryMap = new Map<string, {
       total: number; urination: number; defecation: number;
-      vomit: number; general: number; avgDuration: number | null;
+      vomit: number; general: number;
       urinationAvgDuration: number | null;
       defecationAvgDuration: number | null;
       generalAvgDuration: number | null;
@@ -83,7 +83,6 @@ export default function EliminationAnalyticsPage() {
         defecation: s.defecation_count,
         vomit: s.vomit_count,
         general: s.general_count,
-        avgDuration: s.avg_duration_seconds ?? null,
         urinationAvgDuration: s.urination_avg_duration_seconds ?? null,
         defecationAvgDuration: s.defecation_avg_duration_seconds ?? null,
         generalAvgDuration: s.general_avg_duration_seconds ?? null,
@@ -102,7 +101,6 @@ export default function EliminationAnalyticsPage() {
         vomit: row?.vomit ?? 0,
         general: row?.general ?? 0,
         toiletVisits: (row?.urination ?? 0) + (row?.defecation ?? 0) + (row?.general ?? 0),
-        avgDuration: row?.avgDuration ?? null,
         urinationAvgDuration: row?.urinationAvgDuration ?? null,
         defecationAvgDuration: row?.defecationAvgDuration ?? null,
         generalAvgDuration: row?.generalAvgDuration ?? null,
@@ -143,10 +141,10 @@ export default function EliminationAnalyticsPage() {
     generalDurationTrend,
   } as const;
 
-  // Median + mean duration across days that have data
+  // Median + mean duration across categorized daily averages
   const { medianDuration, avgDuration } = useMemo(() => {
     const vals = dailyData
-      .map((d) => d.avgDuration)
+      .flatMap((d) => [d.urinationAvgDuration, d.defecationAvgDuration, d.generalAvgDuration])
       .filter((v): v is number => v != null)
       .sort((a, b) => a - b);
     if (!vals.length) return { medianDuration: null, avgDuration: null };

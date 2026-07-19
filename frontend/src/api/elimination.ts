@@ -57,7 +57,6 @@ export interface EliminationDailySummary {
   vomit_count: number;
   general_count: number;
   has_vomit: boolean;
-  avg_duration_seconds: number | null;
   urination_avg_duration_seconds: number | null;
   defecation_avg_duration_seconds: number | null;
   general_avg_duration_seconds: number | null;
@@ -73,6 +72,20 @@ export interface EliminationRangeSummary {
   p50_per_day: number;
   p90_per_day: number;
   p99_per_day: number;
+}
+
+export function categorizedDurationValues(summary: EliminationDailySummary): number[] {
+  return [
+    summary.urination_avg_duration_seconds,
+    summary.defecation_avg_duration_seconds,
+    summary.general_avg_duration_seconds,
+  ].filter((v): v is number => v != null);
+}
+
+export function categorizedAvgDuration(summary: EliminationDailySummary): number | null {
+  const vals = categorizedDurationValues(summary);
+  if (!vals.length) return null;
+  return vals.reduce((sum, v) => sum + v, 0) / vals.length;
 }
 
 function toQueryString(params: Record<string, string | number | undefined>): string {

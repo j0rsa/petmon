@@ -1251,7 +1251,6 @@ async fn elimination_range_summary_includes_per_type_avg_duration() {
         summary["general_avg_duration_seconds"].as_f64(),
         Some(120.0)
     );
-    assert_eq!(summary["avg_duration_seconds"].as_f64(), Some(77.5));
 }
 
 #[actix_web::test]

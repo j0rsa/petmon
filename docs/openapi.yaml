@@ -2932,11 +2932,6 @@ components:
           format: int64
         has_vomit:
           type: boolean
-        avg_duration_seconds:
-          type: number
-          format: double
-          nullable: true
-          description: Average session duration in seconds for records that have duration logged; null if none.
         urination_avg_duration_seconds:
           type: number
           format: double

@@ -11,12 +11,6 @@ struct EventTypeCountRow {
 }
 
 #[derive(sqlx::FromRow)]
-struct AvgDurationRow {
-    local_date: String,
-    avg_duration: Option<f64>,
-}
-
-#[derive(sqlx::FromRow)]
 struct AvgDurationByTypeRow {
     local_date: String,
     event_type: String,
@@ -58,32 +52,7 @@ pub async fn daily_summaries(
 
     let rows = q.fetch_all(pool).await?;
 
-    // Second query: avg duration per day (only rows where duration_seconds IS NOT NULL)
-    let mut dur_query = String::from(
-        "SELECT local_date, AVG(duration_seconds) as avg_duration FROM elimination_records WHERE local_date BETWEEN ? AND ? AND duration_seconds IS NOT NULL",
-    );
-    if pet_id.is_some() {
-        dur_query.push_str(" AND pet_id = ?");
-    }
-    dur_query.push_str(" GROUP BY local_date");
-
-    let mut dq = sqlx::query_as::<_, AvgDurationRow>(sqlx::AssertSqlSafe(dur_query))
-        .bind(date_from)
-        .bind(date_to);
-    if let Some(pid) = pet_id {
-        if let Ok(uuid) = uuid::Uuid::parse_str(pid) {
-            dq = dq.bind(uuid);
-        } else {
-            dq = dq.bind(pid);
-        }
-    }
-    let dur_rows = dq.fetch_all(pool).await?;
-    let avg_duration_by_date: BTreeMap<String, f64> = dur_rows
-        .into_iter()
-        .filter_map(|r| r.avg_duration.map(|d| (r.local_date, d)))
-        .collect();
-
-    // Third query: avg duration per day and event type
+    // Avg duration per day and event type
     let mut type_dur_query = String::from(
         "SELECT local_date, event_type, AVG(duration_seconds) as avg_duration FROM elimination_records WHERE local_date BETWEEN ? AND ? AND duration_seconds IS NOT NULL",
     );
@@ -134,7 +103,6 @@ pub async fn daily_summaries(
         .into_iter()
         .map(|(local_date, (urination, defecation, vomit, general))| {
             let total_count = urination + defecation + vomit + general;
-            let avg_duration_seconds = avg_duration_by_date.get(&local_date).copied();
             let type_durations = avg_duration_by_date_type
                 .get(&local_date)
                 .copied()
@@ -148,7 +116,6 @@ pub async fn daily_summaries(
                 vomit_count: vomit,
                 general_count: general,
                 has_vomit: vomit > 0,
-                avg_duration_seconds,
                 urination_avg_duration_seconds: type_durations.urination,
                 defecation_avg_duration_seconds: type_durations.defecation,
                 general_avg_duration_seconds: type_durations.general,
