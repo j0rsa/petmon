@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState, useSyncExternalStore } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
-import { eliminationApi } from '../api/elimination';
+import { eliminationApi, categorizedAvgDuration } from '../api/elimination';
 import { MonthCalendar } from '../components/MonthCalendar';
 import { NoPetSelected } from '../components/NoPetSelected';
 import { EliminationDayPanel } from '../components/EliminationDayPanel';
@@ -44,7 +44,7 @@ export default function EliminationJournalPage() {
         totalCount: summary.total_count - summary.vomit_count,
         hasVomit: summary.has_vomit,
         hasDefecation: summary.defecation_count > 0,
-        avgDurationSec: summary.avg_duration_seconds ?? null,
+        avgDurationSec: categorizedAvgDuration(summary),
       });
     }
     return map;
