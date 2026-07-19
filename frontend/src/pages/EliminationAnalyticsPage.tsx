@@ -35,6 +35,12 @@ const EVENT_TYPE_LABELS: Record<string, string> = {
   general:    'General',
 };
 
+const DURATION_SERIES = [
+  { dataKey: 'urinationAvgDuration', trendKey: 'urinationDurationTrend', type: 'urination' },
+  { dataKey: 'defecationAvgDuration', trendKey: 'defecationDurationTrend', type: 'defecation' },
+  { dataKey: 'generalAvgDuration', trendKey: 'generalDurationTrend', type: 'general' },
+] as const;
+
 function formatDate(iso: string) {
   const d = new Date(`${iso}T00:00:00`);
   return `${d.getDate()} ${d.toLocaleString('en', { month: 'short' })}`;
@@ -65,6 +71,9 @@ export default function EliminationAnalyticsPage() {
     const summaryMap = new Map<string, {
       total: number; urination: number; defecation: number;
       vomit: number; general: number; avgDuration: number | null;
+      urinationAvgDuration: number | null;
+      defecationAvgDuration: number | null;
+      generalAvgDuration: number | null;
     }>();
 
     for (const s of analyticsQuery.data?.daily_summaries ?? []) {
@@ -75,6 +84,9 @@ export default function EliminationAnalyticsPage() {
         vomit: s.vomit_count,
         general: s.general_count,
         avgDuration: s.avg_duration_seconds ?? null,
+        urinationAvgDuration: s.urination_avg_duration_seconds ?? null,
+        defecationAvgDuration: s.defecation_avg_duration_seconds ?? null,
+        generalAvgDuration: s.general_avg_duration_seconds ?? null,
       });
     }
 
@@ -91,6 +103,9 @@ export default function EliminationAnalyticsPage() {
         general: row?.general ?? 0,
         toiletVisits: (row?.urination ?? 0) + (row?.defecation ?? 0) + (row?.general ?? 0),
         avgDuration: row?.avgDuration ?? null,
+        urinationAvgDuration: row?.urinationAvgDuration ?? null,
+        defecationAvgDuration: row?.defecationAvgDuration ?? null,
+        generalAvgDuration: row?.generalAvgDuration ?? null,
       });
     }
     return result;
@@ -109,10 +124,24 @@ export default function EliminationAnalyticsPage() {
     () => linReg(dailyData.map((d) => d.toiletVisits), { min: 0 }),
     [dailyData],
   );
-  const durationTrend = useMemo(
-    () => linReg(dailyData.map((d) => d.avgDuration), { min: 0 }),
+  const urinationDurationTrend = useMemo(
+    () => linReg(dailyData.map((d) => d.urinationAvgDuration), { min: 0 }),
     [dailyData],
   );
+  const defecationDurationTrend = useMemo(
+    () => linReg(dailyData.map((d) => d.defecationAvgDuration), { min: 0 }),
+    [dailyData],
+  );
+  const generalDurationTrend = useMemo(
+    () => linReg(dailyData.map((d) => d.generalAvgDuration), { min: 0 }),
+    [dailyData],
+  );
+
+  const durationTrends = {
+    urinationDurationTrend,
+    defecationDurationTrend,
+    generalDurationTrend,
+  } as const;
 
   // Median + mean duration across days that have data
   const { medianDuration, avgDuration } = useMemo(() => {
@@ -132,9 +161,11 @@ export default function EliminationAnalyticsPage() {
     () => dailyData.map((d, i) => ({
       ...d,
       visitTrend: visitTrend?.[i] ?? null,
-      durationTrend: durationTrend?.[i] ?? null,
+      urinationDurationTrend: urinationDurationTrend?.[i] ?? null,
+      defecationDurationTrend: defecationDurationTrend?.[i] ?? null,
+      generalDurationTrend: generalDurationTrend?.[i] ?? null,
     })),
-    [dailyData, visitTrend, durationTrend],
+    [dailyData, visitTrend, urinationDurationTrend, defecationDurationTrend, generalDurationTrend],
   );
 
   // Vomit days list
@@ -269,17 +300,53 @@ export default function EliminationAnalyticsPage() {
                   <XAxis dataKey="date" tickFormatter={formatDate} stroke="var(--chart-axis)" tick={{ fill: 'var(--chart-axis)', fontFamily: 'monospace', fontSize: 11 }} interval="preserveStartEnd" />
                   <YAxis stroke="var(--chart-axis)" tick={{ fill: 'var(--chart-axis)', fontFamily: 'monospace', fontSize: 11 }} tickFormatter={(v) => fmtSec(v)} width={42} />
                   <Tooltip
-                    formatter={(v, name) => name === 'durationTrend'
-                      ? [fmtSec(Number(v)), 'trend']
-                      : v != null ? [fmtSec(Number(v)), 'time spent'] : ['—', 'time spent']}
+                    formatter={(v, name) => {
+                      const strName = String(name);
+                      const series = DURATION_SERIES.find((s) => s.dataKey === strName || s.trendKey === strName);
+                      const label = series ? EVENT_TYPE_LABELS[series.type] : strName;
+                      const isTrend = strName.endsWith('Trend');
+                      if (v == null) return ['—', isTrend ? `${label} trend` : label];
+                      return [fmtSec(Number(v)), isTrend ? `${label} trend` : label];
+                    }}
                     labelFormatter={(label) => formatDate(String(label))}
                     contentStyle={{ background: 'var(--surface)', border: '1px solid var(--border-subtle)', borderRadius: 8, fontFamily: 'monospace', fontSize: 12 }}
                   />
-                  {medianDuration != null && (
-                    <ReferenceLine y={medianDuration} stroke="var(--text-subtle)" strokeDasharray="5 4" label={{ value: `median ${fmtSec(medianDuration)}`, fill: 'var(--text-subtle)', fontSize: 10, position: 'insideTopRight' }} />
-                  )}
-                  <Line type="monotone" dataKey="avgDuration" name="time spent" stroke="var(--metric-wet)" strokeWidth={2} dot={{ r: 3, fill: 'var(--metric-wet)', strokeWidth: 0 }} activeDot={{ r: 5 }} connectNulls />
-                  {durationTrend && <Line type="linear" dataKey="durationTrend" name="durationTrend" stroke="var(--text-muted)" strokeWidth={1.5} strokeDasharray="4 3" dot={false} activeDot={false} legendType="none" />}
+                  <Legend wrapperStyle={{ fontFamily: 'monospace', fontSize: 12 }} />
+                  {DURATION_SERIES.flatMap(({ dataKey, trendKey, type }) => {
+                    const color = EVENT_TYPE_COLORS[type];
+                    const label = EVENT_TYPE_LABELS[type];
+                    const trend = durationTrends[trendKey];
+                    const lines = [
+                      <Line
+                        key={dataKey}
+                        type="monotone"
+                        dataKey={dataKey}
+                        name={label}
+                        stroke={color}
+                        strokeWidth={2}
+                        dot={{ r: 3, fill: color, strokeWidth: 0 }}
+                        activeDot={{ r: 5 }}
+                        connectNulls
+                      />,
+                    ];
+                    if (trend) {
+                      lines.push(
+                        <Line
+                          key={trendKey}
+                          type="linear"
+                          dataKey={trendKey}
+                          name={trendKey}
+                          stroke={color}
+                          strokeWidth={1.5}
+                          strokeDasharray="4 3"
+                          dot={false}
+                          activeDot={false}
+                          legendType="none"
+                        />,
+                      );
+                    }
+                    return lines;
+                  })}
                 </LineChart>
               </ResponsiveContainer>
             </div>

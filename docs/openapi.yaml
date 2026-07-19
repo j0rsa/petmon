@@ -2937,6 +2937,21 @@ components:
           format: double
           nullable: true
           description: Average session duration in seconds for records that have duration logged; null if none.
+        urination_avg_duration_seconds:
+          type: number
+          format: double
+          nullable: true
+          description: Average session duration in seconds for urination records with duration logged; null if none.
+        defecation_avg_duration_seconds:
+          type: number
+          format: double
+          nullable: true
+          description: Average session duration in seconds for defecation records with duration logged; null if none.
+        general_avg_duration_seconds:
+          type: number
+          format: double
+          nullable: true
+          description: Average session duration in seconds for general records with duration logged; null if none.
       required:
         - local_date
         - total_count

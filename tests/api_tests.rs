@@ -1202,6 +1202,49 @@ async fn api_tokens_returns_json_not_spa() {
     );
 }
 
+/// Range summary must include per-type average duration fields for analytics charts.
+#[actix_web::test]
+async fn elimination_range_summary_includes_per_type_avg_duration() {
+    let (app, _state) = build_dev_app!();
+    let pet_id = api_create_pet!(&app, "EliminationAnalyticsDuration");
+
+    let local_date = "2026-06-01";
+    for (event_type, duration_seconds) in [
+        ("urination", 40),
+        ("urination", 60),
+        ("defecation", 90),
+        ("general", 120),
+    ] {
+        let req = test::TestRequest::post()
+            .uri("/api/v1/elimination/records")
+            .set_json(serde_json::json!({
+                "pet_id": pet_id,
+                "event_type": event_type,
+                "duration_seconds": duration_seconds,
+                "occurred_at": format!("{local_date}T09:00:00"),
+                "local_date": local_date,
+            }))
+            .to_request();
+        let resp = test::call_service(&app, req).await;
+        assert_eq!(resp.status(), 201, "create {event_type} failed");
+    }
+
+    let req = test::TestRequest::get()
+        .uri(&format!(
+            "/api/v1/elimination/analytics/range-summary?date_from={local_date}&date_to={local_date}&pet_id={pet_id}"
+        ))
+        .to_request();
+    let resp = test::call_service(&app, req).await;
+    assert_eq!(resp.status(), 200);
+    let body: serde_json::Value = test::read_body_json(resp).await;
+    let summary = &body["daily_summaries"][0];
+    assert_eq!(summary["local_date"].as_str(), Some(local_date));
+    assert_eq!(summary["urination_avg_duration_seconds"].as_f64(), Some(50.0));
+    assert_eq!(summary["defecation_avg_duration_seconds"].as_f64(), Some(90.0));
+    assert_eq!(summary["general_avg_duration_seconds"].as_f64(), Some(120.0));
+    assert_eq!(summary["avg_duration_seconds"].as_f64(), Some(77.5));
+}
+
 #[actix_web::test]
 async fn elimination_records_returns_json_not_spa() {
     let pool = setup_pool().await;

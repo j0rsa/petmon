@@ -58,6 +58,9 @@ export interface EliminationDailySummary {
   general_count: number;
   has_vomit: boolean;
   avg_duration_seconds: number | null;
+  urination_avg_duration_seconds: number | null;
+  defecation_avg_duration_seconds: number | null;
+  general_avg_duration_seconds: number | null;
 }
 
 export interface EliminationRangeSummary {
