@@ -168,6 +168,98 @@ async fn mcp_endpoint_requires_auth() {
     assert_eq!(resp.status(), 401, "POST /mcp must require auth");
 }
 
+/// tools/list must advertise MCP 2025-11-25 compliant names (no `/`).
+#[actix_web::test]
+async fn mcp_tools_list_names_have_no_slashes() {
+    let pool = setup_pool().await;
+    let raw = "pm_api_mcp_toolnames_00000000000000000000000000000000000000000000000";
+    seed_token(&pool, raw, "mcp").await;
+    let state = web::Data::new(AppState::new(pool, false, None, None));
+    let app = build_full_app!(state);
+
+    let resp = test::call_service(
+        &app,
+        test::TestRequest::post()
+            .uri("/mcp")
+            .insert_header(("Authorization", format!("Bearer {raw}")))
+            .set_json(serde_json::json!({
+                "jsonrpc": "2.0",
+                "id": 1,
+                "method": "tools/list",
+                "params": null
+            }))
+            .to_request(),
+    )
+    .await;
+    assert_eq!(resp.status(), 200);
+    let body: serde_json::Value = test::read_body_json(resp).await;
+    let tools = body["result"]["tools"].as_array().expect("tools array");
+    assert!(!tools.is_empty(), "expected at least one tool");
+
+    // MCP tool names: A-Z a-z 0-9 _ - . only (no slash). See CLAUDE.md / SEP-986.
+    let is_valid_tool_name = |name: &str| -> bool {
+        !name.is_empty()
+            && name.len() <= 128
+            && name
+                .chars()
+                .all(|c| c.is_ascii_alphanumeric() || c == '_' || c == '-' || c == '.')
+    };
+    for tool in tools {
+        let name = tool["name"].as_str().expect("tool name");
+        assert!(
+            is_valid_tool_name(name),
+            "tool name {name:?} must match MCP 2025-11-25 allowed characters"
+        );
+        assert!(
+            !name.contains('/'),
+            "tool name {name:?} must not contain '/'"
+        );
+    }
+    let names: Vec<_> = tools.iter().filter_map(|t| t["name"].as_str()).collect();
+    assert!(names.contains(&"weight.records.create"));
+    assert!(names.contains(&"pets.list"));
+    assert!(!names.iter().any(|n| n.contains('/')));
+}
+
+/// Legacy slash tool names remain callable aliases of the dotted names.
+#[actix_web::test]
+async fn mcp_tools_call_accepts_legacy_slash_alias() {
+    let pool = setup_pool().await;
+    let raw = "pm_api_mcp_slash_alias_000000000000000000000000000000000000000000000";
+    seed_token(&pool, raw, "mcp").await;
+    let state = web::Data::new(AppState::new(pool, true, None, None));
+    let app = build_full_app!(state);
+
+    let resp = test::call_service(
+        &app,
+        test::TestRequest::post()
+            .uri("/mcp")
+            .insert_header(("Authorization", format!("Bearer {raw}")))
+            .set_json(serde_json::json!({
+                "jsonrpc": "2.0",
+                "id": 1,
+                "method": "tools/call",
+                "params": {
+                    "name": "pets/list",
+                    "arguments": {}
+                }
+            }))
+            .to_request(),
+    )
+    .await;
+    assert_eq!(resp.status(), 200);
+    let body: serde_json::Value = test::read_body_json(resp).await;
+    assert!(
+        body["error"].is_null(),
+        "legacy slash alias must succeed: {body}"
+    );
+    let text = body["result"]["content"][0]["text"]
+        .as_str()
+        .expect("tool text");
+    let pets: serde_json::Value = serde_json::from_str(text).expect("pets json");
+    assert!(pets.is_array());
+}
+
 #[actix_web::test]
 async fn sign_out_deletes_api_token() {
     let pool = setup_pool().await;
@@ -1051,7 +1143,7 @@ async fn mcp_nutrition_on_track_returns_summary() {
                 "id": 1,
                 "method": "tools/call",
                 "params": {
-                    "name": "nutrition/on-track",
+                    "name": "nutrition.on-track",
                     "arguments": {
                         "pet_id": pet_id,
                         "ts": "2026-07-18T09:30:00"
@@ -1921,7 +2013,7 @@ async fn mcp_prompts_get_renders_template() {
         .as_str()
         .expect("prompt text");
     assert!(text.contains("Mittens"));
-    assert!(text.contains("pets/health-context"));
+    assert!(text.contains("pets.health-context"));
 }
 
 #[actix_web::test]

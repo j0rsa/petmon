@@ -22,6 +22,25 @@
 
 ---
 
+## MCP tool names
+
+MCP tool names (the `name` field in `tools/list` / `tools/call`) **must** follow the MCP 2025-11-25 tool-name rules (SEP-986 as published):
+
+- Allowed characters only: `A-Z`, `a-z`, `0-9`, `_`, `-`, `.`
+- Length 1–128 characters
+- Use **dots** for namespacing, never slashes — e.g. `weight.records.create`, not `weight/records/create`
+
+**Why:** Clients such as LiteLLM and several LLM providers reject `/` in tool names (even though an early SEP draft allowed it). Slash names produce registration warnings and can break tool calling.
+
+**Do not confuse with:**
+- JSON-RPC **protocol** methods (`tools/list`, `tools/call`, `prompts/get`, …) — those keep slashes; they are not tool names
+- REST API paths (`/api/v1/nutrition/records`) — unchanged
+- MCP resource URIs (`petmon://pets/{id}/today`) — unchanged
+
+When adding a tool in `src/mcp/tools.rs`, advertise only the dotted name. Legacy slash names may be accepted as call aliases (normalized with `replace('/', ".")`) but must not appear in `tools/list`.
+
+---
+
 ## Terminology: BE vs FE split
 
 The app uses two vocabulary layers that must never bleed into each other:

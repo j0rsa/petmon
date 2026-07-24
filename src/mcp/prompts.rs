@@ -27,10 +27,10 @@ const PROMPTS: &[PromptDef] = &[
         template: "\
 Using petmon MCP tools, prepare a caregiver-friendly daily summary for \"{pet_name}\":
 
-1. Resolve the pet via pets/list if you only have the name.
-2. Call pets/nutrition-context, pets/elimination-context, and pets/health-context for that pet.
+1. Resolve the pet via pets.list if you only have the name.
+2. Call pets.nutrition-context, pets.elimination-context, and pets.health-context for that pet.
 3. Summarize in plain language (not clinical jargon):
-   - Nutrition: use status.on_track from pets/nutrition-context (or nutrition/on-track); note weekly trend if relevant
+   - Nutrition: use status.on_track from pets.nutrition-context (or nutrition.on-track); note weekly trend if relevant
    - Toileting: today's wee/poop/vomit counts; anything unusual in the 7-day trend
    - Health: latest weight and 30-day trend; recent wellbeing check-ins and notes
 4. Flag anything worth watching; keep it concise.",
@@ -46,8 +46,8 @@ Using petmon MCP tools, prepare a caregiver-friendly daily summary for \"{pet_na
         template: "\
 Using petmon MCP tools, check nutrition for \"{pet_name}\":
 
-1. Resolve the pet via pets/list if needed.
-2. Call nutrition/on-track for that pet (or pets/nutrition-context if you also need weekly trend or today's records).
+1. Resolve the pet via pets.list if needed.
+2. Call nutrition.on-track for that pet (or pets.nutrition-context if you also need weekly trend or today's records).
 3. Answer for a pet owner using status.on_track / summary: Is intake on track right now? How far ahead or behind the liquid schedule? Only mention weekly comparison if you fetched nutrition-context.
 Use casual terms (wet food, water, liquids) in your reply.",
     },
@@ -62,8 +62,8 @@ Use casual terms (wet food, water, liquids) in your reply.",
         template: "\
 Using petmon MCP tools, check toileting for \"{pet_name}\":
 
-1. Resolve the pet via pets/list if needed.
-2. Call pets/elimination-context for that pet.
+1. Resolve the pet via pets.list if needed.
+2. Call pets.elimination-context for that pet.
 3. Summarize today's wee, poop, and vomit counts. Note anything unusual in the 7-day trend.
 Use casual terms (wee, poop, vomit) in your reply — not urination/defecation.",
     },
@@ -78,8 +78,8 @@ Use casual terms (wee, poop, vomit) in your reply — not urination/defecation."
         template: "\
 Using petmon MCP tools, check health for \"{pet_name}\":
 
-1. Resolve the pet via pets/list if needed.
-2. Call pets/health-context for that pet.
+1. Resolve the pet via pets.list if needed.
+2. Call pets.health-context for that pet.
 3. Summarize for a pet owner:
    - Latest weight and 30-day average/trend (stable, up, or down)
    - Recent wellbeing check-ins (level + any caregiver notes)
@@ -108,12 +108,12 @@ Using petmon MCP tools, check health for \"{pet_name}\":
         template: "\
 Using petmon MCP tools, log nutrition for \"{pet_name}\":
 
-1. Resolve the pet via pets/list if needed.
-2. Create a record with nutrition/records/create:
+1. Resolve the pet via pets.list if needed.
+2. Create a record with nutrition.records.create:
    - category: {category}
    - amount: {amount}
    - unit: ml for water/liquids, g for wet_food/dry_food
-3. Confirm what was logged and show updated on-track status via nutrition/on-track.",
+3. Confirm what was logged and show updated on-track status via nutrition.on-track.",
     },
     PromptDef {
         name: "vet-handoff",
@@ -133,8 +133,8 @@ Using petmon MCP tools, log nutrition for \"{pet_name}\":
         template: "\
 Using petmon MCP tools, prepare a vet/caregiver handoff brief for \"{pet_name}\" covering the last {days} days:
 
-1. Resolve the pet via pets/list if needed.
-2. Gather context: pets/health-context, pets/elimination-context, pets/nutrition-context, and nutrition/analytics/range-summary for the period.
+1. Resolve the pet via pets.list if needed.
+2. Gather context: pets.health-context, pets.elimination-context, pets.nutrition-context, and nutrition.analytics.range-summary for the period.
 3. Produce a structured brief:
    - Pet profile (species, breed, feeding notes if relevant)
    - Weight: latest, trend over the period
