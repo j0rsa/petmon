@@ -101,22 +101,24 @@ Full schema at `/api/docs` (Swagger UI) or `/api/docs/openapi.yaml`.
 
 petmon exposes a **stateless JSON-RPC 2.0** MCP endpoint at `POST /mcp`, protected by the same Bearer-token auth as the REST API.
 
+Tool names use **dots** for namespacing (`weight.records.create`) per the MCP 2025-11-25 tool-name rules — not slashes. Slash forms are still accepted as call aliases for compatibility, but only dotted names are advertised in `tools/list`.
+
 ### Available tools
 
 **Context tools** (recommended starting points — return everything needed in one call):
 
 | Tool | Returns |
 |------|---------|
-| `pets/nutrition-context` | Pet profile + precomputed on-track status + today's records + active schedules + 7-day trend |
-| `pets/elimination-context` | Pet profile + today's wee/poop/vomit counts + 7-day trend |
-| `pets/health-context` | Pet profile + last 10 weight records + 30-day stats + last 10 wellbeing check-ins (level + notes) |
+| `pets.nutrition-context` | Pet profile + precomputed on-track status + today's records + active schedules + 7-day trend |
+| `pets.elimination-context` | Pet profile + today's wee/poop/vomit counts + 7-day trend |
+| `pets.health-context` | Pet profile + last 10 weight records + 30-day stats + last 10 wellbeing check-ins (level + notes) |
 
 **Prompts** (caregiver workflow templates — use via MCP `prompts/get`):
 
 | Prompt | Purpose |
 |--------|---------|
 | `daily-summary` | Full daily snapshot across nutrition, toileting, and health |
-| `nutrition-check` | Is liquid intake on track right now vs schedule? (uses `nutrition/on-track`) |
+| `nutrition-check` | Is liquid intake on track right now vs schedule? (uses `nutrition.on-track`) |
 | `toileting-check` | Today's wee/poop/vomit and recent trends |
 | `health-check` | Weight trend and recent wellbeing check-ins |
 | `log-intake` | Log water, liquids, or food for a pet |
@@ -124,23 +126,23 @@ petmon exposes a **stateless JSON-RPC 2.0** MCP endpoint at `POST /mcp`, protect
 
 **Individual tools:**
 
-`pets/list`, `pets/get`, `pets/create`, `pets/update`
+`pets.list`, `pets.get`, `pets.create`, `pets.update`
 
-`nutrition/records/list`, `nutrition/records/get`, `nutrition/records/create`, `nutrition/records/batch-create`, `nutrition/records/update`, `nutrition/records/delete`
+`nutrition.records.list`, `nutrition.records.get`, `nutrition.records.create`, `nutrition.records.batch-create`, `nutrition.records.update`, `nutrition.records.delete`
 
-`nutrition/status`, `nutrition/on-track`
+`nutrition.status`, `nutrition.on-track`
 
-`nutrition/analytics/daily-totals`, `nutrition/analytics/range-summary`, `nutrition/analytics/best-fluid-day`
+`nutrition.analytics.daily-totals`, `nutrition.analytics.range-summary`, `nutrition.analytics.best-fluid-day`
 
-`nutrition/schedules/list`, `nutrition/schedules/get`, `nutrition/schedules/create`, `nutrition/schedules/update`, `nutrition/schedules/delete`
+`nutrition.schedules.list`, `nutrition.schedules.get`, `nutrition.schedules.create`, `nutrition.schedules.update`, `nutrition.schedules.delete`
 
-`days/summary`, `days/note/get`, `days/note/set`
+`days.summary`, `days.note.get`, `days.note.set`
 
-`elimination/records/list`, `elimination/records/create`, `elimination/records/update`, `elimination/records/delete`, `elimination/analytics/range-summary`
+`elimination.records.list`, `elimination.records.create`, `elimination.records.update`, `elimination.records.delete`, `elimination.analytics.range-summary`
 
-`weight/records/list`, `weight/records/create`, `weight/records/delete`
+`weight.records.list`, `weight.records.create`, `weight.records.delete`
 
-`health/state/list`, `health/state/create`, `health/state/delete`
+`health.state.list`, `health.state.create`, `health.state.delete`
 
 ### Wellbeing levels
 
