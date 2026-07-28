@@ -85,8 +85,9 @@ const AddRow = forwardRef<AddRowHandle, AddRowProps>(function AddRow(
     if (isCombined) {
       const pair = parseWetFoodLiquidPair(amount);
       if (!pair) return;
-      onSave([
-        {
+      const payloads: CreateNutritionRecord[] = [];
+      if (pair.wetFood > 0) {
+        payloads.push({
           pet_id: petId,
           occurred_at: occurredAt,
           local_date: date,
@@ -94,8 +95,10 @@ const AddRow = forwardRef<AddRowHandle, AddRowProps>(function AddRow(
           amount: pair.wetFood,
           unit: unitFor('wet_food'),
           note: noteValue,
-        },
-        {
+        });
+      }
+      if (pair.liquids > 0) {
+        payloads.push({
           pet_id: petId,
           occurred_at: occurredAt,
           local_date: date,
@@ -103,8 +106,10 @@ const AddRow = forwardRef<AddRowHandle, AddRowProps>(function AddRow(
           amount: pair.liquids,
           unit: unitFor('liquids'),
           note: noteValue,
-        },
-      ]);
+        });
+      }
+      if (payloads.length === 0) return;
+      onSave(payloads);
       // Form clears via ref.clearForm() called from createMutation.onSuccess,
       // so values are preserved while the mutation is paused offline.
       return;
