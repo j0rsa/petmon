@@ -981,8 +981,18 @@ pre {
 }
 
 .sidebar-user-name {
+  display: block;
   font-size: 0.88rem;
   color: var(--text-muted);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.sidebar-user-token-creator {
+  display: block;
+  font-size: 0.7rem;
+  color: var(--text-subtle);
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -1646,6 +1656,13 @@ pre {
   min-width: 5.5rem;
 }
 
+.record-entry-form__actions .record-entry-form__move-day {
+  min-width: 2.75rem;
+  padding-inline: 0.65rem;
+  font-size: 1rem;
+  letter-spacing: 0.02em;
+}
+
 .export-telegram-details {
   margin-top: 0.75rem;
   border-top: 1px solid var(--border-subtle);
@@ -1813,6 +1830,11 @@ pre {
   .record-entry-form__actions .button {
     flex: 1;
     min-width: 0;
+  }
+
+  .record-entry-form__actions .record-entry-form__move-day {
+    flex: 0 0 auto;
+    min-width: 2.75rem;
   }
 
   .pet-info-page .pet-info-card {

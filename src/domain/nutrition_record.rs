@@ -45,6 +45,9 @@ pub struct UpdateNutritionRecord {
     pub category: Option<NutritionCategory>,
     pub amount: Option<f64>,
     pub unit: Option<String>,
+    /// `None` = key absent (leave unchanged); `Some(None)` = key present as
+    /// JSON `null` (clear the note); `Some(Some(s))` = set the note to `s`.
+    #[serde(default, deserialize_with = "crate::domain::double_option")]
     pub note: Option<Option<String>>,
 }
 

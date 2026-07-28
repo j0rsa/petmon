@@ -2,6 +2,7 @@ import { NavLink } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { meApi } from '../api/me';
 import { infoApi } from '../api/info';
+import { authApi } from '../api/auth';
 import { clearToken } from '../lib/auth';
 import { PawPrint, Utensils, HeartPulse } from 'lucide-react';
 import { PILLARS, type MonitoringPillar } from '../types/pillars';
@@ -71,9 +72,21 @@ export function SidebarUserChip() {
 
   if (!me) return null;
 
+  async function handleSignOut() {
+    if (me?.kind === 'api_token') {
+      try {
+        await authApi.signOut();
+      } catch {
+        // Still clear local storage even if the server call fails.
+      }
+    }
+    clearToken();
+    window.location.href = '/';
+  }
+
   return (
     <div className="sidebar-user">
-      <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', minWidth: 0 }}>
         <span style={{
           width: 7,
           height: 7,
@@ -81,13 +94,18 @@ export function SidebarUserChip() {
           flexShrink: 0,
           background: me.kind === 'dev' ? 'var(--text-subtle)' : me.kind === 'oidc' ? 'var(--pill-active-text)' : 'var(--accent)',
         }} />
-        <span className="sidebar-user-name">{me.display_name}</span>
+        <div style={{ minWidth: 0 }}>
+          <span className="sidebar-user-name">{me.display_name}</span>
+          {me.kind === 'api_token' && me.token_created_by && (
+            <span className="sidebar-user-token-creator">{me.token_created_by}</span>
+          )}
+        </div>
       </div>
       {me.kind !== 'dev' && (
         <button
           className="sidebar-user-logout"
           type="button"
-          onClick={() => { clearToken(); window.location.href = '/'; }}
+          onClick={() => { void handleSignOut(); }}
         >
           sign out
         </button>

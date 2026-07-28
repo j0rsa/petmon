@@ -12,8 +12,8 @@ use crate::domain::weight::{CreateWeightRecord, WeightRecordFilters};
 use crate::error::{AppError, AppResult};
 use crate::services::{
     day_service, elimination_analytics_service, elimination_record_service, health_state_service,
-    nutrition_analytics_service, nutrition_record_service, nutrition_schedule_service, pet_service,
-    weight_service,
+    nutrition_analytics_service, nutrition_record_service, nutrition_schedule_service,
+    nutrition_status_service, pet_service, weight_service,
 };
 use chrono::Utc;
 use chrono_tz::Tz;
@@ -52,12 +52,12 @@ fn tool_list() -> Value {
         "tools": [
             // ── Pets ─────────────────────────────────────────────────────────
             {
-                "name": "pets/list",
+                "name": "pets.list",
                 "description": "List all pets.",
                 "inputSchema": { "type": "object", "properties": {} }
             },
             {
-                "name": "pets/get",
+                "name": "pets.get",
                 "description": "Get a pet by UUID.",
                 "inputSchema": {
                     "type": "object",
@@ -66,7 +66,7 @@ fn tool_list() -> Value {
                 }
             },
             {
-                "name": "pets/create",
+                "name": "pets.create",
                 "description": "Create a new pet.",
                 "inputSchema": {
                     "type": "object",
@@ -86,8 +86,8 @@ fn tool_list() -> Value {
                 }
             },
             {
-                "name": "pets/update",
-                "description": "Update fields on an existing pet. Weight is managed via weight/records/create — do not pass weight_kg here.",
+                "name": "pets.update",
+                "description": "Update fields on an existing pet. Weight is managed via weight.records.create — do not pass weight_kg here.",
                 "inputSchema": {
                     "type": "object",
                     "required": ["id"],
@@ -106,11 +106,11 @@ fn tool_list() -> Value {
                     }
                 }
             },
-            // pets/delete intentionally omitted — use pets/update with status=archived instead.
+            // pets.delete intentionally omitted — use pets.update with status=archived instead.
 
             // ── Nutrition records ────────────────────────────────────────────
             {
-                "name": "nutrition/records/list",
+                "name": "nutrition.records.list",
                 "description": "List nutrition records with optional filters.",
                 "inputSchema": {
                     "type": "object",
@@ -126,7 +126,7 @@ fn tool_list() -> Value {
                 }
             },
             {
-                "name": "nutrition/records/get",
+                "name": "nutrition.records.get",
                 "description": "Get a single nutrition record by ID.",
                 "inputSchema": {
                     "type": "object",
@@ -135,7 +135,7 @@ fn tool_list() -> Value {
                 }
             },
             {
-                "name": "nutrition/records/create",
+                "name": "nutrition.records.create",
                 "description": "Create a single nutrition record. Also triggers a Telegram notification if configured.",
                 "inputSchema": {
                     "type": "object",
@@ -153,7 +153,7 @@ fn tool_list() -> Value {
                 }
             },
             {
-                "name": "nutrition/records/batch-create",
+                "name": "nutrition.records.batch-create",
                 "description": "Create multiple nutrition records in one call. Note: does NOT trigger Telegram notifications.",
                 "inputSchema": {
                     "type": "object",
@@ -180,7 +180,7 @@ fn tool_list() -> Value {
                 }
             },
             {
-                "name": "nutrition/records/update",
+                "name": "nutrition.records.update",
                 "description": "Update a nutrition record. Also updates the Telegram message if one was sent.",
                 "inputSchema": {
                     "type": "object",
@@ -197,7 +197,7 @@ fn tool_list() -> Value {
                 }
             },
             {
-                "name": "nutrition/records/delete",
+                "name": "nutrition.records.delete",
                 "description": "Delete a nutrition record by ID. Also deletes the Telegram message if one was sent.",
                 "inputSchema": {
                     "type": "object",
@@ -208,7 +208,7 @@ fn tool_list() -> Value {
 
             // ── Days & notes ─────────────────────────────────────────────────
             {
-                "name": "days/summary",
+                "name": "days.summary",
                 "description": "Get a day summary: all nutrition records, totals by category, and the day note.",
                 "inputSchema": {
                     "type": "object",
@@ -220,7 +220,7 @@ fn tool_list() -> Value {
                 }
             },
             {
-                "name": "days/note/get",
+                "name": "days.note.get",
                 "description": "Get the note for a specific day.",
                 "inputSchema": {
                     "type": "object",
@@ -232,7 +232,7 @@ fn tool_list() -> Value {
                 }
             },
             {
-                "name": "days/note/set",
+                "name": "days.note.set",
                 "description": "Create or update the note for a specific day.",
                 "inputSchema": {
                     "type": "object",
@@ -247,21 +247,21 @@ fn tool_list() -> Value {
 
             // ── Nutrition context (high-level summary) ───────────────────────
             {
-                "name": "pets/nutrition-context",
-                "description": "Returns a complete nutrition context for a single pet in one call: pet profile, today's records and totals, active feeding schedule, and a 7-day trend summary. Use this as the starting point for any question about a pet's nutrition — it gives enough context to answer 'is the pet on track today?', 'what's missing vs the schedule?', and 'how does today compare to the past week?' without additional tool calls.",
+                "name": "pets.nutrition-context",
+                "description": "Returns nutrition context for a single pet: profile, today's records, active schedules, 7-day trend, and a precomputed status block (on_track, cumulative intake vs schedule as of now). Prefer nutrition.on-track for a simple on-track yes/no; use this when you also need records, schedule windows, or weekly trend.",
                 "inputSchema": {
                     "type": "object",
                     "required": ["pet_id"],
                     "properties": {
                         "pet_id": { "type": "string", "format": "uuid", "description": "UUID of the pet" },
-                        "today":  { "type": "string", "format": "date", "description": "Override today's date (YYYY-MM-DD). Defaults to server UTC date." }
+                        "today":  { "type": "string", "format": "date", "description": "Override today's date (YYYY-MM-DD). Defaults to server timezone date." }
                     }
                 }
             },
 
             // ── Nutrition analytics ──────────────────────────────────────────
             {
-                "name": "nutrition/analytics/daily-totals",
+                "name": "nutrition.analytics.daily-totals",
                 "description": "Get per-category daily totals for a date range.",
                 "inputSchema": {
                     "type": "object",
@@ -275,7 +275,7 @@ fn tool_list() -> Value {
                 }
             },
             {
-                "name": "nutrition/analytics/range-summary",
+                "name": "nutrition.analytics.range-summary",
                 "description": "Get aggregated nutrition summary with per-category averages for a date range.",
                 "inputSchema": {
                     "type": "object",
@@ -289,7 +289,7 @@ fn tool_list() -> Value {
                 }
             },
             {
-                "name": "nutrition/analytics/best-fluid-day",
+                "name": "nutrition.analytics.best-fluid-day",
                 "description": "Get the best historical fluid intake day with a cumulative curve.",
                 "inputSchema": {
                     "type": "object",
@@ -300,10 +300,34 @@ fn tool_list() -> Value {
                     }
                 }
             },
+            {
+                "name": "nutrition.status",
+                "description": "Get cumulative nutrition intake and liquid schedule expectations for a pet as of a point in time. Returns on_track, delta_ml, and expected_ml. When ts is omitted, uses the current server time.",
+                "inputSchema": {
+                    "type": "object",
+                    "required": ["pet_id"],
+                    "properties": {
+                        "pet_id": { "type": "string", "format": "uuid" },
+                        "ts":     { "type": "string", "description": "As-of timestamp (RFC3339 or YYYY-MM-DDTHH:MM:SS). Defaults to now." }
+                    }
+                }
+            },
+            {
+                "name": "nutrition.on-track",
+                "description": "Quick on-track check for a pet's liquid intake vs the active schedule as of now. Returns on_track (boolean|null), delta_ml, expected_ml, direct_liquid_ml, and a plain-language summary. Use this first for questions like 'is the pet still on track?'",
+                "inputSchema": {
+                    "type": "object",
+                    "required": ["pet_id"],
+                    "properties": {
+                        "pet_id": { "type": "string", "format": "uuid" },
+                        "ts":     { "type": "string", "description": "As-of timestamp (RFC3339 or YYYY-MM-DDTHH:MM:SS). Defaults to now." }
+                    }
+                }
+            },
 
             // ── Nutrition schedules ──────────────────────────────────────────
             {
-                "name": "nutrition/schedules/list",
+                "name": "nutrition.schedules.list",
                 "description": "List nutrition schedules.",
                 "inputSchema": {
                     "type": "object",
@@ -311,7 +335,7 @@ fn tool_list() -> Value {
                 }
             },
             {
-                "name": "nutrition/schedules/get",
+                "name": "nutrition.schedules.get",
                 "description": "Get a nutrition schedule by ID.",
                 "inputSchema": {
                     "type": "object",
@@ -320,7 +344,7 @@ fn tool_list() -> Value {
                 }
             },
             {
-                "name": "nutrition/schedules/create",
+                "name": "nutrition.schedules.create",
                 "description": "Create a nutrition schedule.",
                 "inputSchema": {
                     "type": "object",
@@ -334,7 +358,7 @@ fn tool_list() -> Value {
                 }
             },
             {
-                "name": "nutrition/schedules/update",
+                "name": "nutrition.schedules.update",
                 "description": "Update a nutrition schedule.",
                 "inputSchema": {
                     "type": "object",
@@ -348,7 +372,7 @@ fn tool_list() -> Value {
                 }
             },
             {
-                "name": "nutrition/schedules/delete",
+                "name": "nutrition.schedules.delete",
                 "description": "Delete a nutrition schedule by ID.",
                 "inputSchema": {
                     "type": "object",
@@ -359,7 +383,7 @@ fn tool_list() -> Value {
 
             // ── Elimination / toileting records ──────────────────────────────
             {
-                "name": "elimination/records/list",
+                "name": "elimination.records.list",
                 "description": "List toileting/elimination records for a pet. event_type: general|urination|defecation|vomit",
                 "inputSchema": {
                     "type": "object",
@@ -375,7 +399,7 @@ fn tool_list() -> Value {
                 }
             },
             {
-                "name": "elimination/records/create",
+                "name": "elimination.records.create",
                 "description": "Log a toileting event. subtype for defecation: normal|soft|liquid|hard|blood|mucus; for vomit: food|fur|bile|other",
                 "inputSchema": {
                     "type": "object",
@@ -391,7 +415,7 @@ fn tool_list() -> Value {
                 }
             },
             {
-                "name": "elimination/records/update",
+                "name": "elimination.records.update",
                 "description": "Update an elimination record.",
                 "inputSchema": {
                     "type": "object",
@@ -407,7 +431,7 @@ fn tool_list() -> Value {
                 }
             },
             {
-                "name": "elimination/records/delete",
+                "name": "elimination.records.delete",
                 "description": "Delete an elimination record by ID.",
                 "inputSchema": {
                     "type": "object",
@@ -416,7 +440,7 @@ fn tool_list() -> Value {
                 }
             },
             {
-                "name": "elimination/analytics/range-summary",
+                "name": "elimination.analytics.range-summary",
                 "description": "Get aggregated elimination summary with daily breakdown and percentiles for a date range.",
                 "inputSchema": {
                     "type": "object",
@@ -431,7 +455,7 @@ fn tool_list() -> Value {
 
             // ── Elimination context ──────────────────────────────────────────
             {
-                "name": "pets/elimination-context",
+                "name": "pets.elimination-context",
                 "description": "Returns a complete toileting context for a single pet in one call: pet profile, today's elimination records with type breakdown, and a 7-day trend summary (avg visits/day, vomit days, p50/p90 per day). Use this as the starting point for any question about a pet's toileting habits — it answers 'how many times today?', 'any vomit recently?', 'is the frequency normal?', and 'what types occurred?' without additional tool calls. Event types use informal labels: urination=wee, defecation=poop.",
                 "inputSchema": {
                     "type": "object",
@@ -445,7 +469,7 @@ fn tool_list() -> Value {
 
             // ── API token scopes ─────────────────────────────────────────────
             {
-                "name": "api-tokens/scopes/update",
+                "name": "api-tokens.scopes.update",
                 "description": "Update the scopes on an existing API token. Valid scopes: all, api_read, api_write, mcp.",
                 "inputSchema": {
                     "type": "object",
@@ -459,7 +483,7 @@ fn tool_list() -> Value {
 
             // ── Weight records ───────────────────────────────────────────────
             {
-                "name": "weight/records/list",
+                "name": "weight.records.list",
                 "description": "List weight records for a pet. Without date_from/date_to returns the last 10 records (newest first). With a date range returns all matches (oldest first) for charting.",
                 "inputSchema": {
                     "type": "object",
@@ -473,7 +497,7 @@ fn tool_list() -> Value {
                 }
             },
             {
-                "name": "weight/records/create",
+                "name": "weight.records.create",
                 "description": "Record a weight measurement. Also updates the pet's current weight_kg.",
                 "inputSchema": {
                     "type": "object",
@@ -487,7 +511,7 @@ fn tool_list() -> Value {
                 }
             },
             {
-                "name": "weight/records/delete",
+                "name": "weight.records.delete",
                 "description": "Delete a weight record by ID.",
                 "inputSchema": {
                     "type": "object",
@@ -496,7 +520,7 @@ fn tool_list() -> Value {
                 }
             },
             {
-                "name": "weight/summary",
+                "name": "weight.summary",
                 "description": "Get aggregated weight history bucketed by granularity. Use raw for ≤30d windows, daily for ≤90d, weekly for longer periods. Returns avg/min/max per bucket for chart rendering.",
                 "inputSchema": {
                     "type": "object",
@@ -512,7 +536,7 @@ fn tool_list() -> Value {
 
             // ── Overall health state (wellbeing check-ins) ───────────────────
             {
-                "name": "health/state/list",
+                "name": "health.state.list",
                 "description": "List overall wellbeing check-ins for a pet. Without date_from/date_to returns the last 10 records (newest first). With a date range returns all matches (oldest first) for charting.",
                 "inputSchema": {
                     "type": "object",
@@ -526,7 +550,7 @@ fn tool_list() -> Value {
                 }
             },
             {
-                "name": "health/state/create",
+                "name": "health.state.create",
                 "description": "Log an overall wellbeing check-in. Levels: terrible, poor, ok, good, amazing.",
                 "inputSchema": {
                     "type": "object",
@@ -542,7 +566,7 @@ fn tool_list() -> Value {
                 }
             },
             {
-                "name": "health/state/delete",
+                "name": "health.state.delete",
                 "description": "Delete a wellbeing check-in by ID.",
                 "inputSchema": {
                     "type": "object",
@@ -553,7 +577,7 @@ fn tool_list() -> Value {
 
             // ── Health context ───────────────────────────────────────────────
             {
-                "name": "pets/health-context",
+                "name": "pets.health-context",
                 "description": "Returns a complete health context for a single pet in one call: pet profile, the last 10 weight records (most recent first), 30-day weight stats (latest_kg, avg_kg, count), and the last 10 overall wellbeing check-ins (level + optional note, most recent first). Weight is not included in the pet profile — use stats_30d.latest_kg for current weight. Use recent_state_checks to answer 'how has the pet been feeling?' and read any caregiver notes. Levels: terrible, poor, ok, good, amazing.",
                 "inputSchema": {
                     "type": "object",
@@ -575,63 +599,69 @@ pub async fn dispatch(
 ) -> AppResult<Value> {
     let params = params.unwrap_or_else(|| json!({}));
 
-    match method {
-        // ── MCP protocol ─────────────────────────────────────────────────────
-        "tools/list" => Ok(tool_list()),
+    // Protocol method (JSON-RPC), not a tool name — keep the slash form.
+    if method == "tools/list" {
+        return Ok(tool_list());
+    }
 
+    // Tool names use dots for namespacing (MCP 2025-11-25 / SEP-986: A-Z a-z 0-9 _ - .).
+    // Accept legacy slash-separated names as aliases so existing clients keep working.
+    let tool = method.replace('/', ".");
+
+    match tool.as_str() {
         // ── Pets ─────────────────────────────────────────────────────────────
-        "pets/list" => {
+        "pets.list" => {
             let pets = pet_service::list(pool).await?;
             Ok(json!(pets))
         }
-        "pets/get" => {
+        "pets.get" => {
             let id = require_uuid(&params, "id")?;
             let pet = pet_service::get(pool, id).await?;
             Ok(json!(pet))
         }
-        "pets/create" => {
+        "pets.create" => {
             let req: CreatePet =
                 serde_json::from_value(params).map_err(|e| AppError::BadRequest(e.to_string()))?;
             let pet = pet_service::create(pool, req).await?;
             Ok(json!(pet))
         }
-        "pets/update" => {
+        "pets.update" => {
             let id = require_uuid(&params, "id")?;
             let req: UpdatePet =
                 serde_json::from_value(params).map_err(|e| AppError::BadRequest(e.to_string()))?;
             let pet = pet_service::update(pool, id, req).await?;
             Ok(json!(pet))
         }
-        // pets/delete removed — use pets/update with status=archived
+        // pets.delete removed — use pets.update with status=archived
 
         // ── Nutrition records ─────────────────────────────────────────────────
-        "nutrition/records/list" => {
+        "nutrition.records.list" => {
             let filters: NutritionRecordFilters =
                 serde_json::from_value(params).map_err(|e| AppError::BadRequest(e.to_string()))?;
             let records = nutrition_record_service::list(pool, filters).await?;
             Ok(json!(records))
         }
-        "nutrition/records/get" => {
+        "nutrition.records.get" => {
             let id = params["id"]
                 .as_str()
                 .ok_or_else(|| AppError::BadRequest("id required".to_string()))?;
             let record = nutrition_record_service::get(pool, id).await?;
             Ok(json!(record))
         }
-        "nutrition/records/create" => {
+        "nutrition.records.create" => {
             let req: CreateNutritionRecord =
                 serde_json::from_value(params).map_err(|e| AppError::BadRequest(e.to_string()))?;
             let record = nutrition_record_service::create(pool, req, timezone).await?;
             Ok(json!(record))
         }
-        "nutrition/records/batch-create" => {
+        "nutrition.records.batch-create" => {
             let req: BatchCreateNutritionRecords =
                 serde_json::from_value(params).map_err(|e| AppError::BadRequest(e.to_string()))?;
             let records =
                 nutrition_record_service::batch_create(pool, req.records, timezone).await?;
             Ok(json!(records))
         }
-        "nutrition/records/update" => {
+        "nutrition.records.update" => {
             let id = params["id"]
                 .as_str()
                 .ok_or_else(|| AppError::BadRequest("id required".to_string()))?
@@ -641,7 +671,7 @@ pub async fn dispatch(
             let record = nutrition_record_service::update(pool, &id, req).await?;
             Ok(json!(record))
         }
-        "nutrition/records/delete" => {
+        "nutrition.records.delete" => {
             let id = params["id"]
                 .as_str()
                 .ok_or_else(|| AppError::BadRequest("id required".to_string()))?;
@@ -650,7 +680,7 @@ pub async fn dispatch(
         }
 
         // ── Days & notes ──────────────────────────────────────────────────────
-        "days/summary" => {
+        "days.summary" => {
             let date = params["date"]
                 .as_str()
                 .ok_or_else(|| AppError::BadRequest("date required".to_string()))?;
@@ -658,7 +688,7 @@ pub async fn dispatch(
             let summary = day_service::get_day_summary(pool, date, pet_id).await?;
             Ok(json!(summary))
         }
-        "days/note/get" => {
+        "days.note.get" => {
             let date = params["date"]
                 .as_str()
                 .ok_or_else(|| AppError::BadRequest("date required".to_string()))?;
@@ -666,7 +696,7 @@ pub async fn dispatch(
             let summary = day_service::get_day_summary(pool, date, pet_id).await?;
             Ok(json!({ "date": date, "note": summary.note }))
         }
-        "days/note/set" => {
+        "days.note.set" => {
             let date = params["date"]
                 .as_str()
                 .ok_or_else(|| AppError::BadRequest("date required".to_string()))?;
@@ -679,19 +709,24 @@ pub async fn dispatch(
         }
 
         // ── Nutrition context ─────────────────────────────────────────────────
-        "pets/nutrition-context" => {
+        "pets.nutrition-context" => {
             let pet_id = require_uuid(&params, "pet_id")?;
             let today = params["today"]
                 .as_str()
                 .map(str::to_owned)
-                .unwrap_or_else(|| Utc::now().date_naive().to_string());
+                .unwrap_or_else(|| Utc::now().with_timezone(&timezone).date_naive().to_string());
             let week_from = {
                 let d = chrono::NaiveDate::parse_from_str(&today, "%Y-%m-%d")
                     .map_err(|_| AppError::BadRequest("invalid today date".to_string()))?;
                 (d - chrono::Duration::days(6)).to_string()
             };
+            let now_time = Utc::now()
+                .with_timezone(&timezone)
+                .format("%H:%M:%S")
+                .to_string();
+            let status_ts = format!("{today}T{now_time}");
 
-            let (pet, today_summary, schedules, trend) = tokio::try_join!(
+            let (pet, today_summary, schedules, trend, status) = tokio::try_join!(
                 pet_service::get(pool, pet_id),
                 day_service::get_day_summary(pool, &today, Some(pet_id)),
                 nutrition_schedule_service::list(pool, Some(pet_id)),
@@ -702,6 +737,7 @@ pub async fn dispatch(
                     Some(pet_id),
                     None
                 ),
+                nutrition_status_service::get_status(pool, pet_id, Some(&status_ts), timezone),
             )?;
 
             let active_schedules: Vec<_> = schedules.iter().filter(|s| s.active).collect();
@@ -709,6 +745,7 @@ pub async fn dispatch(
             Ok(json!({
                 "pet": pet,
                 "today": today,
+                "status": status,
                 "today_summary": today_summary,
                 "active_schedules": active_schedules,
                 "trend_7d": trend
@@ -716,7 +753,7 @@ pub async fn dispatch(
         }
 
         // ── Nutrition analytics ───────────────────────────────────────────────
-        "nutrition/analytics/daily-totals" => {
+        "nutrition.analytics.daily-totals" => {
             let date_from = params["date_from"]
                 .as_str()
                 .ok_or_else(|| AppError::BadRequest("date_from required".to_string()))?;
@@ -731,7 +768,7 @@ pub async fn dispatch(
             .await?;
             Ok(json!(totals))
         }
-        "nutrition/analytics/range-summary" => {
+        "nutrition.analytics.range-summary" => {
             let date_from = params["date_from"]
                 .as_str()
                 .ok_or_else(|| AppError::BadRequest("date_from required".to_string()))?;
@@ -746,7 +783,7 @@ pub async fn dispatch(
             .await?;
             Ok(json!(summary))
         }
-        "nutrition/analytics/best-fluid-day" => {
+        "nutrition.analytics.best-fluid-day" => {
             let exclude_date = params["exclude_date"]
                 .as_str()
                 .ok_or_else(|| AppError::BadRequest("exclude_date required".to_string()))?;
@@ -755,27 +792,39 @@ pub async fn dispatch(
                 nutrition_analytics_service::best_fluid_day(pool, pet_id, exclude_date).await?;
             Ok(json!(result))
         }
+        "nutrition.status" => {
+            let pet_id = require_uuid(&params, "pet_id")?;
+            let ts = params["ts"].as_str();
+            let status = nutrition_status_service::get_status(pool, pet_id, ts, timezone).await?;
+            Ok(json!(status))
+        }
+        "nutrition.on-track" => {
+            let pet_id = require_uuid(&params, "pet_id")?;
+            let ts = params["ts"].as_str();
+            let status = nutrition_status_service::get_status(pool, pet_id, ts, timezone).await?;
+            Ok(nutrition_status_service::on_track_summary(&status))
+        }
 
         // ── Nutrition schedules ───────────────────────────────────────────────
-        "nutrition/schedules/list" => {
+        "nutrition.schedules.list" => {
             let pet_id = optional_uuid(&params, "pet_id")?;
             let schedules = nutrition_schedule_service::list(pool, pet_id).await?;
             Ok(json!(schedules))
         }
-        "nutrition/schedules/get" => {
+        "nutrition.schedules.get" => {
             let id = params["id"]
                 .as_str()
                 .ok_or_else(|| AppError::BadRequest("id required".to_string()))?;
             let schedule = nutrition_schedule_service::get(pool, id).await?;
             Ok(json!(schedule))
         }
-        "nutrition/schedules/create" => {
+        "nutrition.schedules.create" => {
             let req: CreateNutritionSchedule =
                 serde_json::from_value(params).map_err(|e| AppError::BadRequest(e.to_string()))?;
             let schedule = nutrition_schedule_service::create(pool, req).await?;
             Ok(json!(schedule))
         }
-        "nutrition/schedules/update" => {
+        "nutrition.schedules.update" => {
             let id = params["id"]
                 .as_str()
                 .ok_or_else(|| AppError::BadRequest("id required".to_string()))?
@@ -785,7 +834,7 @@ pub async fn dispatch(
             let schedule = nutrition_schedule_service::update(pool, &id, req).await?;
             Ok(json!(schedule))
         }
-        "nutrition/schedules/delete" => {
+        "nutrition.schedules.delete" => {
             let id = params["id"]
                 .as_str()
                 .ok_or_else(|| AppError::BadRequest("id required".to_string()))?;
@@ -794,19 +843,19 @@ pub async fn dispatch(
         }
 
         // ── Elimination records ───────────────────────────────────────────────
-        "elimination/records/list" => {
+        "elimination.records.list" => {
             let filters: EliminationRecordFilters =
                 serde_json::from_value(params).map_err(|e| AppError::BadRequest(e.to_string()))?;
             let records = elimination_record_service::list(pool, filters).await?;
             Ok(json!(records))
         }
-        "elimination/records/create" => {
+        "elimination.records.create" => {
             let req: CreateEliminationRecord =
                 serde_json::from_value(params).map_err(|e| AppError::BadRequest(e.to_string()))?;
             let record = elimination_record_service::create(pool, req, timezone).await?;
             Ok(json!(record))
         }
-        "elimination/records/update" => {
+        "elimination.records.update" => {
             let id = params["id"]
                 .as_str()
                 .ok_or_else(|| AppError::BadRequest("id required".to_string()))?
@@ -816,14 +865,14 @@ pub async fn dispatch(
             let record = elimination_record_service::update(pool, &id, req).await?;
             Ok(json!(record))
         }
-        "elimination/records/delete" => {
+        "elimination.records.delete" => {
             let id = params["id"]
                 .as_str()
                 .ok_or_else(|| AppError::BadRequest("id required".to_string()))?;
             elimination_record_service::delete(pool, id).await?;
             Ok(json!({ "deleted": true }))
         }
-        "elimination/analytics/range-summary" => {
+        "elimination.analytics.range-summary" => {
             let date_from = params["date_from"]
                 .as_str()
                 .ok_or_else(|| AppError::BadRequest("date_from required".to_string()))?;
@@ -838,7 +887,7 @@ pub async fn dispatch(
         }
 
         // ── Elimination context ───────────────────────────────────────────────
-        "pets/elimination-context" => {
+        "pets.elimination-context" => {
             let pet_id = require_uuid(&params, "pet_id")?;
             let today = params["today"]
                 .as_str()
@@ -901,7 +950,7 @@ pub async fn dispatch(
         }
 
         // ── API token scopes ──────────────────────────────────────────────────
-        "api-tokens/scopes/update" => {
+        "api-tokens.scopes.update" => {
             use crate::domain::settings::{is_valid_scope, UpdateApiTokenScopes};
             let id = params["id"]
                 .as_str()
@@ -934,26 +983,26 @@ pub async fn dispatch(
         }
 
         // ── Weight records ────────────────────────────────────────────────────
-        "weight/records/list" => {
+        "weight.records.list" => {
             let filters: WeightRecordFilters =
                 serde_json::from_value(params).map_err(|e| AppError::BadRequest(e.to_string()))?;
             let records = weight_service::list(pool, filters).await?;
             Ok(json!(records))
         }
-        "weight/records/create" => {
+        "weight.records.create" => {
             let req: CreateWeightRecord =
                 serde_json::from_value(params).map_err(|e| AppError::BadRequest(e.to_string()))?;
             let record = weight_service::create(pool, req, timezone).await?;
             Ok(json!(record))
         }
-        "weight/records/delete" => {
+        "weight.records.delete" => {
             let id = params["id"]
                 .as_str()
                 .ok_or_else(|| AppError::BadRequest("id required".to_string()))?;
             weight_service::delete(pool, id).await?;
             Ok(json!({ "deleted": true }))
         }
-        "weight/summary" => {
+        "weight.summary" => {
             let pet_id = params["pet_id"]
                 .as_str()
                 .ok_or_else(|| AppError::BadRequest("pet_id required".to_string()))?;
@@ -971,19 +1020,19 @@ pub async fn dispatch(
         }
 
         // ── Overall health state ──────────────────────────────────────────────
-        "health/state/list" => {
+        "health.state.list" => {
             let filters: HealthStateRecordFilters =
                 serde_json::from_value(params).map_err(|e| AppError::BadRequest(e.to_string()))?;
             let records = health_state_service::list(pool, filters).await?;
             Ok(json!(records))
         }
-        "health/state/create" => {
+        "health.state.create" => {
             let req: CreateHealthStateRecord =
                 serde_json::from_value(params).map_err(|e| AppError::BadRequest(e.to_string()))?;
             let record = health_state_service::create(pool, req, timezone).await?;
             Ok(json!(record))
         }
-        "health/state/delete" => {
+        "health.state.delete" => {
             let id = params["id"]
                 .as_str()
                 .ok_or_else(|| AppError::BadRequest("id required".to_string()))?;
@@ -992,7 +1041,7 @@ pub async fn dispatch(
         }
 
         // ── Health context ────────────────────────────────────────────────────
-        "pets/health-context" => {
+        "pets.health-context" => {
             let pet_id = require_uuid(&params, "pet_id")?;
             let pet_id_str = pet_id.to_string();
             let today = Utc::now().date_naive().to_string();

@@ -41,4 +41,4 @@ export const EmptyDay: Story = {
   },
 };
 
-/** See Nutrition/NutritionRecordRow for isolated display and editing states. */
+/** See Nutrition/NutritionRecordRow for isolated display, editing, and move-date actions. */

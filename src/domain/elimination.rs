@@ -100,7 +100,9 @@ pub struct UpdateEliminationRecord {
     pub subtype: Option<Option<String>>,
     /// Use Some(None) to clear, Some(Some(n)) to set.
     pub duration_seconds: Option<Option<i64>>,
-    /// Use Some(None) to clear, Some(Some(s)) to set.
+    /// `None` = key absent (leave unchanged); `Some(None)` = key present as
+    /// JSON `null` (clear the note); `Some(Some(s))` = set the note to `s`.
+    #[serde(default, deserialize_with = "crate::domain::double_option")]
     pub note: Option<Option<String>>,
 }
 
@@ -125,8 +127,12 @@ pub struct EliminationDailySummary {
     pub vomit_count: i64,
     pub general_count: i64,
     pub has_vomit: bool,
-    /// Average duration in seconds for records that have duration_seconds set, or None if none recorded.
-    pub avg_duration_seconds: Option<f64>,
+    /// Average duration in seconds for urination records with duration logged.
+    pub urination_avg_duration_seconds: Option<f64>,
+    /// Average duration in seconds for defecation records with duration logged.
+    pub defecation_avg_duration_seconds: Option<f64>,
+    /// Average duration in seconds for general records with duration logged.
+    pub general_avg_duration_seconds: Option<f64>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

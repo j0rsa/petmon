@@ -11,9 +11,17 @@ struct EventTypeCountRow {
 }
 
 #[derive(sqlx::FromRow)]
-struct AvgDurationRow {
+struct AvgDurationByTypeRow {
     local_date: String,
+    event_type: String,
     avg_duration: Option<f64>,
+}
+
+#[derive(Default, Clone, Copy)]
+struct TypeAvgDurations {
+    urination: Option<f64>,
+    defecation: Option<f64>,
+    general: Option<f64>,
 }
 
 #[tracing::instrument(skip(pool))]
@@ -44,30 +52,36 @@ pub async fn daily_summaries(
 
     let rows = q.fetch_all(pool).await?;
 
-    // Second query: avg duration per day (only rows where duration_seconds IS NOT NULL)
-    let mut dur_query = String::from(
-        "SELECT local_date, AVG(duration_seconds) as avg_duration FROM elimination_records WHERE local_date BETWEEN ? AND ? AND duration_seconds IS NOT NULL",
+    // Avg duration per day and event type
+    let mut type_dur_query = String::from(
+        "SELECT local_date, event_type, AVG(duration_seconds) as avg_duration FROM elimination_records WHERE local_date BETWEEN ? AND ? AND duration_seconds IS NOT NULL",
     );
     if pet_id.is_some() {
-        dur_query.push_str(" AND pet_id = ?");
+        type_dur_query.push_str(" AND pet_id = ?");
     }
-    dur_query.push_str(" GROUP BY local_date");
+    type_dur_query.push_str(" GROUP BY local_date, event_type");
 
-    let mut dq = sqlx::query_as::<_, AvgDurationRow>(sqlx::AssertSqlSafe(dur_query))
+    let mut tq = sqlx::query_as::<_, AvgDurationByTypeRow>(sqlx::AssertSqlSafe(type_dur_query))
         .bind(date_from)
         .bind(date_to);
     if let Some(pid) = pet_id {
         if let Ok(uuid) = uuid::Uuid::parse_str(pid) {
-            dq = dq.bind(uuid);
+            tq = tq.bind(uuid);
         } else {
-            dq = dq.bind(pid);
+            tq = tq.bind(pid);
         }
     }
-    let dur_rows = dq.fetch_all(pool).await?;
-    let avg_duration_by_date: BTreeMap<String, f64> = dur_rows
-        .into_iter()
-        .filter_map(|r| r.avg_duration.map(|d| (r.local_date, d)))
-        .collect();
+    let type_dur_rows = tq.fetch_all(pool).await?;
+    let mut avg_duration_by_date_type: BTreeMap<String, TypeAvgDurations> = BTreeMap::new();
+    for row in type_dur_rows {
+        let entry = avg_duration_by_date_type.entry(row.local_date).or_default();
+        match row.event_type.as_str() {
+            "urination" => entry.urination = row.avg_duration,
+            "defecation" => entry.defecation = row.avg_duration,
+            "general" => entry.general = row.avg_duration,
+            _ => {}
+        }
+    }
 
     // Aggregate event counts by date
     let mut by_date: BTreeMap<String, (i64, i64, i64, i64)> = BTreeMap::new();
@@ -89,7 +103,10 @@ pub async fn daily_summaries(
         .into_iter()
         .map(|(local_date, (urination, defecation, vomit, general))| {
             let total_count = urination + defecation + vomit + general;
-            let avg_duration_seconds = avg_duration_by_date.get(&local_date).copied();
+            let type_durations = avg_duration_by_date_type
+                .get(&local_date)
+                .copied()
+                .unwrap_or_default();
             EliminationDailySummary {
                 local_date,
                 pet_id: pet_id_owned.clone(),
@@ -99,7 +116,9 @@ pub async fn daily_summaries(
                 vomit_count: vomit,
                 general_count: general,
                 has_vomit: vomit > 0,
-                avg_duration_seconds,
+                urination_avg_duration_seconds: type_durations.urination,
+                defecation_avg_duration_seconds: type_durations.defecation,
+                general_avg_duration_seconds: type_durations.general,
             }
         })
         .collect();

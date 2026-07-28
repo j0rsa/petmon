@@ -11,7 +11,7 @@ import { CumulativeFluidChart } from './CumulativeFluidChart';
 import { IntakeBarsChart } from './IntakeBarsChart';
 import { TimeInput } from './TimeInput';
 import { nowTimeString, isoFromDateAndTime, timeFromIso } from '../lib/time';
-import { localToday } from '../lib/dates';
+import { localToday, shiftDate } from '../lib/dates';
 import { useDisplaySettings, useFormatDate, useFormatTime } from '../context/useDisplaySettings';
 import { exportTelegramLog } from '../lib/exportTelegramLog';
 import { LiquidsIcon, WaterIcon, WetFoodIcon, TotalFluidIcon } from '../lib/metricIcons';
@@ -214,15 +214,24 @@ function RecordRow({ record, onSave, onDelete, saving, savingPaused, deleting, d
     setEditing(true);
   }
 
-  function commitEdit() {
-    onSave(record.id, {
-      occurred_at: isoFromDateAndTime(record.local_date, time),
-      local_date: record.local_date,
+  function buildPayload(localDate: string): UpdateNutritionRecord {
+    return {
+      occurred_at: isoFromDateAndTime(localDate, time),
+      local_date: localDate,
       category,
       amount: parseDecimal(amount),
       unit: unitFor(category),
       note: note.trim() || null,
-    });
+    };
+  }
+
+  function commitEdit() {
+    onSave(record.id, buildPayload(record.local_date));
+    setEditing(false);
+  }
+
+  function commitMoveDate(offset: number) {
+    onSave(record.id, buildPayload(shiftDate(record.local_date, offset)));
     setEditing(false);
   }
 
@@ -272,6 +281,26 @@ function RecordRow({ record, onSave, onDelete, saving, savingPaused, deleting, d
             />
           </div>
           <div className="record-entry-form__actions">
+            <button
+              className="button button-secondary button-compact record-entry-form__move-day"
+              type="button"
+              disabled={saving}
+              title={savingPaused ? 'Offline…' : 'Move to yesterday'}
+              aria-label="Move to yesterday"
+              onClick={() => commitMoveDate(-1)}
+            >
+              ⬅️🗓️
+            </button>
+            <button
+              className="button button-secondary button-compact record-entry-form__move-day"
+              type="button"
+              disabled={saving}
+              title={savingPaused ? 'Offline…' : 'Move to tomorrow'}
+              aria-label="Move to tomorrow"
+              onClick={() => commitMoveDate(1)}
+            >
+              ➡️🗓️
+            </button>
             <button
               className="button button-compact"
               type="button"
@@ -384,7 +413,13 @@ export function NutritionDayPanel({ date, petId }: NutritionDayPanelProps) {
   const updateMutation = useMutation({
     mutationFn: ({ id, payload }: { id: string; payload: UpdateNutritionRecord }) =>
       nutritionRecordsApi.update(id, payload),
-    onSuccess: () => invalidateDayData(queryClient, date, petId),
+    onSuccess: (_data, variables) => {
+      const dates = new Set([date]);
+      if (variables.payload.local_date) {
+        dates.add(variables.payload.local_date);
+      }
+      return Promise.all([...dates].map((d) => invalidateDayData(queryClient, d, petId)));
+    },
   });
 
   const deleteMutation = useMutation({

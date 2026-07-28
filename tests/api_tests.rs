@@ -168,6 +168,183 @@ async fn mcp_endpoint_requires_auth() {
     assert_eq!(resp.status(), 401, "POST /mcp must require auth");
 }
 
+/// tools/list must advertise MCP 2025-11-25 compliant names (no `/`).
+#[actix_web::test]
+async fn mcp_tools_list_names_have_no_slashes() {
+    let pool = setup_pool().await;
+    let raw = "pm_api_mcp_toolnames_00000000000000000000000000000000000000000000000";
+    seed_token(&pool, raw, "mcp").await;
+    let state = web::Data::new(AppState::new(pool, false, None, None));
+    let app = build_full_app!(state);
+
+    let resp = test::call_service(
+        &app,
+        test::TestRequest::post()
+            .uri("/mcp")
+            .insert_header(("Authorization", format!("Bearer {raw}")))
+            .set_json(serde_json::json!({
+                "jsonrpc": "2.0",
+                "id": 1,
+                "method": "tools/list",
+                "params": null
+            }))
+            .to_request(),
+    )
+    .await;
+    assert_eq!(resp.status(), 200);
+    let body: serde_json::Value = test::read_body_json(resp).await;
+    let tools = body["result"]["tools"].as_array().expect("tools array");
+    assert!(!tools.is_empty(), "expected at least one tool");
+
+    // MCP tool names: A-Z a-z 0-9 _ - . only (no slash). See CLAUDE.md / SEP-986.
+    let is_valid_tool_name = |name: &str| -> bool {
+        !name.is_empty()
+            && name.len() <= 128
+            && name
+                .chars()
+                .all(|c| c.is_ascii_alphanumeric() || c == '_' || c == '-' || c == '.')
+    };
+    for tool in tools {
+        let name = tool["name"].as_str().expect("tool name");
+        assert!(
+            is_valid_tool_name(name),
+            "tool name {name:?} must match MCP 2025-11-25 allowed characters"
+        );
+        assert!(
+            !name.contains('/'),
+            "tool name {name:?} must not contain '/'"
+        );
+    }
+    let names: Vec<_> = tools.iter().filter_map(|t| t["name"].as_str()).collect();
+    assert!(names.contains(&"weight.records.create"));
+    assert!(names.contains(&"pets.list"));
+    assert!(!names.iter().any(|n| n.contains('/')));
+}
+
+/// Legacy slash tool names remain callable aliases of the dotted names.
+#[actix_web::test]
+async fn mcp_tools_call_accepts_legacy_slash_alias() {
+    let pool = setup_pool().await;
+    let raw = "pm_api_mcp_slash_alias_000000000000000000000000000000000000000000000";
+    seed_token(&pool, raw, "mcp").await;
+    let state = web::Data::new(AppState::new(pool, true, None, None));
+    let app = build_full_app!(state);
+
+    let resp = test::call_service(
+        &app,
+        test::TestRequest::post()
+            .uri("/mcp")
+            .insert_header(("Authorization", format!("Bearer {raw}")))
+            .set_json(serde_json::json!({
+                "jsonrpc": "2.0",
+                "id": 1,
+                "method": "tools/call",
+                "params": {
+                    "name": "pets/list",
+                    "arguments": {}
+                }
+            }))
+            .to_request(),
+    )
+    .await;
+    assert_eq!(resp.status(), 200);
+    let body: serde_json::Value = test::read_body_json(resp).await;
+    assert!(
+        body["error"].is_null(),
+        "legacy slash alias must succeed: {body}"
+    );
+    let text = body["result"]["content"][0]["text"]
+        .as_str()
+        .expect("tool text");
+    let pets: serde_json::Value = serde_json::from_str(text).expect("pets json");
+    assert!(pets.is_array());
+}
+
+#[actix_web::test]
+async fn sign_out_deletes_api_token() {
+    let pool = setup_pool().await;
+    let raw = "pm_api_signout_test_0000000000000000000000000000000000000000000000";
+    let token_id = uuid::Uuid::new_v4().to_string();
+    let hash = {
+        let mut hasher = Sha256::new();
+        hasher.update(raw.as_bytes());
+        format!("{:x}", hasher.finalize())
+    };
+    sqlx::query(
+        "INSERT INTO api_tokens (id, token_hash, alias, scopes, created_by, created_at, last_used_at, active) \
+         VALUES (?, ?, ?, ?, ?, datetime('now'), NULL, 1)",
+    )
+    .bind(&token_id)
+    .bind(&hash)
+    .bind("My Device")
+    .bind("all")
+    .bind("Alice")
+    .execute(&pool)
+    .await
+    .unwrap();
+
+    // Keep auth configured after sign-out so invalid tokens return 401, not 503.
+    sqlx::query(
+        "INSERT INTO api_tokens (id, token_hash, alias, scopes, created_at, last_used_at, active) \
+         VALUES ('other-token', 'otherhash', 'other', 'all', datetime('now'), NULL, 1)",
+    )
+    .execute(&pool)
+    .await
+    .unwrap();
+
+    let state = web::Data::new(AppState::new(pool.clone(), false, None, None));
+    let app = build_app!(state);
+
+    let resp = test::call_service(
+        &app,
+        test::TestRequest::get()
+            .uri("/api/v1/auth/me")
+            .insert_header(("Authorization", format!("Bearer {raw}")))
+            .to_request(),
+    )
+    .await;
+    assert_eq!(
+        resp.status(),
+        200,
+        "token must authenticate before sign-out"
+    );
+    let me: serde_json::Value = test::read_body_json(resp).await;
+    assert_eq!(me["kind"].as_str(), Some("api_token"));
+    assert_eq!(me["display_name"].as_str(), Some("My Device"));
+    assert_eq!(me["token_created_by"].as_str(), Some("Alice"));
+
+    let resp = test::call_service(
+        &app,
+        test::TestRequest::post()
+            .uri("/api/v1/auth/sign-out")
+            .insert_header(("Authorization", format!("Bearer {raw}")))
+            .to_request(),
+    )
+    .await;
+    assert_eq!(resp.status(), 204, "sign-out must return 204");
+
+    let count: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM api_tokens WHERE id = ?")
+        .bind(&token_id)
+        .fetch_one(&pool)
+        .await
+        .unwrap();
+    assert_eq!(count, 0, "sign-out must permanently delete the API token");
+
+    let resp = test::call_service(
+        &app,
+        test::TestRequest::get()
+            .uri("/api/v1/auth/me")
+            .insert_header(("Authorization", format!("Bearer {raw}")))
+            .to_request(),
+    )
+    .await;
+    assert_eq!(
+        resp.status(),
+        401,
+        "deleted token must no longer authenticate"
+    );
+}
+
 #[actix_web::test]
 async fn auth_info_is_public_at_full_app_level() {
     let pool = setup_pool().await;
@@ -636,6 +813,112 @@ async fn nutrition_record_crud() {
     assert_eq!(resp.status(), 404);
 }
 
+/// PATCH nutrition record with `note: null` must clear an existing note (issue #15).
+#[actix_web::test]
+async fn nutrition_record_patch_clears_note_when_null() {
+    let (app, _state) = build_dev_app!();
+    let pet_id = api_create_pet!(&app, "NutritionClearNote");
+
+    // Create a record with a note.
+    let req = test::TestRequest::post()
+        .uri("/api/v1/nutrition/records")
+        .set_json(serde_json::json!({
+            "pet_id": pet_id,
+            "category": "wet_food",
+            "amount": 75,
+            "unit": "g",
+            "note": "original note",
+            "occurred_at": "2026-06-01T08:00:00",
+            "local_date": "2026-06-01"
+        }))
+        .to_request();
+    let resp = test::call_service(&app, req).await;
+    assert_eq!(resp.status(), 201);
+    let body: serde_json::Value = test::read_body_json(resp).await;
+    let record_id = body["id"].as_str().unwrap().to_string();
+    assert_eq!(body["note"].as_str(), Some("original note"));
+
+    // PATCH with note: null — must clear the note.
+    let req = test::TestRequest::patch()
+        .uri(&format!("/api/v1/nutrition/records/{record_id}"))
+        .set_json(serde_json::json!({ "note": null }))
+        .to_request();
+    let resp = test::call_service(&app, req).await;
+    assert_eq!(resp.status(), 200);
+    let body: serde_json::Value = test::read_body_json(resp).await;
+    assert!(
+        body["note"].is_null(),
+        "note must be null after clearing, got: {}",
+        body["note"]
+    );
+
+    // PATCH without note key — must leave note unchanged (still null).
+    let req = test::TestRequest::patch()
+        .uri(&format!("/api/v1/nutrition/records/{record_id}"))
+        .set_json(serde_json::json!({ "amount": 80 }))
+        .to_request();
+    let resp = test::call_service(&app, req).await;
+    assert_eq!(resp.status(), 200);
+    let body: serde_json::Value = test::read_body_json(resp).await;
+    assert!(
+        body["note"].is_null(),
+        "note must remain null when not included in patch, got: {}",
+        body["note"]
+    );
+}
+
+/// PATCH elimination record with `note: null` must clear an existing note (issue #15).
+#[actix_web::test]
+async fn elimination_record_patch_clears_note_when_null() {
+    let (app, _state) = build_dev_app!();
+    let pet_id = api_create_pet!(&app, "EliminationClearNote");
+
+    // Create a record with a note.
+    let req = test::TestRequest::post()
+        .uri("/api/v1/elimination/records")
+        .set_json(serde_json::json!({
+            "pet_id": pet_id,
+            "event_type": "urination",
+            "note": "original note",
+            "occurred_at": "2026-06-01T09:00:00",
+            "local_date": "2026-06-01"
+        }))
+        .to_request();
+    let resp = test::call_service(&app, req).await;
+    assert_eq!(resp.status(), 201);
+    let body: serde_json::Value = test::read_body_json(resp).await;
+    let record_id = body["id"].as_str().unwrap().to_string();
+    assert_eq!(body["note"].as_str(), Some("original note"));
+
+    // PATCH with note: null — must clear the note.
+    let req = test::TestRequest::patch()
+        .uri(&format!("/api/v1/elimination/records/{record_id}"))
+        .set_json(serde_json::json!({ "note": null }))
+        .to_request();
+    let resp = test::call_service(&app, req).await;
+    assert_eq!(resp.status(), 200);
+    let body: serde_json::Value = test::read_body_json(resp).await;
+    assert!(
+        body["note"].is_null(),
+        "note must be null after clearing, got: {}",
+        body["note"]
+    );
+
+    // PATCH without note key — must leave note unchanged (still null).
+    let req = test::TestRequest::patch()
+        .uri(&format!("/api/v1/elimination/records/{record_id}"))
+        .set_json(serde_json::json!({ "event_type": "defecation" }))
+        .to_request();
+    let resp = test::call_service(&app, req).await;
+    assert_eq!(resp.status(), 200);
+    let body: serde_json::Value = test::read_body_json(resp).await;
+    assert!(
+        body["note"].is_null(),
+        "note must remain null when not included in patch, got: {}",
+        body["note"]
+    );
+}
+
 /// Schedule rules must not persist denormalized daily target_min/target_max fields.
 #[actix_web::test]
 async fn nutrition_schedule_rules_strip_stored_targets() {
@@ -721,6 +1004,165 @@ async fn nutrition_schedule_rejects_legacy_array_rules() {
         .to_request();
     let resp = test::call_service(&app, req).await;
     assert_eq!(resp.status(), 422);
+}
+
+/// GET /nutrition/status returns cumulative intake and schedule expectations as of ts.
+#[actix_web::test]
+async fn nutrition_status_as_of_timestamp() {
+    let (app, _state) = build_dev_app!();
+    let pet_id = api_create_pet!(&app, "NutritionStatusTest");
+
+    let req = test::TestRequest::post()
+        .uri("/api/v1/nutrition/schedules")
+        .set_json(serde_json::json!({
+            "pet_id": pet_id,
+            "name": "Hydration",
+            "rules": {
+                "type": "liquid",
+                "windows": [
+                    { "from": "08:00", "to": "10:00", "min": 10, "max": 100, "note": "morning" },
+                    { "from": "12:00", "to": "14:00", "min": 20, "max": 50, "note": "midday" }
+                ]
+            }
+        }))
+        .to_request();
+    let resp = test::call_service(&app, req).await;
+    assert_eq!(resp.status(), 201);
+    let schedule: serde_json::Value = test::read_body_json(resp).await;
+    let schedule_id = schedule["id"].as_str().unwrap();
+
+    for (time, category, amount) in [
+        ("2026-07-18T08:30:00", "liquids", 60.0),
+        ("2026-07-18T11:00:00", "water", 20.0),
+        ("2026-07-18T15:00:00", "liquids", 999.0),
+    ] {
+        let req = test::TestRequest::post()
+            .uri("/api/v1/nutrition/records")
+            .set_json(serde_json::json!({
+                "pet_id": pet_id,
+                "category": category,
+                "amount": amount,
+                "unit": "ml",
+                "occurred_at": time,
+                "local_date": "2026-07-18"
+            }))
+            .to_request();
+        let resp = test::call_service(&app, req).await;
+        assert_eq!(resp.status(), 201, "failed to create record at {time}");
+    }
+
+    let req = test::TestRequest::get()
+        .uri(&format!(
+            "/api/v1/nutrition/status?pet_id={pet_id}&ts=2026-07-18T13:00:00"
+        ))
+        .to_request();
+    let resp = test::call_service(&app, req).await;
+    assert_eq!(resp.status(), 200);
+    let body: serde_json::Value = test::read_body_json(resp).await;
+
+    assert_eq!(body["local_date"].as_str(), Some("2026-07-18"));
+    assert_eq!(body["as_of"].as_str(), Some("2026-07-18T13:00:00"));
+    assert_eq!(body["on_track"].as_bool(), Some(false));
+    assert_eq!(body["intake"]["liquids_ml"].as_f64(), Some(60.0));
+    assert_eq!(body["intake"]["water_ml"].as_f64(), Some(20.0));
+    assert_eq!(body["intake"]["direct_liquid_ml"].as_f64(), Some(80.0));
+
+    let schedule_body = &body["schedule"];
+    assert_eq!(schedule_body["schedule_id"].as_str(), Some(schedule_id));
+    assert_eq!(schedule_body["expected_ml"].as_f64(), Some(150.0));
+    assert_eq!(schedule_body["daily_min_ml"].as_f64(), Some(30.0));
+    assert_eq!(schedule_body["daily_max_ml"].as_f64(), Some(150.0));
+    assert_eq!(schedule_body["delta_ml"].as_f64(), Some(-70.0));
+}
+
+#[actix_web::test]
+async fn nutrition_status_requires_pet_id() {
+    let (app, _state) = build_dev_app!();
+    let req = test::TestRequest::get()
+        .uri("/api/v1/nutrition/status")
+        .to_request();
+    let resp = test::call_service(&app, req).await;
+    assert_eq!(resp.status(), 400);
+}
+
+#[actix_web::test]
+async fn mcp_nutrition_on_track_returns_summary() {
+    let pool = setup_pool().await;
+    let raw = "pm_api_mcp_ontrack_000000000000000000000000000000000000000000000000";
+    seed_token(&pool, raw, "mcp").await;
+    let state = web::Data::new(AppState::new(pool, true, None, None));
+    let app = build_full_app!(state);
+
+    let create_pet = test::TestRequest::post()
+        .uri("/api/v1/pets")
+        .set_json(serde_json::json!({ "name": "McpOnTrack", "species": "cat" }))
+        .to_request();
+    let resp = test::call_service(&app, create_pet).await;
+    assert_eq!(resp.status(), 201);
+    let pet: serde_json::Value = test::read_body_json(resp).await;
+    let pet_id = pet["id"].as_str().unwrap();
+
+    let create_schedule = test::TestRequest::post()
+        .uri("/api/v1/nutrition/schedules")
+        .set_json(serde_json::json!({
+            "pet_id": pet_id,
+            "name": "Hydration",
+            "rules": {
+                "type": "liquid",
+                "windows": [
+                    { "from": "08:00", "to": "10:00", "min": 10, "max": 100 }
+                ]
+            }
+        }))
+        .to_request();
+    assert_eq!(
+        test::call_service(&app, create_schedule).await.status(),
+        201
+    );
+
+    let create_record = test::TestRequest::post()
+        .uri("/api/v1/nutrition/records")
+        .set_json(serde_json::json!({
+            "pet_id": pet_id,
+            "category": "liquids",
+            "amount": 120,
+            "unit": "ml",
+            "occurred_at": "2026-07-18T09:00:00",
+            "local_date": "2026-07-18"
+        }))
+        .to_request();
+    assert_eq!(test::call_service(&app, create_record).await.status(), 201);
+
+    let resp = test::call_service(
+        &app,
+        test::TestRequest::post()
+            .uri("/mcp")
+            .insert_header(("Authorization", format!("Bearer {raw}")))
+            .set_json(serde_json::json!({
+                "jsonrpc": "2.0",
+                "id": 1,
+                "method": "tools/call",
+                "params": {
+                    "name": "nutrition.on-track",
+                    "arguments": {
+                        "pet_id": pet_id,
+                        "ts": "2026-07-18T09:30:00"
+                    }
+                }
+            }))
+            .to_request(),
+    )
+    .await;
+    assert_eq!(resp.status(), 200);
+    let body: serde_json::Value = test::read_body_json(resp).await;
+    let text = body["result"]["content"][0]["text"]
+        .as_str()
+        .expect("tool text");
+    let summary: serde_json::Value = serde_json::from_str(text).expect("tool json");
+    assert_eq!(summary["on_track"].as_bool(), Some(true));
+    assert_eq!(summary["direct_liquid_ml"].as_f64(), Some(120.0));
+    assert_eq!(summary["expected_ml"].as_f64(), Some(100.0));
+    assert!(summary["summary"].as_str().unwrap().contains("ahead"));
 }
 
 // ── Elimination + weight combined ────────────────────────────────────────────
@@ -849,6 +1291,57 @@ async fn api_tokens_returns_json_not_spa() {
     assert!(
         ct.contains("application/json"),
         "api-tokens must return JSON, got: {ct}"
+    );
+}
+
+/// Range summary must include per-type average duration fields for analytics charts.
+#[actix_web::test]
+async fn elimination_range_summary_includes_per_type_avg_duration() {
+    let (app, _state) = build_dev_app!();
+    let pet_id = api_create_pet!(&app, "EliminationAnalyticsDuration");
+
+    let local_date = "2026-06-01";
+    for (event_type, duration_seconds) in [
+        ("urination", 40),
+        ("urination", 60),
+        ("defecation", 90),
+        ("general", 120),
+    ] {
+        let req = test::TestRequest::post()
+            .uri("/api/v1/elimination/records")
+            .set_json(serde_json::json!({
+                "pet_id": pet_id,
+                "event_type": event_type,
+                "duration_seconds": duration_seconds,
+                "occurred_at": format!("{local_date}T09:00:00"),
+                "local_date": local_date,
+            }))
+            .to_request();
+        let resp = test::call_service(&app, req).await;
+        assert_eq!(resp.status(), 201, "create {event_type} failed");
+    }
+
+    let req = test::TestRequest::get()
+        .uri(&format!(
+            "/api/v1/elimination/analytics/range-summary?date_from={local_date}&date_to={local_date}&pet_id={pet_id}"
+        ))
+        .to_request();
+    let resp = test::call_service(&app, req).await;
+    assert_eq!(resp.status(), 200);
+    let body: serde_json::Value = test::read_body_json(resp).await;
+    let summary = &body["daily_summaries"][0];
+    assert_eq!(summary["local_date"].as_str(), Some(local_date));
+    assert_eq!(
+        summary["urination_avg_duration_seconds"].as_f64(),
+        Some(50.0)
+    );
+    assert_eq!(
+        summary["defecation_avg_duration_seconds"].as_f64(),
+        Some(90.0)
+    );
+    assert_eq!(
+        summary["general_avg_duration_seconds"].as_f64(),
+        Some(120.0)
     );
 }
 
@@ -1520,7 +2013,7 @@ async fn mcp_prompts_get_renders_template() {
         .as_str()
         .expect("prompt text");
     assert!(text.contains("Mittens"));
-    assert!(text.contains("pets/health-context"));
+    assert!(text.contains("pets.health-context"));
 }
 
 #[actix_web::test]

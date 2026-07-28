@@ -1,8 +1,23 @@
 import type { Meta, StoryObj } from '@storybook/react-vite';
+import { expect, fn, userEvent, within } from 'storybook/test';
 import { mockNutritionRecords, mockPetId } from '../stories/fixtures';
 import { NutritionRecordRow } from './NutritionDayPanel';
 
 const noop = () => undefined;
+
+const editingRecord = {
+  id: 'rec-edit',
+  pet_id: mockPetId,
+  occurred_at: '2024-06-15T09:21:00',
+  local_date: '2024-06-15',
+  category: 'liquids',
+  amount: 10,
+  unit: 'ml',
+  note: 'Katovit mit Ente, col',
+  source_type: 'manual',
+  created_at: '2024-06-15T09:21:00',
+  updated_at: '2024-06-15T09:21:00',
+};
 
 const meta = {
   title: 'Nutrition/NutritionRecordRow',
@@ -20,7 +35,7 @@ const meta = {
   ],
   args: {
     record: mockNutritionRecords[0],
-    onSave: noop,
+    onSave: fn(),
     onDelete: noop,
     saving: false,
     savingPaused: false,
@@ -43,27 +58,74 @@ export const DisplayWithNote: Story = {
 
 export const Editing: Story = {
   args: {
-    record: {
-      id: 'rec-edit',
-      pet_id: mockPetId,
-      occurred_at: '2024-06-15T09:21:00',
-      local_date: '2024-06-15',
-      category: 'liquids',
-      amount: 10,
-      unit: 'ml',
-      note: 'Katovit mit Ente, col',
-      source_type: 'manual',
-      created_at: '2024-06-15T09:21:00',
-      updated_at: '2024-06-15T09:21:00',
-    },
+    record: editingRecord,
     defaultEditing: true,
+  },
+  parameters: {
+    docs: {
+      description: {
+        story:
+          'Edit time, category, amount, and note. Move-day actions use compact captions ⬅️🗓️ / ➡️🗓️ (full “Move to yesterday/tomorrow” remains the accessible name).',
+      },
+    },
+  },
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    const yesterday = canvas.getByRole('button', { name: 'Move to yesterday' });
+    const tomorrow = canvas.getByRole('button', { name: 'Move to tomorrow' });
+    await expect(yesterday).toHaveTextContent('⬅️🗓️');
+    await expect(tomorrow).toHaveTextContent('➡️🗓️');
   },
 };
 
+export const EditingSavingMoveDate: Story = {
+  args: {
+    record: editingRecord,
+    defaultEditing: true,
+    saving: true,
+  },
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    await expect(canvas.getByRole('button', { name: 'Move to yesterday' })).toBeDisabled();
+    await expect(canvas.getByRole('button', { name: 'Move to tomorrow' })).toBeDisabled();
+    await expect(canvas.getByRole('button', { name: 'Move to yesterday' })).toHaveTextContent('⬅️🗓️');
+    await expect(canvas.getByRole('button', { name: 'Move to tomorrow' })).toHaveTextContent('➡️🗓️');
+  },
+};
+
+export const EditingSavingPausedMoveDate: Story = {
+  args: {
+    record: editingRecord,
+    defaultEditing: true,
+    saving: true,
+    savingPaused: true,
+  },
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    await expect(canvas.getByRole('button', { name: 'Move to yesterday' })).toHaveAttribute(
+      'title',
+      'Offline…',
+    );
+    await expect(canvas.getByRole('button', { name: 'Move to tomorrow' })).toHaveAttribute(
+      'title',
+      'Offline…',
+    );
+    await expect(canvas.getByRole('button', { name: 'Move to yesterday' })).toHaveTextContent('⬅️🗓️');
+  },
+};
+
+/** Mobile width: compact ⬅️🗓️ / ➡️🗓️ captions keep the edit action row usable. */
 export const EditingNarrow: Story = {
   ...Editing,
   parameters: {
+    ...Editing.parameters,
     viewport: { defaultViewport: 'mobile1' },
+    docs: {
+      description: {
+        story:
+          'Mobile edit form: move-day buttons stay compact (⬅️🗓️ / ➡️🗓️) instead of wrapping long “Move to yesterday/tomorrow” labels.',
+      },
+    },
   },
   decorators: [
     (Story) => (
@@ -74,6 +136,70 @@ export const EditingNarrow: Story = {
       </div>
     ),
   ],
+};
+
+export const MoveToYesterday: Story = {
+  args: {
+    record: editingRecord,
+    defaultEditing: true,
+    onSave: fn(),
+  },
+  play: async ({ canvasElement, args }) => {
+    const canvas = within(canvasElement);
+    await userEvent.click(canvas.getByRole('button', { name: 'Move to yesterday' }));
+    await expect(args.onSave).toHaveBeenCalledWith('rec-edit', {
+      occurred_at: '2024-06-14T09:21:00',
+      local_date: '2024-06-14',
+      category: 'liquids',
+      amount: 10,
+      unit: 'ml',
+      note: 'Katovit mit Ente, col',
+    });
+  },
+};
+
+export const MoveToTomorrow: Story = {
+  args: {
+    record: editingRecord,
+    defaultEditing: true,
+    onSave: fn(),
+  },
+  play: async ({ canvasElement, args }) => {
+    const canvas = within(canvasElement);
+    await userEvent.click(canvas.getByRole('button', { name: 'Move to tomorrow' }));
+    await expect(args.onSave).toHaveBeenCalledWith('rec-edit', {
+      occurred_at: '2024-06-16T09:21:00',
+      local_date: '2024-06-16',
+      category: 'liquids',
+      amount: 10,
+      unit: 'ml',
+      note: 'Katovit mit Ente, col',
+    });
+  },
+};
+
+export const MoveToYesterdayKeepsEditedTimeAndNote: Story = {
+  args: {
+    record: editingRecord,
+    defaultEditing: true,
+    onSave: fn(),
+  },
+  play: async ({ canvasElement, args }) => {
+    const canvas = within(canvasElement);
+    await userEvent.clear(canvas.getByLabelText('Time'));
+    await userEvent.type(canvas.getByLabelText('Time'), '14:05');
+    await userEvent.clear(canvas.getByLabelText('Note'));
+    await userEvent.type(canvas.getByLabelText('Note'), 'Evening top-up');
+    await userEvent.click(canvas.getByRole('button', { name: 'Move to yesterday' }));
+    await expect(args.onSave).toHaveBeenCalledWith('rec-edit', {
+      occurred_at: '2024-06-14T14:05:00',
+      local_date: '2024-06-14',
+      category: 'liquids',
+      amount: 10,
+      unit: 'ml',
+      note: 'Evening top-up',
+    });
+  },
 };
 
 export const EditingWithDisplayBelow: Story = {

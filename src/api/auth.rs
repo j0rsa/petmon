@@ -1,10 +1,14 @@
-use actix_web::{get, web, HttpMessage, HttpRequest, HttpResponse};
+use actix_web::{get, post, web, HttpMessage, HttpRequest, HttpResponse};
 use openidconnect::{core::CoreProviderMetadata, reqwest::async_http_client, IssuerUrl};
 use serde::Serialize;
 
-use crate::auth::{identity::Identity, AppState};
+use crate::auth::{
+    identity::{Identity, IdentityKind},
+    AppState,
+};
 use crate::domain::settings::OidcConfig;
 use crate::error::{AppError, AppResult};
+use crate::repo::api_tokens;
 use crate::repo::settings;
 
 #[derive(Serialize)]
@@ -88,6 +92,9 @@ pub struct MeResponse {
     pub kind: &'static str,
     /// Granted scopes. Empty means full access (no restriction).
     pub scopes: Vec<String>,
+    /// Creator display name for the API token session (api_token kind only).
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub token_created_by: Option<String>,
 }
 
 #[get("/auth/me")]
@@ -114,7 +121,25 @@ pub async fn me(req: HttpRequest) -> AppResult<HttpResponse> {
         name: identity.name,
         kind,
         scopes,
+        token_created_by: identity.token_created_by,
     }))
+}
+
+/// End the current session. When authenticated via a long-lived API token the
+/// token is permanently deleted so it cannot be reused after sign-out.
+#[post("/auth/sign-out")]
+pub async fn sign_out(req: HttpRequest, state: web::Data<AppState>) -> AppResult<HttpResponse> {
+    let identity = req
+        .extensions()
+        .get::<Identity>()
+        .cloned()
+        .ok_or_else(|| AppError::Internal("missing identity".to_string()))?;
+
+    if let IdentityKind::ApiToken { token_id } = identity.kind {
+        api_tokens::delete_by_id(&state.pool, &token_id).await?;
+    }
+
+    Ok(HttpResponse::NoContent().finish())
 }
 
 /// Public routes — mount outside RequireAuth
@@ -124,5 +149,5 @@ pub fn configure_public(cfg: &mut web::ServiceConfig) {
 
 /// Protected routes — mount inside RequireAuth
 pub fn configure_protected(cfg: &mut web::ServiceConfig) {
-    cfg.service(me);
+    cfg.service(me).service(sign_out);
 }
