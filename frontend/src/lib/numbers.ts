@@ -30,6 +30,21 @@ export function parseAmountExpression(raw: string): number {
   }
 }
 
+/** Parse a wet-food + liquid pair like "123,456" → { wetFood: 123, liquids: 456 }.
+ *  Each side accepts the same expressions as parseAmountExpression.
+ *  Returns null when the input is not exactly two positive amounts. */
+export function parseWetFoodLiquidPair(
+  raw: string,
+): { wetFood: number; liquids: number } | null {
+  const parts = raw.split(',').map((part) => part.trim());
+  if (parts.length !== 2 || parts[0] === '' || parts[1] === '') return null;
+
+  const wetFood = parseAmountExpression(parts[0]!);
+  const liquids = parseAmountExpression(parts[1]!);
+  if (isNaN(wetFood) || wetFood <= 0 || isNaN(liquids) || liquids <= 0) return null;
+  return { wetFood, liquids };
+}
+
 function evaluateSimpleExpression(input: string): number {
   const chars = [...input];
   let index = 0;
