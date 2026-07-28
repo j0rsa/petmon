@@ -42,6 +42,11 @@ describe('parseWetFoodLiquidPair', () => {
     expect(parseWetFoodLiquidPair('15, 12')).toEqual({ wetFood: 15, liquids: 12 });
   });
 
+  it('allows zero on either side', () => {
+    expect(parseWetFoodLiquidPair('0,123')).toEqual({ wetFood: 0, liquids: 123 });
+    expect(parseWetFoodLiquidPair('123,0')).toEqual({ wetFood: 123, liquids: 0 });
+  });
+
   it('allows expressions on each side', () => {
     expect(parseWetFoodLiquidPair('450 - 320, 10 + 2')).toEqual({ wetFood: 130, liquids: 12 });
   });
@@ -51,8 +56,9 @@ describe('parseWetFoodLiquidPair', () => {
     expect(parseWetFoodLiquidPair('123')).toBeNull();
     expect(parseWetFoodLiquidPair('123,')).toBeNull();
     expect(parseWetFoodLiquidPair(',456')).toBeNull();
-    expect(parseWetFoodLiquidPair('0,10')).toBeNull();
-    expect(parseWetFoodLiquidPair('10,0')).toBeNull();
+    expect(parseWetFoodLiquidPair('0,0')).toBeNull();
+    expect(parseWetFoodLiquidPair('-1,10')).toBeNull();
+    expect(parseWetFoodLiquidPair('10,-1')).toBeNull();
     expect(parseWetFoodLiquidPair('1,2,3')).toBeNull();
   });
 });

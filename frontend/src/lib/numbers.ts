@@ -32,7 +32,8 @@ export function parseAmountExpression(raw: string): number {
 
 /** Parse a wet-food + liquid pair like "123,456" → { wetFood: 123, liquids: 456 }.
  *  Each side accepts the same expressions as parseAmountExpression.
- *  Returns null when the input is not exactly two positive amounts. */
+ *  Zero is allowed on either side (that create is skipped by the caller).
+ *  Returns null when the input is not exactly two non-negative amounts with at least one positive. */
 export function parseWetFoodLiquidPair(
   raw: string,
 ): { wetFood: number; liquids: number } | null {
@@ -41,7 +42,8 @@ export function parseWetFoodLiquidPair(
 
   const wetFood = parseAmountExpression(parts[0]!);
   const liquids = parseAmountExpression(parts[1]!);
-  if (isNaN(wetFood) || wetFood <= 0 || isNaN(liquids) || liquids <= 0) return null;
+  if (isNaN(wetFood) || wetFood < 0 || isNaN(liquids) || liquids < 0) return null;
+  if (wetFood === 0 && liquids === 0) return null;
   return { wetFood, liquids };
 }
 
