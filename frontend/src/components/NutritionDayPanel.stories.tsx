@@ -32,6 +32,13 @@ export const EmptyDay: Story = {
     date: '2024-06-16',
   },
   decorators: [withNutritionDayPanel('2024-06-16', mockPetId, true)],
+  parameters: {
+    docs: {
+      description: {
+        story: 'Empty day with the add form defaulting to Wet food + Liquid (amount as wet,liquid).',
+      },
+    },
+  },
 };
 
 /** See Nutrition/NutritionRecordRow for isolated display and editing states. */

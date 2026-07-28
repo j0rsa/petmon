@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { parseAmountExpression, parseDecimal } from './numbers';
+import { parseAmountExpression, parseDecimal, parseWetFoodLiquidPair } from './numbers';
 
 describe('parseDecimal', () => {
   it('parses comma decimals', () => {
@@ -33,5 +33,26 @@ describe('parseAmountExpression', () => {
     expect(parseAmountExpression('abc')).toBeNaN();
     expect(parseAmountExpression('450 -')).toBeNaN();
     expect(parseAmountExpression('1 + 2 +')).toBeNaN();
+  });
+});
+
+describe('parseWetFoodLiquidPair', () => {
+  it('parses wet food then liquid amounts', () => {
+    expect(parseWetFoodLiquidPair('123,456')).toEqual({ wetFood: 123, liquids: 456 });
+    expect(parseWetFoodLiquidPair('15, 12')).toEqual({ wetFood: 15, liquids: 12 });
+  });
+
+  it('allows expressions on each side', () => {
+    expect(parseWetFoodLiquidPair('450 - 320, 10 + 2')).toEqual({ wetFood: 130, liquids: 12 });
+  });
+
+  it('rejects invalid pairs', () => {
+    expect(parseWetFoodLiquidPair('')).toBeNull();
+    expect(parseWetFoodLiquidPair('123')).toBeNull();
+    expect(parseWetFoodLiquidPair('123,')).toBeNull();
+    expect(parseWetFoodLiquidPair(',456')).toBeNull();
+    expect(parseWetFoodLiquidPair('0,10')).toBeNull();
+    expect(parseWetFoodLiquidPair('10,0')).toBeNull();
+    expect(parseWetFoodLiquidPair('1,2,3')).toBeNull();
   });
 });

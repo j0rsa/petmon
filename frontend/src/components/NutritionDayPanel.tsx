@@ -18,7 +18,7 @@ import { LiquidsIcon, WaterIcon, WetFoodIcon, TotalFluidIcon } from '../lib/metr
 import { highlightFromSummary, totalKnownFluidMl } from '../lib/nutritionMetrics';
 import { CATEGORIES, CATEGORY_LABELS } from '../types';
 import type { CreateNutritionRecord, NutritionRecord, UpdateNutritionRecord } from '../types';
-import { parseAmountExpression, parseDecimal } from '../lib/numbers';
+import { parseAmountExpression, parseDecimal, parseWetFoodLiquidPair } from '../lib/numbers';
 
 const UNIT_FOR_CATEGORY: Record<string, string> = {
   wet_food: 'g',
@@ -27,7 +27,11 @@ const UNIT_FOR_CATEGORY: Record<string, string> = {
   liquids: 'ml',
 };
 
+/** UI-only entry mode: creates one wet_food + one liquids record. Not a backend category. */
+const ENTRY_WET_FOOD_PLUS_LIQUID = 'wet_food_plus_liquid';
+
 function unitFor(category: string) {
+  if (category === ENTRY_WET_FOOD_PLUS_LIQUID) return 'g, ml';
   return UNIT_FOR_CATEGORY[category] ?? '';
 }
 
@@ -46,7 +50,7 @@ function invalidateDayData(queryClient: ReturnType<typeof useQueryClient>, date:
 interface AddRowProps {
   date: string;
   petId: string;
-  onSave: (payload: CreateNutritionRecord) => void;
+  onSave: (payloads: CreateNutritionRecord[]) => void;
   saving: boolean;
   isPaused: boolean;
 }
@@ -60,10 +64,11 @@ const AddRow = forwardRef<AddRowHandle, AddRowProps>(function AddRow(
   ref,
 ) {
   const [time, setTime] = useState(nowTimeString);
-  const [category, setCategory] = useState<string>('liquids');
+  const [category, setCategory] = useState<string>(ENTRY_WET_FOOD_PLUS_LIQUID);
   const [amount, setAmount] = useState('');
   const [note, setNote] = useState('');
   const amountRef = useRef<HTMLInputElement>(null);
+  const isCombined = category === ENTRY_WET_FOOD_PLUS_LIQUID;
 
   useImperativeHandle(ref, () => ({
     clearForm() {
@@ -74,17 +79,48 @@ const AddRow = forwardRef<AddRowHandle, AddRowProps>(function AddRow(
   }));
 
   function handleAdd() {
+    const occurredAt = isoFromDateAndTime(date, time);
+    const noteValue = note.trim() || null;
+
+    if (isCombined) {
+      const pair = parseWetFoodLiquidPair(amount);
+      if (!pair) return;
+      onSave([
+        {
+          pet_id: petId,
+          occurred_at: occurredAt,
+          local_date: date,
+          category: 'wet_food',
+          amount: pair.wetFood,
+          unit: unitFor('wet_food'),
+          note: noteValue,
+        },
+        {
+          pet_id: petId,
+          occurred_at: occurredAt,
+          local_date: date,
+          category: 'liquids',
+          amount: pair.liquids,
+          unit: unitFor('liquids'),
+          note: noteValue,
+        },
+      ]);
+      // Form clears via ref.clearForm() called from createMutation.onSuccess,
+      // so values are preserved while the mutation is paused offline.
+      return;
+    }
+
     const n = parseAmountExpression(amount);
     if (!amount.trim() || isNaN(n) || n <= 0) return;
-    onSave({
+    onSave([{
       pet_id: petId,
-      occurred_at: isoFromDateAndTime(date, time),
+      occurred_at: occurredAt,
       local_date: date,
       category,
       amount: n,
       unit: unitFor(category),
-      note: note.trim() || null,
-    });
+      note: noteValue,
+    }]);
     // Form clears via ref.clearForm() called from createMutation.onSuccess,
     // so values are preserved while the mutation is paused offline.
   }
@@ -102,6 +138,7 @@ const AddRow = forwardRef<AddRowHandle, AddRowProps>(function AddRow(
           value={category}
           onChange={(e) => setCategory(e.target.value)}
         >
+          <option value={ENTRY_WET_FOOD_PLUS_LIQUID}>Wet food + Liquid</option>
           {CATEGORIES.map((cat) => (
             <option key={cat} value={cat}>{CATEGORY_LABELS[cat]}</option>
           ))}
@@ -115,7 +152,7 @@ const AddRow = forwardRef<AddRowHandle, AddRowProps>(function AddRow(
             type="text"
             inputMode="decimal"
             aria-label="Amount"
-            placeholder="130 or 450 - 320"
+            placeholder={isCombined ? '123,456' : '130 or 450 - 320'}
             value={amount}
             onChange={(e) => setAmount(e.target.value)}
             onKeyDown={(e) => { if (e.key === 'Enter') handleAdd(); }}
@@ -333,7 +370,11 @@ export function NutritionDayPanel({ date, petId }: NutritionDayPanelProps) {
   }, [summaryQuery.data?.note]);
 
   const createMutation = useMutation({
-    mutationFn: (payload: CreateNutritionRecord) => nutritionRecordsApi.create(payload),
+    mutationFn: async (payloads: CreateNutritionRecord[]) => {
+      for (const payload of payloads) {
+        await nutritionRecordsApi.create(payload);
+      }
+    },
     onSuccess: () => {
       invalidateDayData(queryClient, date, petId);
       addRowRef.current?.clearForm();
@@ -450,7 +491,7 @@ export function NutritionDayPanel({ date, petId }: NutritionDayPanelProps) {
             petId={petId}
             saving={createMutation.isPending}
             isPaused={createMutation.isPaused}
-            onSave={(payload) => createMutation.mutate(payload)}
+            onSave={(payloads) => createMutation.mutate(payloads)}
           />
         )}
 
