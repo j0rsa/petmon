@@ -21,3 +21,8 @@ export const WithWeightHistory: Story = {
 export const NoWeightData: Story = {
   decorators: [withPetInfoPage(undefined, false)],
 };
+
+export const AutoTagEnabled: Story = {
+  name: 'Auto-tag enabled',
+  decorators: [withPetInfoPage(undefined, true, true)],
+};

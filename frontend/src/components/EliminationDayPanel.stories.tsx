@@ -21,6 +21,20 @@ export const WithRecords: Story = {
   decorators: [withEliminationDayPanel('2024-06-15', mockPetId)],
 };
 
+export const DeepLinkHighlight: Story = {
+  name: 'Deep link highlight',
+  decorators: [withEliminationDayPanel('2024-06-15', mockPetId, false, { routeHash: '#record-elim-01' })],
+  play: async ({ canvasElement }) => {
+    await waitFor(() => {
+      expect(canvasElement.querySelector('#record-elim-01')).toBeTruthy();
+    });
+    const row = canvasElement.querySelector('#record-elim-01');
+    await waitFor(() => {
+      expect(row).toHaveClass('entry-row-wrap--deep-link-flash');
+    });
+  },
+};
+
 /** Latest entry is general — shows one-press Wee/Poop categorization. */
 export const GeneralLatestRecord: Story = {
   decorators: [

@@ -5,6 +5,7 @@ pub mod health;
 pub mod health_state;
 pub mod info;
 pub mod notes;
+pub mod notifications;
 pub mod nutrition;
 pub mod pets;
 pub mod settings;
@@ -24,6 +25,7 @@ pub fn configure(cfg: &mut web::ServiceConfig) {
             .configure(weight::configure)
             .configure(days::configure)
             .configure(notes::configure)
+            .configure(notifications::configure)
             .configure(settings::configure),
     );
 }

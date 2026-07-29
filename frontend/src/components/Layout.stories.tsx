@@ -38,6 +38,29 @@ type Story = StoryObj<typeof meta>;
 
 export const Default: Story = {};
 
+export const WithNotifications: Story = {
+  name: 'With notification bell',
+  parameters: {
+    docs: {
+      description: {
+        story: 'Desktop shows the global notification bell; mobile uses the bottom-nav pet tab red dot and sheet.',
+      },
+    },
+  },
+};
+
 export const Mobile: Story = {
   parameters: { viewport: { defaultViewport: 'pwaMobile' } },
+};
+
+export const MobileWithNotifications: Story = {
+  name: 'Mobile with unread dot',
+  parameters: {
+    viewport: { defaultViewport: 'pwaMobile' },
+    docs: {
+      description: {
+        story: 'Mobile bottom bar: Home, Food, Toilet, Health, and pet tab. Settings lives in the pet sheet.',
+      },
+    },
+  },
 };

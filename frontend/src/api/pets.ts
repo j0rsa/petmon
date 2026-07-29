@@ -11,6 +11,7 @@ export interface PetProfilePayload {
   color?: string;
   weight_kg?: number;
   feeding_notes?: string;
+  elimination_auto_categorize_by_duration?: boolean;
 }
 
 export const petsApi = {

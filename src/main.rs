@@ -100,6 +100,7 @@ async fn main() -> anyhow::Result<()> {
                     .configure(api::weight::configure)
                     .configure(api::days::configure)
                     .configure(api::notes::configure)
+                    .configure(api::notifications::configure)
                     .configure(api::settings::configure)
                     .configure(api::settings::configure_api_tokens),
             )

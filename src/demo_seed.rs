@@ -141,6 +141,7 @@ async fn seed_pets(pool: &SqlitePool) -> AppResult<Vec<Pet>> {
             feeding_notes: feeding_notes.map(str::to_string),
             telegram_chat_id: None,
             telegram_thread_id: None,
+            elimination_auto_categorize_by_duration: false,
             created_at: now.clone(),
             updated_at: now.clone(),
         };

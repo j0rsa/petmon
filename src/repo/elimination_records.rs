@@ -1,5 +1,6 @@
 use crate::domain::elimination::{
-    EliminationRecord, EliminationRecordFilters, UpdateEliminationRecord,
+    EliminationDurationBucket, EliminationDurationProfile, EliminationRecord,
+    EliminationRecordFilters, UpdateEliminationRecord,
 };
 use crate::error::{AppError, AppResult};
 use chrono::Utc;
@@ -174,4 +175,58 @@ pub async fn delete(pool: &SqlitePool, id: &str) -> AppResult<()> {
         )));
     }
     Ok(())
+}
+
+#[derive(Debug, sqlx::FromRow)]
+struct TypeDurationAgg {
+    event_type: String,
+    sample_count: i64,
+    avg_duration_seconds: f64,
+}
+
+#[tracing::instrument(skip(pool))]
+pub async fn duration_profile(
+    pool: &SqlitePool,
+    pet_id: Uuid,
+) -> AppResult<EliminationDurationProfile> {
+    let rows = sqlx::query_as::<_, TypeDurationAgg>(
+        "SELECT event_type, COUNT(*) as sample_count, AVG(duration_seconds) as avg_duration_seconds \
+         FROM elimination_records \
+         WHERE pet_id = ? AND duration_seconds IS NOT NULL AND event_type IN ('urination', 'defecation') \
+         GROUP BY event_type",
+    )
+    .bind(pet_id)
+    .fetch_all(pool)
+    .await?;
+
+    let mut wee_count = 0_i64;
+    let mut wee_avg = None;
+    let mut poo_count = 0_i64;
+    let mut poo_avg = None;
+
+    for row in rows {
+        match row.event_type.as_str() {
+            "urination" => {
+                wee_count = row.sample_count;
+                wee_avg = Some(row.avg_duration_seconds);
+            }
+            "defecation" => {
+                poo_count = row.sample_count;
+                poo_avg = Some(row.avg_duration_seconds);
+            }
+            _ => {}
+        }
+    }
+
+    Ok(EliminationDurationProfile {
+        pet_id: pet_id.to_string(),
+        wee: wee_avg.map(|avg_duration_seconds| EliminationDurationBucket {
+            sample_count: wee_count,
+            avg_duration_seconds,
+        }),
+        poo: poo_avg.map(|avg_duration_seconds| EliminationDurationBucket {
+            sample_count: poo_count,
+            avg_duration_seconds,
+        }),
+    })
 }

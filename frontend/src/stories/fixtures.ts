@@ -3,7 +3,8 @@ import type { BestFluidDay, Category, NutritionDaySummary, NutritionRangeSummary
 import type { DayNutritionHighlight, DayEliminationHighlight } from '../types/pillars';
 import type { AppInfo } from '../api/info';
 import type { ApiTokenCreated, ApiTokenPublic, DisplaySettings, OidcConfigPublic, TelegramConfigPublic } from '../api/settings';
-import type { EliminationRecord, EliminationDailySummary, EliminationRangeSummary } from '../api/elimination';
+import type { EliminationRecord, EliminationDailySummary, EliminationRangeSummary, EliminationDurationProfile } from '../api/elimination';
+import type { NotificationItem } from '../api/notifications';
 import type { WeightRecord, WeightSummaryBucket } from '../api/weight';
 import type { HealthStateRecord } from '../api/healthState';
 
@@ -20,6 +21,7 @@ export const mockPets: Pet[] = [
     blood_type: 'A',
     color: '#c4a882',
     feeding_notes: 'Prefers wet food in the morning.',
+    elimination_auto_categorize_by_duration: false,
     created_at: '2024-01-01T00:00:00Z',
     updated_at: '2024-01-01T00:00:00Z',
   },
@@ -31,6 +33,7 @@ export const mockPets: Pet[] = [
     breed: 'Golden Retriever',
     birth_date: '2019-07-22',
     color: '#8b6f47',
+    elimination_auto_categorize_by_duration: false,
     created_at: '2024-01-01T00:00:00Z',
     updated_at: '2024-01-01T00:00:00Z',
   },
@@ -381,6 +384,71 @@ export const mockEliminationRangeSummary: EliminationRangeSummary = {
   p90_per_day: 5.8,
   p99_per_day: 6.0,
 };
+
+export const mockEliminationDurationProfile: EliminationDurationProfile = {
+  pet_id: mockPetId,
+  wee: { sample_count: 12, avg_duration_seconds: 52 },
+  poo: { sample_count: 8, avg_duration_seconds: 118 },
+};
+
+export const mockEliminationDurationProfileSparse: EliminationDurationProfile = {
+  pet_id: mockPetId,
+  wee: { sample_count: 1, avg_duration_seconds: 52 },
+  poo: null,
+};
+
+/** Range summary with only wee duration averages populated (poo charts/cards hidden). */
+export function mockEliminationRangeSummaryWeeOnly(): EliminationRangeSummary {
+  const base = mockEliminationRangeSummary;
+  return {
+    ...base,
+    daily_summaries: base.daily_summaries.map((s) => ({
+      ...s,
+      defecation_avg_duration_seconds: null,
+      general_avg_duration_seconds: null,
+    })),
+  };
+}
+
+/** Range summary with only poo duration averages populated (wee charts/cards hidden). */
+export function mockEliminationRangeSummaryPooOnly(): EliminationRangeSummary {
+  const base = mockEliminationRangeSummary;
+  return {
+    ...base,
+    daily_summaries: base.daily_summaries.map((s) => ({
+      ...s,
+      urination_avg_duration_seconds: null,
+      general_avg_duration_seconds: null,
+    })),
+  };
+}
+
+export const mockNotifications: NotificationItem[] = [
+  {
+    id: 'n-1',
+    kind: 'elimination.auto_categorize_failed',
+    title: 'Visit duration did not match history for Mittens',
+    body: 'The logged duration did not match wee or poop patterns — categorize the 2026-06-02 visit manually.',
+    link_path: '/elimination/2026-06-02',
+    link_hash: 'record-elim-01',
+    pet_id: mockPetId,
+    pet_name: 'Mittens',
+    created_at: new Date(Date.now() - 5 * 60_000).toISOString(),
+    read: false,
+  },
+  {
+    id: 'n-2',
+    kind: 'elimination.auto_categorize_failed',
+    title: 'Could not auto-tag Rex\'s visit',
+    body: 'Auto-tagging needs at least two categorized wee and poop visits with durations.',
+    link_path: '/elimination/2026-06-01',
+    link_hash: 'record-elim-02',
+    pet_id: mockPets[1].id,
+    pet_name: 'Rex',
+    created_at: new Date(Date.now() - 2 * 60 * 60_000).toISOString(),
+    read: true,
+  },
+];
 
 // ── Weight fixtures ───────────────────────────────────────────────────────────
 

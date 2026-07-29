@@ -1,6 +1,7 @@
 import { PET_SPECIES, PET_SPECIES_LABELS, PET_STATUSES, PET_STATUS_LABELS, type PetSpecies, type PetStatus } from '../../types';
 import { ColorPickerField } from './ColorPickerField';
 import { PetAvatar } from './PetAvatar';
+import { PetEliminationAutoTagBuckets } from './PetEliminationAutoTagBuckets';
 
 export interface PetInfoFormState {
   name: string;
@@ -13,11 +14,13 @@ export interface PetInfoFormState {
   feeding_notes: string;
   telegram_chat_id: string;
   telegram_thread_id: string;
+  elimination_auto_categorize_by_duration: boolean;
 }
 
 interface PetInfoFormProps {
   form: PetInfoFormState;
   setForm: React.Dispatch<React.SetStateAction<PetInfoFormState>>;
+  petId?: string;
   photoUrl?: string;
   onPhotoChange?: (file: File) => void;
   onPhotoRemove?: () => void;
@@ -39,6 +42,7 @@ export function petToFormState(pet: {
   feeding_notes?: string;
   telegram_chat_id?: string;
   telegram_thread_id?: string;
+  elimination_auto_categorize_by_duration?: boolean;
 }): PetInfoFormState {
   return {
     name: pet.name,
@@ -51,6 +55,7 @@ export function petToFormState(pet: {
     feeding_notes: pet.feeding_notes ?? '',
     telegram_chat_id: pet.telegram_chat_id ?? '',
     telegram_thread_id: pet.telegram_thread_id ?? '',
+    elimination_auto_categorize_by_duration: pet.elimination_auto_categorize_by_duration ?? false,
   };
 }
 
@@ -67,12 +72,14 @@ export function formStateToPayload(form: PetInfoFormState) {
     feeding_notes: form.feeding_notes.trim() || undefined,
     telegram_chat_id: form.telegram_chat_id.trim() || undefined,
     telegram_thread_id: form.telegram_thread_id.trim() || undefined,
+    elimination_auto_categorize_by_duration: form.elimination_auto_categorize_by_duration,
   };
 }
 
 export function PetInfoForm({
   form,
   setForm,
+  petId,
   photoUrl,
   onPhotoChange,
   onPhotoRemove,
@@ -179,6 +186,29 @@ export function PetInfoForm({
         <div className="form-row">
           <label htmlFor="pet-info-tg-thread">Thread ID <span style={{ fontWeight: 400, color: 'var(--text-subtle)' }}>(optional)</span></label>
           <input id="pet-info-tg-thread" placeholder="e.g. 42" value={form.telegram_thread_id} onChange={(event) => setForm((current) => ({ ...current, telegram_thread_id: event.target.value }))} />
+        </div>
+        <div className="form-row form-row-full">
+          <span className="eyebrow">Toileting</span>
+          <p className="muted-text" style={{ fontSize: '0.82rem', marginTop: '0.15rem' }}>
+            When enabled, general visits with a logged duration are tagged as Wee or Poop when they match this pet&apos;s history.
+          </p>
+        </div>
+        <div className="form-row form-row-full">
+          <label className="checkbox-row" htmlFor="pet-info-auto-tag">
+            <input
+              id="pet-info-auto-tag"
+              type="checkbox"
+              checked={form.elimination_auto_categorize_by_duration}
+              onChange={(event) => setForm((current) => ({
+                ...current,
+                elimination_auto_categorize_by_duration: event.target.checked,
+              }))}
+            />
+            Auto-tag by duration
+          </label>
+          {form.elimination_auto_categorize_by_duration && petId && (
+            <PetEliminationAutoTagBuckets petId={petId} />
+          )}
         </div>
       </div>
 

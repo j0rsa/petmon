@@ -16,8 +16,19 @@ const meta = {
 export default meta;
 type Story = StoryObj<typeof meta>;
 
-export const WithData: Story = {
-  decorators: [withEliminationAnalyticsPage()],
+export const WithWeeAndPooDurations: Story = {
+  name: 'Wee and poo durations',
+  decorators: [withEliminationAnalyticsPage({ durationVariant: 'both' })],
+};
+
+export const WeeDurationOnly: Story = {
+  name: 'Wee duration only',
+  decorators: [withEliminationAnalyticsPage({ durationVariant: 'wee-only' })],
+};
+
+export const PooDurationOnly: Story = {
+  name: 'Poo duration only',
+  decorators: [withEliminationAnalyticsPage({ durationVariant: 'poo-only' })],
 };
 
 export const EmptyRange: Story = {
