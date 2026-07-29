@@ -19,11 +19,6 @@ export const WithRecords: Story = {
   decorators: [withEliminationJournalPage('2024-06-15')],
 };
 
-export const AutoTagEnabled: Story = {
-  name: 'Auto-tag enabled',
-  decorators: [withEliminationJournalPage('2024-06-15', { autoTagEnabled: true })],
-};
-
 export const DeepLinkToRecord: Story = {
   name: 'Deep link highlight',
   decorators: [withEliminationJournalPage('2024-06-15', { routeHash: '#record-elim-01' })],

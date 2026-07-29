@@ -9,6 +9,7 @@ import { localToday, shiftDate } from '../lib/dates';
 import { useSelectedPet } from '../context/SelectedPetContext';
 import { PetAvatar } from '../components/pet/PetAvatar';
 import { PetInfoFields } from '../components/pet/PetInfoFields';
+import { PetEliminationAutoTagBuckets } from '../components/pet/PetEliminationAutoTagBuckets';
 import { formStateToPayload, PetInfoForm, petToFormState } from '../components/pet/PetInfoForm';
 import { getPetPhoto, readPhotoFile, removePetPhoto, setPetPhoto } from '../lib/petPhotoStorage';
 import { PET_SPECIES_LABELS } from '../types';
@@ -102,6 +103,7 @@ export default function PetInfoPage() {
           <PetInfoForm
             form={form}
             setForm={setForm}
+            petId={id}
             photoUrl={photoUrl}
             loading={updateMutation.isPending}
             submitLabel="Save profile"
@@ -126,6 +128,9 @@ export default function PetInfoPage() {
         <section className="panel pet-info-card">
           <PetAvatar species={pet.species} name={pet.name} color={pet.color} photoUrl={photoUrl} size={160} />
           <PetInfoFields pet={pet} />
+          {pet.elimination_auto_categorize_by_duration && (
+            <PetEliminationAutoTagBuckets petId={pet.id} />
+          )}
         </section>
       )}
       <WeightChartPanel weightsQuery={weightsQuery} />

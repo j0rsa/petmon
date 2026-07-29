@@ -4,7 +4,6 @@ import { useQuery } from '@tanstack/react-query';
 import { eliminationApi, categorizedAvgDuration } from '../api/elimination';
 import { MonthCalendar } from '../components/MonthCalendar';
 import { NoPetSelected } from '../components/NoPetSelected';
-import { AutoCategorizePanel } from '../components/EliminationAutoCategorizePanel';
 import { EliminationDayPanel } from '../components/EliminationDayPanel';
 import { useSelectedPet } from '../context/SelectedPetContext';
 import { useDisplaySettings } from '../context/useDisplaySettings';
@@ -16,7 +15,7 @@ const mq = window.matchMedia('(max-width: 768px)');
 export default function EliminationJournalPage() {
   const navigate = useNavigate();
   const { date: routeDate } = useParams();
-  const { selectedPetId, selectedPet, petsLoading } = useSelectedPet();
+  const { selectedPetId, petsLoading } = useSelectedPet();
   const displaySettings = useDisplaySettings();
   const isMobile = useSyncExternalStore(
     (cb) => { mq.addEventListener('change', cb); return () => mq.removeEventListener('change', cb); },
@@ -88,7 +87,6 @@ export default function EliminationJournalPage() {
 
   return (
     <div className="nutrition-journal">
-      {selectedPet && <AutoCategorizePanel pet={selectedPet} />}
       <MonthCalendar
         month={month}
         selectedDate={selectedDate}

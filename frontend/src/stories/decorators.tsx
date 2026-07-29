@@ -217,17 +217,11 @@ export function withEliminationDayPanel(
 
 export function withEliminationJournalPage(
   date: string,
-  options?: { empty?: boolean; autoTagEnabled?: boolean; routeHash?: string },
+  options?: { empty?: boolean; routeHash?: string },
 ): Decorator {
   return function EliminationJournalDecorator(Story) {
     const client = makeMockClient();
-    const pets = options?.autoTagEnabled
-      ? mockPets.map((pet, index) => (
-          index === 0 ? { ...pet, elimination_auto_categorize_by_duration: true } : pet
-        ))
-      : mockPets;
-
-    client.setQueryData(['pets'], pets);
+    client.setQueryData(['pets'], mockPets);
     client.setQueryData(['me'], { subject: 'dev', email: null, name: 'Dev', display_name: 'Dev', kind: 'dev', scopes: [] });
     client.setQueryData(['settings-display'], mockDisplaySettings);
     client.setQueryData(['app-info'], mockAppInfo);
@@ -236,11 +230,7 @@ export function withEliminationJournalPage(
       options?.empty ? [] : mockEliminationRecords.map((r) => ({ ...r, local_date: date })),
     );
     const month = date.slice(0, 7);
-    client.setQueryData(
-      ['elimination-calendar', month, mockPetId],
-      options?.empty ? [] : [mockEliminationDaySummary],
-    );
-    client.setQueryData(['elimination-duration-profile', mockPetId], mockEliminationDurationProfile);
+    client.setQueryData(['elimination-calendar', month, mockPetId], options?.empty ? [] : [mockEliminationDaySummary]);
     client.setQueryData(['notifications-unread-count'], { count: 1 });
 
     const path = date === localToday() ? '/elimination' : `/elimination/${date}`;
@@ -352,14 +342,21 @@ export function withEliminationAnalyticsPage({
 
 // ── Pet info page decorator ──────────────────────────────────────────────────
 
-export function withPetInfoPage(petId = mockPetId, withWeights = true): Decorator {
+export function withPetInfoPage(petId = mockPetId, withWeights = true, autoTagEnabled = false): Decorator {
   return function PetInfoDecorator(Story) {
     const client = makeMockClient();
-    client.setQueryData(['pets'], mockPets);
-    client.setQueryData(['pets', petId], mockPets.find((p) => p.id === petId) ?? mockPets[0]);
+    const pet = mockPets.find((p) => p.id === petId) ?? mockPets[0];
+    const petData = autoTagEnabled
+      ? { ...pet, elimination_auto_categorize_by_duration: true }
+      : pet;
+    client.setQueryData(['pets'], mockPets.map((p) => (p.id === petData.id ? petData : p)));
+    client.setQueryData(['pets', petId], petData);
     client.setQueryData(['me'], { subject: 'dev', email: null, name: 'Dev', display_name: 'Dev', kind: 'dev', scopes: [] });
     client.setQueryData(['app-info'], mockAppInfo);
     client.setQueryData(['weight-records', petId], withWeights ? mockWeightRecords.map((r) => ({ ...r, pet_id: petId })) : []);
+    if (autoTagEnabled) {
+      client.setQueryData(['elimination-duration-profile', petId], mockEliminationDurationProfile);
+    }
 
     return (
       <MemoryRouter initialEntries={[`/pets/${petId}`]}>
