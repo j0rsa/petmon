@@ -76,6 +76,15 @@ export const OnNutritionRoute: Story = {
   parameters: { route: '/nutrition' },
 };
 
+export const OnToiletingRoute: Story = {
+  name: 'On toileting route',
+  parameters: { route: '/elimination' },
+};
+
+export const OnHealthRoute: Story = {
+  parameters: { route: '/health' },
+};
+
 export const NoPets: Story = {
   decorators: [withNoPets],
 };
@@ -85,14 +94,28 @@ export const PetSheetWithNotifications: Story = {
   decorators: [withBottomNavData(1)],
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement);
-    await userEvent.click(canvas.getByRole('button', { name: /switch pet/i }));
+    await userEvent.click(canvas.getByRole('button', { name: /^Mittens/i }));
     await waitFor(() => {
-      expect(canvas.getByRole('dialog', { name: 'Pet and notifications' })).toBeInTheDocument();
+      expect(canvas.getByRole('dialog', { name: 'Pet, notifications, and settings' })).toBeInTheDocument();
     });
     await expect(canvas.getByText('Switch pet')).toBeInTheDocument();
     await expect(canvas.getByText('Manage pets')).toBeInTheDocument();
+    await expect(canvas.getByText('Settings')).toBeInTheDocument();
     await expect(canvas.getByText('Notifications')).toBeInTheDocument();
     await expect(canvas.getByText('Visit duration did not match history for Mittens')).toBeInTheDocument();
     await expect(canvas.getByRole('button', { name: 'Mark all read' })).toBeInTheDocument();
+  },
+};
+
+export const AllPillarTabs: Story = {
+  name: 'All pillar tabs visible',
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    await expect(canvas.getByRole('link', { name: 'Home' })).toBeInTheDocument();
+    await expect(canvas.getByRole('link', { name: 'Food' })).toBeInTheDocument();
+    await expect(canvas.getByRole('link', { name: 'Toilet' })).toBeInTheDocument();
+    await expect(canvas.getByRole('link', { name: 'Health' })).toBeInTheDocument();
+    await expect(canvas.getByRole('button', { name: /^Mittens/i })).toBeInTheDocument();
+    await expect(canvas.queryByRole('link', { name: 'Settings' })).not.toBeInTheDocument();
   },
 };

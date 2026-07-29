@@ -59,7 +59,7 @@ export const MobileWithNotifications: Story = {
     viewport: { defaultViewport: 'pwaMobile' },
     docs: {
       description: {
-        story: 'On mobile the bell is hidden; unread notifications appear as a red dot on the pet tab.',
+        story: 'Mobile bottom bar: Home, Food, Toilet, Health, and pet tab. Settings lives in the pet sheet.',
       },
     },
   },

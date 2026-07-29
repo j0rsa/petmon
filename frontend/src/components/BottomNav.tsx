@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { Link, useMatch, useNavigate } from 'react-router-dom';
-import { LayoutDashboard, Utensils, PawPrint, Settings, ChevronRight } from 'lucide-react';
+import { LayoutDashboard, Utensils, PawPrint, HeartPulse, Settings, ChevronRight } from 'lucide-react';
 import { useSelectedPet } from '../context/SelectedPetContext';
 import {
   useNotificationActions,
@@ -26,6 +26,7 @@ export function BottomNav() {
   const unreadCount = unreadQuery.data?.count ?? 0;
   const notifications = listQuery.data ?? [];
   const hasUnreadNotifications = notifications.some((item) => !item.read);
+  const petTabLabel = selectedPet?.name ?? 'Pet';
 
   function selectPet(id: string) {
     setSelectedPetId(id);
@@ -33,9 +34,9 @@ export function BottomNav() {
     setPetSheetOpen(false);
   }
 
-  const petTabLabel = unreadCount > 0
-    ? `Switch pet, ${unreadCount} unread notification${unreadCount === 1 ? '' : 's'}`
-    : 'Switch pet';
+  const petButtonLabel = unreadCount > 0
+    ? `${petTabLabel}, ${unreadCount} unread notification${unreadCount === 1 ? '' : 's'}`
+    : petTabLabel;
 
   return (
     <>
@@ -44,7 +45,7 @@ export function BottomNav() {
       )}
 
       {petSheetOpen && (
-        <div className="bottom-nav-sheet" role="dialog" aria-label="Pet and notifications">
+        <div className="bottom-nav-sheet" role="dialog" aria-label="Pet, notifications, and settings">
           <div className="bottom-nav-sheet-handle" />
           <p className="eyebrow bottom-nav-sheet-title">Switch pet</p>
           {petsLoading && <p className="muted-text bottom-nav-sheet-subtitle">Loading…</p>}
@@ -77,15 +78,26 @@ export function BottomNav() {
             );
           })}
           {!petsLoading && (
-            <Link
-              to="/pets"
-              className="bottom-nav-sheet-pet bottom-nav-sheet-footer-link"
-              onClick={() => setPetSheetOpen(false)}
-            >
-              <PawPrint size={20} style={{ opacity: 0.6 }} />
-              <span>Manage pets</span>
-              <ChevronRight size={16} style={{ marginLeft: 'auto', opacity: 0.4 }} />
-            </Link>
+            <>
+              <Link
+                to="/pets"
+                className="bottom-nav-sheet-pet bottom-nav-sheet-footer-link"
+                onClick={() => setPetSheetOpen(false)}
+              >
+                <PawPrint size={20} style={{ opacity: 0.6 }} />
+                <span>Manage pets</span>
+                <ChevronRight size={16} style={{ marginLeft: 'auto', opacity: 0.4 }} />
+              </Link>
+              <Link
+                to="/settings"
+                className="bottom-nav-sheet-pet bottom-nav-sheet-footer-link"
+                onClick={() => setPetSheetOpen(false)}
+              >
+                <Settings size={20} style={{ opacity: 0.6 }} />
+                <span>Settings</span>
+                <ChevronRight size={16} style={{ marginLeft: 'auto', opacity: 0.4 }} />
+              </Link>
+            </>
           )}
 
           <div className="bottom-nav-sheet-divider" aria-hidden="true" />
@@ -123,20 +135,30 @@ export function BottomNav() {
 
       <nav className="bottom-nav" aria-label="Main navigation">
         <BottomNavLink to="/" end>
-          <LayoutDashboard size={22} />
-          <span>Overview</span>
+          <LayoutDashboard size={20} />
+          <span>Home</span>
         </BottomNavLink>
 
         <BottomNavLink to="/nutrition">
-          <Utensils size={22} />
-          <span>Nutrition</span>
+          <Utensils size={20} />
+          <span>Food</span>
+        </BottomNavLink>
+
+        <BottomNavLink to="/elimination">
+          <PawPrint size={20} />
+          <span>Toilet</span>
+        </BottomNavLink>
+
+        <BottomNavLink to="/health">
+          <HeartPulse size={20} />
+          <span>Health</span>
         </BottomNavLink>
 
         <button
           type="button"
           className={`bottom-nav-item bottom-nav-pet${petSheetOpen ? ' active' : ''}`}
           onClick={() => setPetSheetOpen((value) => !value)}
-          aria-label={petTabLabel}
+          aria-label={petButtonLabel}
           aria-expanded={petSheetOpen}
         >
           <span className="bottom-nav-pet-avatar-wrap">
@@ -146,22 +168,17 @@ export function BottomNav() {
                 name={selectedPet.name}
                 color={petColor}
                 circleBg={`${petColor}28`}
-                size={28}
+                size={26}
               />
             ) : (
-              <PawPrint size={22} />
+              <PawPrint size={20} />
             )}
             {unreadCount > 0 && (
               <span className="bottom-nav-pet-unread-dot" aria-hidden="true" />
             )}
           </span>
-          <span>{selectedPet?.name ?? 'Pet'}</span>
+          <span className="bottom-nav-pet-label">{petTabLabel}</span>
         </button>
-
-        <BottomNavLink to="/settings">
-          <Settings size={22} />
-          <span>Settings</span>
-        </BottomNavLink>
       </nav>
     </>
   );
