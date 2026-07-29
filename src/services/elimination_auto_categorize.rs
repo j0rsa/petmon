@@ -13,6 +13,19 @@ pub const DEVIATION_RATIO: f64 = 0.25;
 /// Minimum absolute deviation in seconds regardless of bucket center.
 pub const MIN_ABSOLUTE_DEVIATION_SECS: f64 = 10.0;
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum AutoCategorizeFailureReason {
+    InsufficientHistory,
+    Ambiguous,
+    NoMatch,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct AutoCategorizeAttempt {
+    pub event_type: EliminationEventType,
+    pub failure: Option<AutoCategorizeFailureReason>,
+}
+
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct DurationBucket {
     pub sample_count: i64,
@@ -23,6 +36,14 @@ pub struct DurationBucket {
 pub struct DurationBuckets {
     pub wee: Option<DurationBucket>,
     pub poo: Option<DurationBucket>,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum ClassifyOutcome {
+    Matched(EliminationEventType),
+    Ambiguous,
+    NoMatch,
+    InsufficientHistory,
 }
 
 impl DurationBuckets {
@@ -51,24 +72,43 @@ pub fn within_deviation(duration_seconds: i64, center: f64) -> bool {
     (duration_seconds as f64 - center).abs() <= deviation
 }
 
+fn bucket_ready(bucket: Option<DurationBucket>) -> bool {
+    bucket
+        .map(|b| b.sample_count >= MIN_SAMPLES_PER_BUCKET)
+        .unwrap_or(false)
+}
+
 /// Match a duration against wee/poo buckets. Returns a type only when exactly one bucket fits.
 pub fn classify_by_duration(
     duration_seconds: i64,
     buckets: DurationBuckets,
 ) -> Option<EliminationEventType> {
+    match classify_by_duration_detailed(duration_seconds, buckets) {
+        ClassifyOutcome::Matched(event_type) => Some(event_type),
+        _ => None,
+    }
+}
+
+fn classify_by_duration_detailed(
+    duration_seconds: i64,
+    buckets: DurationBuckets,
+) -> ClassifyOutcome {
+    let wee_ready = bucket_ready(buckets.wee);
+    let poo_ready = bucket_ready(buckets.poo);
+
+    if !wee_ready && !poo_ready {
+        return ClassifyOutcome::InsufficientHistory;
+    }
+
     let wee_match = buckets.wee.and_then(|bucket| {
-        if bucket.sample_count >= MIN_SAMPLES_PER_BUCKET
-            && within_deviation(duration_seconds, bucket.avg_duration_seconds)
-        {
+        if wee_ready && within_deviation(duration_seconds, bucket.avg_duration_seconds) {
             Some(EliminationEventType::Urination)
         } else {
             None
         }
     });
     let poo_match = buckets.poo.and_then(|bucket| {
-        if bucket.sample_count >= MIN_SAMPLES_PER_BUCKET
-            && within_deviation(duration_seconds, bucket.avg_duration_seconds)
-        {
+        if poo_ready && within_deviation(duration_seconds, bucket.avg_duration_seconds) {
             Some(EliminationEventType::Defecation)
         } else {
             None
@@ -76,9 +116,10 @@ pub fn classify_by_duration(
     });
 
     match (wee_match, poo_match) {
-        (Some(wee), None) => Some(wee),
-        (None, Some(poo)) => Some(poo),
-        _ => None,
+        (Some(wee), None) => ClassifyOutcome::Matched(wee),
+        (None, Some(poo)) => ClassifyOutcome::Matched(poo),
+        (Some(_), Some(_)) => ClassifyOutcome::Ambiguous,
+        _ => ClassifyOutcome::NoMatch,
     }
 }
 
@@ -96,26 +137,52 @@ pub async fn load_duration_buckets(pool: &SqlitePool, pet_id: Uuid) -> AppResult
     })
 }
 
-pub async fn maybe_auto_categorize(
+pub async fn attempt_auto_categorize(
     pool: &SqlitePool,
     pet_id: Uuid,
     event_type: EliminationEventType,
     duration_seconds: Option<i64>,
-) -> AppResult<EliminationEventType> {
+) -> AppResult<AutoCategorizeAttempt> {
     if event_type != EliminationEventType::General {
-        return Ok(event_type);
+        return Ok(AutoCategorizeAttempt {
+            event_type,
+            failure: None,
+        });
     }
     let Some(duration) = duration_seconds else {
-        return Ok(event_type);
+        return Ok(AutoCategorizeAttempt {
+            event_type,
+            failure: None,
+        });
     };
 
     let pet = pets::get_pet(pool, pet_id).await?;
     if !pet.elimination_auto_categorize_by_duration {
-        return Ok(event_type);
+        return Ok(AutoCategorizeAttempt {
+            event_type,
+            failure: None,
+        });
     }
 
     let buckets = load_duration_buckets(pool, pet_id).await?;
-    Ok(classify_by_duration(duration, buckets).unwrap_or(event_type))
+    match classify_by_duration_detailed(duration, buckets) {
+        ClassifyOutcome::Matched(event_type) => Ok(AutoCategorizeAttempt {
+            event_type,
+            failure: None,
+        }),
+        ClassifyOutcome::Ambiguous => Ok(AutoCategorizeAttempt {
+            event_type: EliminationEventType::General,
+            failure: Some(AutoCategorizeFailureReason::Ambiguous),
+        }),
+        ClassifyOutcome::NoMatch => Ok(AutoCategorizeAttempt {
+            event_type: EliminationEventType::General,
+            failure: Some(AutoCategorizeFailureReason::NoMatch),
+        }),
+        ClassifyOutcome::InsufficientHistory => Ok(AutoCategorizeAttempt {
+            event_type: EliminationEventType::General,
+            failure: Some(AutoCategorizeFailureReason::InsufficientHistory),
+        }),
+    }
 }
 
 #[cfg(test)]
@@ -147,6 +214,10 @@ mod tests {
             Some(EliminationEventType::Defecation)
         );
         assert_eq!(classify_by_duration(80, b), None);
+        assert_eq!(
+            classify_by_duration_detailed(80, b),
+            ClassifyOutcome::NoMatch
+        );
     }
 
     #[test]
@@ -156,6 +227,15 @@ mod tests {
         assert_eq!(
             classify_by_duration(118, b),
             Some(EliminationEventType::Defecation)
+        );
+    }
+
+    #[test]
+    fn insufficient_history_when_no_ready_buckets() {
+        let b = buckets(45.0, 1, 120.0, 1);
+        assert_eq!(
+            classify_by_duration_detailed(45, b),
+            ClassifyOutcome::InsufficientHistory
         );
     }
 }

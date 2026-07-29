@@ -383,6 +383,93 @@ paths:
         '401':
           $ref: '#/components/responses/Unauthorized'
 
+  /notifications:
+    get:
+      tags:
+        - Notifications
+      summary: List notifications
+      x-required-scope: api_read
+      description: Returns global notification messages with read state for the current authenticated reader.
+      parameters:
+        - name: limit
+          in: query
+          required: false
+          schema: { type: integer, format: int64, minimum: 1, maximum: 200, default: 50 }
+        - name: unread_only
+          in: query
+          required: false
+          schema: { type: boolean, default: false }
+      responses:
+        '200':
+          description: Notification list
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/NotificationView'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  /notifications/unread-count:
+    get:
+      tags:
+        - Notifications
+      summary: Get unread notification count
+      x-required-scope: api_read
+      responses:
+        '200':
+          description: Unread count for the current reader
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/NotificationUnreadCount'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  /notifications/read-all:
+    post:
+      tags:
+        - Notifications
+      summary: Mark all notifications read
+      x-required-scope: api_write
+      responses:
+        '200':
+          description: Updated unread count
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/NotificationUnreadCount'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  /notifications/{id}/read:
+    post:
+      tags:
+        - Notifications
+      summary: Mark one notification read
+      x-required-scope: api_write
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+      responses:
+        '204':
+          description: Marked read
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
   /settings/display:
     get:
       tags:
@@ -2014,6 +2101,56 @@ components:
         elimination_auto_categorize_by_duration:
           type: boolean
           description: Enable duration-based auto-categorization for general elimination records
+
+    NotificationView:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        kind:
+          type: string
+        title:
+          type: string
+        body:
+          type: string
+          nullable: true
+        link_path:
+          type: string
+          description: In-app route path, e.g. /elimination/2026-06-02
+        link_hash:
+          type: string
+          nullable: true
+          description: Optional hash target within the page, e.g. record-{id}
+        pet_id:
+          type: string
+          format: uuid
+          nullable: true
+        pet_name:
+          type: string
+          nullable: true
+        created_at:
+          type: string
+          format: date-time
+        read:
+          type: boolean
+          description: Whether the current authenticated reader has marked this notification read
+      required:
+        - id
+        - kind
+        - title
+        - link_path
+        - created_at
+        - read
+
+    NotificationUnreadCount:
+      type: object
+      properties:
+        count:
+          type: integer
+          format: int64
+      required:
+        - count
 
     DayNote:
       type: object

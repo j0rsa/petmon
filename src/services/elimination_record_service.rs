@@ -5,7 +5,7 @@ use crate::domain::elimination::{
 use crate::domain::weight::CreateWeightRecord;
 use crate::error::{AppError, AppResult};
 use crate::repo::{elimination_records, pets, weight_records};
-use crate::services::elimination_auto_categorize;
+use crate::services::{elimination_auto_categorize, notification_service};
 use chrono::Utc;
 use chrono_tz::Tz;
 use sqlx::SqlitePool;
@@ -30,14 +30,13 @@ pub async fn create(
     req: CreateEliminationRecord,
     timezone: Tz,
 ) -> AppResult<EliminationRecord> {
-    // Validate pet exists
     let pet_id = Uuid::parse_str(&req.pet_id)
         .map_err(|_| AppError::BadRequest(format!("invalid pet_id: {}", req.pet_id)))?;
-    pets::get_pet(pool, pet_id)
+    let pet = pets::get_pet(pool, pet_id)
         .await
         .map_err(|_| AppError::BadRequest(format!("Pet {} not found", req.pet_id)))?;
 
-    let event_type = elimination_auto_categorize::maybe_auto_categorize(
+    let attempt = elimination_auto_categorize::attempt_auto_categorize(
         pool,
         pet_id,
         req.event_type,
@@ -46,9 +45,18 @@ pub async fn create(
     .await?;
 
     let mut req = req;
-    req.event_type = event_type;
+    req.event_type = attempt.event_type;
 
-    elimination_records::create(pool, req, timezone).await
+    let record = elimination_records::create(pool, req, timezone).await?;
+
+    if let Some(reason) = attempt.failure {
+        notification_service::notify_elimination_auto_categorize_failed(
+            pool, &record, &pet.name, reason,
+        )
+        .await?;
+    }
+
+    Ok(record)
 }
 
 #[tracing::instrument(skip(pool))]
@@ -63,7 +71,6 @@ pub async fn create_with_weight(
         .await
         .map_err(|_| AppError::BadRequest(format!("Pet {} not found", req.pet_id)))?;
 
-    // Resolve the shared timestamp once so both records land at exactly the same moment.
     let occurred_at = req.occurred_at.unwrap_or_else(|| {
         Utc::now()
             .with_timezone(&timezone)

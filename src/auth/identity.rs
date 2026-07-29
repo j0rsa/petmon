@@ -44,6 +44,15 @@ impl Identity {
             .unwrap_or(&self.subject)
     }
 
+    /// Stable key for per-reader notification read state.
+    pub fn reader_key(&self) -> String {
+        match &self.kind {
+            IdentityKind::Dev => "dev".to_string(),
+            IdentityKind::Oidc => self.subject.clone(),
+            IdentityKind::ApiToken { token_id } => format!("api_token:{token_id}"),
+        }
+    }
+
     /// Returns true if this identity is permitted to use `required_scope`.
     ///
     /// - Dev identities always pass.

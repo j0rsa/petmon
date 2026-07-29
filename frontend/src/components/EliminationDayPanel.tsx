@@ -14,6 +14,7 @@ import { EliminationDayChart } from './EliminationDayChart';
 import { nowTimeString, isoFromDateAndTime } from '../lib/time';
 import { localToday } from '../lib/dates';
 import { useFormatTime, useFormatDate } from '../context/useDisplaySettings';
+import { useScrollToHash } from '../hooks/useScrollToHash';
 import { digitsToDisplay, digitsToSecs, secsToDigits, normaliseDigits } from '../lib/duration';
 
 // ── Label maps ──────────────────────────────────────────────────────────────
@@ -390,7 +391,7 @@ function RecordRow({
   }
 
   return (
-    <div className="entry-row-wrap">
+    <div className="entry-row-wrap" id={`record-${record.id}`}>
       <div className="entry-row">
         <span className="entry-time">{formatTime(record.occurred_at)}</span>
         <TypeBadge eventType={record.event_type} />
@@ -448,6 +449,8 @@ export function EliminationDayPanel({ date, petId }: EliminationDayPanelProps) {
     [recordsQuery.data],
   );
 
+  useScrollToHash(records.length, recordsQuery.isSuccess);
+
   // Derived metrics — vomit is shown separately, not counted as a visit
   const totalCount = records.filter((r) => r.event_type !== 'vomit').length;
   const defecationCount = records.filter((r) => r.event_type === 'defecation').length;
@@ -463,6 +466,8 @@ export function EliminationDayPanel({ date, petId }: EliminationDayPanelProps) {
     mutationFn: (payload: CreateEliminationRecord) => eliminationApi.create(payload),
     onSuccess: () => {
       invalidateDayData(queryClient, date, petId);
+      queryClient.invalidateQueries({ queryKey: ['notifications-unread-count'] });
+      queryClient.invalidateQueries({ queryKey: ['notifications'] });
       addRowRef.current?.clearForm();
     },
   });
