@@ -35,26 +35,24 @@ const EVENT_TYPE_LABELS: Record<string, string> = {
   general:    'General',
 };
 
-const DURATION_TYPES = [
+const DURATION_STAT_TYPES = [
   {
     key: 'urination' as const,
-    dataKey: 'urinationAvgDuration' as const,
-    trendKey: 'urinationDurationTrend' as const,
     statLabel: 'wee median time spent',
-    chartTitle: 'wee time spent',
     color: EVENT_TYPE_COLORS.urination,
-    label: EVENT_TYPE_LABELS.urination,
   },
   {
     key: 'defecation' as const,
-    dataKey: 'defecationAvgDuration' as const,
-    trendKey: 'defecationDurationTrend' as const,
     statLabel: 'poo median time spent',
-    chartTitle: 'poo time spent',
     color: EVENT_TYPE_COLORS.defecation,
-    label: EVENT_TYPE_LABELS.defecation,
   },
 ];
+
+const DURATION_SERIES = [
+  { dataKey: 'urinationAvgDuration', trendKey: 'urinationDurationTrend', type: 'urination' },
+  { dataKey: 'defecationAvgDuration', trendKey: 'defecationDurationTrend', type: 'defecation' },
+  { dataKey: 'generalAvgDuration', trendKey: 'generalDurationTrend', type: 'general' },
+] as const;
 
 function medianAndMean(values: Array<number | null>) {
   const vals = values.filter((v): v is number => v != null).sort((a, b) => a - b);
@@ -65,7 +63,7 @@ function medianAndMean(values: Array<number | null>) {
   return { median, mean };
 }
 
-function hasDurationData(values: Array<number | null>) {
+function hasDurationChartData(values: Array<number | null>) {
   return values.some((v) => v != null);
 }
 
@@ -158,10 +156,15 @@ export default function EliminationAnalyticsPage() {
     () => linReg(dailyData.map((d) => d.defecationAvgDuration), { min: 0 }),
     [dailyData],
   );
+  const generalDurationTrend = useMemo(
+    () => linReg(dailyData.map((d) => d.generalAvgDuration), { min: 0 }),
+    [dailyData],
+  );
 
   const durationTrends = {
     urinationDurationTrend,
     defecationDurationTrend,
+    generalDurationTrend,
   } as const;
 
   const durationStats = useMemo(() => ({
@@ -176,8 +179,16 @@ export default function EliminationAnalyticsPage() {
       visitTrend: visitTrend?.[i] ?? null,
       urinationDurationTrend: urinationDurationTrend?.[i] ?? null,
       defecationDurationTrend: defecationDurationTrend?.[i] ?? null,
+      generalDurationTrend: generalDurationTrend?.[i] ?? null,
     })),
-    [dailyData, visitTrend, urinationDurationTrend, defecationDurationTrend],
+    [dailyData, visitTrend, urinationDurationTrend, defecationDurationTrend, generalDurationTrend],
+  );
+
+  const showDurationChart = useMemo(
+    () => hasDurationChartData(
+      dailyData.flatMap((d) => [d.urinationAvgDuration, d.defecationAvgDuration, d.generalAvgDuration]),
+    ),
+    [dailyData],
   );
 
   // Vomit days list
@@ -226,7 +237,7 @@ export default function EliminationAnalyticsPage() {
                 current={stats.median}
                 avg={stats.avg}
               />
-              {DURATION_TYPES.map(({ key, statLabel, color }) => {
+              {DURATION_STAT_TYPES.map(({ key, statLabel, color }) => {
                 const typeStats = durationStats[key];
                 if (!typeStats) return null;
                 return (
@@ -307,72 +318,69 @@ export default function EliminationAnalyticsPage() {
             </div>
           </section>
 
-          {/* Duration charts — wee and poo separately */}
-          {DURATION_TYPES.map(({ key, chartTitle, dataKey, trendKey, color, label }) => {
-            if (!hasDurationData(dailyData.map((d) => d[dataKey]))) return null;
-            const typeStats = durationStats[key];
-            const trend = durationTrends[trendKey];
-            return (
-              <section key={key} className="panel">
-                <p className="eyebrow" style={{ marginBottom: '0.5rem' }}>{chartTitle}</p>
-                <div className="chart-wrapper">
-                  <ResponsiveContainer width="100%" height="100%">
-                    <LineChart data={chartData} margin={{ top: 8, right: 16, left: 0, bottom: 0 }}>
-                      <CartesianGrid stroke="var(--chart-grid)" strokeDasharray="3 3" />
-                      <XAxis dataKey="date" tickFormatter={formatDate} stroke="var(--chart-axis)" tick={{ fill: 'var(--chart-axis)', fontFamily: 'monospace', fontSize: 11 }} interval="preserveStartEnd" />
-                      <YAxis stroke="var(--chart-axis)" tick={{ fill: 'var(--chart-axis)', fontFamily: 'monospace', fontSize: 11 }} tickFormatter={(v) => fmtSec(v)} width={42} />
-                      <Tooltip
-                        formatter={(v, name) => {
-                          const strName = String(name);
-                          const isTrend = strName.endsWith('Trend');
-                          if (v == null) return ['—', isTrend ? `${label} trend` : label];
-                          return [fmtSec(Number(v)), isTrend ? `${label} trend` : label];
-                        }}
-                        labelFormatter={(label) => formatDate(String(label))}
-                        contentStyle={{ background: 'var(--surface)', border: '1px solid var(--border-subtle)', borderRadius: 8, fontFamily: 'monospace', fontSize: 12 }}
-                      />
-                      {typeStats && (
-                        <ReferenceLine
-                          y={typeStats.median}
-                          stroke="var(--text-subtle)"
-                          strokeDasharray="5 4"
-                          label={{
-                            value: `median ${fmtSec(typeStats.median)}`,
-                            fill: 'var(--text-subtle)',
-                            fontSize: 10,
-                            position: 'insideTopRight',
-                          }}
-                        />
-                      )}
-                      <Line
-                        type="monotone"
-                        dataKey={dataKey}
-                        name={label}
-                        stroke={color}
-                        strokeWidth={2}
-                        dot={{ r: 3, fill: color, strokeWidth: 0 }}
-                        activeDot={{ r: 5 }}
-                        connectNulls
-                      />
-                      {trend && (
+          {/* Duration chart — wee, poo, and general with trend lines */}
+          {showDurationChart && (
+            <section className="panel">
+              <p className="eyebrow" style={{ marginBottom: '0.5rem' }}>time spent</p>
+              <div className="chart-wrapper">
+                <ResponsiveContainer width="100%" height="100%">
+                  <LineChart data={chartData} margin={{ top: 8, right: 16, left: 0, bottom: 0 }}>
+                    <CartesianGrid stroke="var(--chart-grid)" strokeDasharray="3 3" />
+                    <XAxis dataKey="date" tickFormatter={formatDate} stroke="var(--chart-axis)" tick={{ fill: 'var(--chart-axis)', fontFamily: 'monospace', fontSize: 11 }} interval="preserveStartEnd" />
+                    <YAxis stroke="var(--chart-axis)" tick={{ fill: 'var(--chart-axis)', fontFamily: 'monospace', fontSize: 11 }} tickFormatter={(v) => fmtSec(v)} width={42} />
+                    <Tooltip
+                      formatter={(v, name) => {
+                        const strName = String(name);
+                        const series = DURATION_SERIES.find((s) => s.dataKey === strName || s.trendKey === strName);
+                        const label = series ? EVENT_TYPE_LABELS[series.type] : strName;
+                        const isTrend = strName.endsWith('Trend');
+                        if (v == null) return ['—', isTrend ? `${label} trend` : label];
+                        return [fmtSec(Number(v)), isTrend ? `${label} trend` : label];
+                      }}
+                      labelFormatter={(label) => formatDate(String(label))}
+                      contentStyle={{ background: 'var(--surface)', border: '1px solid var(--border-subtle)', borderRadius: 8, fontFamily: 'monospace', fontSize: 12 }}
+                    />
+                    <Legend wrapperStyle={{ fontFamily: 'monospace', fontSize: 12 }} />
+                    {DURATION_SERIES.flatMap(({ dataKey, trendKey, type }) => {
+                      const color = EVENT_TYPE_COLORS[type];
+                      const label = EVENT_TYPE_LABELS[type];
+                      const trend = durationTrends[trendKey];
+                      const lines = [
                         <Line
-                          type="linear"
-                          dataKey={trendKey}
-                          name={`${label} trend`}
+                          key={dataKey}
+                          type="monotone"
+                          dataKey={dataKey}
+                          name={label}
                           stroke={color}
-                          strokeWidth={1.5}
-                          strokeDasharray="4 3"
-                          dot={false}
-                          activeDot={false}
-                          legendType="none"
-                        />
-                      )}
-                    </LineChart>
-                  </ResponsiveContainer>
-                </div>
-              </section>
-            );
-          })}
+                          strokeWidth={2}
+                          dot={{ r: 3, fill: color, strokeWidth: 0 }}
+                          activeDot={{ r: 5 }}
+                          connectNulls
+                        />,
+                      ];
+                      if (trend) {
+                        lines.push(
+                          <Line
+                            key={trendKey}
+                            type="linear"
+                            dataKey={trendKey}
+                            name={trendKey}
+                            stroke={color}
+                            strokeWidth={1.5}
+                            strokeDasharray="4 3"
+                            dot={false}
+                            activeDot={false}
+                            legendType="none"
+                          />,
+                        );
+                      }
+                      return lines;
+                    })}
+                  </LineChart>
+                </ResponsiveContainer>
+              </div>
+            </section>
+          )}
 
           {/* Vomit days list */}
           {vomitDays.length > 0 && (
