@@ -51,6 +51,7 @@ export const withLayoutData: Decorator = (Story) => {
   client.setQueryData(['app-info'], mockAppInfo);
   client.setQueryData(['settings-display'], mockDisplaySettings);
   client.setQueryData(['notifications-unread-count'], { count: 1 });
+  client.setQueryData(['notifications'], mockNotifications);
   return (
     <QueryClientProvider client={client}>
       <DisplaySettingsProvider>

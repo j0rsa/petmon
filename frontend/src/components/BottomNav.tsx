@@ -2,7 +2,13 @@ import { useState } from 'react';
 import { Link, useMatch, useNavigate } from 'react-router-dom';
 import { LayoutDashboard, Utensils, PawPrint, Settings, ChevronRight } from 'lucide-react';
 import { useSelectedPet } from '../context/SelectedPetContext';
+import {
+  useNotificationActions,
+  useNotificationList,
+  useNotificationUnreadCount,
+} from '../hooks/useNotifications';
 import { resolvePetColor } from '../lib/petColors';
+import { NotificationRow } from './NotificationRow';
 import { PetAvatar } from './pet/PetAvatar';
 import { BottomNavLink } from './BottomNavLink';
 
@@ -12,7 +18,14 @@ export function BottomNav() {
   const navigate = useNavigate();
   const onPetProfile = useMatch('/pets/:id');
 
+  const unreadQuery = useNotificationUnreadCount();
+  const listQuery = useNotificationList(petSheetOpen);
+  const { markAllReadMutation, openNotification } = useNotificationActions(() => setPetSheetOpen(false));
+
   const petColor = selectedPet ? resolvePetColor(selectedPet.species, selectedPet.color) : 'var(--accent)';
+  const unreadCount = unreadQuery.data?.count ?? 0;
+  const notifications = listQuery.data ?? [];
+  const hasUnreadNotifications = notifications.some((item) => !item.read);
 
   function selectPet(id: string) {
     setSelectedPetId(id);
@@ -20,16 +33,18 @@ export function BottomNav() {
     setPetSheetOpen(false);
   }
 
+  const petTabLabel = unreadCount > 0
+    ? `Switch pet, ${unreadCount} unread notification${unreadCount === 1 ? '' : 's'}`
+    : 'Switch pet';
+
   return (
     <>
-      {/* Pet sheet backdrop */}
       {petSheetOpen && (
         <div className="bottom-nav-backdrop" onClick={() => setPetSheetOpen(false)} />
       )}
 
-      {/* Pet sheet */}
       {petSheetOpen && (
-        <div className="bottom-nav-sheet">
+        <div className="bottom-nav-sheet" role="dialog" aria-label="Pet and notifications">
           <div className="bottom-nav-sheet-handle" />
           <p className="eyebrow bottom-nav-sheet-title">Switch pet</p>
           {petsLoading && <p className="muted-text bottom-nav-sheet-subtitle">Loading…</p>}
@@ -72,10 +87,40 @@ export function BottomNav() {
               <ChevronRight size={16} style={{ marginLeft: 'auto', opacity: 0.4 }} />
             </Link>
           )}
+
+          <div className="bottom-nav-sheet-divider" aria-hidden="true" />
+
+          <div className="bottom-nav-sheet-section-header">
+            <p className="eyebrow bottom-nav-sheet-title bottom-nav-sheet-title-inline">Notifications</p>
+            {hasUnreadNotifications && (
+              <button
+                type="button"
+                className="bottom-nav-sheet-manage"
+                disabled={markAllReadMutation.isPending}
+                onClick={() => markAllReadMutation.mutate()}
+              >
+                Mark all read
+              </button>
+            )}
+          </div>
+
+          <div className="bottom-nav-sheet-notifications">
+            {listQuery.isLoading && <p className="notification-empty">Loading…</p>}
+            {!listQuery.isLoading && notifications.length === 0 && (
+              <p className="notification-empty">No notifications yet.</p>
+            )}
+            {notifications.map((item) => (
+              <NotificationRow
+                key={item.id}
+                item={item}
+                compact
+                onOpen={openNotification}
+              />
+            ))}
+          </div>
         </div>
       )}
 
-      {/* Bottom nav bar */}
       <nav className="bottom-nav" aria-label="Main navigation">
         <BottomNavLink to="/" end>
           <LayoutDashboard size={22} />
@@ -87,24 +132,29 @@ export function BottomNav() {
           <span>Nutrition</span>
         </BottomNavLink>
 
-        {/* Pet switcher tab */}
         <button
           type="button"
           className={`bottom-nav-item bottom-nav-pet${petSheetOpen ? ' active' : ''}`}
-          onClick={() => setPetSheetOpen((v) => !v)}
-          aria-label="Switch pet"
+          onClick={() => setPetSheetOpen((value) => !value)}
+          aria-label={petTabLabel}
+          aria-expanded={petSheetOpen}
         >
-          {selectedPet ? (
-            <PetAvatar
-              species={selectedPet.species}
-              name={selectedPet.name}
-              color={petColor}
-              circleBg={`${petColor}28`}
-              size={28}
-            />
-          ) : (
-            <PawPrint size={22} />
-          )}
+          <span className="bottom-nav-pet-avatar-wrap">
+            {selectedPet ? (
+              <PetAvatar
+                species={selectedPet.species}
+                name={selectedPet.name}
+                color={petColor}
+                circleBg={`${petColor}28`}
+                size={28}
+              />
+            ) : (
+              <PawPrint size={22} />
+            )}
+            {unreadCount > 0 && (
+              <span className="bottom-nav-pet-unread-dot" aria-hidden="true" />
+            )}
+          </span>
           <span>{selectedPet?.name ?? 'Pet'}</span>
         </button>
 

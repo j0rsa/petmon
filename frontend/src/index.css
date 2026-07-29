@@ -777,6 +777,25 @@ pre {
   position: relative;
 }
 
+.bottom-nav-pet-avatar-wrap {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.bottom-nav-pet-unread-dot {
+  position: absolute;
+  top: -0.05rem;
+  right: -0.05rem;
+  width: 0.55rem;
+  height: 0.55rem;
+  border-radius: 999px;
+  background: var(--error-text);
+  border: 2px solid var(--surface-sidebar);
+  box-sizing: content-box;
+}
+
 .bottom-nav-pet .pet-avatar-circle {
   transition: box-shadow 0.15s ease;
 }
@@ -888,6 +907,59 @@ pre {
   font-size: 0.9rem;
 }
 
+.bottom-nav-sheet-divider {
+  height: 1px;
+  background: var(--border-subtle);
+  margin: 0.75rem 1rem 0;
+}
+
+.bottom-nav-sheet-section-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  padding: 0.75rem 1rem 0.35rem;
+}
+
+.bottom-nav-sheet-title-inline {
+  padding: 0;
+  margin: 0;
+}
+
+.bottom-nav-sheet-manage {
+  border: none;
+  background: none;
+  color: var(--accent);
+  font-size: 0.78rem;
+  cursor: pointer;
+  padding: 0;
+  white-space: nowrap;
+}
+
+.bottom-nav-sheet-manage:hover {
+  text-decoration: underline;
+}
+
+.bottom-nav-sheet-notifications {
+  display: flex;
+  flex-direction: column;
+  padding-bottom: 0.5rem;
+}
+
+.bottom-nav-sheet-notifications .notification-item {
+  padding-left: 1.25rem;
+  padding-right: 1.25rem;
+}
+
+.bottom-nav-sheet-notifications .notification-empty {
+  padding: 0.5rem 1.25rem 0.75rem;
+}
+
+.notification-item-compact {
+  padding-top: 0.7rem;
+  padding-bottom: 0.7rem;
+}
+
 .nav-section {
   display: flex;
   flex-direction: column;
@@ -969,6 +1041,12 @@ pre {
   top: 0.85rem;
   right: 0.85rem;
   z-index: 130;
+}
+
+@media (max-width: 768px) {
+  .notification-center-desktop {
+    display: none;
+  }
 }
 
 .notification-bell {

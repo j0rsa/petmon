@@ -43,7 +43,7 @@ export const WithNotifications: Story = {
   parameters: {
     docs: {
       description: {
-        story: 'Layout includes the global notification bell with an unread badge seeded via fixtures.',
+        story: 'Desktop shows the global notification bell; mobile uses the bottom-nav pet tab red dot and sheet.',
       },
     },
   },
@@ -51,4 +51,16 @@ export const WithNotifications: Story = {
 
 export const Mobile: Story = {
   parameters: { viewport: { defaultViewport: 'pwaMobile' } },
+};
+
+export const MobileWithNotifications: Story = {
+  name: 'Mobile with unread dot',
+  parameters: {
+    viewport: { defaultViewport: 'pwaMobile' },
+    docs: {
+      description: {
+        story: 'On mobile the bell is hidden; unread notifications appear as a red dot on the pet tab.',
+      },
+    },
+  },
 };
