@@ -5,6 +5,7 @@ use crate::domain::elimination::{
 use crate::domain::weight::CreateWeightRecord;
 use crate::error::{AppError, AppResult};
 use crate::repo::{elimination_records, pets, weight_records};
+use crate::services::elimination_auto_categorize;
 use chrono::Utc;
 use chrono_tz::Tz;
 use sqlx::SqlitePool;
@@ -35,6 +36,17 @@ pub async fn create(
     pets::get_pet(pool, pet_id)
         .await
         .map_err(|_| AppError::BadRequest(format!("Pet {} not found", req.pet_id)))?;
+
+    let event_type = elimination_auto_categorize::maybe_auto_categorize(
+        pool,
+        pet_id,
+        req.event_type,
+        req.duration_seconds,
+    )
+    .await?;
+
+    let mut req = req;
+    req.event_type = event_type;
 
     elimination_records::create(pool, req, timezone).await
 }
@@ -81,7 +93,7 @@ pub async fn create_with_weight(
         source_type: req.source_type,
     };
 
-    let elimination = elimination_records::create(pool, elim_req, timezone).await?;
+    let elimination = create(pool, elim_req, timezone).await?;
     let weight = weight_records::create(pool, weight_req, timezone).await?;
     pets::update_weight(pool, &req.pet_id, req.weight_kg).await?;
 

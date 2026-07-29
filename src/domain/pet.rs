@@ -22,6 +22,10 @@ pub struct Pet {
     pub feeding_notes: Option<String>,
     pub telegram_chat_id: Option<String>,
     pub telegram_thread_id: Option<String>,
+    /// When true, general elimination records with duration are auto-tagged as wee/poop
+    /// based on historical duration buckets for this pet.
+    #[serde(default)]
+    pub elimination_auto_categorize_by_duration: bool,
     pub created_at: String,
     pub updated_at: String,
 }
@@ -40,6 +44,8 @@ pub struct CreatePet {
     pub feeding_notes: Option<String>,
     pub telegram_chat_id: Option<String>,
     pub telegram_thread_id: Option<String>,
+    #[serde(default)]
+    pub elimination_auto_categorize_by_duration: bool,
 }
 
 #[derive(Debug, Deserialize)]
@@ -54,6 +60,7 @@ pub struct UpdatePet {
     pub feeding_notes: Option<String>,
     pub telegram_chat_id: Option<String>,
     pub telegram_thread_id: Option<String>,
+    pub elimination_auto_categorize_by_duration: Option<bool>,
 }
 
 impl Pet {
@@ -72,6 +79,7 @@ impl Pet {
             feeding_notes: req.feeding_notes,
             telegram_chat_id: req.telegram_chat_id,
             telegram_thread_id: req.telegram_thread_id,
+            elimination_auto_categorize_by_duration: req.elimination_auto_categorize_by_duration,
             created_at: now.clone(),
             updated_at: now,
         }

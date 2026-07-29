@@ -1,5 +1,6 @@
 pub mod day_service;
 pub mod elimination_analytics_service;
+pub mod elimination_auto_categorize;
 pub mod elimination_record_service;
 pub mod health_state_service;
 pub mod nutrition_analytics_service;

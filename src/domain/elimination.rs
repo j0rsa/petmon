@@ -136,6 +136,19 @@ pub struct EliminationDailySummary {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct EliminationDurationBucket {
+    pub sample_count: i64,
+    pub avg_duration_seconds: f64,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct EliminationDurationProfile {
+    pub pet_id: String,
+    pub wee: Option<EliminationDurationBucket>,
+    pub poo: Option<EliminationDurationBucket>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct EliminationRangeSummary {
     pub date_from: String,
     pub date_to: String,

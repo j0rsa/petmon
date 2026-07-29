@@ -11,7 +11,14 @@ import {
   mockPetId,
   mockPets,
 } from '../stories/fixtures';
+import type { EliminationDurationProfile } from '../api/elimination';
 import EliminationJournalPage from './EliminationJournalPage';
+
+const mockDurationProfile: EliminationDurationProfile = {
+  pet_id: mockPetId,
+  wee: { sample_count: 12, avg_duration_seconds: 52 },
+  poo: { sample_count: 8, avg_duration_seconds: 118 },
+};
 
 function makeClient() {
   return new QueryClient({
@@ -38,6 +45,7 @@ function withJournalData(date: string, empty = false) {
     // Pre-seed calendar data for the month
     const month = date.slice(0, 7);
     client.setQueryData(['elimination-calendar', month, mockPetId], empty ? [] : [mockEliminationDaySummary]);
+    client.setQueryData(['elimination-duration-profile', mockPetId], mockDurationProfile);
 
     return (
       <MemoryRouter initialEntries={[date === new Date().toISOString().slice(0, 10) ? '/elimination' : `/elimination/${date}`]}>

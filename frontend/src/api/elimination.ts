@@ -74,6 +74,17 @@ export interface EliminationRangeSummary {
   p99_per_day: number;
 }
 
+export interface EliminationDurationBucket {
+  sample_count: number;
+  avg_duration_seconds: number;
+}
+
+export interface EliminationDurationProfile {
+  pet_id: string;
+  wee: EliminationDurationBucket | null;
+  poo: EliminationDurationBucket | null;
+}
+
 export function categorizedDurationValues(summary: EliminationDailySummary): number[] {
   return [
     summary.urination_avg_duration_seconds,
@@ -117,4 +128,6 @@ export const eliminationApi = {
     api.get<EliminationRangeSummary>(
       `/elimination/analytics/range-summary?date_from=${dateFrom}&date_to=${dateTo}${petId ? `&pet_id=${petId}` : ''}`,
     ),
+  durationProfile: (petId: string) =>
+    api.get<EliminationDurationProfile>(`/elimination/duration-profile?pet_id=${petId}`),
 };

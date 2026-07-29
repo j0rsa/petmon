@@ -921,6 +921,32 @@ paths:
         '401':
           $ref: '#/components/responses/Unauthorized'
 
+  /elimination/duration-profile:
+    get:
+      tags:
+        - Elimination Analytics
+      summary: Get duration buckets for auto-categorization
+      x-required-scope: api_read
+      description: Returns historical average durations for wee and poop records used to auto-tag general entries when enabled for the pet.
+      parameters:
+        - name: pet_id
+          in: query
+          required: true
+          schema: { type: string, format: uuid }
+      responses:
+        '200':
+          description: Duration profile
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/EliminationDurationProfile'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
   /health/weight:
     get:
       tags:
@@ -1895,6 +1921,9 @@ components:
           type: string
           nullable: true
           description: Telegram thread ID for topic replies
+        elimination_auto_categorize_by_duration:
+          type: boolean
+          description: When enabled, general elimination records with duration are auto-tagged as wee or poop based on this pet's historical duration buckets
         created_at:
           type: string
           format: date-time
@@ -1908,6 +1937,7 @@ components:
         - name
         - species
         - status
+        - elimination_auto_categorize_by_duration
         - created_at
         - updated_at
 
@@ -1943,6 +1973,9 @@ components:
         telegram_thread_id:
           type: string
           nullable: true
+        elimination_auto_categorize_by_duration:
+          type: boolean
+          description: Enable duration-based auto-categorization for general elimination records
       required:
         - name
 
@@ -1978,6 +2011,9 @@ components:
         telegram_thread_id:
           type: string
           nullable: true
+        elimination_auto_categorize_by_duration:
+          type: boolean
+          description: Enable duration-based auto-categorization for general elimination records
 
     DayNote:
       type: object
@@ -2904,6 +2940,38 @@ components:
         note:
           type: string
           nullable: true
+
+    EliminationDurationBucket:
+      type: object
+      properties:
+        sample_count:
+          type: integer
+          format: int64
+        avg_duration_seconds:
+          type: number
+          format: double
+      required:
+        - sample_count
+        - avg_duration_seconds
+
+    EliminationDurationProfile:
+      type: object
+      properties:
+        pet_id:
+          type: string
+          format: uuid
+        wee:
+          allOf:
+            - $ref: '#/components/schemas/EliminationDurationBucket'
+          nullable: true
+          description: Historical wee duration bucket; null when no categorized wee records with duration exist.
+        poo:
+          allOf:
+            - $ref: '#/components/schemas/EliminationDurationBucket'
+          nullable: true
+          description: Historical poop duration bucket; null when no categorized poop records with duration exist.
+      required:
+        - pet_id
 
     EliminationDailySummary:
       type: object

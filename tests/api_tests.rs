@@ -1212,6 +1212,103 @@ async fn elimination_record_with_weight_creates_both_records() {
     assert_eq!(elim["pet_id"].as_str(), weight["pet_id"].as_str());
 }
 
+macro_rules! api_enable_elimination_auto_categorize {
+    ($app:expr, $pet_id:expr) => {{
+        let req = test::TestRequest::patch()
+            .uri(&format!("/api/v1/pets/{}", $pet_id))
+            .set_json(serde_json::json!({ "elimination_auto_categorize_by_duration": true }))
+            .to_request();
+        let resp = test::call_service($app, req).await;
+        assert_eq!(resp.status(), 200, "failed to enable auto-categorize");
+    }};
+}
+
+macro_rules! api_create_elimination {
+    ($app:expr, $pet_id:expr, $event_type:expr, $duration_seconds:expr, $occurred_at:expr) => {{
+        let req = test::TestRequest::post()
+            .uri("/api/v1/elimination/records")
+            .set_json(serde_json::json!({
+                "pet_id": $pet_id,
+                "event_type": $event_type,
+                "duration_seconds": $duration_seconds,
+                "occurred_at": $occurred_at,
+                "local_date": $occurred_at.split('T').next().unwrap()
+            }))
+            .to_request();
+        let resp = test::call_service($app, req).await;
+        assert_eq!(resp.status(), 201, "failed to create elimination record");
+        test::read_body_json::<serde_json::Value, _>(resp).await
+    }};
+}
+
+/// General elimination records with duration are auto-tagged on the backend when enabled.
+#[actix_web::test]
+async fn elimination_auto_categorize_by_duration() {
+    let (app, _state) = build_dev_app!();
+    let pet_id = api_create_pet!(&app, "AutoCat");
+
+    for (event_type, duration, hour) in [
+        ("urination", 45, 8),
+        ("urination", 50, 9),
+        ("defecation", 120, 10),
+        ("defecation", 125, 11),
+    ] {
+        api_create_elimination!(
+            &app,
+            pet_id,
+            event_type,
+            duration,
+            format!("2026-06-01T{hour:02}:00:00")
+        );
+    }
+
+    api_enable_elimination_auto_categorize!(&app, pet_id);
+
+    let body = api_create_elimination!(&app, pet_id, "general", 48, "2026-06-02T08:30:00");
+    assert_eq!(body["event_type"].as_str(), Some("urination"));
+
+    let body = api_create_elimination!(&app, pet_id, "general", 122, "2026-06-02T10:30:00");
+    assert_eq!(body["event_type"].as_str(), Some("defecation"));
+
+    let body = api_create_elimination!(&app, pet_id, "general", 90, "2026-06-02T12:00:00");
+    assert_eq!(body["event_type"].as_str(), Some("general"));
+
+    let req = test::TestRequest::patch()
+        .uri(&format!("/api/v1/pets/{pet_id}"))
+        .set_json(serde_json::json!({ "elimination_auto_categorize_by_duration": false }))
+        .to_request();
+    let resp = test::call_service(&app, req).await;
+    assert_eq!(resp.status(), 200);
+
+    let body = api_create_elimination!(&app, pet_id, "general", 47, "2026-06-02T14:00:00");
+    assert_eq!(body["event_type"].as_str(), Some("general"));
+}
+
+#[actix_web::test]
+async fn elimination_duration_profile_returns_buckets() {
+    let (app, _state) = build_dev_app!();
+    let pet_id = api_create_pet!(&app, "DurationProfile");
+
+    api_create_elimination!(&app, pet_id, "urination", 40, "2026-06-01T08:00:00");
+    api_create_elimination!(&app, pet_id, "urination", 60, "2026-06-01T09:00:00");
+    api_create_elimination!(&app, pet_id, "defecation", 100, "2026-06-01T10:00:00");
+
+    let req = test::TestRequest::get()
+        .uri(&format!(
+            "/api/v1/elimination/duration-profile?pet_id={pet_id}"
+        ))
+        .to_request();
+    let resp = test::call_service(&app, req).await;
+    assert_eq!(resp.status(), 200);
+    let body: serde_json::Value = test::read_body_json(resp).await;
+
+    assert_eq!(body["pet_id"].as_str(), Some(pet_id.as_str()));
+    assert_eq!(body["wee"]["sample_count"].as_i64(), Some(2));
+    assert_eq!(body["wee"]["avg_duration_seconds"].as_f64(), Some(50.0));
+    assert_eq!(body["poo"]["sample_count"].as_i64(), Some(1));
+    assert_eq!(body["poo"]["avg_duration_seconds"].as_f64(), Some(100.0));
+}
+
 // ── Route registration smoke tests ───────────────────────────────────────────
 // These guard against routes silently falling through to the SPA/assets
 // fallback. Each test hits a real endpoint and asserts it returns JSON (not

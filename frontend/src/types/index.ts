@@ -29,6 +29,7 @@ export interface Pet {
   feeding_notes?: string;
   telegram_chat_id?: string;
   telegram_thread_id?: string;
+  elimination_auto_categorize_by_duration?: boolean;
   created_at: string;
   updated_at: string;
 }
