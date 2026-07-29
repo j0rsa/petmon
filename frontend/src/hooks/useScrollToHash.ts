@@ -16,6 +16,7 @@ function cleanupFlash(el: Element) {
 export function useScrollToHash(...deps: unknown[]) {
   const { hash } = useLocation();
   const highlightedRef = useRef<Element | null>(null);
+  const depsKey = JSON.stringify(deps);
 
   useEffect(() => {
     if (!hash || hash.length <= 1) return;
@@ -24,8 +25,9 @@ export function useScrollToHash(...deps: unknown[]) {
     let attempts = 0;
     let retryTimer: number | undefined;
 
-    function onAnimationEnd(event: AnimationEvent) {
-      if (event.animationName !== FLASH_ANIMATION_NAME) return;
+    function onAnimationEnd(event: Event) {
+      const anim = event as AnimationEvent;
+      if (anim.animationName !== FLASH_ANIMATION_NAME) return;
       const el = event.currentTarget as Element;
       cleanupFlash(el);
       el.removeEventListener('animationend', onAnimationEnd);
@@ -72,5 +74,5 @@ export function useScrollToHash(...deps: unknown[]) {
         highlightedRef.current = null;
       }
     };
-  }, [hash, ...deps]);
+  }, [hash, depsKey]);
 }

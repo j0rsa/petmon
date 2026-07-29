@@ -1,5 +1,5 @@
 import type { Meta, StoryObj } from '@storybook/react-vite';
-import { expect, within, waitFor } from 'storybook/test';
+import { expect, waitFor } from 'storybook/test';
 import { withEliminationJournalPage } from '../stories/decorators';
 import EliminationJournalPage from './EliminationJournalPage';
 
