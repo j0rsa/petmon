@@ -43,15 +43,29 @@ export const TrendFlatEdge: Story = {
   args: { label: 'median visits / day', value: '4.2', icon: <TrendUpIcon />, current: 4.2, avg: 4.0 },
 };
 
-export const WithCustomAvgLabel: Story = {
+export const WeeMedianTimeSpent: Story = {
+  name: 'Wee median time spent',
   args: {
-    label: 'median time spent',
-    value: '1m 35s',
+    label: 'wee median time spent',
+    value: '52s',
+    color: 'var(--metric-water)',
+    icon: <ClockIcon />,
+    current: 52,
+    avg: 48,
+    avgLabel: 'avg 48s',
+  },
+};
+
+export const PooMedianTimeSpent: Story = {
+  name: 'Poo median time spent',
+  args: {
+    label: 'poo median time spent',
+    value: '1m 58s',
     color: 'var(--metric-wet)',
     icon: <ClockIcon />,
-    current: 95,
-    avg: 80,
-    avgLabel: 'avg 1m 20s',
+    current: 118,
+    avg: 105,
+    avgLabel: 'avg 1m 45s',
   },
 };
 

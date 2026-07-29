@@ -1,6 +1,6 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import type { Decorator } from '@storybook/react-vite';
-import { MemoryRouter } from 'react-router-dom';
+import { MemoryRouter, Route, Routes } from 'react-router-dom';
 import { SelectedPetProvider } from '../context/SelectedPetContext';
 import { DisplaySettingsProvider } from '../context/DisplaySettingsProvider';
 import { localToday, shiftDate } from '../lib/dates';
@@ -13,8 +13,13 @@ import {
   mockDisplaySettings,
   mockEliminationRecords,
   mockEliminationRangeSummary,
+  mockEliminationRangeSummaryPooOnly,
+  mockEliminationRangeSummaryWeeOnly,
+  mockEliminationDurationProfile,
+  mockEliminationDaySummary,
   mockEmptyDaySummary,
   mockEmptyRangeSummary,
+  mockNotifications,
   mockNutritionRecords,
   mockNutritionSchedules,
   mockOidcConfigured,
@@ -45,6 +50,7 @@ export const withLayoutData: Decorator = (Story) => {
   client.setQueryData(['me'], { subject: 'dev', email: null, name: 'Dev', display_name: 'Dev', kind: 'dev', scopes: [] });
   client.setQueryData(['app-info'], mockAppInfo);
   client.setQueryData(['settings-display'], mockDisplaySettings);
+  client.setQueryData(['notifications-unread-count'], { count: 1 });
   return (
     <QueryClientProvider client={client}>
       <DisplaySettingsProvider>
@@ -177,7 +183,7 @@ export function withEliminationDayPanel(
   date: string,
   petId: string,
   empty = false,
-  options?: { recordsOverride?: typeof mockEliminationRecords },
+  options?: { recordsOverride?: typeof mockEliminationRecords; routeHash?: string },
 ): Decorator {
   return function EliminationDayDecorator(Story) {
     const client = makeMockClient();
@@ -189,8 +195,13 @@ export function withEliminationDayPanel(
       ?? (empty ? [] : mockEliminationRecords.map((r) => ({ ...r, local_date: date })));
     client.setQueryData(['elimination-records-day', date, petId], records);
 
+    const path = `/elimination/${date}`;
+    const initialEntry = options?.routeHash
+      ? { pathname: path, hash: options.routeHash }
+      : path;
+
     return (
-      <MemoryRouter>
+      <MemoryRouter initialEntries={[initialEntry]}>
         <QueryClientProvider client={client}>
           <DisplaySettingsProvider>
             <SelectedPetProvider initialPetId={petId}>
@@ -203,11 +214,88 @@ export function withEliminationDayPanel(
   };
 }
 
+export function withEliminationJournalPage(
+  date: string,
+  options?: { empty?: boolean; autoTagEnabled?: boolean; routeHash?: string },
+): Decorator {
+  return function EliminationJournalDecorator(Story) {
+    const client = makeMockClient();
+    const pets = options?.autoTagEnabled
+      ? mockPets.map((pet, index) => (
+          index === 0 ? { ...pet, elimination_auto_categorize_by_duration: true } : pet
+        ))
+      : mockPets;
+
+    client.setQueryData(['pets'], pets);
+    client.setQueryData(['me'], { subject: 'dev', email: null, name: 'Dev', display_name: 'Dev', kind: 'dev', scopes: [] });
+    client.setQueryData(['settings-display'], mockDisplaySettings);
+    client.setQueryData(['app-info'], mockAppInfo);
+    client.setQueryData(
+      ['elimination-records-day', date, mockPetId],
+      options?.empty ? [] : mockEliminationRecords.map((r) => ({ ...r, local_date: date })),
+    );
+    const month = date.slice(0, 7);
+    client.setQueryData(
+      ['elimination-calendar', month, mockPetId],
+      options?.empty ? [] : [mockEliminationDaySummary],
+    );
+    client.setQueryData(['elimination-duration-profile', mockPetId], mockEliminationDurationProfile);
+    client.setQueryData(['notifications-unread-count'], { count: 1 });
+
+    const path = date === localToday() ? '/elimination' : `/elimination/${date}`;
+    const initialEntry = options?.routeHash
+      ? { pathname: path, hash: options.routeHash }
+      : path;
+
+    return (
+      <MemoryRouter initialEntries={[initialEntry]}>
+        <QueryClientProvider client={client}>
+          <DisplaySettingsProvider>
+            <SelectedPetProvider initialPetId={mockPetId}>
+              <Routes>
+                <Route path="/elimination/:date?" element={<Story />} />
+              </Routes>
+            </SelectedPetProvider>
+          </DisplaySettingsProvider>
+        </QueryClientProvider>
+      </MemoryRouter>
+    );
+  };
+}
+
+export function withNotificationCenter(options?: {
+  unreadCount?: number;
+  notifications?: typeof mockNotifications;
+}): Decorator {
+  return function NotificationCenterDecorator(Story) {
+    const client = makeMockClient();
+    const notifications = options?.notifications ?? mockNotifications;
+    client.setQueryData(['notifications-unread-count'], { count: options?.unreadCount ?? 1 });
+    client.setQueryData(['notifications'], notifications);
+    client.setQueryData(['pets'], mockPets);
+    client.setQueryData(['me'], { subject: 'dev', email: null, name: 'Dev', display_name: 'Dev', kind: 'dev', scopes: [] });
+
+    return (
+      <MemoryRouter>
+        <QueryClientProvider client={client}>
+          <SelectedPetProvider initialPetId={mockPetId}>
+            <div style={{ minHeight: '24rem' }}>
+              <Story />
+            </div>
+          </SelectedPetProvider>
+        </QueryClientProvider>
+      </MemoryRouter>
+    );
+  };
+}
+
 interface EliminationAnalyticsDecoratorOptions {
   empty?: boolean;
   petId?: string;
   loading?: boolean;
   error?: boolean;
+  /** Which duration series appear in analytics charts/cards. */
+  durationVariant?: 'both' | 'wee-only' | 'poo-only';
 }
 
 export function withEliminationAnalyticsPage({
@@ -215,6 +303,7 @@ export function withEliminationAnalyticsPage({
   petId = mockPetId,
   loading = false,
   error = false,
+  durationVariant = 'both',
 }: EliminationAnalyticsDecoratorOptions = {}): Decorator {
   return function EliminationAnalyticsDecorator(Story) {
     const client = makeMockClient();
@@ -224,7 +313,12 @@ export function withEliminationAnalyticsPage({
 
     const today = localToday();
     const emptyRangeSummary = { ...mockEliminationRangeSummary, daily_summaries: [], type_totals: {}, avg_per_day: 0, p50_per_day: 0, p90_per_day: 0, p99_per_day: 0 };
-    const summary = empty ? emptyRangeSummary : mockEliminationRangeSummary;
+    let summary = empty ? emptyRangeSummary : mockEliminationRangeSummary;
+    if (!empty && durationVariant === 'wee-only') {
+      summary = mockEliminationRangeSummaryWeeOnly();
+    } else if (!empty && durationVariant === 'poo-only') {
+      summary = mockEliminationRangeSummaryPooOnly();
+    }
 
     if (loading) {
       const pending = () => new Promise(() => {});

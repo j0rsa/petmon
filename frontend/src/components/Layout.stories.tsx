@@ -38,6 +38,17 @@ type Story = StoryObj<typeof meta>;
 
 export const Default: Story = {};
 
+export const WithNotifications: Story = {
+  name: 'With notification bell',
+  parameters: {
+    docs: {
+      description: {
+        story: 'Layout includes the global notification bell with an unread badge seeded via fixtures.',
+      },
+    },
+  },
+};
+
 export const Mobile: Story = {
   parameters: { viewport: { defaultViewport: 'pwaMobile' } },
 };
