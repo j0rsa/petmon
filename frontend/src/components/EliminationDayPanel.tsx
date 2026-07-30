@@ -1,7 +1,8 @@
-import { forwardRef, useImperativeHandle, useMemo, useRef, useState } from 'react';
+import { forwardRef, useEffect, useImperativeHandle, useMemo, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { usePermissions } from '../context/usePermissions';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { daysApi } from '../api/days';
 import {
   eliminationApi,
   type CreateEliminationRecord,
@@ -101,6 +102,7 @@ function subtypesFor(eventType: EliminationEventType) {
 
 function invalidateDayData(queryClient: ReturnType<typeof useQueryClient>, date: string, petId: string) {
   return Promise.all([
+    queryClient.invalidateQueries({ queryKey: ['day-summary', date, petId] }),
     queryClient.invalidateQueries({ queryKey: ['elimination-records-day', date, petId] }),
     queryClient.invalidateQueries({ queryKey: ['elimination-calendar'] }),
     queryClient.invalidateQueries({ queryKey: ['elimination-analytics'] }),
@@ -446,10 +448,15 @@ export function EliminationDayPanel({ date, petId }: EliminationDayPanelProps) {
   const queryClient = useQueryClient();
   const { canWrite } = usePermissions();
   const [noteDraft, setNoteDraft] = useState('');
-  const [noteSaved, setNoteSaved] = useState(false);
   const [editingRecordId, setEditingRecordId] = useState<string | null>(null);
   const addRowRef = useRef<AddRowHandle>(null);
   const formatDate = useFormatDate();
+
+  const summaryQuery = useQuery({
+    queryKey: ['day-summary', date, petId],
+    queryFn: () => daysApi.getSummary(date, petId),
+    enabled: Boolean(petId),
+  });
 
   const recordsQuery = useQuery({
     queryKey: ['elimination-records-day', date, petId],
@@ -463,6 +470,11 @@ export function EliminationDayPanel({ date, petId }: EliminationDayPanelProps) {
   );
 
   useScrollToHash(records.length, recordsQuery.isSuccess);
+
+  useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    setNoteDraft(summaryQuery.data?.note ?? '');
+  }, [summaryQuery.data?.note]);
 
   // Derived metrics — vomit is shown separately, not counted as a visit
   const totalCount = records.filter((r) => r.event_type !== 'vomit').length;
@@ -494,6 +506,11 @@ export function EliminationDayPanel({ date, petId }: EliminationDayPanelProps) {
   const deleteMutation = useMutation({
     mutationFn: (id: string) => eliminationApi.delete(id),
     onSuccess: () => invalidateDayData(queryClient, date, petId),
+  });
+
+  const noteMutation = useMutation({
+    mutationFn: () => daysApi.updateNote(date, noteDraft, petId),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['day-summary', date, petId] }),
   });
 
   if (recordsQuery.isLoading) {
@@ -600,26 +617,26 @@ export function EliminationDayPanel({ date, petId }: EliminationDayPanelProps) {
       </div>
 
       {/* Day note */}
-      {canWrite && <div className="day-note-block">
-        <label htmlFor={`elim-day-note-${date}`}>Day note</label>
-        <textarea
-          id={`elim-day-note-${date}`}
-          rows={3}
-          value={noteDraft}
-          onChange={(e) => { setNoteDraft(e.target.value); setNoteSaved(false); }}
-          placeholder="Notes for caregivers"
-        />
-        <button
-          className="button button-secondary button-compact"
-          type="button"
-          onClick={() => {
-            // No server-side day note endpoint for elimination yet — store locally as UI state.
-            setNoteSaved(true);
-          }}
-        >
-          {noteSaved ? 'Saved' : 'Save note'}
-        </button>
-      </div>}
+      {canWrite && (
+        <div className="day-note-block">
+          <label htmlFor={`elim-day-note-${date}`}>Day note</label>
+          <textarea
+            id={`elim-day-note-${date}`}
+            rows={3}
+            value={noteDraft}
+            onChange={(e) => setNoteDraft(e.target.value)}
+            placeholder="Notes for caregivers"
+          />
+          <button
+            className="button button-secondary button-compact"
+            type="button"
+            onClick={() => noteMutation.mutate()}
+            disabled={noteMutation.isPending}
+          >
+            {noteMutation.isPending ? 'Saving…' : 'Save note'}
+          </button>
+        </div>
+      )}
     </section>
   );
 }

@@ -1,5 +1,5 @@
 import { useEffect, useRef } from 'react';
-import { useLocation } from 'react-router-dom';
+import { useLocation, useNavigate } from 'react-router-dom';
 
 /** Applied to deep-link targets (e.g. elimination record rows) for the pop flash. */
 export const DEEP_LINK_FLASH_CLASS = 'entry-row-wrap--deep-link-flash';
@@ -14,7 +14,8 @@ function cleanupFlash(el: Element) {
 
 /** Scroll to the element matching `location.hash` and play a one-shot highlight animation. */
 export function useScrollToHash(...deps: unknown[]) {
-  const { hash } = useLocation();
+  const { hash, pathname, search } = useLocation();
+  const navigate = useNavigate();
   const highlightedRef = useRef<Element | null>(null);
   const depsKey = JSON.stringify(deps);
 
@@ -36,6 +37,10 @@ export function useScrollToHash(...deps: unknown[]) {
       }
     }
 
+    function clearHashFromUrl() {
+      navigate({ pathname, search, hash: '' }, { replace: true });
+    }
+
     function flashElement(el: HTMLElement) {
       if (highlightedRef.current && highlightedRef.current !== el) {
         cleanupFlash(highlightedRef.current);
@@ -49,6 +54,7 @@ export function useScrollToHash(...deps: unknown[]) {
       el.classList.add(DEEP_LINK_FLASH_CLASS);
       el.addEventListener('animationend', onAnimationEnd);
       highlightedRef.current = el;
+      clearHashFromUrl();
     }
 
     function tryHighlight() {
@@ -74,5 +80,5 @@ export function useScrollToHash(...deps: unknown[]) {
         highlightedRef.current = null;
       }
     };
-  }, [hash, depsKey]);
+  }, [hash, depsKey, navigate, pathname, search]);
 }
