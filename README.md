@@ -222,6 +222,8 @@ petmon supports two auth methods:
 | `OIDC_ENABLED` | *(unset)* | `1`/`true`/`yes` to enable |
 | `OTEL_EXPORTER_OTLP_ENDPOINT` | *(unset)* | OTLP/gRPC collector for distributed tracing |
 | `OTEL_SERVICE_NAME` | `petmon` | Service name in traces |
+| `VAPID_PUBLIC_KEY` / `VAPID_PRIVATE_KEY` | *(auto-generated)* | Optional Web Push VAPID key pair (URL-safe base64). When unset, keys are generated and stored in the DB. |
+| `VAPID_SUBJECT` | `https://petmon.j0rsa.com` | VAPID JWT contact URI (`mailto:` or `https:`). Must not use `localhost` — Apple/Safari reject those with `BadJwtToken`. |
 
 ## Demo data
 

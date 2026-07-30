@@ -48,3 +48,20 @@ export const OfflinePaused: Story = {
     isPaused: true,
   },
 };
+
+export const NarrowMobile: Story = {
+  decorators: [
+    (Story) => (
+      <div className="panel" style={{ maxWidth: 320, width: '100%', overflow: 'hidden' }}>
+        <Story />
+      </div>
+    ),
+  ],
+  parameters: {
+    docs: {
+      description: {
+        story: 'Confirms the time field stays inside a phone-width card.',
+      },
+    },
+  },
+};

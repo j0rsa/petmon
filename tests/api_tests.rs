@@ -1463,6 +1463,42 @@ async fn push_config_auto_generates_vapid_keys() {
 }
 
 #[actix_web::test]
+async fn push_repairs_localhost_vapid_subject() {
+    use petmon::domain::push::VapidConfig;
+    use petmon::repo::settings;
+
+    let pool = setup_pool().await;
+    let broken = VapidConfig {
+        public_key: "BAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"
+            .to_string(),
+        private_key: "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA".to_string(),
+        subject: "mailto:admin@localhost".to_string(),
+    };
+    settings::upsert(&pool, "vapid", &broken)
+        .await
+        .expect("store broken vapid");
+
+    // Hitting public config runs ensure_vapid, which must rewrite the subject.
+    let cfg = petmon::services::push_service::public_config(&pool)
+        .await
+        .expect("public config");
+    assert!(cfg.enabled);
+    assert!(cfg.public_key.is_some());
+
+    let repaired: VapidConfig = settings::get(&pool, "vapid").await.expect("load vapid");
+    assert_ne!(repaired.subject, "mailto:admin@localhost");
+    assert!(
+        repaired.subject.starts_with("mailto:") || repaired.subject.starts_with("https://"),
+        "subject should be a contact URI, got {}",
+        repaired.subject
+    );
+    assert!(
+        !repaired.subject.to_ascii_lowercase().contains("localhost"),
+        "subject must not use localhost for Apple Web Push"
+    );
+}
+
+#[actix_web::test]
 async fn push_subscribe_and_test_endpoints_work() {
     let (app, _state) = build_dev_app!();
 

@@ -1,4 +1,5 @@
 use std::sync::OnceLock;
+use std::time::Duration as StdDuration;
 
 use base64::Engine;
 use p256::ecdsa::SigningKey;
@@ -21,8 +22,10 @@ use crate::repo::settings;
 use chrono::{Duration, Utc};
 
 const VAPID_SETTINGS_KEY: &str = "vapid";
-const DEFAULT_VAPID_SUBJECT: &str = "mailto:admin@localhost";
+/// Contact URI for VAPID JWTs. Apple/Safari reject `@localhost` subjects with BadJwtToken.
+const DEFAULT_VAPID_SUBJECT: &str = "https://petmon.j0rsa.com";
 const DEFAULT_SUBSCRIPTION_TTL_DAYS: i64 = 90;
+const PUSH_SEND_TIMEOUT: StdDuration = StdDuration::from_secs(15);
 
 fn web_push_client() -> &'static HyperWebPushClient {
     static CLIENT: OnceLock<HyperWebPushClient> = OnceLock::new();
@@ -44,21 +47,53 @@ fn generate_vapid_keys() -> (String, String) {
     (public_key, private_key)
 }
 
-fn vapid_from_env() -> Option<VapidConfig> {
+/// Apple Web Push requires a real `mailto:` or `https:` contact URI — not localhost.
+fn is_valid_vapid_subject(subject: &str) -> bool {
+    let subject = subject.trim();
+    if subject.is_empty() {
+        return false;
+    }
+    let lower = subject.to_ascii_lowercase();
+    if lower.contains("localhost") || lower.contains("127.0.0.1") {
+        return false;
+    }
+    if let Some(rest) = lower.strip_prefix("mailto:") {
+        return rest.contains('@') && !rest.starts_with('@') && !rest.ends_with('@');
+    }
+    lower.starts_with("https://") && lower.len() > "https://".len()
+}
+
+fn resolve_vapid_subject(existing: Option<&str>) -> String {
+    if let Ok(from_env) = std::env::var("VAPID_SUBJECT") {
+        let trimmed = from_env.trim();
+        if is_valid_vapid_subject(trimmed) {
+            return trimmed.to_string();
+        }
+        if !trimmed.is_empty() {
+            tracing::warn!(
+                subject = %trimmed,
+                "VAPID_SUBJECT is invalid for Apple/Safari web push; expected mailto: or https: contact URI without localhost"
+            );
+        }
+    }
+    if let Some(existing) = existing {
+        if is_valid_vapid_subject(existing) {
+            return existing.trim().to_string();
+        }
+    }
+    DEFAULT_VAPID_SUBJECT.to_string()
+}
+
+fn vapid_keys_from_env() -> Option<(String, String)> {
     let public_key = std::env::var("VAPID_PUBLIC_KEY").ok()?;
     let private_key = std::env::var("VAPID_PRIVATE_KEY").ok()?;
     if public_key.trim().is_empty() || private_key.trim().is_empty() {
         return None;
     }
-    let subject = std::env::var("VAPID_SUBJECT")
-        .ok()
-        .filter(|s| !s.trim().is_empty())
-        .unwrap_or_else(|| DEFAULT_VAPID_SUBJECT.to_string());
-    Some(VapidConfig {
-        public_key: public_key.trim().to_string(),
-        private_key: private_key.trim().to_string(),
-        subject,
-    })
+    Some((
+        public_key.trim().to_string(),
+        private_key.trim().to_string(),
+    ))
 }
 
 async fn load_vapid_from_settings(pool: &SqlitePool) -> AppResult<Option<VapidConfig>> {
@@ -70,10 +105,25 @@ async fn load_vapid_from_settings(pool: &SqlitePool) -> AppResult<Option<VapidCo
 }
 
 async fn ensure_vapid(pool: &SqlitePool) -> AppResult<VapidConfig> {
-    if let Some(cfg) = vapid_from_env() {
-        return Ok(cfg);
+    if let Some((public_key, private_key)) = vapid_keys_from_env() {
+        return Ok(VapidConfig {
+            public_key,
+            private_key,
+            subject: resolve_vapid_subject(None),
+        });
     }
-    if let Some(cfg) = load_vapid_from_settings(pool).await? {
+
+    if let Some(mut cfg) = load_vapid_from_settings(pool).await? {
+        let subject = resolve_vapid_subject(Some(&cfg.subject));
+        if subject != cfg.subject {
+            tracing::info!(
+                old_subject = %cfg.subject,
+                new_subject = %subject,
+                "repairing invalid VAPID subject for Apple/Safari web push compatibility"
+            );
+            cfg.subject = subject;
+            settings::upsert(pool, VAPID_SETTINGS_KEY, &cfg).await?;
+        }
         return Ok(cfg);
     }
 
@@ -81,11 +131,21 @@ async fn ensure_vapid(pool: &SqlitePool) -> AppResult<VapidConfig> {
     let cfg = VapidConfig {
         public_key,
         private_key,
-        subject: DEFAULT_VAPID_SUBJECT.to_string(),
+        subject: resolve_vapid_subject(None),
     };
     settings::upsert(pool, VAPID_SETTINGS_KEY, &cfg).await?;
-    tracing::info!("generated and persisted VAPID keys for web push");
+    tracing::info!(subject = %cfg.subject, "generated and persisted VAPID keys for web push");
     Ok(cfg)
+}
+
+fn format_push_delivery_error(error: &WebPushError) -> String {
+    let text = error.to_string();
+    if text.contains("BadJwtToken") {
+        return format!(
+            "Push delivery failed: {text}. Apple/Safari rejected the VAPID JWT — set VAPID_SUBJECT to a real mailto: email or https: contact URL (not localhost)."
+        );
+    }
+    format!("Push delivery failed: {text}")
 }
 
 fn subscription_ttl_days() -> i64 {
@@ -224,12 +284,17 @@ async fn deliver_to_subscription(
 
     let _ = push_subscriptions::record_attempt(pool, &sub.endpoint).await;
 
-    match web_push_client().send(message).await {
-        Ok(()) => {
+    // HyperWebPushClient never times out on its own — bound delivery so the
+    // Settings "Test" button cannot hang forever on a stalled push endpoint.
+    let send_result =
+        tokio::time::timeout(PUSH_SEND_TIMEOUT, web_push_client().send(message)).await;
+
+    match send_result {
+        Ok(Ok(())) => {
             let _ = push_subscriptions::record_success(pool, &sub.endpoint).await;
             DeliveryOutcome::Sent
         }
-        Err(WebPushError::EndpointNotValid(_) | WebPushError::EndpointNotFound(_)) => {
+        Ok(Err(WebPushError::EndpointNotValid(_) | WebPushError::EndpointNotFound(_))) => {
             tracing::info!(endpoint = %sub.endpoint, "removing stale push subscription");
             let _ = push_subscriptions::delete_by_endpoint(pool, &sub.endpoint).await;
             DeliveryOutcome::Failed {
@@ -237,11 +302,18 @@ async fn deliver_to_subscription(
                     .to_string(),
             }
         }
-        Err(e) => {
-            tracing::warn!(error = %e, endpoint = %sub.endpoint, "push delivery failed");
-            DeliveryOutcome::Failed {
-                error: format!("Push delivery failed: {e}"),
-            }
+        Ok(Err(e)) => {
+            let error = format_push_delivery_error(&e);
+            tracing::warn!(error = %error, endpoint = %sub.endpoint, "push delivery failed");
+            DeliveryOutcome::Failed { error }
+        }
+        Err(_) => {
+            let error = format!(
+                "Push delivery timed out after {}s. The push service did not respond — try again.",
+                PUSH_SEND_TIMEOUT.as_secs()
+            );
+            tracing::warn!(endpoint = %sub.endpoint, "push delivery timed out");
+            DeliveryOutcome::Failed { error }
         }
     }
 }
@@ -364,4 +436,33 @@ pub fn spawn_broadcast(pool: SqlitePool, notification: Notification) {
     tokio::spawn(async move {
         broadcast_notification(&pool, &notification).await;
     });
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn vapid_subject_rejects_localhost_placeholders() {
+        assert!(!is_valid_vapid_subject("mailto:admin@localhost"));
+        assert!(!is_valid_vapid_subject("mailto:petmon@127.0.0.1"));
+        assert!(!is_valid_vapid_subject("https://localhost"));
+        assert!(!is_valid_vapid_subject(""));
+        assert!(!is_valid_vapid_subject("admin@example.com"));
+        assert!(!is_valid_vapid_subject("http://example.com"));
+    }
+
+    #[test]
+    fn vapid_subject_accepts_mailto_and_https_contacts() {
+        assert!(is_valid_vapid_subject("mailto:ops@example.com"));
+        assert!(is_valid_vapid_subject("https://example.com/contact"));
+        assert!(is_valid_vapid_subject(DEFAULT_VAPID_SUBJECT));
+    }
+
+    #[test]
+    fn resolve_subject_falls_back_when_existing_is_localhost() {
+        let subject = resolve_vapid_subject(Some("mailto:admin@localhost"));
+        assert_eq!(subject, DEFAULT_VAPID_SUBJECT);
+        assert!(is_valid_vapid_subject(&subject));
+    }
 }

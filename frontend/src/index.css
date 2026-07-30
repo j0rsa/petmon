@@ -1853,11 +1853,11 @@ pre {
 }
 
 .record-entry-form--nutrition {
-  grid-template-columns: minmax(7.5rem, 1fr) minmax(0, 2fr) minmax(9rem, 1fr) auto;
+  grid-template-columns: minmax(0, 7rem) minmax(0, 2fr) minmax(0, 8rem);
 }
 
 .record-entry-form--nutrition.record-entry-form--edit {
-  grid-template-columns: minmax(7.5rem, 1fr) minmax(0, 2fr) minmax(9rem, 1fr);
+  grid-template-columns: minmax(0, 7rem) minmax(0, 2fr) minmax(0, 8rem);
 }
 
 .record-entry-form--elimination {
@@ -1922,7 +1922,11 @@ pre {
   color: var(--input-text);
 }
 
-.record-entry-form input[type="time"] {
+.record-entry-form input[type="time"],
+.record-entry-form .record-entry-time {
+  min-width: 0;
+  max-width: 100%;
+  width: 100%;
   text-align: left;
 }
 
@@ -1933,6 +1937,7 @@ pre {
 .record-entry-form input[type="time"]::-webkit-datetime-edit {
   padding: 0;
   margin: 0;
+  min-width: 0;
 }
 
 .record-entry-form .record-entry-amount-wrap {
@@ -1961,8 +1966,8 @@ pre {
   white-space: nowrap;
 }
 
-.record-entry-form--edit .record-entry-form__note,
-.record-entry-form--edit .record-entry-form__actions {
+.record-entry-form .record-entry-form__note,
+.record-entry-form .record-entry-form__actions {
   grid-column: 1 / -1;
 }
 
@@ -2143,6 +2148,13 @@ pre {
   .record-entry-form--elimination,
   .record-entry-form--nutrition.record-entry-form--edit {
     grid-template-columns: 1fr;
+  }
+
+  .record-entry-form input[type="time"],
+  .record-entry-form .record-entry-time {
+    /* Native time pickers keep a large intrinsic width on iOS; keep them inside the card. */
+    padding-inline: 0.65rem;
+    font-size: 1rem;
   }
 
   .record-entry-form__actions {

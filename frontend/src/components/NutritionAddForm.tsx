@@ -136,7 +136,7 @@ export const NutritionAddForm = forwardRef<NutritionAddFormHandle, NutritionAddF
             <span className="entry-unit-hint">{unitFor(category)}</span>
           </div>
         </div>
-        <div className="form-row">
+        <div className="form-row record-entry-form__note">
           <label>Note</label>
           <input
             type="text"
@@ -147,14 +147,16 @@ export const NutritionAddForm = forwardRef<NutritionAddFormHandle, NutritionAddF
             onKeyDown={(e) => { if (e.key === 'Enter') handleAdd(); }}
           />
         </div>
-        <button
-          className="button"
-          type="button"
-          disabled={saving || !amount}
-          onClick={handleAdd}
-        >
-          {isPaused ? 'Offline…' : saving ? 'Saving…' : 'Log intake'}
-        </button>
+        <div className="record-entry-form__actions">
+          <button
+            className="button"
+            type="button"
+            disabled={saving || !amount}
+            onClick={handleAdd}
+          >
+            {isPaused ? 'Offline…' : saving ? 'Saving…' : 'Log intake'}
+          </button>
+        </div>
       </div>
     );
   },
