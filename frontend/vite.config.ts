@@ -24,6 +24,16 @@ export default defineConfig({
       : [
           VitePWA({
             registerType: 'prompt',
+            strategies: 'injectManifest',
+            srcDir: 'src',
+            filename: 'sw.ts',
+            injectManifest: {
+              globPatterns: ['**/*.{js,css,html,ico,png,svg,woff2}'],
+            },
+            devOptions: {
+              enabled: true,
+              type: 'module',
+            },
             workbox: {
               skipWaiting: true,
               clientsClaim: true,

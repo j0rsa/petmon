@@ -28,6 +28,7 @@ macro_rules! build_app {
                     .configure(api::days::configure)
                     .configure(api::notes::configure)
                     .configure(api::notifications::configure)
+                    .configure(api::push::configure)
                     .configure(api::settings::configure)
                     .configure(api::settings::configure_api_tokens),
             ),
@@ -59,6 +60,7 @@ macro_rules! build_full_app {
                         .configure(api::days::configure)
                         .configure(api::notes::configure)
                         .configure(api::notifications::configure)
+                        .configure(api::push::configure)
                         .configure(api::settings::configure)
                         .configure(api::settings::configure_api_tokens),
                 )
@@ -1396,6 +1398,56 @@ async fn notifications_are_global_with_per_reader_read_state() {
     assert_eq!(resp.status(), 200);
     let body: serde_json::Value = test::read_body_json(resp).await;
     assert_eq!(body["count"].as_i64(), Some(0));
+}
+
+#[actix_web::test]
+async fn push_config_auto_generates_vapid_keys() {
+    let (app, _state) = build_dev_app!();
+
+    let req = test::TestRequest::get()
+        .uri("/api/v1/push/config")
+        .to_request();
+    let resp = test::call_service(&app, req).await;
+    assert_eq!(resp.status(), 200);
+    let body: serde_json::Value = test::read_body_json(resp).await;
+    assert_eq!(body["enabled"].as_bool(), Some(true));
+    assert!(body["public_key"].as_str().is_some_and(|k| !k.is_empty()));
+}
+
+#[actix_web::test]
+async fn push_subscribe_and_test_endpoints_work() {
+    let (app, _state) = build_dev_app!();
+
+    let subscribe_body = serde_json::json!({
+        "endpoint": "https://push.example.test/device/abc",
+        "keys": {
+            "p256dh": "test-p256dh-key",
+            "auth": "test-auth-key"
+        }
+    });
+
+    let req = test::TestRequest::post()
+        .uri("/api/v1/push/subscribe")
+        .set_json(&subscribe_body)
+        .to_request();
+    let resp = test::call_service(&app, req).await;
+    assert_eq!(resp.status(), 204);
+
+    let req = test::TestRequest::post()
+        .uri("/api/v1/push/test")
+        .to_request();
+    let resp = test::call_service(&app, req).await;
+    assert_eq!(resp.status(), 200);
+    let body: serde_json::Value = test::read_body_json(resp).await;
+    assert!(body["sent"].is_number());
+    assert!(body["failed"].is_number());
+
+    let req = test::TestRequest::post()
+        .uri("/api/v1/push/unsubscribe")
+        .set_json(&serde_json::json!({ "endpoint": "https://push.example.test/device/abc" }))
+        .to_request();
+    let resp = test::call_service(&app, req).await;
+    assert_eq!(resp.status(), 204);
 }
 
 // ── Route registration smoke tests ───────────────────────────────────────────

@@ -8,6 +8,7 @@ pub mod notes;
 pub mod notifications;
 pub mod nutrition;
 pub mod pets;
+pub mod push;
 pub mod settings;
 pub mod weight;
 
@@ -26,6 +27,7 @@ pub fn configure(cfg: &mut web::ServiceConfig) {
             .configure(days::configure)
             .configure(notes::configure)
             .configure(notifications::configure)
+            .configure(push::configure)
             .configure(settings::configure),
     );
 }
