@@ -8,7 +8,8 @@ export type PushSupportStatus =
   | 'subscribed'
   | 'server-disabled';
 
-const RESYNC_MIN_INTERVAL_MS = 30_000;
+/** Minimum gap between background re-syncs (focus/visibility). Subscriptions last weeks+. */
+const RESYNC_MIN_INTERVAL_MS = 24 * 60 * 60 * 1000;
 
 let lastSyncAt = 0;
 
