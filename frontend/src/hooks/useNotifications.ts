@@ -45,6 +45,14 @@ export function useNotificationActions(onAfterOpen?: () => void) {
     },
   });
 
+  const dismissAllMutation = useMutation({
+    mutationFn: notificationsApi.dismissAll,
+    onSuccess: (data) => {
+      queryClient.setQueryData(UNREAD_COUNT_QUERY_KEY, data);
+      queryClient.setQueryData(NOTIFICATIONS_QUERY_KEY, []);
+    },
+  });
+
   function openNotification(item: NotificationItem) {
     if (item.pet_id) {
       setSelectedPetId(item.pet_id);
@@ -59,6 +67,7 @@ export function useNotificationActions(onAfterOpen?: () => void) {
   return {
     markReadMutation,
     markAllReadMutation,
+    dismissAllMutation,
     openNotification,
   };
 }

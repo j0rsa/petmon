@@ -449,6 +449,25 @@ paths:
         '401':
           $ref: '#/components/responses/Unauthorized'
 
+  /notifications/dismiss-all:
+    post:
+      tags:
+        - Notifications
+      summary: Dismiss all notifications
+      x-required-scope: api_write
+      description: Permanently deletes all notifications from the database for every reader.
+      responses:
+        '200':
+          description: Unread count after dismissal (always zero)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/NotificationUnreadCount'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
   /notifications/{id}/read:
     post:
       tags:

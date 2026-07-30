@@ -157,3 +157,11 @@ pub async fn mark_all_read(pool: &SqlitePool, reader_key: &str) -> AppResult<i64
     .await?;
     Ok(result.rows_affected() as i64)
 }
+
+#[tracing::instrument(skip(pool))]
+pub async fn delete_all(pool: &SqlitePool) -> AppResult<i64> {
+    let result = sqlx::query("DELETE FROM notifications")
+        .execute(pool)
+        .await?;
+    Ok(result.rows_affected() as i64)
+}

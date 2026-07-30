@@ -14,7 +14,7 @@ export function NotificationCenter() {
 
   const unreadQuery = useNotificationUnreadCount();
   const listQuery = useNotificationList(open);
-  const { markAllReadMutation, openNotification } = useNotificationActions(() => setOpen(false));
+  const { markAllReadMutation, dismissAllMutation, openNotification } = useNotificationActions(() => setOpen(false));
 
   useEffect(() => {
     if (!open) return;
@@ -34,6 +34,12 @@ export function NotificationCenter() {
   const unreadCount = unreadQuery.data?.count ?? 0;
   const items = listQuery.data ?? [];
   const hasUnread = items.some((item) => !item.read);
+  const hasNotifications = items.length > 0;
+
+  function handleDismissAll() {
+    if (!window.confirm('Dismiss all notifications? This cannot be undone.')) return;
+    dismissAllMutation.mutate();
+  }
 
   return (
     <div className="notification-center notification-center-desktop" ref={panelRef}>
@@ -56,15 +62,29 @@ export function NotificationCenter() {
         <div className="notification-panel" role="dialog" aria-label="Notifications">
           <div className="notification-panel-header">
             <h3>Notifications</h3>
-            {hasUnread && (
-              <button
-                type="button"
-                className="notification-mark-all"
-                disabled={markAllReadMutation.isPending}
-                onClick={() => markAllReadMutation.mutate()}
-              >
-                Mark all read
-              </button>
+            {(hasUnread || hasNotifications) && (
+              <div className="notification-panel-actions">
+                {hasUnread && (
+                  <button
+                    type="button"
+                    className="notification-panel-action"
+                    disabled={markAllReadMutation.isPending}
+                    onClick={() => markAllReadMutation.mutate()}
+                  >
+                    Mark all read
+                  </button>
+                )}
+                {hasNotifications && (
+                  <button
+                    type="button"
+                    className="notification-panel-action"
+                    disabled={dismissAllMutation.isPending}
+                    onClick={handleDismissAll}
+                  >
+                    Dismiss all
+                  </button>
+                )}
+              </div>
             )}
           </div>
 

@@ -1396,6 +1396,22 @@ async fn notifications_are_global_with_per_reader_read_state() {
     assert_eq!(resp.status(), 200);
     let body: serde_json::Value = test::read_body_json(resp).await;
     assert_eq!(body["count"].as_i64(), Some(0));
+
+    let req = test::TestRequest::post()
+        .uri("/api/v1/notifications/dismiss-all")
+        .to_request();
+    let resp = test::call_service(&app, req).await;
+    assert_eq!(resp.status(), 200);
+    let body: serde_json::Value = test::read_body_json(resp).await;
+    assert_eq!(body["count"].as_i64(), Some(0));
+
+    let req = test::TestRequest::get()
+        .uri("/api/v1/notifications")
+        .to_request();
+    let resp = test::call_service(&app, req).await;
+    assert_eq!(resp.status(), 200);
+    let notifications: serde_json::Value = test::read_body_json(resp).await;
+    assert_eq!(notifications.as_array().unwrap().len(), 0);
 }
 
 // ── Route registration smoke tests ───────────────────────────────────────────

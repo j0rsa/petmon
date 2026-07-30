@@ -59,12 +59,20 @@ pub async fn mark_all_read(
     Ok(HttpResponse::Ok().json(count))
 }
 
+#[post("/dismiss-all")]
+#[require_scope("api_write")]
+pub async fn dismiss_all(_req: HttpRequest, state: web::Data<AppState>) -> AppResult<HttpResponse> {
+    let count = notification_service::dismiss_all(&state.pool).await?;
+    Ok(HttpResponse::Ok().json(count))
+}
+
 pub fn configure(cfg: &mut web::ServiceConfig) {
     cfg.service(
         web::scope("/notifications")
             .service(list_notifications)
             .service(unread_count)
             .service(mark_read)
-            .service(mark_all_read),
+            .service(mark_all_read)
+            .service(dismiss_all),
     );
 }
