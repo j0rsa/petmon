@@ -32,4 +32,5 @@ export const notificationsApi = {
   unreadCount: () => api.get<NotificationUnreadCount>('/notifications/unread-count'),
   markRead: (id: string) => api.post<void>(`/notifications/${id}/read`, {}),
   markAllRead: () => api.post<NotificationUnreadCount>('/notifications/read-all', {}),
+  dismissAll: () => api.post<NotificationUnreadCount>('/notifications/dismiss-all', {}),
 };

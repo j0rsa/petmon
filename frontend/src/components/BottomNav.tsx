@@ -20,13 +20,19 @@ export function BottomNav() {
 
   const unreadQuery = useNotificationUnreadCount();
   const listQuery = useNotificationList(petSheetOpen);
-  const { markAllReadMutation, openNotification } = useNotificationActions(() => setPetSheetOpen(false));
+  const { markAllReadMutation, dismissAllMutation, openNotification } = useNotificationActions(() => setPetSheetOpen(false));
 
   const petColor = selectedPet ? resolvePetColor(selectedPet.species, selectedPet.color) : 'var(--accent)';
   const unreadCount = unreadQuery.data?.count ?? 0;
   const notifications = listQuery.data ?? [];
   const hasUnreadNotifications = notifications.some((item) => !item.read);
+  const hasNotifications = notifications.length > 0;
   const petTabLabel = selectedPet?.name ?? 'Pet';
+
+  function handleDismissAll() {
+    if (!window.confirm('Dismiss all notifications? This cannot be undone.')) return;
+    dismissAllMutation.mutate();
+  }
 
   function selectPet(id: string) {
     setSelectedPetId(id);
@@ -104,15 +110,29 @@ export function BottomNav() {
 
           <div className="bottom-nav-sheet-section-header">
             <p className="eyebrow bottom-nav-sheet-title bottom-nav-sheet-title-inline">Notifications</p>
-            {hasUnreadNotifications && (
-              <button
-                type="button"
-                className="bottom-nav-sheet-manage"
-                disabled={markAllReadMutation.isPending}
-                onClick={() => markAllReadMutation.mutate()}
-              >
-                Mark all read
-              </button>
+            {(hasUnreadNotifications || hasNotifications) && (
+              <div className="notification-panel-actions">
+                {hasUnreadNotifications && (
+                  <button
+                    type="button"
+                    className="notification-panel-action"
+                    disabled={markAllReadMutation.isPending}
+                    onClick={() => markAllReadMutation.mutate()}
+                  >
+                    Mark all read
+                  </button>
+                )}
+                {hasNotifications && (
+                  <button
+                    type="button"
+                    className="notification-panel-action"
+                    disabled={dismissAllMutation.isPending}
+                    onClick={handleDismissAll}
+                  >
+                    Dismiss all
+                  </button>
+                )}
+              </div>
             )}
           </div>
 

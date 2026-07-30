@@ -1155,17 +1155,31 @@ pre {
   font-size: 0.95rem;
 }
 
-.notification-mark-all {
+.notification-panel-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.65rem;
+  flex-shrink: 0;
+}
+
+.notification-panel-action {
   border: none;
   background: none;
   color: var(--accent);
   font-size: 0.78rem;
   cursor: pointer;
   padding: 0;
+  white-space: nowrap;
 }
 
-.notification-mark-all:hover {
+.notification-panel-action:hover {
   text-decoration: underline;
+}
+
+.notification-panel-action:disabled {
+  opacity: 0.5;
+  cursor: default;
+  text-decoration: none;
 }
 
 .notification-panel-body {

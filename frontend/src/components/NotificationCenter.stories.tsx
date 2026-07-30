@@ -2,6 +2,7 @@ import type { Meta, StoryObj } from '@storybook/react-vite';
 import { expect, userEvent, within } from 'storybook/test';
 import { NotificationCenter } from './NotificationCenter';
 import { withNotificationCenter } from '../stories/decorators';
+import { mockNotifications } from '../stories/fixtures';
 
 const meta = {
   title: 'Components/NotificationCenter',
@@ -18,7 +19,18 @@ export const WithUnreadBadge: Story = {
 };
 
 export const AllRead: Story = {
-  decorators: [withNotificationCenter({ unreadCount: 0 })],
+  decorators: [
+    withNotificationCenter({
+      unreadCount: 0,
+      notifications: mockNotifications.map((item) => ({ ...item, read: true })),
+    }),
+  ],
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    await userEvent.click(canvas.getByRole('button', { name: /notification/i }));
+    await expect(canvas.getByRole('button', { name: 'Dismiss all' })).toBeInTheDocument();
+    await expect(canvas.queryByRole('button', { name: 'Mark all read' })).not.toBeInTheDocument();
+  },
 };
 
 export const PanelOpen: Story = {

@@ -50,6 +50,12 @@ pub async fn mark_all_read(
 }
 
 #[tracing::instrument(skip(pool))]
+pub async fn dismiss_all(pool: &SqlitePool) -> AppResult<NotificationUnreadCount> {
+    notifications::delete_all(pool).await?;
+    Ok(NotificationUnreadCount { count: 0 })
+}
+
+#[tracing::instrument(skip(pool))]
 pub async fn notify_elimination_auto_categorize_failed(
     pool: &SqlitePool,
     record: &EliminationRecord,
