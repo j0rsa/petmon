@@ -478,6 +478,12 @@ jobs:
     name: Renovate trigger
     runs-on: ubuntu-latest
     needs: [docker]
+    # Docker uses always() to run when version-check is skipped on PRs; without the
+    # same guard here, GitHub skips this job even when docker succeeded.
+    if: |
+      always() &&
+      needs.docker.result == 'success' &&
+      !cancelled()
     steps:
       - name: Check Renovate trigger secret
         env:
