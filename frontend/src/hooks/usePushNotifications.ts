@@ -1,16 +1,51 @@
-import { useEffect, useRef } from 'react';
-import { ensurePushSubscription } from '../lib/pushNotifications';
+import { useEffect } from 'react';
+import {
+  ensurePushSubscription,
+  unsubscribePushNotifications,
+  watchNotificationPermission,
+} from '../lib/pushNotifications';
 
-/** Request notification permission and register a push subscription once per session. */
+/** Keep push subscription in sync when the app loads or regains focus. */
 export function usePushNotifications() {
-  const started = useRef(false);
-
   useEffect(() => {
-    if (started.current) return;
-    started.current = true;
+    let cancelled = false;
 
-    void ensurePushSubscription().catch((error) => {
-      console.warn('Push notification setup failed', error);
+    const sync = (force = false) => {
+      if (cancelled) return;
+      void ensurePushSubscription(force ? { force: true } : undefined).catch((error) => {
+        console.warn('Push notification setup failed', error);
+      });
+    };
+
+    sync(true);
+
+    const onFocus = () => sync();
+    const onVisibility = () => {
+      if (document.visibilityState === 'visible') {
+        sync();
+      }
+    };
+
+    window.addEventListener('focus', onFocus);
+    document.addEventListener('visibilitychange', onVisibility);
+
+    const stopPermissionWatch = watchNotificationPermission((permission) => {
+      if (permission === 'denied') {
+        void unsubscribePushNotifications().catch((error) => {
+          console.warn('Push unsubscribe failed after permission change', error);
+        });
+        return;
+      }
+      if (permission === 'granted') {
+        sync(true);
+      }
     });
+
+    return () => {
+      cancelled = true;
+      window.removeEventListener('focus', onFocus);
+      document.removeEventListener('visibilitychange', onVisibility);
+      stopPermissionWatch();
+    };
   }, []);
 }

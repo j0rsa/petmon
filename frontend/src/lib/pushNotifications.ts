@@ -8,6 +8,10 @@ export type PushSupportStatus =
   | 'subscribed'
   | 'server-disabled';
 
+const RESYNC_MIN_INTERVAL_MS = 30_000;
+
+let lastSyncAt = 0;
+
 function urlBase64ToUint8Array(base64String: string): BufferSource {
   const padding = '='.repeat((4 - (base64String.length % 4)) % 4);
   const base64 = (base64String + padding).replace(/-/g, '+').replace(/_/g, '/');
@@ -64,8 +68,47 @@ async function syncSubscription(subscription: PushSubscription): Promise<void> {
   });
 }
 
-export async function ensurePushSubscription(): Promise<PushSupportStatus> {
+async function getBrowserSubscription(): Promise<PushSubscription | null> {
+  if (!isPushSupported()) return null;
+  try {
+    const registration = await navigator.serviceWorker.ready;
+    return registration.pushManager.getSubscription();
+  } catch {
+    return null;
+  }
+}
+
+/** Remove this device's push subscription from the browser and server. */
+export async function unsubscribePushNotifications(): Promise<void> {
+  if (!isPushSupported()) return;
+
+  const subscription = await getBrowserSubscription();
+  if (!subscription) return;
+
+  const endpoint = subscription.endpoint;
+  try {
+    await pushApi.unsubscribe(endpoint);
+  } catch {
+    // Best effort — token may already be cleared during sign-out.
+  }
+
+  try {
+    await subscription.unsubscribe();
+  } catch {
+    // Browser may have already dropped the subscription.
+  }
+}
+
+export async function ensurePushSubscription(options?: {
+  force?: boolean;
+}): Promise<PushSupportStatus> {
   if (!isPushSupported()) return 'unsupported';
+
+  const now = Date.now();
+  if (!options?.force && now - lastSyncAt < RESYNC_MIN_INTERVAL_MS) {
+    return getPushSupportStatus();
+  }
+  lastSyncAt = now;
 
   let permission = Notification.permission;
   if (permission === 'default') {
@@ -73,6 +116,9 @@ export async function ensurePushSubscription(): Promise<PushSupportStatus> {
   }
 
   if (permission !== 'granted') {
+    if (permission === 'denied') {
+      await unsubscribePushNotifications();
+    }
     return permission === 'denied' ? 'denied' : 'prompt';
   }
 
@@ -95,7 +141,7 @@ export async function ensurePushSubscription(): Promise<PushSupportStatus> {
 }
 
 export async function sendTestPushNotification(): Promise<{ sent: number; failed: number }> {
-  const status = await ensurePushSubscription();
+  const status = await ensurePushSubscription({ force: true });
   if (status === 'unsupported') {
     throw new Error('Push notifications are not supported in this browser.');
   }
@@ -107,4 +153,34 @@ export async function sendTestPushNotification(): Promise<{ sent: number; failed
   }
 
   return pushApi.sendTest();
+}
+
+/** Watch for notification permission changes (e.g. user blocks in browser settings). */
+export function watchNotificationPermission(
+  onChange: (permission: NotificationPermission) => void,
+): () => void {
+  if (!isPushSupported() || !('permissions' in navigator)) {
+    return () => {};
+  }
+
+  let disposed = false;
+  let statusRef: PermissionStatus | null = null;
+
+  void navigator.permissions
+    .query({ name: 'notifications' as PermissionName })
+    .then((status) => {
+      if (disposed) return;
+      statusRef = status;
+      status.onchange = () => {
+        onChange(Notification.permission);
+      };
+    })
+    .catch(() => {});
+
+  return () => {
+    disposed = true;
+    if (statusRef) {
+      statusRef.onchange = null;
+    }
+  };
 }

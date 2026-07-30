@@ -17,9 +17,11 @@ use crate::domain::push::{
 };
 use crate::error::{AppError, AppResult};
 use crate::repo::{push_subscriptions, settings};
+use chrono::{Duration, Utc};
 
 const VAPID_SETTINGS_KEY: &str = "vapid";
 const DEFAULT_VAPID_SUBJECT: &str = "mailto:admin@localhost";
+const DEFAULT_SUBSCRIPTION_TTL_DAYS: i64 = 90;
 
 fn web_push_client() -> &'static HyperWebPushClient {
     static CLIENT: OnceLock<HyperWebPushClient> = OnceLock::new();
@@ -83,6 +85,24 @@ async fn ensure_vapid(pool: &SqlitePool) -> AppResult<VapidConfig> {
     settings::upsert(pool, VAPID_SETTINGS_KEY, &cfg).await?;
     tracing::info!("generated and persisted VAPID keys for web push");
     Ok(cfg)
+}
+
+fn subscription_ttl_days() -> i64 {
+    std::env::var("PUSH_SUBSCRIPTION_TTL_DAYS")
+        .ok()
+        .and_then(|v| v.parse().ok())
+        .filter(|days| *days > 0)
+        .unwrap_or(DEFAULT_SUBSCRIPTION_TTL_DAYS)
+}
+
+pub async fn cleanup_stale_subscriptions(pool: &SqlitePool) -> AppResult<u64> {
+    let days = subscription_ttl_days();
+    let cutoff = (Utc::now() - Duration::days(days)).to_rfc3339();
+    let removed = push_subscriptions::delete_stale(pool, &cutoff).await?;
+    if removed > 0 {
+        tracing::info!(removed, ttl_days = days, "removed stale push subscriptions");
+    }
+    Ok(removed)
 }
 
 pub async fn public_config(pool: &SqlitePool) -> AppResult<PushConfigPublic> {
@@ -217,8 +237,13 @@ async fn send_payload(
             }
         };
 
+        let _ = push_subscriptions::record_attempt(pool, &sub.endpoint).await;
+
         match client.send(message).await {
-            Ok(()) => sent += 1,
+            Ok(()) => {
+                let _ = push_subscriptions::record_success(pool, &sub.endpoint).await;
+                sent += 1;
+            }
             Err(WebPushError::EndpointNotValid(_) | WebPushError::EndpointNotFound(_)) => {
                 tracing::info!(endpoint = %sub.endpoint, "removing stale push subscription");
                 let _ = push_subscriptions::delete_by_endpoint(pool, &sub.endpoint).await;

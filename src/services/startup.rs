@@ -2,6 +2,7 @@ use sqlx::SqlitePool;
 
 use crate::domain::settings::OidcConfig;
 use crate::repo::settings;
+use crate::services::push_service;
 
 /// If any of the OIDC_* env vars are present, merge them over whatever is
 /// stored in the database.  This lets container deployments inject OIDC config
@@ -38,5 +39,15 @@ pub async fn sync_oidc_from_env(pool: &SqlitePool) {
     match settings::upsert(pool, "oidc", &merged).await {
         Ok(()) => tracing::info!("OIDC config synced from environment"),
         Err(e) => tracing::warn!(error = %e, "failed to persist OIDC config from environment"),
+    }
+}
+
+pub async fn cleanup_push_subscriptions(pool: &SqlitePool) {
+    match push_service::cleanup_stale_subscriptions(pool).await {
+        Ok(removed) if removed > 0 => {
+            tracing::info!(removed, "push subscription cleanup complete");
+        }
+        Ok(_) => {}
+        Err(e) => tracing::warn!(error = %e, "push subscription cleanup failed"),
     }
 }

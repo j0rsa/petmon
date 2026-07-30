@@ -14,6 +14,8 @@ pub struct PushSubscriptionRow {
     pub reader_key: String,
     pub user_agent: Option<String>,
     pub created_at: String,
+    pub last_success_at: Option<String>,
+    pub last_attempt_at: Option<String>,
 }
 
 #[tracing::instrument(skip(pool, req))]
@@ -51,7 +53,7 @@ pub async fn upsert(
 #[tracing::instrument(skip(pool))]
 pub async fn get_by_endpoint(pool: &SqlitePool, endpoint: &str) -> AppResult<PushSubscriptionRow> {
     sqlx::query_as::<_, PushSubscriptionRow>(
-        "SELECT id, endpoint, p256dh, auth, reader_key, user_agent, created_at \
+        "SELECT id, endpoint, p256dh, auth, reader_key, user_agent, created_at, last_success_at, last_attempt_at \
          FROM push_subscriptions WHERE endpoint = ?",
     )
     .bind(endpoint)
@@ -72,10 +74,52 @@ pub async fn delete_by_endpoint(pool: &SqlitePool, endpoint: &str) -> AppResult<
 #[tracing::instrument(skip(pool))]
 pub async fn list_all(pool: &SqlitePool) -> AppResult<Vec<PushSubscriptionRow>> {
     let rows = sqlx::query_as::<_, PushSubscriptionRow>(
-        "SELECT id, endpoint, p256dh, auth, reader_key, user_agent, created_at \
+        "SELECT id, endpoint, p256dh, auth, reader_key, user_agent, created_at, last_success_at, last_attempt_at \
          FROM push_subscriptions ORDER BY created_at ASC",
     )
     .fetch_all(pool)
     .await?;
     Ok(rows)
+}
+
+#[tracing::instrument(skip(pool))]
+pub async fn record_attempt(pool: &SqlitePool, endpoint: &str) -> AppResult<()> {
+    let now = Utc::now().to_rfc3339();
+    sqlx::query("UPDATE push_subscriptions SET last_attempt_at = ? WHERE endpoint = ?")
+        .bind(&now)
+        .bind(endpoint)
+        .execute(pool)
+        .await?;
+    Ok(())
+}
+
+#[tracing::instrument(skip(pool))]
+pub async fn record_success(pool: &SqlitePool, endpoint: &str) -> AppResult<()> {
+    let now = Utc::now().to_rfc3339();
+    sqlx::query(
+        "UPDATE push_subscriptions SET last_success_at = ?, last_attempt_at = ? WHERE endpoint = ?",
+    )
+    .bind(&now)
+    .bind(&now)
+    .bind(endpoint)
+    .execute(pool)
+    .await?;
+    Ok(())
+}
+
+/// Remove subscriptions with no successful delivery since `cutoff` (RFC3339).
+#[tracing::instrument(skip(pool))]
+pub async fn delete_stale(pool: &SqlitePool, cutoff: &str) -> AppResult<u64> {
+    let result = sqlx::query(
+        "DELETE FROM push_subscriptions WHERE \
+         (last_attempt_at IS NOT NULL AND last_attempt_at < ? \
+          AND (last_success_at IS NULL OR last_success_at < ?)) \
+         OR (last_attempt_at IS NULL AND created_at < ?)",
+    )
+    .bind(cutoff)
+    .bind(cutoff)
+    .bind(cutoff)
+    .execute(pool)
+    .await?;
+    Ok(result.rows_affected())
 }

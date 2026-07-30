@@ -1450,6 +1450,41 @@ async fn push_subscribe_and_test_endpoints_work() {
     assert_eq!(resp.status(), 204);
 }
 
+#[actix_web::test]
+async fn push_stale_subscriptions_are_cleaned_up() {
+    use chrono::{Duration, Utc};
+    use petmon::services::push_service;
+
+    let pool = setup_pool().await;
+    let old = (Utc::now() - Duration::days(120)).to_rfc3339();
+
+    sqlx::query(
+        "INSERT INTO push_subscriptions (id, endpoint, p256dh, auth, reader_key, created_at, last_attempt_at) \
+         VALUES ('sub-old', 'https://push.example.test/stale', 'k', 'a', 'dev', ?, ?)",
+    )
+    .bind(&old)
+    .bind(&old)
+    .execute(&pool)
+    .await
+    .unwrap();
+
+    std::env::set_var("PUSH_SUBSCRIPTION_TTL_DAYS", "90");
+    let removed = push_service::cleanup_stale_subscriptions(&pool)
+        .await
+        .unwrap();
+    std::env::remove_var("PUSH_SUBSCRIPTION_TTL_DAYS");
+
+    assert_eq!(removed, 1);
+
+    let remaining: (i64,) =
+        sqlx::query_as("SELECT COUNT(*) FROM push_subscriptions WHERE endpoint = ?")
+            .bind("https://push.example.test/stale")
+            .fetch_one(&pool)
+            .await
+            .unwrap();
+    assert_eq!(remaining.0, 0);
+}
+
 // ── Route registration smoke tests ───────────────────────────────────────────
 // These guard against routes silently falling through to the SPA/assets
 // fallback. Each test hits a real endpoint and asserts it returns JSON (not

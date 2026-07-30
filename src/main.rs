@@ -31,6 +31,7 @@ async fn main() -> anyhow::Result<()> {
     tracing::info!(database_url = %config.database_url, "database migrations applied");
 
     services::startup::sync_oidc_from_env(&pool).await;
+    services::startup::cleanup_push_subscriptions(&pool).await;
 
     let dev_mode = std::env::var("DEV_MODE")
         .map(|v| matches!(v.to_lowercase().as_str(), "1" | "true" | "yes"))
