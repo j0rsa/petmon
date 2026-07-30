@@ -195,6 +195,10 @@ export function withEliminationDayPanel(
     const records = options?.recordsOverride
       ?? (empty ? [] : mockEliminationRecords.map((r) => ({ ...r, local_date: date })));
     client.setQueryData(['elimination-records-day', date, petId], records);
+    client.setQueryData(
+      ['day-summary', date, petId],
+      empty ? { ...mockEmptyDaySummary, local_date: date } : { ...mockDaySummary, local_date: date },
+    );
 
     const path = `/elimination/${date}`;
     const initialEntry = options?.routeHash
