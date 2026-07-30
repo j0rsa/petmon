@@ -6,6 +6,7 @@ use crate::domain::notification::{
 use crate::error::AppResult;
 use crate::repo::notifications;
 use crate::services::elimination_auto_categorize::AutoCategorizeFailureReason;
+use crate::services::push_service;
 use sqlx::SqlitePool;
 
 #[tracing::instrument(skip(pool))]
@@ -65,7 +66,7 @@ pub async fn notify_elimination_auto_categorize_failed(
     let (title, body) = failure_copy(pet_name, record.local_date.as_str(), reason);
     let link_path = format!("/elimination/{}", record.local_date);
 
-    notifications::create(
+    let created = notifications::create(
         pool,
         CreateNotification {
             kind: KIND_ELIMINATION_AUTO_CATEGORIZE_FAILED.to_string(),
@@ -80,6 +81,10 @@ pub async fn notify_elimination_auto_categorize_failed(
         },
     )
     .await?;
+
+    if let Some(notification) = created {
+        push_service::spawn_broadcast(pool.clone(), notification);
+    }
     Ok(())
 }
 

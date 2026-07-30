@@ -4,6 +4,7 @@ import { meApi } from '../api/me';
 import { infoApi } from '../api/info';
 import { authApi } from '../api/auth';
 import { clearToken } from '../lib/auth';
+import { unsubscribePushNotifications } from '../lib/pushNotifications';
 import { PawPrint, Utensils, HeartPulse } from 'lucide-react';
 import { PILLARS, type MonitoringPillar } from '../types/pillars';
 import { ExternalLinks } from './ExternalLinks';
@@ -73,6 +74,11 @@ export function SidebarUserChip() {
   if (!me) return null;
 
   async function handleSignOut() {
+    try {
+      await unsubscribePushNotifications();
+    } catch {
+      // Still sign out even if push cleanup fails.
+    }
     if (me?.kind === 'api_token') {
       try {
         await authApi.signOut();

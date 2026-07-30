@@ -8,6 +8,7 @@ pub mod nutrition_status;
 pub mod pet;
 pub mod pet_status;
 pub mod pillar;
+pub mod push;
 pub mod settings;
 pub mod species;
 pub mod weight;

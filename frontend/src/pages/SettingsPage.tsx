@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { settingsApi } from '../api/settings';
 import type { ApiTokenCreated, ApiTokenPublic, ApiTokenScope, DisplaySettings, OidcConfigPublic, TelegramConfigPublic } from '../api/settings';
@@ -6,6 +6,7 @@ import { API_TOKEN_SCOPES } from '../api/settings';
 import { infoApi } from '../api/info';
 import { deriveDeviceAlias, getStoredToken, storeToken } from '../lib/auth';
 import { clearPwaCachesAndReload, isPwaCacheSupported } from '../lib/pwaCache';
+import { getPushSupportStatus, isPushSupported, sendTestPushNotification } from '../lib/pushNotifications';
 import { TagInput } from '../components/TagInput';
 import { usePermissions } from '../context/usePermissions';
 
@@ -15,6 +16,7 @@ export default function SettingsPage() {
   return (
     <div className="page-stack">
       <DisplaySection />
+      <PushNotificationsSection />
       <AppCacheSection />
       <OidcSection />
       <TelegramSection />
@@ -162,6 +164,98 @@ function DisplaySection() {
           {mutation.error instanceof Error ? mutation.error.message : 'Failed to save display settings.'}
         </div>
       )}
+    </section>
+  );
+}
+
+// ── Push notifications ────────────────────────────────────────────────────────
+
+function pushStatusLabel(status: string): string {
+  switch (status) {
+    case 'subscribed':
+      return 'Enabled — this device is subscribed.';
+    case 'granted-not-subscribed':
+      return 'Permission granted — finishing subscription…';
+    case 'prompt':
+      return 'Waiting for permission — allow notifications when prompted.';
+    case 'denied':
+      return 'Blocked — enable notifications in your browser or OS settings.';
+    case 'server-disabled':
+      return 'Server push is not configured.';
+    case 'unsupported':
+      return 'Not supported in this browser.';
+    default:
+      return status;
+  }
+}
+
+function PushNotificationsSection() {
+  const supported = isPushSupported();
+  const [status, setStatus] = useState<string>(() => (supported ? 'loading' : 'unsupported'));
+  const [testing, setTesting] = useState(false);
+  const [message, setMessage] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!supported) return;
+    getPushSupportStatus()
+      .then(setStatus)
+      .catch(() => setStatus('prompt'));
+  }, [supported]);
+
+  async function handleTestPush() {
+    setTesting(true);
+    setMessage(null);
+    setError(null);
+    try {
+      const result = await sendTestPushNotification();
+      const refreshed = await getPushSupportStatus();
+      setStatus(refreshed);
+      if (result.sent === 0 && result.failed === 0) {
+        setMessage('No active push subscriptions yet — allow notifications and reload, then try again.');
+      } else {
+        setMessage(`Test push sent to ${result.sent} device(s)${result.failed ? ` (${result.failed} failed)` : ''}.`);
+      }
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to send test push.');
+    } finally {
+      setTesting(false);
+    }
+  }
+
+  if (!supported) return null;
+
+  return (
+    <section className="panel">
+      <div className="section-heading">
+        <div>
+          <p className="eyebrow">Alerts</p>
+          <h3>Push notifications</h3>
+        </div>
+      </div>
+
+      <p style={{ fontSize: '0.88rem', color: 'var(--text-muted)' }}>
+        Petmon can send browser push notifications when new in-app alerts are created.
+        Permission is requested when you open the app. Works on desktop browsers and installed mobile PWAs.
+      </p>
+
+      <p style={{ fontSize: '0.88rem', color: 'var(--text-muted)', marginTop: '0.75rem' }}>
+        Status: {status === 'loading' ? 'Checking…' : pushStatusLabel(status)}
+      </p>
+
+      <div className="form-row" style={{ justifyContent: 'flex-end' }}>
+        <button
+          className="button button-secondary"
+          type="button"
+          disabled={testing || status === 'loading'}
+          onClick={handleTestPush}
+        >
+          {testing ? 'Sending…' : 'Test push notifications system'}
+        </button>
+      </div>
+
+      {message && <p style={{ fontSize: '0.88rem', color: 'var(--text-muted)' }}>{message}</p>}
+      {error && <div className="error-state">{error}</div>}
     </section>
   );
 }

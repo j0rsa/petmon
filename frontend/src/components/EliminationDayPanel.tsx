@@ -469,7 +469,7 @@ export function EliminationDayPanel({ date, petId }: EliminationDayPanelProps) {
     [recordsQuery.data],
   );
 
-  useScrollToHash(records.length, recordsQuery.isSuccess);
+  useScrollToHash(petId, records.length, recordsQuery.isSuccess);
 
   useEffect(() => {
     // eslint-disable-next-line react-hooks/set-state-in-effect

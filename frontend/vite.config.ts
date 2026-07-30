@@ -15,15 +15,26 @@ const isStorybookBuild =
   process.env.npm_lifecycle_event === 'build-storybook' ||
   process.env.npm_lifecycle_event === 'storybook';
 
+const enablePwa = !isStorybookBuild && !process.env.VITEST;
+
 // More info at: https://storybook.js.org/docs/next/writing-tests/integrations/vitest-addon
 export default defineConfig({
   plugins: [
     react(),
-    ...(isStorybookBuild
-      ? []
-      : [
+    ...(enablePwa
+      ? [
           VitePWA({
             registerType: 'prompt',
+            strategies: 'injectManifest',
+            srcDir: 'src',
+            filename: 'sw.ts',
+            injectManifest: {
+              globPatterns: ['**/*.{js,css,html,ico,png,svg,woff2}'],
+            },
+            devOptions: {
+              enabled: true,
+              type: 'module',
+            },
             workbox: {
               skipWaiting: true,
               clientsClaim: true,
@@ -55,7 +66,8 @@ export default defineConfig({
               ],
             },
           }),
-        ]),
+        ]
+      : []),
   ],
   server: {
     proxy: {
@@ -76,6 +88,8 @@ export default defineConfig({
         ],
         test: {
           name: 'storybook',
+          retry: 2,
+          fileParallelism: false,
           browser: {
             enabled: true,
             headless: true,

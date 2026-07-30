@@ -6,8 +6,10 @@ import { NotificationCenter } from './NotificationCenter';
 import { SidebarPetPicker } from './SidebarPetPicker';
 import { BottomNav } from './BottomNav';
 import { PwaUpdateBanner } from './PwaUpdateBanner';
+import { usePushNotifications } from '../hooks/usePushNotifications';
 
 export function Layout() {
+  usePushNotifications();
   return (
     <SelectedPetProvider>
       <PwaUpdateBanner />

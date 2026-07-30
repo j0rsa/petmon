@@ -449,6 +449,92 @@ paths:
         '401':
           $ref: '#/components/responses/Unauthorized'
 
+  /push/config:
+    get:
+      tags:
+        - Push
+      summary: Get web push configuration
+      x-required-scope: api_read
+      responses:
+        '200':
+          description: VAPID public key and availability
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PushConfigPublic'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  /push/subscribe:
+    post:
+      tags:
+        - Push
+      summary: Register a browser push subscription
+      x-required-scope: api_write
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PushSubscribeRequest'
+      responses:
+        '204':
+          description: Subscription stored
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  /push/unsubscribe:
+    post:
+      tags:
+        - Push
+      summary: Remove a browser push subscription
+      x-required-scope: api_write
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                endpoint:
+                  type: string
+              required:
+                - endpoint
+      responses:
+        '204':
+          description: Subscription removed
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  /push/test:
+    post:
+      tags:
+        - Push
+      summary: Send a test push notification
+      x-required-scope: api_write
+      description: Sends a test notification to all registered push subscriptions for this instance.
+      responses:
+        '200':
+          description: Delivery summary
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PushTestResult'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
   /notifications/dismiss-all:
     post:
       tags:
@@ -2170,6 +2256,49 @@ components:
           format: int64
       required:
         - count
+
+    PushConfigPublic:
+      type: object
+      properties:
+        enabled:
+          type: boolean
+        public_key:
+          type: string
+          nullable: true
+      required:
+        - enabled
+
+    PushSubscribeRequest:
+      type: object
+      properties:
+        endpoint:
+          type: string
+        keys:
+          type: object
+          properties:
+            p256dh:
+              type: string
+            auth:
+              type: string
+          required:
+            - p256dh
+            - auth
+      required:
+        - endpoint
+        - keys
+
+    PushTestResult:
+      type: object
+      properties:
+        sent:
+          type: integer
+          format: int32
+        failed:
+          type: integer
+          format: int32
+      required:
+        - sent
+        - failed
 
     DayNote:
       type: object
