@@ -463,6 +463,38 @@ async fn api_docs_trailing_slash_is_not_caught_by_spa_fallback() {
 }
 
 #[actix_web::test]
+async fn push_config_is_not_caught_by_spa_fallback() {
+    let pool = setup_pool().await;
+    let state = web::Data::new(AppState::new(pool, true, None, None));
+    let app = build_full_app!(state);
+
+    let req = test::TestRequest::get()
+        .uri("/api/v1/push/config")
+        .to_request();
+    let resp = test::call_service(&app, req).await;
+    assert_eq!(
+        resp.status(),
+        200,
+        "GET /api/v1/push/config must be registered (not SPA fallback)"
+    );
+    let ct = resp
+        .headers()
+        .get("content-type")
+        .unwrap()
+        .to_str()
+        .unwrap();
+    assert!(
+        ct.contains("application/json"),
+        "GET /api/v1/push/config must return JSON, got: {ct}"
+    );
+    let body = String::from_utf8(test::read_body(resp).await.to_vec()).unwrap();
+    assert!(
+        !body.contains("<div id=\"root\">"),
+        "GET /api/v1/push/config must not serve the React SPA"
+    );
+}
+
+#[actix_web::test]
 async fn api_docs_openapi_yaml_trailing_slash_serves_yaml() {
     let pool = setup_pool().await;
     let state = web::Data::new(AppState::new(pool, false, None, None));
