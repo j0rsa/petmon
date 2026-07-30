@@ -4,7 +4,7 @@ use serde::Deserialize;
 
 use crate::auth::identity::Identity;
 use crate::auth::AppState;
-use crate::domain::push::PushSubscribeRequest;
+use crate::domain::push::{PushSubscribeRequest, PushTestRequest};
 use crate::error::{AppError, AppResult};
 use crate::services::push_service;
 
@@ -55,8 +55,11 @@ pub async fn unsubscribe(
 
 #[post("/test")]
 #[require_scope("api_write")]
-pub async fn send_test(state: web::Data<AppState>) -> AppResult<HttpResponse> {
-    let result = push_service::send_test(&state.pool).await?;
+pub async fn send_test(
+    state: web::Data<AppState>,
+    body: web::Json<PushTestRequest>,
+) -> AppResult<HttpResponse> {
+    let result = push_service::send_test(&state.pool, &body.endpoint).await?;
     Ok(HttpResponse::Ok().json(result))
 }
 

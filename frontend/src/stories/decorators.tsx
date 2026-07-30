@@ -493,3 +493,56 @@ export function withSettings({
     );
   };
 }
+
+// ── Overview page decorator ──────────────────────────────────────────────────
+
+interface WithOverviewPageOptions {
+  petId?: string;
+  empty?: boolean;
+}
+
+export function withOverviewPage({
+  petId = mockPetId,
+  empty = false,
+}: WithOverviewPageOptions = {}): Decorator {
+  return function OverviewPageDecorator(Story) {
+    const client = makeMockClient();
+    const today = localToday();
+    const weightStatsFrom = shiftDate(today, -29);
+
+    client.setQueryData(['pets'], mockPets);
+    client.setQueryData(['me'], { subject: 'dev', email: null, name: 'Dev', display_name: 'Dev', kind: 'dev', scopes: [] });
+    client.setQueryData(['app-info'], mockAppInfo);
+    client.setQueryData(['settings-display'], mockDisplaySettings);
+    client.setQueryData(
+      ['day-summary', today, petId],
+      empty ? { ...mockEmptyDaySummary, local_date: today } : { ...mockDaySummary, local_date: today },
+    );
+    client.setQueryData(
+      ['elimination-records-day', today, petId],
+      empty ? [] : mockEliminationRecords,
+    );
+    client.setQueryData(
+      ['weight-stats', petId, weightStatsFrom, today],
+      empty
+        ? { latest_kg: null, latest_date: null, avg_kg: null, count: 0 }
+        : { latest_kg: 4.22, latest_date: '2024-06-15', avg_kg: 4.19, count: 4 },
+    );
+    client.setQueryData(
+      ['health-state-records', petId],
+      empty ? [] : mockHealthStateRecords.map((r) => ({ ...r, pet_id: petId })),
+    );
+
+    return (
+      <MemoryRouter initialEntries={['/']}>
+        <QueryClientProvider client={client}>
+          <DisplaySettingsProvider>
+            <SelectedPetProvider initialPetId={petId}>
+              <Story />
+            </SelectedPetProvider>
+          </DisplaySettingsProvider>
+        </QueryClientProvider>
+      </MemoryRouter>
+    );
+  };
+}

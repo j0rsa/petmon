@@ -1483,12 +1483,30 @@ async fn push_subscribe_and_test_endpoints_work() {
 
     let req = test::TestRequest::post()
         .uri("/api/v1/push/test")
+        .set_json(&serde_json::json!({
+            "endpoint": "https://push.example.test/device/abc"
+        }))
         .to_request();
     let resp = test::call_service(&app, req).await;
     assert_eq!(resp.status(), 200);
     let body: serde_json::Value = test::read_body_json(resp).await;
     assert!(body["sent"].is_number());
     assert!(body["failed"].is_number());
+    // Fake endpoint keys cannot deliver — expect failure with an error message,
+    // not a broadcast fan-out to other devices.
+    assert_eq!(body["sent"], 0);
+    assert_eq!(body["failed"], 1);
+    assert!(body["error"].as_str().is_some_and(|e| !e.is_empty()));
+
+    // Unknown endpoint is rejected (does not silently fan out).
+    let req = test::TestRequest::post()
+        .uri("/api/v1/push/test")
+        .set_json(&serde_json::json!({
+            "endpoint": "https://push.example.test/device/missing"
+        }))
+        .to_request();
+    let resp = test::call_service(&app, req).await;
+    assert_eq!(resp.status(), 400);
 
     let req = test::TestRequest::post()
         .uri("/api/v1/push/unsubscribe")

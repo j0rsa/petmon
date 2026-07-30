@@ -16,7 +16,8 @@ use crate::domain::push::{
     PushConfigPublic, PushPayload, PushSubscribeRequest, PushTestResult, VapidConfig,
 };
 use crate::error::{AppError, AppResult};
-use crate::repo::{push_subscriptions, settings};
+use crate::repo::push_subscriptions::{self, PushSubscriptionRow};
+use crate::repo::settings;
 use chrono::{Duration, Utc};
 
 const VAPID_SETTINGS_KEY: &str = "vapid";
@@ -165,6 +166,86 @@ fn payload_from_notification(notification: &Notification) -> PushPayload {
     }
 }
 
+enum DeliveryOutcome {
+    Sent,
+    Failed { error: String },
+}
+
+async fn deliver_to_subscription(
+    pool: &SqlitePool,
+    vapid: &VapidConfig,
+    body: &[u8],
+    sub: &PushSubscriptionRow,
+) -> DeliveryOutcome {
+    let subscription = SubscriptionInfo {
+        endpoint: sub.endpoint.clone(),
+        keys: SubscriptionKeys {
+            p256dh: sub.p256dh.clone(),
+            auth: sub.auth.clone(),
+        },
+    };
+
+    let sig_builder = match VapidSignatureBuilder::from_base64(&vapid.private_key, &subscription) {
+        Ok(mut builder) => {
+            // Chrome/FCM expect a contact subject claim on VAPID JWTs.
+            builder.add_claim("sub", vapid.subject.clone());
+            match builder.build() {
+                Ok(sig) => sig,
+                Err(e) => {
+                    tracing::warn!(error = %e, "failed to build VAPID signature");
+                    return DeliveryOutcome::Failed {
+                        error: format!("Failed to build VAPID signature: {e}"),
+                    };
+                }
+            }
+        }
+        Err(e) => {
+            tracing::warn!(error = %e, "invalid VAPID private key");
+            return DeliveryOutcome::Failed {
+                error: format!("Invalid VAPID private key: {e}"),
+            };
+        }
+    };
+
+    let mut builder = WebPushMessageBuilder::new(&subscription);
+    builder.set_payload(ContentEncoding::Aes128Gcm, body);
+    builder.set_vapid_signature(sig_builder);
+    builder.set_ttl(86400);
+
+    let message = match builder.build() {
+        Ok(msg) => msg,
+        Err(e) => {
+            tracing::warn!(error = %e, "failed to build push message");
+            return DeliveryOutcome::Failed {
+                error: format!("Failed to build push message: {e}"),
+            };
+        }
+    };
+
+    let _ = push_subscriptions::record_attempt(pool, &sub.endpoint).await;
+
+    match web_push_client().send(message).await {
+        Ok(()) => {
+            let _ = push_subscriptions::record_success(pool, &sub.endpoint).await;
+            DeliveryOutcome::Sent
+        }
+        Err(WebPushError::EndpointNotValid(_) | WebPushError::EndpointNotFound(_)) => {
+            tracing::info!(endpoint = %sub.endpoint, "removing stale push subscription");
+            let _ = push_subscriptions::delete_by_endpoint(pool, &sub.endpoint).await;
+            DeliveryOutcome::Failed {
+                error: "Push endpoint is no longer valid. Re-enable notifications and try again."
+                    .to_string(),
+            }
+        }
+        Err(e) => {
+            tracing::warn!(error = %e, endpoint = %sub.endpoint, "push delivery failed");
+            DeliveryOutcome::Failed {
+                error: format!("Push delivery failed: {e}"),
+            }
+        }
+    }
+}
+
 async fn send_payload(
     pool: &SqlitePool,
     vapid: &VapidConfig,
@@ -174,12 +255,20 @@ async fn send_payload(
         Ok(rows) => rows,
         Err(e) => {
             tracing::warn!(error = %e, "failed to list push subscriptions");
-            return PushTestResult { sent: 0, failed: 0 };
+            return PushTestResult {
+                sent: 0,
+                failed: 0,
+                error: Some(format!("Failed to list push subscriptions: {e}")),
+            };
         }
     };
 
     if subscriptions.is_empty() {
-        return PushTestResult { sent: 0, failed: 0 };
+        return PushTestResult {
+            sent: 0,
+            failed: 0,
+            error: None,
+        };
     }
 
     let body = match serde_json::to_vec(payload) {
@@ -189,85 +278,67 @@ async fn send_payload(
             return PushTestResult {
                 sent: 0,
                 failed: subscriptions.len() as u32,
+                error: Some(format!("Failed to serialize push payload: {e}")),
             };
         }
     };
 
-    let client = web_push_client();
     let mut sent = 0u32;
     let mut failed = 0u32;
 
     for sub in subscriptions {
-        let subscription = SubscriptionInfo {
-            endpoint: sub.endpoint.clone(),
-            keys: SubscriptionKeys {
-                p256dh: sub.p256dh.clone(),
-                auth: sub.auth.clone(),
-            },
-        };
-
-        let sig_builder =
-            match VapidSignatureBuilder::from_base64(&vapid.private_key, &subscription) {
-                Ok(builder) => match builder.build() {
-                    Ok(sig) => sig,
-                    Err(e) => {
-                        tracing::warn!(error = %e, "failed to build VAPID signature");
-                        failed += 1;
-                        continue;
-                    }
-                },
-                Err(e) => {
-                    tracing::warn!(error = %e, "invalid VAPID private key");
-                    failed += 1;
-                    continue;
-                }
-            };
-
-        let mut builder = WebPushMessageBuilder::new(&subscription);
-        builder.set_payload(ContentEncoding::Aes128Gcm, &body);
-        builder.set_vapid_signature(sig_builder);
-        builder.set_ttl(86400);
-
-        let message = match builder.build() {
-            Ok(msg) => msg,
-            Err(e) => {
-                tracing::warn!(error = %e, "failed to build push message");
-                failed += 1;
-                continue;
-            }
-        };
-
-        let _ = push_subscriptions::record_attempt(pool, &sub.endpoint).await;
-
-        match client.send(message).await {
-            Ok(()) => {
-                let _ = push_subscriptions::record_success(pool, &sub.endpoint).await;
-                sent += 1;
-            }
-            Err(WebPushError::EndpointNotValid(_) | WebPushError::EndpointNotFound(_)) => {
-                tracing::info!(endpoint = %sub.endpoint, "removing stale push subscription");
-                let _ = push_subscriptions::delete_by_endpoint(pool, &sub.endpoint).await;
-                failed += 1;
-            }
-            Err(e) => {
-                tracing::warn!(error = %e, endpoint = %sub.endpoint, "push delivery failed");
-                failed += 1;
-            }
+        match deliver_to_subscription(pool, vapid, &body, &sub).await {
+            DeliveryOutcome::Sent => sent += 1,
+            DeliveryOutcome::Failed { .. } => failed += 1,
         }
     }
 
-    PushTestResult { sent, failed }
+    PushTestResult {
+        sent,
+        failed,
+        error: None,
+    }
 }
 
-pub async fn send_test(pool: &SqlitePool) -> AppResult<PushTestResult> {
+/// Send a test notification to a single device subscription (by endpoint).
+pub async fn send_test(pool: &SqlitePool, endpoint: &str) -> AppResult<PushTestResult> {
+    if endpoint.trim().is_empty() {
+        return Err(AppError::BadRequest("endpoint is required".to_string()));
+    }
+
     let vapid = ensure_vapid(pool).await?;
+    let sub = push_subscriptions::get_by_endpoint(pool, endpoint.trim())
+        .await
+        .map_err(|e| match e {
+            AppError::NotFound(_) => AppError::BadRequest(
+                "This device is not subscribed for push. Allow notifications and try again."
+                    .to_string(),
+            ),
+            other => other,
+        })?;
+
     let payload = PushPayload {
         title: "Petmon test notification".to_string(),
         body: "Push notifications are working.".to_string(),
         url: "/settings".to_string(),
         notification_id: None,
     };
-    Ok(send_payload(pool, &vapid, &payload).await)
+
+    let body = serde_json::to_vec(&payload)
+        .map_err(|e| AppError::Internal(format!("failed to serialize push payload: {e}")))?;
+
+    match deliver_to_subscription(pool, &vapid, &body, &sub).await {
+        DeliveryOutcome::Sent => Ok(PushTestResult {
+            sent: 1,
+            failed: 0,
+            error: None,
+        }),
+        DeliveryOutcome::Failed { error } => Ok(PushTestResult {
+            sent: 0,
+            failed: 1,
+            error: Some(error),
+        }),
+    }
 }
 
 pub async fn broadcast_notification(pool: &SqlitePool, notification: &Notification) {

@@ -141,7 +141,11 @@ export async function ensurePushSubscription(options?: {
   return 'subscribed';
 }
 
-export async function sendTestPushNotification(): Promise<{ sent: number; failed: number }> {
+export async function sendTestPushNotification(): Promise<{
+  sent: number;
+  failed: number;
+  error?: string | null;
+}> {
   const status = await ensurePushSubscription({ force: true });
   if (status === 'unsupported') {
     throw new Error('Push notifications are not supported in this browser.');
@@ -153,7 +157,13 @@ export async function sendTestPushNotification(): Promise<{ sent: number; failed
     throw new Error('Push notifications are not configured on the server.');
   }
 
-  return pushApi.sendTest();
+  const subscription = await getBrowserSubscription();
+  if (!subscription?.endpoint) {
+    throw new Error('This device has no push subscription. Allow notifications and try again.');
+  }
+
+  // ensurePushSubscription already synced keys; send only to this browser endpoint.
+  return pushApi.sendTest(subscription.endpoint);
 }
 
 /** Watch for notification permission changes (e.g. user blocks in browser settings). */

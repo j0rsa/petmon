@@ -16,11 +16,12 @@ export interface PushSubscribeBody {
 export interface PushTestResult {
   sent: number;
   failed: number;
+  error?: string | null;
 }
 
 export const pushApi = {
   getConfig: () => api.get<PushConfig>('/push/config'),
   subscribe: (body: PushSubscribeBody) => api.post<void>('/push/subscribe', body),
   unsubscribe: (endpoint: string) => api.post<void>('/push/unsubscribe', { endpoint }),
-  sendTest: () => api.post<PushTestResult>('/push/test', {}),
+  sendTest: (endpoint: string) => api.post<PushTestResult>('/push/test', { endpoint }),
 };

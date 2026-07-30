@@ -470,3 +470,35 @@ jobs:
           tags: ${{ steps.meta.outputs.tags }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
+
+  # ─────────────────────────────────────────────
+  # Renovate: secret check (all runs) + trigger (main push)
+  # ─────────────────────────────────────────────
+  renovate-trigger:
+    name: Renovate trigger
+    runs-on: ubuntu-latest
+    needs: [docker]
+    # Docker uses always() to run when version-check is skipped on PRs; without the
+    # same guard here, GitHub skips this job even when docker succeeded.
+    if: |
+      always() &&
+      needs.docker.result == 'success' &&
+      !cancelled()
+    steps:
+      - name: Check Renovate trigger secret
+        env:
+          RENOVATE_TRIGGER_API_SECRET: ${{ secrets.RENOVATE_TRIGGER_API_SECRET }}
+        run: |
+          if [ -z "${RENOVATE_TRIGGER_API_SECRET}" ]; then
+            echo "::error::RENOVATE_TRIGGER_API_SECRET is not set. Register it as a repository or organization Actions secret."
+            exit 1
+          fi
+
+      - name: Trigger Renovate
+        if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+        env:
+          RENOVATE_TRIGGER_API_SECRET: ${{ secrets.RENOVATE_TRIGGER_API_SECRET }}
+        run: |
+          curl --fail -X POST \
+            -H "X-Api-Key: ${RENOVATE_TRIGGER_API_SECRET}" \
+            https://renovate.j0rsa.com/trigger
