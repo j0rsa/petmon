@@ -26,6 +26,10 @@ export function useScrollToHash(...deps: unknown[]) {
     let attempts = 0;
     let retryTimer: number | undefined;
 
+    function clearHashFromUrl() {
+      navigate({ pathname, search, hash: '' }, { replace: true });
+    }
+
     function onAnimationEnd(event: Event) {
       const anim = event as AnimationEvent;
       if (anim.animationName !== FLASH_ANIMATION_NAME) return;
@@ -35,10 +39,7 @@ export function useScrollToHash(...deps: unknown[]) {
       if (highlightedRef.current === el) {
         highlightedRef.current = null;
       }
-    }
-
-    function clearHashFromUrl() {
-      navigate({ pathname, search, hash: '' }, { replace: true });
+      clearHashFromUrl();
     }
 
     function flashElement(el: HTMLElement) {
@@ -46,6 +47,7 @@ export function useScrollToHash(...deps: unknown[]) {
         cleanupFlash(highlightedRef.current);
         highlightedRef.current.removeEventListener('animationend', onAnimationEnd);
       }
+      el.removeEventListener('animationend', onAnimationEnd);
 
       el.scrollIntoView({ behavior: 'smooth', block: 'start' });
 
@@ -54,7 +56,6 @@ export function useScrollToHash(...deps: unknown[]) {
       el.classList.add(DEEP_LINK_FLASH_CLASS);
       el.addEventListener('animationend', onAnimationEnd);
       highlightedRef.current = el;
-      clearHashFromUrl();
     }
 
     function tryHighlight() {
@@ -74,11 +75,8 @@ export function useScrollToHash(...deps: unknown[]) {
     return () => {
       window.clearTimeout(initialTimer);
       if (retryTimer) window.clearTimeout(retryTimer);
-      if (highlightedRef.current) {
-        highlightedRef.current.removeEventListener('animationend', onAnimationEnd);
-        cleanupFlash(highlightedRef.current);
-        highlightedRef.current = null;
-      }
+      // Don't remove the flash class here — clearing the hash (after animation)
+      // or a subsequent flash on the same target handles teardown.
     };
   }, [hash, depsKey, navigate, pathname, search]);
 }

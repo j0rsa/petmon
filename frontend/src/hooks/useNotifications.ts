@@ -1,3 +1,4 @@
+import { flushSync } from 'react-dom';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useNavigate } from 'react-router-dom';
 import { notificationsApi, notificationHref, type NotificationItem } from '../api/notifications';
@@ -46,10 +47,11 @@ export function useNotificationActions(onAfterOpen?: () => void) {
   });
 
   function openNotification(item: NotificationItem) {
+    const href = notificationHref(item);
     if (item.pet_id) {
-      setSelectedPetId(item.pet_id);
+      flushSync(() => setSelectedPetId(item.pet_id!));
     }
-    navigate(notificationHref(item));
+    navigate(href);
     if (!item.read) {
       markReadMutation.mutate(item.id);
     }
