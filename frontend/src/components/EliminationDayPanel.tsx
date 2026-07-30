@@ -109,13 +109,26 @@ function invalidateDayData(queryClient: ReturnType<typeof useQueryClient>, date:
 
 // ── Type badge ───────────────────────────────────────────────────────────────
 
-function TypeBadge({ eventType }: { eventType: EliminationEventType }) {
+function TypeBadge({
+  eventType,
+  autoCategorized = false,
+}: {
+  eventType: EliminationEventType;
+  autoCategorized?: boolean;
+}) {
   return (
-    <span
-      className="badge badge-muted"
-      style={{ color: EVENT_TYPE_BADGE_COLOR[eventType], background: `${EVENT_TYPE_BADGE_COLOR[eventType]}1a`, fontSize: '0.75rem', padding: '0.2rem 0.55rem' }}
-    >
-      {EVENT_TYPE_LABELS[eventType]}
+    <span className="type-badge-wrap">
+      <span
+        className="badge badge-muted"
+        style={{ color: EVENT_TYPE_BADGE_COLOR[eventType], background: `${EVENT_TYPE_BADGE_COLOR[eventType]}1a`, fontSize: '0.75rem', padding: '0.2rem 0.55rem' }}
+      >
+        {EVENT_TYPE_LABELS[eventType]}
+      </span>
+      {autoCategorized && (
+        <span className="auto-tag-icon" title="Auto-detected" aria-label="Auto-detected">
+          A
+        </span>
+      )}
     </span>
   );
 }
@@ -394,7 +407,7 @@ function RecordRow({
     <div className="entry-row-wrap" id={`record-${record.id}`}>
       <div className="entry-row">
         <span className="entry-time">{formatTime(record.occurred_at)}</span>
-        <TypeBadge eventType={record.event_type} />
+        <TypeBadge eventType={record.event_type} autoCategorized={record.is_auto_categorized} />
         <span className="entry-amount" style={{ color: 'var(--text-muted)', fontSize: '0.82rem' }}>
           {record.subtype ? record.subtype : ''}
           {record.duration_seconds != null ? ` ${fmtDurationSecs(record.duration_seconds)}` : ''}

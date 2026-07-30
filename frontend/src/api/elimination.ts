@@ -14,6 +14,7 @@ export interface EliminationRecord {
   duration_seconds: number | null;
   note: string | null;
   source_type: string;
+  is_auto_categorized: boolean;
   created_at: string;
   updated_at: string;
 }

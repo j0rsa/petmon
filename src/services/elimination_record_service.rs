@@ -47,7 +47,8 @@ pub async fn create(
     let mut req = req;
     req.event_type = attempt.event_type;
 
-    let record = elimination_records::create(pool, req, timezone).await?;
+    let record =
+        elimination_records::create(pool, req, timezone, attempt.is_auto_categorized).await?;
 
     if let Some(reason) = attempt.failure {
         notification_service::notify_elimination_auto_categorize_failed(

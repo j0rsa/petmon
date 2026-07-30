@@ -1268,12 +1268,29 @@ async fn elimination_auto_categorize_by_duration() {
 
     let body = api_create_elimination!(&app, pet_id, "general", 48, "2026-06-02T08:30:00");
     assert_eq!(body["event_type"].as_str(), Some("urination"));
+    assert_eq!(body["is_auto_categorized"].as_bool(), Some(true));
+    let auto_id = body["id"].as_str().unwrap().to_string();
 
     let body = api_create_elimination!(&app, pet_id, "general", 122, "2026-06-02T10:30:00");
     assert_eq!(body["event_type"].as_str(), Some("defecation"));
+    assert_eq!(body["is_auto_categorized"].as_bool(), Some(true));
 
-    let body = api_create_elimination!(&app, pet_id, "general", 90, "2026-06-02T12:00:00");
+    let manual = api_create_elimination!(&app, pet_id, "urination", 45, "2026-06-02T11:00:00");
+    assert_eq!(manual["is_auto_categorized"].as_bool(), Some(false));
+
+    let req = test::TestRequest::patch()
+        .uri(&format!("/api/v1/elimination/records/{auto_id}"))
+        .set_json(serde_json::json!({ "event_type": "defecation" }))
+        .to_request();
+    let resp = test::call_service(&app, req).await;
+    assert_eq!(resp.status(), 200);
+    let updated: serde_json::Value = test::read_body_json(resp).await;
+    assert_eq!(updated["event_type"].as_str(), Some("defecation"));
+    assert_eq!(updated["is_auto_categorized"].as_bool(), Some(false));
+
+    let body = api_create_elimination!(&app, pet_id, "general", 30, "2026-06-02T12:00:00");
     assert_eq!(body["event_type"].as_str(), Some("general"));
+    assert_eq!(body["is_auto_categorized"].as_bool(), Some(false));
     let record_id = body["id"].as_str().unwrap().to_string();
 
     let req = test::TestRequest::get()
@@ -1324,6 +1341,7 @@ async fn elimination_auto_categorize_by_duration() {
 
     let body = api_create_elimination!(&app, pet_id, "general", 47, "2026-06-02T14:00:00");
     assert_eq!(body["event_type"].as_str(), Some("general"));
+    assert_eq!(body["is_auto_categorized"].as_bool(), Some(false));
 }
 
 #[actix_web::test]

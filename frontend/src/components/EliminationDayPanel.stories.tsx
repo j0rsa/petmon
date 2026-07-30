@@ -50,6 +50,7 @@ export const GeneralLatestRecord: Story = {
           duration_seconds: 45,
           note: null,
           source_type: 'manual',
+          is_auto_categorized: false,
           created_at: '2024-06-15T20:00:00',
           updated_at: '2024-06-15T20:00:00',
         },
@@ -63,12 +64,41 @@ export const GeneralLatestRecord: Story = {
           duration_seconds: 90,
           note: 'Normal stool',
           source_type: 'manual',
+          is_auto_categorized: false,
           created_at: '2024-06-15T08:30:00',
           updated_at: '2024-06-15T08:30:00',
         },
       ],
     }),
   ],
+};
+
+export const AutoCategorizedRecord: Story = {
+  name: 'Auto-categorized badge',
+  decorators: [
+    withEliminationDayPanel('2024-06-15', mockPetId, false, {
+      recordsOverride: [
+        {
+          id: 'elim-auto',
+          pet_id: mockPetId,
+          occurred_at: '2024-06-15T18:00:00',
+          local_date: '2024-06-15',
+          event_type: 'urination',
+          subtype: null,
+          duration_seconds: 48,
+          note: null,
+          source_type: 'manual',
+          is_auto_categorized: true,
+          created_at: '2024-06-15T18:00:00',
+          updated_at: '2024-06-15T18:00:00',
+        },
+      ],
+    }),
+  ],
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    await expect(canvas.getByLabelText('Auto-detected')).toBeInTheDocument();
+  },
 };
 
 export const EmptyDay: Story = {
@@ -89,6 +119,7 @@ const weeLatestRecords = [
     duration_seconds: 45,
     note: null,
     source_type: 'manual',
+    is_auto_categorized: false,
     created_at: '2024-06-15T20:00:00',
     updated_at: '2024-06-15T20:00:00',
   },

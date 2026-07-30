@@ -24,6 +24,7 @@ pub enum AutoCategorizeFailureReason {
 pub struct AutoCategorizeAttempt {
     pub event_type: EliminationEventType,
     pub failure: Option<AutoCategorizeFailureReason>,
+    pub is_auto_categorized: bool,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq)]
@@ -147,12 +148,14 @@ pub async fn attempt_auto_categorize(
         return Ok(AutoCategorizeAttempt {
             event_type,
             failure: None,
+            is_auto_categorized: false,
         });
     }
     let Some(duration) = duration_seconds else {
         return Ok(AutoCategorizeAttempt {
             event_type,
             failure: None,
+            is_auto_categorized: false,
         });
     };
 
@@ -161,6 +164,7 @@ pub async fn attempt_auto_categorize(
         return Ok(AutoCategorizeAttempt {
             event_type,
             failure: None,
+            is_auto_categorized: false,
         });
     }
 
@@ -169,18 +173,22 @@ pub async fn attempt_auto_categorize(
         ClassifyOutcome::Matched(event_type) => Ok(AutoCategorizeAttempt {
             event_type,
             failure: None,
+            is_auto_categorized: true,
         }),
         ClassifyOutcome::Ambiguous => Ok(AutoCategorizeAttempt {
             event_type: EliminationEventType::General,
             failure: Some(AutoCategorizeFailureReason::Ambiguous),
+            is_auto_categorized: false,
         }),
         ClassifyOutcome::NoMatch => Ok(AutoCategorizeAttempt {
             event_type: EliminationEventType::General,
             failure: Some(AutoCategorizeFailureReason::NoMatch),
+            is_auto_categorized: false,
         }),
         ClassifyOutcome::InsufficientHistory => Ok(AutoCategorizeAttempt {
             event_type: EliminationEventType::General,
             failure: Some(AutoCategorizeFailureReason::InsufficientHistory),
+            is_auto_categorized: false,
         }),
     }
 }
