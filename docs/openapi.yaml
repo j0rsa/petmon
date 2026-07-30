@@ -522,14 +522,25 @@ paths:
         - Push
       summary: Send a test push notification
       x-required-scope: api_write
-      description: Sends a test notification to all registered push subscriptions for this instance.
+      description: >
+        Sends a test notification to a single push subscription identified by
+        `endpoint` (the requesting browser/device). Does not broadcast to other
+        devices.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PushTestRequest'
       responses:
         '200':
-          description: Delivery summary
+          description: Delivery summary for the targeted device
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/PushTestResult'
+        '400':
+          $ref: '#/components/responses/BadRequest'
         '403':
           $ref: '#/components/responses/Forbidden'
         '401':
@@ -2287,6 +2298,15 @@ components:
         - endpoint
         - keys
 
+    PushTestRequest:
+      type: object
+      properties:
+        endpoint:
+          type: string
+          description: Push subscription endpoint of the device that should receive the test
+      required:
+        - endpoint
+
     PushTestResult:
       type: object
       properties:
@@ -2296,6 +2316,10 @@ components:
         failed:
           type: integer
           format: int32
+        error:
+          type: string
+          nullable: true
+          description: Present when delivery to the targeted device failed
       required:
         - sent
         - failed

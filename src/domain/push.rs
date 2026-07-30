@@ -25,10 +25,17 @@ pub struct PushConfigPublic {
     pub public_key: Option<String>,
 }
 
+#[derive(Debug, Clone, Deserialize)]
+pub struct PushTestRequest {
+    pub endpoint: String,
+}
+
 #[derive(Debug, Clone, Serialize)]
 pub struct PushTestResult {
     pub sent: u32,
     pub failed: u32,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub error: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize)]

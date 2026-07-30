@@ -232,10 +232,15 @@ function PushNotificationsSection() {
       const result = await sendTestPushNotification();
       const refreshed = await getPushSupportStatus();
       setStatus(refreshed);
-      if (result.sent === 0 && result.failed === 0) {
-        setMessage('No active push subscriptions yet — allow notifications and reload, then try again.');
+      if (result.sent > 0) {
+        setMessage(
+          'Test notification sent to this device — you should see “Petmon test notification” from your browser/OS.',
+        );
       } else {
-        setMessage(`Test push sent to ${result.sent} device(s)${result.failed ? ` (${result.failed} failed)` : ''}.`);
+        setError(
+          result.error
+            ?? 'Failed to deliver the test notification to this device. Check permission and try again.',
+        );
       }
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to send test push.');
@@ -275,7 +280,23 @@ function PushNotificationsSection() {
         </button>
       </div>
 
-      {message && <p style={{ fontSize: '0.88rem', color: 'var(--text-muted)' }}>{message}</p>}
+      {message && (
+        <p
+          role="status"
+          style={{
+            margin: 0,
+            padding: '0.65rem 0.85rem',
+            borderRadius: 10,
+            background: 'var(--success-bg)',
+            border: '1px solid var(--success-border)',
+            color: 'var(--success-text, #4ade80)',
+            fontSize: '0.88rem',
+            fontWeight: 500,
+          }}
+        >
+          {message}
+        </p>
+      )}
       {error && <div className="error-state">{error}</div>}
     </section>
   );
