@@ -412,7 +412,7 @@ async fn seed_elimination_records(pool: &SqlitePool, demo_pets: &[Pet]) -> AppRe
             let local_date = date.format("%Y-%m-%d").to_string();
             let events = daily_elimination_for_pet(pet, &local_date, day_offset);
             for req in events {
-                elimination_records::create(pool, req, chrono_tz::UTC).await?;
+                elimination_records::create(pool, req, chrono_tz::UTC, false).await?;
                 count += 1;
             }
         }

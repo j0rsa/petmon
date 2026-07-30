@@ -49,6 +49,7 @@ pub struct EliminationRecord {
     pub duration_seconds: Option<i64>,
     pub note: Option<String>,
     pub source_type: String,
+    pub is_auto_categorized: bool,
     pub created_at: String,
     pub updated_at: String,
 }

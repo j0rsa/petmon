@@ -319,27 +319,27 @@ export const mockEliminationRecords: EliminationRecord[] = [
   {
     id: 'elim-01', pet_id: mockPetId, occurred_at: `${elim_date}T06:15:00`, local_date: elim_date,
     event_type: 'urination', subtype: null, duration_seconds: 45, note: null,
-    source_type: 'manual', created_at: `${elim_date}T06:15:00`, updated_at: `${elim_date}T06:15:00`,
+    source_type: 'manual', is_auto_categorized: false, created_at: `${elim_date}T06:15:00`, updated_at: `${elim_date}T06:15:00`,
   },
   {
     id: 'elim-02', pet_id: mockPetId, occurred_at: `${elim_date}T08:30:00`, local_date: elim_date,
     event_type: 'defecation', subtype: 'normal', duration_seconds: 90, note: 'Normal stool',
-    source_type: 'manual', created_at: `${elim_date}T08:30:00`, updated_at: `${elim_date}T08:30:00`,
+    source_type: 'manual', is_auto_categorized: false, created_at: `${elim_date}T08:30:00`, updated_at: `${elim_date}T08:30:00`,
   },
   {
     id: 'elim-03', pet_id: mockPetId, occurred_at: `${elim_date}T11:00:00`, local_date: elim_date,
     event_type: 'urination', subtype: null, duration_seconds: 60, note: null,
-    source_type: 'manual', created_at: `${elim_date}T11:00:00`, updated_at: `${elim_date}T11:00:00`,
+    source_type: 'manual', is_auto_categorized: false, created_at: `${elim_date}T11:00:00`, updated_at: `${elim_date}T11:00:00`,
   },
   {
     id: 'elim-04', pet_id: mockPetId, occurred_at: `${elim_date}T14:45:00`, local_date: elim_date,
     event_type: 'vomit', subtype: 'bile', duration_seconds: 20, note: 'Yellow bile, small amount',
-    source_type: 'manual', created_at: `${elim_date}T14:45:00`, updated_at: `${elim_date}T14:45:00`,
+    source_type: 'manual', is_auto_categorized: false, created_at: `${elim_date}T14:45:00`, updated_at: `${elim_date}T14:45:00`,
   },
   {
     id: 'elim-05', pet_id: mockPetId, occurred_at: `${elim_date}T19:20:00`, local_date: elim_date,
     event_type: 'urination', subtype: null, duration_seconds: 55, note: null,
-    source_type: 'manual', created_at: `${elim_date}T19:20:00`, updated_at: `${elim_date}T19:20:00`,
+    source_type: 'manual', is_auto_categorized: false, created_at: `${elim_date}T19:20:00`, updated_at: `${elim_date}T19:20:00`,
   },
 ];
 

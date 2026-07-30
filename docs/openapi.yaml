@@ -2948,6 +2948,9 @@ components:
           nullable: true
         source_type:
           type: string
+        is_auto_categorized:
+          type: boolean
+          description: True when event_type was set by duration auto-categorization; false for manual entries and edits.
         created_at:
           type: string
           format: date-time
@@ -2961,6 +2964,7 @@ components:
         - local_date
         - event_type
         - source_type
+        - is_auto_categorized
         - created_at
         - updated_at
 

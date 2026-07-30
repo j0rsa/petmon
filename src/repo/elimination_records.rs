@@ -14,7 +14,7 @@ pub async fn list(
     filters: &EliminationRecordFilters,
 ) -> AppResult<Vec<EliminationRecord>> {
     let mut query = String::from(
-        "SELECT id, pet_id, occurred_at, local_date, event_type, subtype, duration_seconds, note, source_type, created_at, updated_at FROM elimination_records WHERE 1=1",
+        "SELECT id, pet_id, occurred_at, local_date, event_type, subtype, duration_seconds, note, source_type, is_auto_categorized, created_at, updated_at FROM elimination_records WHERE 1=1",
     );
 
     if filters.pet_id.is_some() {
@@ -67,7 +67,7 @@ pub async fn list(
 #[tracing::instrument(skip(pool))]
 pub async fn get(pool: &SqlitePool, id: &str) -> AppResult<EliminationRecord> {
     sqlx::query_as::<_, EliminationRecord>(
-        "SELECT id, pet_id, occurred_at, local_date, event_type, subtype, duration_seconds, note, source_type, created_at, updated_at FROM elimination_records WHERE id = ?",
+        "SELECT id, pet_id, occurred_at, local_date, event_type, subtype, duration_seconds, note, source_type, is_auto_categorized, created_at, updated_at FROM elimination_records WHERE id = ?",
     )
     .bind(id)
     .fetch_optional(pool)
@@ -80,6 +80,7 @@ pub async fn create(
     pool: &SqlitePool,
     req: crate::domain::elimination::CreateEliminationRecord,
     timezone: Tz,
+    is_auto_categorized: bool,
 ) -> AppResult<EliminationRecord> {
     let now = Utc::now().to_rfc3339();
     let occurred_at = req.occurred_at.unwrap_or_else(|| {
@@ -97,7 +98,7 @@ pub async fn create(
         .map_err(|_| AppError::BadRequest(format!("invalid pet_id: {}", req.pet_id)))?;
 
     sqlx::query(
-        "INSERT INTO elimination_records (id, pet_id, occurred_at, local_date, event_type, subtype, duration_seconds, note, source_type, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+        "INSERT INTO elimination_records (id, pet_id, occurred_at, local_date, event_type, subtype, duration_seconds, note, source_type, is_auto_categorized, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
     )
     .bind(&id)
     .bind(pet_id)
@@ -108,6 +109,7 @@ pub async fn create(
     .bind(req.duration_seconds)
     .bind(&req.note)
     .bind(&source_type)
+    .bind(is_auto_categorized)
     .bind(&now)
     .bind(&now)
     .execute(pool)
@@ -133,6 +135,7 @@ pub async fn update(
     }
     if let Some(event_type) = req.event_type {
         record.event_type = event_type;
+        record.is_auto_categorized = false;
     }
     if let Some(subtype) = req.subtype {
         record.subtype = subtype;
@@ -146,7 +149,7 @@ pub async fn update(
     record.updated_at = now;
 
     sqlx::query(
-        "UPDATE elimination_records SET occurred_at=?, local_date=?, event_type=?, subtype=?, duration_seconds=?, note=?, updated_at=? WHERE id=?",
+        "UPDATE elimination_records SET occurred_at=?, local_date=?, event_type=?, subtype=?, duration_seconds=?, note=?, is_auto_categorized=?, updated_at=? WHERE id=?",
     )
     .bind(&record.occurred_at)
     .bind(&record.local_date)
@@ -154,6 +157,7 @@ pub async fn update(
     .bind(&record.subtype)
     .bind(record.duration_seconds)
     .bind(&record.note)
+    .bind(record.is_auto_categorized)
     .bind(&record.updated_at)
     .bind(id)
     .execute(pool)
