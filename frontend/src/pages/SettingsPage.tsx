@@ -262,7 +262,9 @@ function PushNotificationsSection() {
 
       <p style={{ fontSize: '0.88rem', color: 'var(--text-muted)' }}>
         Petmon can send browser push notifications when new in-app alerts are created.
-        Permission is requested when you open the app. Works on desktop browsers and installed mobile PWAs.
+        Permission is requested when you open the app. Works on desktop browsers and installed mobile PWAs
+        (iOS requires Add to Home Screen). If a test says it was sent but nothing appears, check OS notification
+        settings for this browser — the server only confirms delivery to the push service.
       </p>
 
       <p style={{ fontSize: '0.88rem', color: 'var(--text-muted)', marginTop: '0.75rem' }}>

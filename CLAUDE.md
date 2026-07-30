@@ -41,6 +41,12 @@ When adding a tool in `src/mcp/tools.rs`, advertise only the dotted name. Legacy
 
 ---
 
+## Web Push / VAPID
+
+- VAPID JWT `sub` must be a real `mailto:` or `https:` contact URI. **Never** use `@localhost` — Apple/Safari return `403 BadJwtToken`.
+- Default subject is `https://petmon.j0rsa.com`; override with `VAPID_SUBJECT`. Keys auto-generate into `app_settings` unless `VAPID_PUBLIC_KEY` + `VAPID_PRIVATE_KEY` are set.
+- On load, invalid stored subjects (e.g. legacy `mailto:admin@localhost`) are rewritten automatically.
+
 ## Terminology: BE vs FE split
 
 The app uses two vocabulary layers that must never bleed into each other:

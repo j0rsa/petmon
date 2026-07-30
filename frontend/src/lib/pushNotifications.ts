@@ -13,7 +13,7 @@ const RESYNC_MIN_INTERVAL_MS = 24 * 60 * 60 * 1000;
 
 let lastSyncAt = 0;
 
-function urlBase64ToUint8Array(base64String: string): BufferSource {
+function urlBase64ToUint8Array(base64String: string): Uint8Array {
   const padding = '='.repeat((4 - (base64String.length % 4)) % 4);
   const base64 = (base64String + padding).replace(/-/g, '+').replace(/_/g, '/');
   const raw = atob(base64);
@@ -22,6 +22,19 @@ function urlBase64ToUint8Array(base64String: string): BufferSource {
     output[i] = raw.charCodeAt(i);
   }
   return output;
+}
+
+/** `null` when the browser does not expose the bound key — do not force-rotate. */
+function applicationServerKeysMatch(
+  subscription: PushSubscription,
+  publicKey: string,
+): boolean | null {
+  const existing = subscription.options?.applicationServerKey;
+  if (!existing) return null;
+  const expected = urlBase64ToUint8Array(publicKey);
+  const actual = new Uint8Array(existing);
+  if (actual.length !== expected.length) return false;
+  return actual.every((byte, i) => byte === expected[i]);
 }
 
 export function isPushSupported(): boolean {
@@ -128,6 +141,22 @@ export async function ensurePushSubscription(options?: {
 
   const registration = await navigator.serviceWorker.ready;
   let subscription = await registration.pushManager.getSubscription();
+
+  // Re-subscribe when the server VAPID public key changed — browsers keep the
+  // old applicationServerKey binding otherwise, and push auth fails.
+  if (subscription && applicationServerKeysMatch(subscription, config.public_key) === false) {
+    try {
+      await pushApi.unsubscribe(subscription.endpoint);
+    } catch {
+      // Best effort — local unsubscribe is what matters for rebinding.
+    }
+    try {
+      await subscription.unsubscribe();
+    } catch {
+      // Already gone.
+    }
+    subscription = null;
+  }
 
   if (!subscription) {
     const keyBytes = urlBase64ToUint8Array(config.public_key);
