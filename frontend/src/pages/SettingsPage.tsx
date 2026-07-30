@@ -6,7 +6,7 @@ import { API_TOKEN_SCOPES } from '../api/settings';
 import { infoApi } from '../api/info';
 import { deriveDeviceAlias, getStoredToken, storeToken } from '../lib/auth';
 import { clearPwaCachesAndReload, isPwaCacheSupported } from '../lib/pwaCache';
-import { getPushSupportStatus, isPushSupported, sendTestPushNotification } from '../lib/pushNotifications';
+import { getPushSupportStatus, isPushSupported, sendTestPushNotification, watchNotificationPermission } from '../lib/pushNotifications';
 import { TagInput } from '../components/TagInput';
 import { usePermissions } from '../context/usePermissions';
 
@@ -198,9 +198,30 @@ function PushNotificationsSection() {
 
   useEffect(() => {
     if (!supported) return;
-    getPushSupportStatus()
-      .then(setStatus)
-      .catch(() => setStatus('prompt'));
+
+    const refreshStatus = () => {
+      getPushSupportStatus()
+        .then(setStatus)
+        .catch(() => setStatus('prompt'));
+    };
+
+    refreshStatus();
+
+    const stopPermissionWatch = watchNotificationPermission(() => {
+      refreshStatus();
+    });
+
+    const onVisibility = () => {
+      if (document.visibilityState === 'visible') {
+        refreshStatus();
+      }
+    };
+    document.addEventListener('visibilitychange', onVisibility);
+
+    return () => {
+      stopPermissionWatch();
+      document.removeEventListener('visibilitychange', onVisibility);
+    };
   }, [supported]);
 
   async function handleTestPush() {
