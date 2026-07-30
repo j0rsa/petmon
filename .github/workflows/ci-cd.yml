@@ -471,6 +471,14 @@ jobs:
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
+  # ─────────────────────────────────────────────
+  # Renovate: secret check (all runs) + trigger (main push)
+  # ─────────────────────────────────────────────
+  renovate-trigger:
+    name: Renovate trigger
+    runs-on: ubuntu-latest
+    needs: [docker]
+    steps:
       - name: Check Renovate trigger secret
         env:
           RENOVATE_TRIGGER_API_SECRET: ${{ secrets.RENOVATE_TRIGGER_API_SECRET }}
