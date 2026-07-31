@@ -46,6 +46,8 @@ function invalidateDayData(queryClient: ReturnType<typeof useQueryClient>, date:
 
 interface RecordRowProps {
   record: NutritionRecord;
+  /** Calendar day currently open in the journal — move-day shifts relative to this. */
+  viewDate: string;
   onSave: (id: string, payload: UpdateNutritionRecord) => void;
   onDelete: (id: string) => void;
   saving: boolean;
@@ -57,13 +59,21 @@ interface RecordRowProps {
   defaultEditing?: boolean;
 }
 
-function RecordRow({ record, onSave, onDelete, saving, savingPaused, deleting, deletingPaused, canWrite, defaultEditing = false }: RecordRowProps) {
+function RecordRow({ record, viewDate, onSave, onDelete, saving, savingPaused, deleting, deletingPaused, canWrite, defaultEditing = false }: RecordRowProps) {
   const formatTime = useFormatTime();
   const [editing, setEditing] = useState(defaultEditing);
+  const [committing, setCommitting] = useState(false);
   const [time, setTime] = useState(() => (defaultEditing ? timeFromIso(record.occurred_at) : ''));
   const [category, setCategory] = useState(() => (defaultEditing ? record.category : ''));
   const [amount, setAmount] = useState(() => (defaultEditing ? String(record.amount) : ''));
   const [note, setNote] = useState(() => (defaultEditing ? (record.note ?? '') : ''));
+
+  useEffect(() => {
+    if (!saving) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
+      setCommitting(false);
+    }
+  }, [saving]);
 
   function startEdit() {
     setTime(timeFromIso(record.occurred_at));
@@ -85,14 +95,20 @@ function RecordRow({ record, onSave, onDelete, saving, savingPaused, deleting, d
   }
 
   function commitEdit() {
+    if (committing || saving) return;
+    setCommitting(true);
     onSave(record.id, buildPayload(record.local_date));
     setEditing(false);
   }
 
   function commitMoveDate(offset: number) {
-    onSave(record.id, buildPayload(shiftDate(record.local_date, offset)));
+    if (committing || saving) return;
+    setCommitting(true);
+    onSave(record.id, buildPayload(shiftDate(viewDate, offset)));
     setEditing(false);
   }
+
+  const actionsDisabled = saving || committing;
 
   if (editing) {
     return (
@@ -143,7 +159,7 @@ function RecordRow({ record, onSave, onDelete, saving, savingPaused, deleting, d
             <button
               className="button button-secondary button-compact record-entry-form__move-day"
               type="button"
-              disabled={saving}
+              disabled={actionsDisabled}
               title={savingPaused ? 'Offline…' : 'Move to yesterday'}
               aria-label="Move to yesterday"
               onClick={() => commitMoveDate(-1)}
@@ -153,7 +169,7 @@ function RecordRow({ record, onSave, onDelete, saving, savingPaused, deleting, d
             <button
               className="button button-secondary button-compact record-entry-form__move-day"
               type="button"
-              disabled={saving}
+              disabled={actionsDisabled}
               title={savingPaused ? 'Offline…' : 'Move to tomorrow'}
               aria-label="Move to tomorrow"
               onClick={() => commitMoveDate(1)}
@@ -163,7 +179,7 @@ function RecordRow({ record, onSave, onDelete, saving, savingPaused, deleting, d
             <button
               className="button button-compact"
               type="button"
-              disabled={saving}
+              disabled={actionsDisabled}
               onClick={commitEdit}
             >
               {savingPaused ? 'Offline…' : saving ? 'Saving…' : 'Save'}
@@ -397,6 +413,7 @@ export function NutritionDayPanel({ date, petId }: NutritionDayPanelProps) {
               <RecordRow
                 key={record.id}
                 record={record}
+                viewDate={date}
                 saving={updateMutation.isPending && updateMutation.variables?.id === record.id}
                 savingPaused={updateMutation.isPaused && updateMutation.variables?.id === record.id}
                 deleting={deleteMutation.isPending && deleteMutation.variables === record.id}

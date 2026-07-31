@@ -35,6 +35,7 @@ const meta = {
   ],
   args: {
     record: mockNutritionRecords[0],
+    viewDate: '2024-06-15',
     onSave: fn(),
     onDelete: noop,
     saving: false,
@@ -219,6 +220,7 @@ export const EditingWithDisplayBelow: Story = {
           created_at: '2024-06-15T07:39:00',
           updated_at: '2024-06-15T07:39:00',
         }}
+        viewDate="2024-06-15"
         onSave={noop}
         onDelete={noop}
         saving={false}
