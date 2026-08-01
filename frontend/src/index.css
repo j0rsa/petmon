@@ -658,6 +658,10 @@ pre {
   color: var(--text-muted) !important;
 }
 
+.chart-legend-interactive .recharts-legend-item {
+  cursor: pointer;
+}
+
 .table-wrap {
   overflow-x: auto;
 }
