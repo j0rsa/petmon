@@ -7,6 +7,42 @@ export const DEEP_LINK_FLASH_CLASS = 'entry-row-wrap--deep-link-flash';
 const FLASH_ANIMATION_NAME = 'entry-row-deep-link-pop';
 const MAX_ATTEMPTS = 40;
 const RETRY_MS = 100;
+/** Fallback when scrollend is unavailable or scroll distance is zero. */
+const FLASH_AFTER_SCROLL_MS = 500;
+
+function applyFlash(el: HTMLElement, onAnimationEnd: (event: Event) => void) {
+  el.classList.remove(DEEP_LINK_FLASH_CLASS);
+  void el.offsetWidth;
+  el.classList.add(DEEP_LINK_FLASH_CLASS);
+  el.addEventListener('animationend', onAnimationEnd);
+}
+
+function flashAfterScroll(
+  el: HTMLElement,
+  onAnimationEnd: (event: Event) => void,
+  onFlashStart: () => void,
+) {
+  let started = false;
+
+  function startFlash() {
+    if (started) return;
+    started = true;
+    onFlashStart();
+    applyFlash(el, onAnimationEnd);
+  }
+
+  const fallbackTimer = window.setTimeout(startFlash, FLASH_AFTER_SCROLL_MS);
+
+  function onScrollEnd() {
+    window.clearTimeout(fallbackTimer);
+    window.removeEventListener('scrollend', onScrollEnd);
+    startFlash();
+  }
+
+  if ('onscrollend' in window) {
+    window.addEventListener('scrollend', onScrollEnd, { once: true });
+  }
+}
 
 function cleanupFlash(el: Element) {
   el.classList.remove(DEEP_LINK_FLASH_CLASS);
@@ -50,12 +86,9 @@ export function useScrollToHash(...deps: unknown[]) {
       el.removeEventListener('animationend', onAnimationEnd);
 
       el.scrollIntoView({ behavior: 'smooth', block: 'start' });
-
-      el.classList.remove(DEEP_LINK_FLASH_CLASS);
-      void el.offsetWidth;
-      el.classList.add(DEEP_LINK_FLASH_CLASS);
-      el.addEventListener('animationend', onAnimationEnd);
-      highlightedRef.current = el;
+      flashAfterScroll(el, onAnimationEnd, () => {
+        highlightedRef.current = el;
+      });
     }
 
     function tryHighlight() {
