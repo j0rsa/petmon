@@ -1,7 +1,7 @@
 import { useMemo, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import {
-  Bar, BarChart, CartesianGrid, Legend, Line, LineChart, ReferenceLine,
+  Bar, BarChart, CartesianGrid, DefaultLegendContent, Legend, Line, LineChart, ReferenceLine,
   ResponsiveContainer, Tooltip, XAxis, YAxis,
 } from 'recharts';
 import { eliminationApi } from '../api/elimination';
@@ -97,6 +97,16 @@ export default function EliminationAnalyticsPage() {
 
   const visibleEventStack = useMemo(
     () => EVENT_TYPE_STACK_ORDER.filter((type) => soloEventType === null || soloEventType === type),
+    [soloEventType],
+  );
+
+  const eventLegendPayload = useMemo(
+    () => EVENT_TYPE_LEGEND_ORDER.map((type) => ({
+      value: EVENT_TYPE_LABELS[type],
+      type: 'square' as const,
+      color: EVENT_TYPE_COLORS[type],
+      inactive: soloEventType !== null && soloEventType !== type,
+    })),
     [soloEventType],
   );
 
@@ -307,17 +317,16 @@ export default function EliminationAnalyticsPage() {
                   <Legend
                     className="chart-legend-interactive"
                     wrapperStyle={{ fontFamily: 'monospace', fontSize: 12 }}
-                    payload={EVENT_TYPE_LEGEND_ORDER.map((type) => ({
-                      value: EVENT_TYPE_LABELS[type],
-                      type: 'square',
-                      color: EVENT_TYPE_COLORS[type],
-                      id: type,
-                      inactive: soloEventType !== null && soloEventType !== type,
-                    }))}
-                    onClick={(entry) => {
-                      const type = EVENT_TYPE_LEGEND_ORDER.find((t) => EVENT_TYPE_LABELS[t] === entry.value);
-                      if (type) handleEventLegendClick(type);
-                    }}
+                    content={(props) => (
+                      <DefaultLegendContent
+                        {...props}
+                        payload={eventLegendPayload}
+                        onClick={(entry) => {
+                          const type = EVENT_TYPE_LEGEND_ORDER.find((t) => EVENT_TYPE_LABELS[t] === entry.value);
+                          if (type) handleEventLegendClick(type);
+                        }}
+                      />
+                    )}
                   />
                   {visibleEventStack.map((type, index) => (
                     <Bar
