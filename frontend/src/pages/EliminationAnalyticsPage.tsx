@@ -35,6 +35,12 @@ const EVENT_TYPE_LABELS: Record<string, string> = {
   general:    'General',
 };
 
+/** Bottom-to-top stack in the daily visits chart. */
+const EVENT_TYPE_STACK_ORDER = ['defecation', 'vomit', 'urination', 'general'] as const;
+
+/** Legend order (independent of stack order). */
+const EVENT_TYPE_LEGEND_ORDER = ['general', 'defecation', 'vomit', 'urination'] as const;
+
 const DURATION_STAT_TYPES = [
   {
     key: 'urination' as const,
@@ -286,11 +292,24 @@ export default function EliminationAnalyticsPage() {
                     labelFormatter={(label) => formatDate(String(label))}
                     contentStyle={{ background: 'var(--surface)', border: '1px solid var(--border-subtle)', borderRadius: 8, fontFamily: 'monospace', fontSize: 12 }}
                   />
-                  <Legend wrapperStyle={{ fontFamily: 'monospace', fontSize: 12 }} />
-                  <Bar dataKey="urination"  name="Wee"     stackId="day" fill={EVENT_TYPE_COLORS.urination}  radius={[0, 0, 0, 0]} />
-                  <Bar dataKey="defecation" name="Poop"    stackId="day" fill={EVENT_TYPE_COLORS.defecation} radius={[0, 0, 0, 0]} />
-                  <Bar dataKey="vomit"      name="Vomit"   stackId="day" fill={EVENT_TYPE_COLORS.vomit}      radius={[0, 0, 0, 0]} />
-                  <Bar dataKey="general"    name="General" stackId="day" fill={EVENT_TYPE_COLORS.general}    radius={[4, 4, 0, 0]} />
+                  <Legend
+                    wrapperStyle={{ fontFamily: 'monospace', fontSize: 12 }}
+                    payload={EVENT_TYPE_LEGEND_ORDER.map((type) => ({
+                      value: EVENT_TYPE_LABELS[type],
+                      type: 'square',
+                      color: EVENT_TYPE_COLORS[type],
+                    }))}
+                  />
+                  {EVENT_TYPE_STACK_ORDER.map((type, index) => (
+                    <Bar
+                      key={type}
+                      dataKey={type}
+                      name={EVENT_TYPE_LABELS[type]}
+                      stackId="day"
+                      fill={EVENT_TYPE_COLORS[type]}
+                      radius={index === EVENT_TYPE_STACK_ORDER.length - 1 ? [4, 4, 0, 0] : [0, 0, 0, 0]}
+                    />
+                  ))}
                 </BarChart>
               </ResponsiveContainer>
             </div>
