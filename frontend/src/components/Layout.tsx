@@ -7,9 +7,11 @@ import { SidebarPetPicker } from './SidebarPetPicker';
 import { BottomNav } from './BottomNav';
 import { PwaUpdateBanner } from './PwaUpdateBanner';
 import { usePushNotifications } from '../hooks/usePushNotifications';
+import { useScrollToTopOnNavigate } from '../hooks/useScrollToTopOnNavigate';
 
 export function Layout() {
   usePushNotifications();
+  useScrollToTopOnNavigate();
   return (
     <SelectedPetProvider>
       <PwaUpdateBanner />

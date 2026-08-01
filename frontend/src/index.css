@@ -1731,12 +1731,17 @@ pre {
     background-color: transparent;
     box-shadow: none;
   }
-  14% {
+  10% {
     transform: scale(1.028);
     background-color: color-mix(in srgb, var(--accent) 24%, transparent);
     box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 38%, transparent);
   }
-  38% {
+  18% {
+    transform: scale(1.012);
+    background-color: color-mix(in srgb, var(--accent-soft) 85%, transparent);
+    box-shadow: 0 0 0 2px color-mix(in srgb, var(--accent) 22%, transparent);
+  }
+  58% {
     transform: scale(1.012);
     background-color: color-mix(in srgb, var(--accent-soft) 85%, transparent);
     box-shadow: 0 0 0 2px color-mix(in srgb, var(--accent) 22%, transparent);
@@ -1749,7 +1754,7 @@ pre {
 }
 
 .entry-row-wrap.entry-row-wrap--deep-link-flash {
-  animation: entry-row-deep-link-pop 1.35s cubic-bezier(0.22, 1, 0.36, 1);
+  animation: entry-row-deep-link-pop 2.75s cubic-bezier(0.22, 1, 0.36, 1);
   border-radius: 0.5rem;
   padding-inline: 0.35rem;
   transform-origin: center left;
