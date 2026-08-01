@@ -1,7 +1,7 @@
 import { useMemo, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import {
-  Bar, BarChart, CartesianGrid, Legend, Line, LineChart, ReferenceLine,
+  Bar, BarChart, CartesianGrid, DefaultLegendContent, Legend, Line, LineChart, ReferenceLine,
   ResponsiveContainer, Tooltip, XAxis, YAxis,
 } from 'recharts';
 import { eliminationApi } from '../api/elimination';
@@ -34,6 +34,14 @@ const EVENT_TYPE_LABELS: Record<string, string> = {
   vomit:      'Vomit',
   general:    'General',
 };
+
+/** Bottom-to-top stack in the daily visits chart. */
+const EVENT_TYPE_STACK_ORDER = ['defecation', 'vomit', 'urination', 'general'] as const;
+
+/** Legend order (independent of stack order). */
+const EVENT_TYPE_LEGEND_ORDER = ['general', 'defecation', 'vomit', 'urination'] as const;
+
+type EventType = typeof EVENT_TYPE_STACK_ORDER[number];
 
 const DURATION_STAT_TYPES = [
   {
@@ -81,10 +89,30 @@ function fmtSec(sec: number) {
 export default function EliminationAnalyticsPage() {
   const { selectedPetId, petsLoading } = useSelectedPet();
   const [period, setPeriod] = useState<PeriodLabel>('30d');
+  const [soloEventType, setSoloEventType] = useState<EventType | null>(null);
 
   const today = localToday();
   const days = PERIODS.find((p) => p.label === period)!.days;
   const dateFrom = shiftDate(today, -(days - 1));
+
+  const visibleEventStack = useMemo(
+    () => EVENT_TYPE_STACK_ORDER.filter((type) => soloEventType === null || soloEventType === type),
+    [soloEventType],
+  );
+
+  const eventLegendPayload = useMemo(
+    () => EVENT_TYPE_LEGEND_ORDER.map((type) => ({
+      value: EVENT_TYPE_LABELS[type],
+      type: 'square' as const,
+      color: EVENT_TYPE_COLORS[type],
+      inactive: soloEventType !== null && soloEventType !== type,
+    })),
+    [soloEventType],
+  );
+
+  const handleEventLegendClick = (type: EventType) => {
+    setSoloEventType((current) => (current === type ? null : type));
+  };
 
   const analyticsQuery = useQuery({
     queryKey: ['elimination-analytics', dateFrom, today, selectedPetId],
@@ -286,11 +314,30 @@ export default function EliminationAnalyticsPage() {
                     labelFormatter={(label) => formatDate(String(label))}
                     contentStyle={{ background: 'var(--surface)', border: '1px solid var(--border-subtle)', borderRadius: 8, fontFamily: 'monospace', fontSize: 12 }}
                   />
-                  <Legend wrapperStyle={{ fontFamily: 'monospace', fontSize: 12 }} />
-                  <Bar dataKey="urination"  name="Wee"     stackId="day" fill={EVENT_TYPE_COLORS.urination}  radius={[0, 0, 0, 0]} />
-                  <Bar dataKey="defecation" name="Poop"    stackId="day" fill={EVENT_TYPE_COLORS.defecation} radius={[0, 0, 0, 0]} />
-                  <Bar dataKey="vomit"      name="Vomit"   stackId="day" fill={EVENT_TYPE_COLORS.vomit}      radius={[0, 0, 0, 0]} />
-                  <Bar dataKey="general"    name="General" stackId="day" fill={EVENT_TYPE_COLORS.general}    radius={[4, 4, 0, 0]} />
+                  <Legend
+                    className="chart-legend-interactive"
+                    wrapperStyle={{ fontFamily: 'monospace', fontSize: 12 }}
+                    content={(props) => (
+                      <DefaultLegendContent
+                        {...props}
+                        payload={eventLegendPayload}
+                        onClick={(entry) => {
+                          const type = EVENT_TYPE_LEGEND_ORDER.find((t) => EVENT_TYPE_LABELS[t] === entry.value);
+                          if (type) handleEventLegendClick(type);
+                        }}
+                      />
+                    )}
+                  />
+                  {visibleEventStack.map((type, index) => (
+                    <Bar
+                      key={type}
+                      dataKey={type}
+                      name={EVENT_TYPE_LABELS[type]}
+                      stackId="day"
+                      fill={EVENT_TYPE_COLORS[type]}
+                      radius={index === visibleEventStack.length - 1 ? [4, 4, 0, 0] : [0, 0, 0, 0]}
+                    />
+                  ))}
                 </BarChart>
               </ResponsiveContainer>
             </div>
