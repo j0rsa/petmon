@@ -32,6 +32,7 @@ async fn main() -> anyhow::Result<()> {
 
     services::startup::sync_oidc_from_env(&pool).await;
     services::startup::cleanup_push_subscriptions(&pool).await;
+    services::elimination_classifier_retrain::spawn(pool.clone());
 
     let dev_mode = std::env::var("DEV_MODE")
         .map(|v| matches!(v.to_lowercase().as_str(), "1" | "true" | "yes"))

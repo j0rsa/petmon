@@ -1403,6 +1403,87 @@ async fn elimination_duration_profile_returns_buckets() {
     assert_eq!(body["poo"]["avg_duration_seconds"].as_f64(), Some(100.0));
 }
 
+/// Contextual classifier uses rolling 24h windows to disambiguate overlapping durations.
+#[actix_web::test]
+async fn elimination_classifier_rolling_window_disambiguates_overlap() {
+    let (app, _state) = build_dev_app!();
+    let pet_id = api_create_pet!(&app, "ContextCat");
+    for (event_type, duration, occurred) in [
+        ("urination", 44, "2026-05-28T08:00:00"),
+        ("urination", 46, "2026-05-29T08:00:00"),
+        ("urination", 45, "2026-05-30T08:00:00"),
+        ("urination", 47, "2026-05-31T08:00:00"),
+        ("defecation", 118, "2026-05-28T10:00:00"),
+        ("defecation", 122, "2026-05-29T10:00:00"),
+        ("defecation", 120, "2026-05-30T10:00:00"),
+        ("defecation", 119, "2026-05-31T10:00:00"),
+    ] {
+        api_create_elimination!(&app, pet_id, event_type, duration, occurred);
+    }
+    api_enable_elimination_auto_categorize!(&app, pet_id);
+
+    let req = test::TestRequest::post()
+        .uri(&format!(
+            "/api/v1/elimination/classifier/retrain?pet_id={pet_id}"
+        ))
+        .to_request();
+    let resp = test::call_service(&app, req).await;
+    assert_eq!(resp.status(), 200);
+    let retrain: serde_json::Value = test::read_body_json(resp).await;
+    assert_eq!(retrain["trained"].as_bool(), Some(true));
+
+    api_create_elimination!(&app, pet_id, "defecation", 120, "2026-06-01T23:00:00");
+
+    let body = api_create_elimination!(&app, pet_id, "general", 55, "2026-06-02T01:00:00");
+    assert_eq!(
+        body["event_type"].as_str(),
+        Some("urination"),
+        "expected wee: poop already within rolling 24h and duration is ambiguous"
+    );
+    assert_eq!(body["is_auto_categorized"].as_bool(), Some(true));
+}
+
+#[actix_web::test]
+async fn elimination_classifier_status_and_retrain() {
+    let (app, _state) = build_dev_app!();
+    let pet_id = api_create_pet!(&app, "ClassifierStatus");
+    for (event_type, duration, occurred) in [
+        ("urination", 44, "2026-05-28T08:00:00"),
+        ("urination", 46, "2026-05-29T08:00:00"),
+        ("urination", 45, "2026-05-30T08:00:00"),
+        ("urination", 47, "2026-05-31T08:00:00"),
+        ("defecation", 118, "2026-05-28T10:00:00"),
+        ("defecation", 122, "2026-05-29T10:00:00"),
+        ("defecation", 120, "2026-05-30T10:00:00"),
+        ("defecation", 119, "2026-05-31T10:00:00"),
+    ] {
+        api_create_elimination!(&app, pet_id, event_type, duration, occurred);
+    }
+    api_enable_elimination_auto_categorize!(&app, pet_id);
+
+    let req = test::TestRequest::get()
+        .uri(&format!(
+            "/api/v1/elimination/classifier/status?pet_id={pet_id}"
+        ))
+        .to_request();
+    let resp = test::call_service(&app, req).await;
+    assert_eq!(resp.status(), 200);
+    let status: serde_json::Value = test::read_body_json(resp).await;
+    assert_eq!(status["enabled"].as_bool(), Some(true));
+    assert!(status["baselines"]["p50_wees_per_day"].as_f64().is_some());
+
+    let req = test::TestRequest::post()
+        .uri(&format!(
+            "/api/v1/elimination/classifier/retrain?pet_id={pet_id}"
+        ))
+        .to_request();
+    let resp = test::call_service(&app, req).await;
+    assert_eq!(resp.status(), 200);
+    let retrain: serde_json::Value = test::read_body_json(resp).await;
+    assert_eq!(retrain["trained"].as_bool(), Some(true));
+    assert!(retrain["model"]["sample_count"].as_i64().unwrap() >= 8);
+}
+
 #[actix_web::test]
 async fn notifications_are_global_with_per_reader_read_state() {
     let (app, _state) = build_dev_app!();

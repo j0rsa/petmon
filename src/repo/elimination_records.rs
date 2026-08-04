@@ -1,5 +1,5 @@
 use crate::domain::elimination::{
-    EliminationDurationBucket, EliminationDurationProfile, EliminationRecord,
+    EliminationDurationBucket, EliminationDurationProfile, EliminationEventType, EliminationRecord,
     EliminationRecordFilters, UpdateEliminationRecord,
 };
 use crate::error::{AppError, AppResult};
@@ -233,4 +233,90 @@ pub async fn duration_profile(
             avg_duration_seconds,
         }),
     })
+}
+
+#[derive(Debug, sqlx::FromRow)]
+pub struct LabeledTrainingRecord {
+    pub occurred_at: String,
+    pub event_type: EliminationEventType,
+    pub duration_seconds: Option<i64>,
+}
+
+#[tracing::instrument(skip(pool))]
+pub async fn labeled_training_records(
+    pool: &SqlitePool,
+    pet_id: Uuid,
+    date_from: &str,
+    date_to: &str,
+) -> AppResult<Vec<LabeledTrainingRecord>> {
+    Ok(sqlx::query_as::<_, LabeledTrainingRecord>(
+        "SELECT occurred_at, event_type, duration_seconds
+         FROM elimination_records
+         WHERE pet_id = ?
+           AND local_date >= ?
+           AND local_date <= ?
+           AND duration_seconds IS NOT NULL
+           AND event_type IN ('urination', 'defecation')
+         ORDER BY occurred_at ASC",
+    )
+    .bind(pet_id)
+    .bind(date_from)
+    .bind(date_to)
+    .fetch_all(pool)
+    .await?)
+}
+
+#[tracing::instrument(skip(pool))]
+pub async fn count_by_type_in_window(
+    pool: &SqlitePool,
+    pet_id: Uuid,
+    before: &str,
+    window_start: &str,
+) -> AppResult<Vec<(EliminationEventType, i32)>> {
+    #[derive(sqlx::FromRow)]
+    struct Row {
+        event_type: EliminationEventType,
+        cnt: i64,
+    }
+    let rows = sqlx::query_as::<_, Row>(
+        "SELECT event_type, COUNT(*) AS cnt
+         FROM elimination_records
+         WHERE pet_id = ?
+           AND occurred_at < ?
+           AND occurred_at >= ?
+           AND event_type IN ('urination', 'defecation')
+         GROUP BY event_type",
+    )
+    .bind(pet_id)
+    .bind(before)
+    .bind(window_start)
+    .fetch_all(pool)
+    .await?;
+    Ok(rows
+        .into_iter()
+        .map(|r| (r.event_type, r.cnt as i32))
+        .collect())
+}
+
+#[tracing::instrument(skip(pool))]
+pub async fn records_in_window(
+    pool: &SqlitePool,
+    pet_id: Uuid,
+    before: &str,
+    window_start: &str,
+) -> AppResult<Vec<EliminationRecord>> {
+    Ok(sqlx::query_as::<_, EliminationRecord>(
+        "SELECT id, pet_id, occurred_at, local_date, event_type, subtype, duration_seconds, note, source_type, is_auto_categorized, created_at, updated_at
+         FROM elimination_records
+         WHERE pet_id = ?
+           AND occurred_at < ?
+           AND occurred_at >= ?
+           AND event_type IN ('urination', 'defecation')
+         ORDER BY occurred_at ASC",
+    )
+    .bind(pet_id)
+    .bind(before)
+    .bind(window_start)
+    .fetch_all(pool)
+    .await?)
 }

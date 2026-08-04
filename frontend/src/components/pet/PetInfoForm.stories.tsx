@@ -2,7 +2,7 @@ import { useState } from 'react';
 import type { Meta, StoryObj } from '@storybook/react-vite';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { fn } from 'storybook/test';
-import { mockEliminationDurationProfile, mockPets } from '../../stories/fixtures';
+import { mockEliminationClassifierStatus, mockPets } from '../../stories/fixtures';
 import { PetInfoForm, petToFormState } from './PetInfoForm';
 
 function PetInfoFormDemo({
@@ -88,7 +88,7 @@ export const AutoTagEnabled: Story = {
           queries: { retry: false, staleTime: Infinity, refetchOnMount: false, refetchOnWindowFocus: false },
         },
       });
-      client.setQueryData(['elimination-duration-profile', mockPets[0].id], mockEliminationDurationProfile);
+      client.setQueryData(['elimination-classifier-status', mockPets[0].id], mockEliminationClassifierStatus);
       return (
         <QueryClientProvider client={client}>
           <Story />

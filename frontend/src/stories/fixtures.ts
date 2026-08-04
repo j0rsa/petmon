@@ -3,7 +3,7 @@ import type { BestFluidDay, Category, NutritionDaySummary, NutritionRangeSummary
 import type { DayNutritionHighlight, DayEliminationHighlight } from '../types/pillars';
 import type { AppInfo } from '../api/info';
 import type { ApiTokenCreated, ApiTokenPublic, DisplaySettings, OidcConfigPublic, TelegramConfigPublic } from '../api/settings';
-import type { EliminationRecord, EliminationDailySummary, EliminationRangeSummary, EliminationDurationProfile } from '../api/elimination';
+import type { EliminationRecord, EliminationDailySummary, EliminationRangeSummary, EliminationDurationProfile, EliminationClassifierStatus } from '../api/elimination';
 import type { NotificationItem } from '../api/notifications';
 import type { WeightRecord, WeightSummaryBucket } from '../api/weight';
 import type { HealthStateRecord } from '../api/healthState';
@@ -395,6 +395,33 @@ export const mockEliminationDurationProfileSparse: EliminationDurationProfile = 
   pet_id: mockPetId,
   wee: { sample_count: 1, avg_duration_seconds: 52 },
   poo: null,
+};
+
+export const mockEliminationClassifierStatus: EliminationClassifierStatus = {
+  pet_id: mockPetId,
+  enabled: true,
+  model: {
+    trained_at: '2026-06-01T12:00:00Z',
+    sample_count: 142,
+    wee_samples: 98,
+    poop_samples: 44,
+    metrics: { accuracy: 0.91, log_loss: 0.28, ambiguous_rate: 0.08 },
+  },
+  baselines: {
+    p50_wees_per_day: 4,
+    p90_wees_per_day: 6,
+    p50_poops_per_day: 1,
+    p90_poops_per_day: 2,
+    wee_duration: { mean: 52, std: 10, median: 48, n: 98 },
+    poop_duration: { mean: 118, std: 15, median: 115, n: 44 },
+  },
+  fallback_active: false,
+};
+
+export const mockEliminationClassifierStatusFallback: EliminationClassifierStatus = {
+  ...mockEliminationClassifierStatus,
+  model: null,
+  fallback_active: true,
 };
 
 /** Range summary with only wee duration averages populated (poo charts/cards hidden). */

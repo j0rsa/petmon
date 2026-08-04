@@ -1,17 +1,19 @@
 use crate::domain::elimination::EliminationEventType;
 use crate::error::AppResult;
-use crate::repo::{elimination_records, pets};
+use crate::repo::{elimination_classifiers, elimination_records, pets};
+use crate::services::elimination_classifier::{self, ClassifierDecision, MIN_SAMPLES_PER_CLASS};
+use crate::services::elimination_classifier_context::build_feature_context;
 use sqlx::SqlitePool;
 use uuid::Uuid;
 
-/// Minimum categorized records with duration before a bucket is used for matching.
-pub const MIN_SAMPLES_PER_BUCKET: i64 = 2;
-
-/// Relative deviation from bucket center (25%).
+/// Relative deviation from bucket center (25%) — legacy fallback only.
 pub const DEVIATION_RATIO: f64 = 0.25;
 
 /// Minimum absolute deviation in seconds regardless of bucket center.
 pub const MIN_ABSOLUTE_DEVIATION_SECS: f64 = 10.0;
+
+/// Minimum categorized records with duration before a bucket is used for matching.
+pub const MIN_SAMPLES_PER_BUCKET: i64 = 2;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum AutoCategorizeFailureReason {
@@ -138,11 +140,25 @@ pub async fn load_duration_buckets(pool: &SqlitePool, pet_id: Uuid) -> AppResult
     })
 }
 
+fn map_classifier_decision(
+    decision: ClassifierDecision,
+) -> Result<EliminationEventType, AutoCategorizeFailureReason> {
+    match decision {
+        ClassifierDecision::Wee => Ok(EliminationEventType::Urination),
+        ClassifierDecision::Poop => Ok(EliminationEventType::Defecation),
+        ClassifierDecision::Ambiguous => Err(AutoCategorizeFailureReason::Ambiguous),
+        ClassifierDecision::InsufficientHistory => {
+            Err(AutoCategorizeFailureReason::InsufficientHistory)
+        }
+    }
+}
+
 pub async fn attempt_auto_categorize(
     pool: &SqlitePool,
     pet_id: Uuid,
     event_type: EliminationEventType,
     duration_seconds: Option<i64>,
+    occurred_at: &str,
 ) -> AppResult<AutoCategorizeAttempt> {
     if event_type != EliminationEventType::General {
         return Ok(AutoCategorizeAttempt {
@@ -166,6 +182,32 @@ pub async fn attempt_auto_categorize(
             failure: None,
             is_auto_categorized: false,
         });
+    }
+
+    if let Some(model) = elimination_classifiers::get(pool, pet_id).await? {
+        if model.wee_samples >= MIN_SAMPLES_PER_CLASS && model.poop_samples >= MIN_SAMPLES_PER_CLASS
+        {
+            let ctx = build_feature_context(pool, pet_id, occurred_at, duration).await?;
+            let decision = elimination_classifier::classify(&model, &ctx);
+            match map_classifier_decision(decision) {
+                Ok(event_type) => {
+                    return Ok(AutoCategorizeAttempt {
+                        event_type,
+                        failure: None,
+                        is_auto_categorized: true,
+                    });
+                }
+                Err(AutoCategorizeFailureReason::Ambiguous) => {
+                    return Ok(AutoCategorizeAttempt {
+                        event_type: EliminationEventType::General,
+                        failure: Some(AutoCategorizeFailureReason::Ambiguous),
+                        is_auto_categorized: false,
+                    });
+                }
+                Err(AutoCategorizeFailureReason::InsufficientHistory) => {}
+                Err(AutoCategorizeFailureReason::NoMatch) => {}
+            }
+        }
     }
 
     let buckets = load_duration_buckets(pool, pet_id).await?;

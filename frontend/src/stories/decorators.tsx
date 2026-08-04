@@ -15,7 +15,7 @@ import {
   mockEliminationRangeSummary,
   mockEliminationRangeSummaryPooOnly,
   mockEliminationRangeSummaryWeeOnly,
-  mockEliminationDurationProfile,
+  mockEliminationClassifierStatus,
   mockEliminationDaySummary,
   mockEmptyDaySummary,
   mockEmptyRangeSummary,
@@ -359,7 +359,7 @@ export function withPetInfoPage(petId = mockPetId, withWeights = true, autoTagEn
     client.setQueryData(['app-info'], mockAppInfo);
     client.setQueryData(['weight-records', petId], withWeights ? mockWeightRecords.map((r) => ({ ...r, pet_id: petId })) : []);
     if (autoTagEnabled) {
-      client.setQueryData(['elimination-duration-profile', petId], mockEliminationDurationProfile);
+      client.setQueryData(['elimination-classifier-status', petId], mockEliminationClassifierStatus);
     }
 
     return (

@@ -1,6 +1,7 @@
 use crate::domain::pet::{CreatePet, Pet, UpdatePet};
 use crate::error::{AppError, AppResult};
 use crate::repo::pets;
+use crate::services::elimination_classifier;
 use sqlx::SqlitePool;
 use uuid::Uuid;
 
@@ -36,7 +37,12 @@ pub async fn update(pool: &SqlitePool, id: Uuid, req: UpdatePet) -> AppResult<Pe
             });
         }
     }
-    pets::update_pet(pool, id, req).await
+    let enabled_auto_categorize = req.elimination_auto_categorize_by_duration;
+    let pet = pets::update_pet(pool, id, req).await?;
+    if enabled_auto_categorize == Some(true) {
+        elimination_classifier::maybe_train_on_enable(pool, id).await?;
+    }
+    Ok(pet)
 }
 
 #[tracing::instrument(skip(pool))]

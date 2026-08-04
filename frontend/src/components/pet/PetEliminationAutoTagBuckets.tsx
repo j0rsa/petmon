@@ -1,5 +1,5 @@
-import { useQuery } from '@tanstack/react-query';
-import { eliminationApi, type EliminationDurationProfile } from '../../api/elimination';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { eliminationApi, type EliminationDurationDist } from '../../api/elimination';
 
 function fmtDuration(sec: number): string {
   const m = Math.floor(sec / 60);
@@ -7,26 +7,37 @@ function fmtDuration(sec: number): string {
   return m > 0 ? `${m}m ${s}s` : `${s}s`;
 }
 
-function bucketLabel(bucket: EliminationDurationProfile['wee'], label: string): string {
-  if (!bucket) return `${label}: no history yet`;
-  const ready = bucket.sample_count >= 2 ? '' : ' (needs 2+ samples)';
-  return `${label}: ~${fmtDuration(bucket.avg_duration_seconds)} · ${bucket.sample_count} record${bucket.sample_count === 1 ? '' : 's'}${ready}`;
+function durationLabel(dist: EliminationDurationDist | null | undefined, label: string): string {
+  if (!dist) return `${label}: no history yet`;
+  return `${label}: ~${fmtDuration(dist.median)} · ${dist.n} record${dist.n === 1 ? '' : 's'}`;
 }
 
 interface PetEliminationAutoTagBucketsProps {
   petId: string;
 }
 
-/** Duration bucket summary shown when auto-tag is enabled for a pet. */
+/** Classifier status and baselines shown when auto-tag is enabled for a pet. */
 export function PetEliminationAutoTagBuckets({ petId }: PetEliminationAutoTagBucketsProps) {
-  const profileQuery = useQuery({
-    queryKey: ['elimination-duration-profile', petId],
-    queryFn: () => eliminationApi.durationProfile(petId),
+  const queryClient = useQueryClient();
+  const statusQuery = useQuery({
+    queryKey: ['elimination-classifier-status', petId],
+    queryFn: () => eliminationApi.classifierStatus(petId),
   });
 
-  if (profileQuery.isLoading) {
-    return <p className="muted-text" style={{ fontSize: '0.82rem', margin: '0.5rem 0 0' }}>Loading duration history…</p>;
+  const retrainMutation = useMutation({
+    mutationFn: () => eliminationApi.classifierRetrain(petId),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['elimination-classifier-status', petId] });
+    },
+  });
+
+  if (statusQuery.isLoading) {
+    return <p className="muted-text" style={{ fontSize: '0.82rem', margin: '0.5rem 0 0' }}>Loading auto-tag model…</p>;
   }
+
+  const baselines = statusQuery.data?.baselines;
+  const model = statusQuery.data?.model;
+  const fallback = statusQuery.data?.fallback_active ?? true;
 
   return (
     <div
@@ -39,8 +50,31 @@ export function PetEliminationAutoTagBuckets({ petId }: PetEliminationAutoTagBuc
         gap: '0.35rem',
       }}
     >
-      <span>{bucketLabel(profileQuery.data?.wee ?? null, 'Wee bucket')}</span>
-      <span>{bucketLabel(profileQuery.data?.poo ?? null, 'Poop bucket')}</span>
+      <span>
+        Typical day: ~{baselines?.p50_wees_per_day.toFixed(0) ?? '?'} wees, ~{baselines?.p50_poops_per_day.toFixed(0) ?? '?'} poops
+      </span>
+      <span>{durationLabel(baselines?.wee_duration, 'Wee duration')}</span>
+      <span>{durationLabel(baselines?.poop_duration, 'Poop duration')}</span>
+      {model ? (
+        <span>
+          Model: {model.sample_count} visits
+          {model.metrics ? ` · ${Math.round(model.metrics.accuracy * 100)}% accuracy` : ''}
+        </span>
+      ) : (
+        <span>{fallback ? 'Using duration buckets until enough labeled visits (4+ wee & 4+ poop)' : 'Model not trained yet'}</span>
+      )}
+      <button
+        type="button"
+        className="btn btn-secondary"
+        style={{ alignSelf: 'flex-start', marginTop: '0.25rem', fontSize: '0.78rem', padding: '0.25rem 0.6rem' }}
+        disabled={retrainMutation.isPending}
+        onClick={() => retrainMutation.mutate()}
+      >
+        {retrainMutation.isPending ? 'Retraining…' : 'Retrain now'}
+      </button>
+      {retrainMutation.data && !retrainMutation.data.trained && (
+        <span style={{ color: 'var(--warning, #b8860b)' }}>{retrainMutation.data.message}</span>
+      )}
     </div>
   );
 }

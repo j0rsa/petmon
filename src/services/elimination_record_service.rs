@@ -5,11 +5,20 @@ use crate::domain::elimination::{
 use crate::domain::weight::CreateWeightRecord;
 use crate::error::{AppError, AppResult};
 use crate::repo::{elimination_records, pets, weight_records};
-use crate::services::{elimination_auto_categorize, notification_service};
+use crate::services::{elimination_auto_categorize, elimination_classifier, notification_service};
 use chrono::Utc;
 use chrono_tz::Tz;
 use sqlx::SqlitePool;
 use uuid::Uuid;
+
+fn resolve_occurred_at(req: &CreateEliminationRecord, timezone: Tz) -> String {
+    req.occurred_at.clone().unwrap_or_else(|| {
+        Utc::now()
+            .with_timezone(&timezone)
+            .format("%Y-%m-%dT%H:%M:%S")
+            .to_string()
+    })
+}
 
 #[tracing::instrument(skip(pool))]
 pub async fn list(
@@ -36,16 +45,22 @@ pub async fn create(
         .await
         .map_err(|_| AppError::BadRequest(format!("Pet {} not found", req.pet_id)))?;
 
+    let occurred_at = resolve_occurred_at(&req, timezone);
+
     let attempt = elimination_auto_categorize::attempt_auto_categorize(
         pool,
         pet_id,
         req.event_type,
         req.duration_seconds,
+        &occurred_at,
     )
     .await?;
 
     let mut req = req;
     req.event_type = attempt.event_type;
+    if req.occurred_at.is_none() {
+        req.occurred_at = Some(occurred_at);
+    }
 
     let record =
         elimination_records::create(pool, req, timezone, attempt.is_auto_categorized).await?;
@@ -72,7 +87,7 @@ pub async fn create_with_weight(
         .await
         .map_err(|_| AppError::BadRequest(format!("Pet {} not found", req.pet_id)))?;
 
-    let occurred_at = req.occurred_at.unwrap_or_else(|| {
+    let occurred_at = req.occurred_at.clone().unwrap_or_else(|| {
         Utc::now()
             .with_timezone(&timezone)
             .format("%Y-%m-%dT%H:%M:%S")
@@ -80,6 +95,7 @@ pub async fn create_with_weight(
     });
     let local_date = req
         .local_date
+        .clone()
         .unwrap_or_else(|| occurred_at.split('T').next().unwrap_or("").to_string());
 
     let elim_req = CreateEliminationRecord {
@@ -117,7 +133,14 @@ pub async fn update(
     id: &str,
     req: UpdateEliminationRecord,
 ) -> AppResult<EliminationRecord> {
-    elimination_records::update(pool, id, req).await
+    let existing = elimination_records::get(pool, id).await?;
+    let event_type_changed =
+        req.event_type.is_some() && req.event_type != Some(existing.event_type);
+    let record = elimination_records::update(pool, id, req).await?;
+    if event_type_changed {
+        elimination_classifier::mark_pending_retrain(pool, record.pet_id).await?;
+    }
+    Ok(record)
 }
 
 #[tracing::instrument(skip(pool))]
