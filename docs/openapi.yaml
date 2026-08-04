@@ -3174,7 +3174,12 @@ components:
           type: string
         is_auto_categorized:
           type: boolean
-          description: True when event_type was set by duration auto-categorization; false for manual entries and edits.
+          description: True when event_type was set by auto-categorization; false for manual entries and edits.
+        auto_categorize_confidence:
+          type: number
+          format: float
+          nullable: true
+          description: Classifier confidence (0–1) when auto-tagged by the contextual model; null for manual entries, legacy bucket match, or after user correction.
         created_at:
           type: string
           format: date-time
@@ -3189,6 +3194,7 @@ components:
         - event_type
         - source_type
         - is_auto_categorized
+        - auto_categorize_confidence
         - created_at
         - updated_at
 

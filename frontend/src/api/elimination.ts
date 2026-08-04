@@ -15,6 +15,8 @@ export interface EliminationRecord {
   note: string | null;
   source_type: string;
   is_auto_categorized: boolean;
+  /** Classifier confidence 0–1 when auto-tagged by the contextual model; null for manual or legacy bucket match. */
+  auto_categorize_confidence: number | null;
   created_at: string;
   updated_at: string;
 }

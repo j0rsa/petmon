@@ -62,8 +62,14 @@ pub async fn create(
         req.occurred_at = Some(occurred_at);
     }
 
-    let record =
-        elimination_records::create(pool, req, timezone, attempt.is_auto_categorized).await?;
+    let record = elimination_records::create(
+        pool,
+        req,
+        timezone,
+        attempt.is_auto_categorized,
+        attempt.auto_categorize_confidence,
+    )
+    .await?;
 
     if let Some(reason) = attempt.failure {
         notification_service::notify_elimination_auto_categorize_failed(

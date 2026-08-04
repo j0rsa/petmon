@@ -8,14 +8,16 @@ use chrono_tz::Tz;
 use sqlx::SqlitePool;
 use uuid::Uuid;
 
+const RECORD_COLUMNS: &str = "id, pet_id, occurred_at, local_date, event_type, subtype, duration_seconds, note, source_type, is_auto_categorized, auto_categorize_confidence, created_at, updated_at";
+
 #[tracing::instrument(skip(pool, filters))]
 pub async fn list(
     pool: &SqlitePool,
     filters: &EliminationRecordFilters,
 ) -> AppResult<Vec<EliminationRecord>> {
-    let mut query = String::from(
-        "SELECT id, pet_id, occurred_at, local_date, event_type, subtype, duration_seconds, note, source_type, is_auto_categorized, created_at, updated_at FROM elimination_records WHERE 1=1",
-    );
+    let mut query = String::from("SELECT ");
+    query.push_str(RECORD_COLUMNS);
+    query.push_str(" FROM elimination_records WHERE 1=1");
 
     if filters.pet_id.is_some() {
         query.push_str(" AND pet_id = ?");
@@ -66,13 +68,12 @@ pub async fn list(
 
 #[tracing::instrument(skip(pool))]
 pub async fn get(pool: &SqlitePool, id: &str) -> AppResult<EliminationRecord> {
-    sqlx::query_as::<_, EliminationRecord>(
-        "SELECT id, pet_id, occurred_at, local_date, event_type, subtype, duration_seconds, note, source_type, is_auto_categorized, created_at, updated_at FROM elimination_records WHERE id = ?",
-    )
-    .bind(id)
-    .fetch_optional(pool)
-    .await?
-    .ok_or_else(|| AppError::NotFound(format!("Elimination record {id} not found")))
+    let query = format!("SELECT {RECORD_COLUMNS} FROM elimination_records WHERE id = ?");
+    sqlx::query_as::<_, EliminationRecord>(sqlx::AssertSqlSafe(query))
+        .bind(id)
+        .fetch_optional(pool)
+        .await?
+        .ok_or_else(|| AppError::NotFound(format!("Elimination record {id} not found")))
 }
 
 #[tracing::instrument(skip(pool, req))]
@@ -81,6 +82,7 @@ pub async fn create(
     req: crate::domain::elimination::CreateEliminationRecord,
     timezone: Tz,
     is_auto_categorized: bool,
+    auto_categorize_confidence: Option<f32>,
 ) -> AppResult<EliminationRecord> {
     let now = Utc::now().to_rfc3339();
     let occurred_at = req.occurred_at.unwrap_or_else(|| {
@@ -98,7 +100,7 @@ pub async fn create(
         .map_err(|_| AppError::BadRequest(format!("invalid pet_id: {}", req.pet_id)))?;
 
     sqlx::query(
-        "INSERT INTO elimination_records (id, pet_id, occurred_at, local_date, event_type, subtype, duration_seconds, note, source_type, is_auto_categorized, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+        "INSERT INTO elimination_records (id, pet_id, occurred_at, local_date, event_type, subtype, duration_seconds, note, source_type, is_auto_categorized, auto_categorize_confidence, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
     )
     .bind(&id)
     .bind(pet_id)
@@ -110,6 +112,7 @@ pub async fn create(
     .bind(&req.note)
     .bind(&source_type)
     .bind(is_auto_categorized)
+    .bind(auto_categorize_confidence)
     .bind(&now)
     .bind(&now)
     .execute(pool)
@@ -136,6 +139,7 @@ pub async fn update(
     if let Some(event_type) = req.event_type {
         record.event_type = event_type;
         record.is_auto_categorized = false;
+        record.auto_categorize_confidence = None;
     }
     if let Some(subtype) = req.subtype {
         record.subtype = subtype;
@@ -149,7 +153,7 @@ pub async fn update(
     record.updated_at = now;
 
     sqlx::query(
-        "UPDATE elimination_records SET occurred_at=?, local_date=?, event_type=?, subtype=?, duration_seconds=?, note=?, is_auto_categorized=?, updated_at=? WHERE id=?",
+        "UPDATE elimination_records SET occurred_at=?, local_date=?, event_type=?, subtype=?, duration_seconds=?, note=?, is_auto_categorized=?, auto_categorize_confidence=?, updated_at=? WHERE id=?",
     )
     .bind(&record.occurred_at)
     .bind(&record.local_date)
@@ -158,6 +162,7 @@ pub async fn update(
     .bind(record.duration_seconds)
     .bind(&record.note)
     .bind(record.is_auto_categorized)
+    .bind(record.auto_categorize_confidence)
     .bind(&record.updated_at)
     .bind(id)
     .execute(pool)
@@ -305,18 +310,20 @@ pub async fn records_in_window(
     before: &str,
     window_start: &str,
 ) -> AppResult<Vec<EliminationRecord>> {
-    Ok(sqlx::query_as::<_, EliminationRecord>(
-        "SELECT id, pet_id, occurred_at, local_date, event_type, subtype, duration_seconds, note, source_type, is_auto_categorized, created_at, updated_at
-         FROM elimination_records
+    let query = format!(
+        "SELECT {RECORD_COLUMNS} FROM elimination_records
          WHERE pet_id = ?
            AND occurred_at < ?
            AND occurred_at >= ?
            AND event_type IN ('urination', 'defecation')
-         ORDER BY occurred_at ASC",
+         ORDER BY occurred_at ASC"
+    );
+    Ok(
+        sqlx::query_as::<_, EliminationRecord>(sqlx::AssertSqlSafe(query))
+            .bind(pet_id)
+            .bind(before)
+            .bind(window_start)
+            .fetch_all(pool)
+            .await?,
     )
-    .bind(pet_id)
-    .bind(before)
-    .bind(window_start)
-    .fetch_all(pool)
-    .await?)
 }

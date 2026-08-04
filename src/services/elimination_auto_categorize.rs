@@ -22,11 +22,12 @@ pub enum AutoCategorizeFailureReason {
     NoMatch,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq)]
 pub struct AutoCategorizeAttempt {
     pub event_type: EliminationEventType,
     pub failure: Option<AutoCategorizeFailureReason>,
     pub is_auto_categorized: bool,
+    pub auto_categorize_confidence: Option<f32>,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq)]
@@ -153,6 +154,24 @@ fn map_classifier_decision(
     }
 }
 
+fn attempt_without_auto(event_type: EliminationEventType) -> AutoCategorizeAttempt {
+    AutoCategorizeAttempt {
+        event_type,
+        failure: None,
+        is_auto_categorized: false,
+        auto_categorize_confidence: None,
+    }
+}
+
+fn attempt_failed(reason: AutoCategorizeFailureReason) -> AutoCategorizeAttempt {
+    AutoCategorizeAttempt {
+        event_type: EliminationEventType::General,
+        failure: Some(reason),
+        is_auto_categorized: false,
+        auto_categorize_confidence: None,
+    }
+}
+
 pub async fn attempt_auto_categorize(
     pool: &SqlitePool,
     pet_id: Uuid,
@@ -161,27 +180,15 @@ pub async fn attempt_auto_categorize(
     occurred_at: &str,
 ) -> AppResult<AutoCategorizeAttempt> {
     if event_type != EliminationEventType::General {
-        return Ok(AutoCategorizeAttempt {
-            event_type,
-            failure: None,
-            is_auto_categorized: false,
-        });
+        return Ok(attempt_without_auto(event_type));
     }
     let Some(duration) = duration_seconds else {
-        return Ok(AutoCategorizeAttempt {
-            event_type,
-            failure: None,
-            is_auto_categorized: false,
-        });
+        return Ok(attempt_without_auto(event_type));
     };
 
     let pet = pets::get_pet(pool, pet_id).await?;
     if !pet.elimination_auto_categorize_by_duration {
-        return Ok(AutoCategorizeAttempt {
-            event_type,
-            failure: None,
-            is_auto_categorized: false,
-        });
+        return Ok(attempt_without_auto(event_type));
     }
 
     if let Some(model) = elimination_classifiers::get(pool, pet_id).await? {
@@ -191,18 +198,16 @@ pub async fn attempt_auto_categorize(
             let decision = elimination_classifier::classify(&model, &ctx);
             match map_classifier_decision(decision) {
                 Ok(event_type) => {
+                    let prediction = elimination_classifier::explain(&model, &ctx);
                     return Ok(AutoCategorizeAttempt {
                         event_type,
                         failure: None,
                         is_auto_categorized: true,
+                        auto_categorize_confidence: Some(prediction.confidence),
                     });
                 }
                 Err(AutoCategorizeFailureReason::Ambiguous) => {
-                    return Ok(AutoCategorizeAttempt {
-                        event_type: EliminationEventType::General,
-                        failure: Some(AutoCategorizeFailureReason::Ambiguous),
-                        is_auto_categorized: false,
-                    });
+                    return Ok(attempt_failed(AutoCategorizeFailureReason::Ambiguous));
                 }
                 Err(AutoCategorizeFailureReason::InsufficientHistory) => {}
                 Err(AutoCategorizeFailureReason::NoMatch) => {}
@@ -216,22 +221,13 @@ pub async fn attempt_auto_categorize(
             event_type,
             failure: None,
             is_auto_categorized: true,
+            auto_categorize_confidence: None,
         }),
-        ClassifyOutcome::Ambiguous => Ok(AutoCategorizeAttempt {
-            event_type: EliminationEventType::General,
-            failure: Some(AutoCategorizeFailureReason::Ambiguous),
-            is_auto_categorized: false,
-        }),
-        ClassifyOutcome::NoMatch => Ok(AutoCategorizeAttempt {
-            event_type: EliminationEventType::General,
-            failure: Some(AutoCategorizeFailureReason::NoMatch),
-            is_auto_categorized: false,
-        }),
-        ClassifyOutcome::InsufficientHistory => Ok(AutoCategorizeAttempt {
-            event_type: EliminationEventType::General,
-            failure: Some(AutoCategorizeFailureReason::InsufficientHistory),
-            is_auto_categorized: false,
-        }),
+        ClassifyOutcome::Ambiguous => Ok(attempt_failed(AutoCategorizeFailureReason::Ambiguous)),
+        ClassifyOutcome::NoMatch => Ok(attempt_failed(AutoCategorizeFailureReason::NoMatch)),
+        ClassifyOutcome::InsufficientHistory => Ok(attempt_failed(
+            AutoCategorizeFailureReason::InsufficientHistory,
+        )),
     }
 }
 

@@ -1441,6 +1441,12 @@ async fn elimination_classifier_rolling_window_disambiguates_overlap() {
         "expected wee: poop already within rolling 24h and duration is ambiguous"
     );
     assert_eq!(body["is_auto_categorized"].as_bool(), Some(true));
+    let confidence = body["auto_categorize_confidence"].as_f64();
+    assert!(confidence.is_some(), "classifier should persist confidence");
+    assert!(
+        confidence.unwrap() >= 0.72,
+        "confidence should meet threshold, got {confidence:?}"
+    );
 }
 
 #[actix_web::test]
