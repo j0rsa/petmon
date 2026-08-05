@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import type { Meta, StoryObj } from '@storybook/react-vite';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { fn } from 'storybook/test';
+import { expect, fn, within } from 'storybook/test';
 import { mockEliminationClassifierStatus, mockPets } from '../../stories/fixtures';
 import { PetInfoForm, petToFormState } from './PetInfoForm';
 
@@ -98,5 +98,12 @@ export const AutoTagEnabled: Story = {
   ],
   args: {
     initialPet: { ...mockPets[0], elimination_auto_categorize_by_duration: true },
+  },
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    await expect(canvas.getByLabelText('Auto-tag by duration')).toBeChecked();
+    await expect(canvas.getByText(/Typical day:/)).toBeInTheDocument();
+    await expect(canvas.getByText(/Model: 142 visits/)).toBeInTheDocument();
+    await expect(canvas.getByRole('button', { name: 'Retrain now' })).toBeInTheDocument();
   },
 };

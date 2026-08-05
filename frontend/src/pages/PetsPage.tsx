@@ -34,6 +34,7 @@ export default function PetsPage() {
   const queryClient = useQueryClient();
   const { canWrite } = usePermissions();
   const [createForm, setCreateForm] = useState<PetFormState>(emptyForm);
+  const [showCreateForm, setShowCreateForm] = useState(false);
 
   const petsQuery = useQuery({ queryKey: ['pets'], queryFn: petsApi.list });
   const sortedPets = useMemo(() => [...(petsQuery.data ?? [])].sort((left, right) => left.name.localeCompare(right.name)), [petsQuery.data]);
@@ -42,6 +43,7 @@ export default function PetsPage() {
     mutationFn: () => petsApi.create(toPayload(createForm)),
     onSuccess: async () => {
       setCreateForm(emptyForm);
+      setShowCreateForm(false);
       await queryClient.invalidateQueries({ queryKey: ['pets'] });
     },
   });
@@ -59,29 +61,31 @@ export default function PetsPage() {
         <div>
           <p className="eyebrow">Pets</p>
           <h2>Manage pet profiles</h2>
-          <p className="muted-text">Keep weights, statuses, and feeding notes current.</p>
+          <p className="muted-text">Keep weights, statuses, and feeding notes current. Open a profile to manage auto-tag settings.</p>
         </div>
-      </section>
-
-      {canWrite && (
-        <section className="panel">
-          <div className="section-heading">
-            <div>
-              <p className="eyebrow">Add pet</p>
-              <h3>Create a new profile</h3>
-            </div>
+        {canWrite && !showCreateForm && (
+          <div className="button-row">
+            <button className="button" type="button" onClick={() => setShowCreateForm(true)}>
+              Add a pet
+            </button>
           </div>
-          <PetForm form={createForm} setForm={setCreateForm} onSubmit={() => createMutation.mutate()} submitLabel={createMutation.isPending ? 'Saving…' : 'Add a pet'} />
-        </section>
-      )}
+        )}
+      </section>
 
       {petsQuery.isLoading ? (
         <div className="loading-state">Loading pets…</div>
       ) : petsQuery.isError ? (
         <div className="error-state">{petsQuery.error instanceof Error ? petsQuery.error.message : 'Unable to load pets.'}</div>
-      ) : sortedPets.length === 0 ? (
-        <div className="empty-state">No pets yet. Add the first one above.</div>
-      ) : (
+      ) : sortedPets.length === 0 && !showCreateForm ? (
+        <div className="empty-state">
+          <p>No pets yet.</p>
+          {canWrite && (
+            <button className="button" type="button" onClick={() => setShowCreateForm(true)}>
+              Add your first pet
+            </button>
+          )}
+        </div>
+      ) : sortedPets.length > 0 ? (
         <div className="card-grid">
           {sortedPets.map((pet) => (
             <article key={pet.id} className="panel">
@@ -121,6 +125,33 @@ export default function PetsPage() {
             </article>
           ))}
         </div>
+      ) : null}
+
+      {canWrite && showCreateForm && (
+        <section className="panel">
+          <div className="section-heading">
+            <div>
+              <p className="eyebrow">Add pet</p>
+              <h3>Create a new profile</h3>
+            </div>
+            <button
+              className="button button-secondary"
+              type="button"
+              onClick={() => {
+                setShowCreateForm(false);
+                setCreateForm(emptyForm);
+              }}
+            >
+              Cancel
+            </button>
+          </div>
+          <PetForm
+            form={createForm}
+            setForm={setCreateForm}
+            onSubmit={() => createMutation.mutate()}
+            submitLabel={createMutation.isPending ? 'Saving…' : 'Add a pet'}
+          />
+        </section>
       )}
     </div>
   );

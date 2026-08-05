@@ -353,11 +353,15 @@ export function withPetInfoPage(petId = mockPetId, withWeights = true, autoTagEn
     const petData = autoTagEnabled
       ? { ...pet, elimination_auto_categorize_by_duration: true }
       : pet;
+    const weightDateFrom = shiftDate(localToday(), -29);
     client.setQueryData(['pets'], mockPets.map((p) => (p.id === petData.id ? petData : p)));
     client.setQueryData(['pets', petId], petData);
     client.setQueryData(['me'], { subject: 'dev', email: null, name: 'Dev', display_name: 'Dev', kind: 'dev', scopes: [] });
     client.setQueryData(['app-info'], mockAppInfo);
-    client.setQueryData(['weight-records', petId], withWeights ? mockWeightRecords.map((r) => ({ ...r, pet_id: petId })) : []);
+    client.setQueryData(
+      ['weight-records', petId, weightDateFrom],
+      withWeights ? mockWeightRecords.map((r) => ({ ...r, pet_id: petId })) : [],
+    );
     if (autoTagEnabled) {
       client.setQueryData(['elimination-classifier-status', petId], mockEliminationClassifierStatus);
     }
@@ -366,6 +370,27 @@ export function withPetInfoPage(petId = mockPetId, withWeights = true, autoTagEn
       <MemoryRouter initialEntries={[`/pets/${petId}`]}>
         <QueryClientProvider client={client}>
           <SelectedPetProvider initialPetId={petId}>
+            <Routes>
+              <Route path="/pets/:id" element={<Story />} />
+            </Routes>
+          </SelectedPetProvider>
+        </QueryClientProvider>
+      </MemoryRouter>
+    );
+  };
+}
+
+export function withPetsPage(options?: { empty?: boolean }): Decorator {
+  return function PetsPageDecorator(Story) {
+    const client = makeMockClient();
+    client.setQueryData(['pets'], options?.empty ? [] : mockPets);
+    client.setQueryData(['me'], { subject: 'dev', email: null, name: 'Dev', display_name: 'Dev', kind: 'dev', scopes: [] });
+    client.setQueryData(['app-info'], mockAppInfo);
+
+    return (
+      <MemoryRouter initialEntries={['/pets']}>
+        <QueryClientProvider client={client}>
+          <SelectedPetProvider>
             <Story />
           </SelectedPetProvider>
         </QueryClientProvider>

@@ -65,7 +65,7 @@ export function PetEliminationAutoTagBuckets({ petId }: PetEliminationAutoTagBuc
       )}
       <button
         type="button"
-        className="btn btn-secondary"
+        className="button button-secondary"
         style={{ alignSelf: 'flex-start', marginTop: '0.25rem', fontSize: '0.78rem', padding: '0.25rem 0.6rem' }}
         disabled={retrainMutation.isPending}
         onClick={() => retrainMutation.mutate()}
