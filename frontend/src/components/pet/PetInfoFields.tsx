@@ -49,7 +49,7 @@ export function PetInfoFields({ pet }: PetInfoFieldsProps) {
           <dd style={{ fontFamily: 'monospace', fontSize: '0.88rem' }}>{pet.telegram_thread_id}</dd>
         </div>
       )}
-      <div className="pet-info-row">
+      <div className="pet-info-row pet-info-row-full">
         <dt>Auto-tag by duration</dt>
         <dd>{pet.elimination_auto_categorize_by_duration ? 'Enabled' : 'Disabled'}</dd>
       </div>

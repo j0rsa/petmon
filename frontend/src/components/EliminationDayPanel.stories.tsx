@@ -51,6 +51,7 @@ export const GeneralLatestRecord: Story = {
           note: null,
           source_type: 'manual',
           is_auto_categorized: false,
+          auto_categorize_confidence: null,
           created_at: '2024-06-15T20:00:00',
           updated_at: '2024-06-15T20:00:00',
         },
@@ -65,6 +66,7 @@ export const GeneralLatestRecord: Story = {
           note: 'Normal stool',
           source_type: 'manual',
           is_auto_categorized: false,
+          auto_categorize_confidence: null,
           created_at: '2024-06-15T08:30:00',
           updated_at: '2024-06-15T08:30:00',
         },
@@ -89,6 +91,7 @@ export const AutoCategorizedRecord: Story = {
           note: null,
           source_type: 'manual',
           is_auto_categorized: true,
+          auto_categorize_confidence: 0.87,
           created_at: '2024-06-15T18:00:00',
           updated_at: '2024-06-15T18:00:00',
         },
@@ -97,7 +100,7 @@ export const AutoCategorizedRecord: Story = {
   ],
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement);
-    await expect(canvas.getByLabelText('Auto-detected')).toBeInTheDocument();
+    await expect(canvas.getByLabelText('Auto-detected (87% confidence)')).toBeInTheDocument();
   },
 };
 
@@ -120,6 +123,7 @@ const weeLatestRecords = [
     note: null,
     source_type: 'manual',
     is_auto_categorized: false,
+    auto_categorize_confidence: null,
     created_at: '2024-06-15T20:00:00',
     updated_at: '2024-06-15T20:00:00',
   },

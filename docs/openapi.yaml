@@ -1124,6 +1124,58 @@ paths:
         '401':
           $ref: '#/components/responses/Unauthorized'
 
+  /elimination/classifier/status:
+    get:
+      tags:
+        - Elimination Analytics
+      summary: Get contextual auto-tag classifier status
+      x-required-scope: api_read
+      description: Returns per-pet elimination classifier training status, baselines (typical daily wee/poop counts and durations), and whether legacy duration-bucket fallback is active.
+      parameters:
+        - name: pet_id
+          in: query
+          required: true
+          schema: { type: string, format: uuid }
+      responses:
+        '200':
+          description: Classifier status
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/EliminationClassifierStatus'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  /elimination/classifier/retrain:
+    post:
+      tags:
+        - Elimination Analytics
+      summary: Retrain elimination auto-tag classifier
+      x-required-scope: api_write
+      description: Trains or retrains the per-pet contextual classifier from labeled wee/poop records in the last 90 days. Requires at least 4 wee and 4 poop samples with duration.
+      parameters:
+        - name: pet_id
+          in: query
+          required: true
+          schema: { type: string, format: uuid }
+      responses:
+        '200':
+          description: Retrain result
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/EliminationClassifierRetrainResult'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
   /elimination/duration-profile:
     get:
       tags:
@@ -3122,7 +3174,12 @@ components:
           type: string
         is_auto_categorized:
           type: boolean
-          description: True when event_type was set by duration auto-categorization; false for manual entries and edits.
+          description: True when event_type was set by auto-categorization; false for manual entries and edits.
+        auto_categorize_confidence:
+          type: number
+          format: float
+          nullable: true
+          description: Classifier confidence (0–1) when auto-tagged by the contextual model; null for manual entries, legacy bucket match, or after user correction.
         created_at:
           type: string
           format: date-time
@@ -3137,6 +3194,7 @@ components:
         - event_type
         - source_type
         - is_auto_categorized
+        - auto_categorize_confidence
         - created_at
         - updated_at
 
@@ -3266,6 +3324,140 @@ components:
       required:
         - sample_count
         - avg_duration_seconds
+
+    EliminationClassifierMetrics:
+      type: object
+      properties:
+        accuracy:
+          type: number
+          format: float
+        log_loss:
+          type: number
+          format: float
+        ambiguous_rate:
+          type: number
+          format: float
+      required:
+        - accuracy
+        - log_loss
+        - ambiguous_rate
+
+    EliminationDurationDist:
+      type: object
+      properties:
+        mean:
+          type: number
+          format: float
+        std:
+          type: number
+          format: float
+        median:
+          type: number
+          format: float
+        n:
+          type: integer
+          format: int32
+      required:
+        - mean
+        - std
+        - median
+        - n
+
+    EliminationClassifierBaselines:
+      type: object
+      properties:
+        p50_wees_per_day:
+          type: number
+          format: float
+        p90_wees_per_day:
+          type: number
+          format: float
+        p50_poops_per_day:
+          type: number
+          format: float
+        p90_poops_per_day:
+          type: number
+          format: float
+        wee_duration:
+          allOf:
+            - $ref: '#/components/schemas/EliminationDurationDist'
+          nullable: true
+        poop_duration:
+          allOf:
+            - $ref: '#/components/schemas/EliminationDurationDist'
+          nullable: true
+      required:
+        - p50_wees_per_day
+        - p90_wees_per_day
+        - p50_poops_per_day
+        - p90_poops_per_day
+
+    EliminationClassifierModelSummary:
+      type: object
+      properties:
+        trained_at:
+          type: string
+          format: date-time
+        sample_count:
+          type: integer
+          format: int32
+        wee_samples:
+          type: integer
+          format: int32
+        poop_samples:
+          type: integer
+          format: int32
+        metrics:
+          allOf:
+            - $ref: '#/components/schemas/EliminationClassifierMetrics'
+          nullable: true
+      required:
+        - trained_at
+        - sample_count
+        - wee_samples
+        - poop_samples
+
+    EliminationClassifierStatus:
+      type: object
+      properties:
+        pet_id:
+          type: string
+          format: uuid
+        enabled:
+          type: boolean
+        model:
+          allOf:
+            - $ref: '#/components/schemas/EliminationClassifierModelSummary'
+          nullable: true
+        baselines:
+          $ref: '#/components/schemas/EliminationClassifierBaselines'
+        fallback_active:
+          type: boolean
+          description: True when the legacy duration-bucket matcher is used because the classifier is not ready.
+      required:
+        - pet_id
+        - enabled
+        - baselines
+        - fallback_active
+
+    EliminationClassifierRetrainResult:
+      type: object
+      properties:
+        pet_id:
+          type: string
+          format: uuid
+        trained:
+          type: boolean
+        model:
+          allOf:
+            - $ref: '#/components/schemas/EliminationClassifierModelSummary'
+          nullable: true
+        message:
+          type: string
+      required:
+        - pet_id
+        - trained
+        - message
 
     EliminationDurationProfile:
       type: object

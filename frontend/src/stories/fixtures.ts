@@ -3,7 +3,7 @@ import type { BestFluidDay, Category, NutritionDaySummary, NutritionRangeSummary
 import type { DayNutritionHighlight, DayEliminationHighlight } from '../types/pillars';
 import type { AppInfo } from '../api/info';
 import type { ApiTokenCreated, ApiTokenPublic, DisplaySettings, OidcConfigPublic, TelegramConfigPublic } from '../api/settings';
-import type { EliminationRecord, EliminationDailySummary, EliminationRangeSummary, EliminationDurationProfile } from '../api/elimination';
+import type { EliminationRecord, EliminationDailySummary, EliminationRangeSummary, EliminationDurationProfile, EliminationClassifierStatus } from '../api/elimination';
 import type { NotificationItem } from '../api/notifications';
 import type { WeightRecord, WeightSummaryBucket } from '../api/weight';
 import type { HealthStateRecord } from '../api/healthState';
@@ -319,27 +319,27 @@ export const mockEliminationRecords: EliminationRecord[] = [
   {
     id: 'elim-01', pet_id: mockPetId, occurred_at: `${elim_date}T06:15:00`, local_date: elim_date,
     event_type: 'urination', subtype: null, duration_seconds: 45, note: null,
-    source_type: 'manual', is_auto_categorized: false, created_at: `${elim_date}T06:15:00`, updated_at: `${elim_date}T06:15:00`,
+    source_type: 'manual', is_auto_categorized: false, auto_categorize_confidence: null, created_at: `${elim_date}T06:15:00`, updated_at: `${elim_date}T06:15:00`,
   },
   {
     id: 'elim-02', pet_id: mockPetId, occurred_at: `${elim_date}T08:30:00`, local_date: elim_date,
     event_type: 'defecation', subtype: 'normal', duration_seconds: 90, note: 'Normal stool',
-    source_type: 'manual', is_auto_categorized: false, created_at: `${elim_date}T08:30:00`, updated_at: `${elim_date}T08:30:00`,
+    source_type: 'manual', is_auto_categorized: false, auto_categorize_confidence: null, created_at: `${elim_date}T08:30:00`, updated_at: `${elim_date}T08:30:00`,
   },
   {
     id: 'elim-03', pet_id: mockPetId, occurred_at: `${elim_date}T11:00:00`, local_date: elim_date,
     event_type: 'urination', subtype: null, duration_seconds: 60, note: null,
-    source_type: 'manual', is_auto_categorized: false, created_at: `${elim_date}T11:00:00`, updated_at: `${elim_date}T11:00:00`,
+    source_type: 'manual', is_auto_categorized: false, auto_categorize_confidence: null, created_at: `${elim_date}T11:00:00`, updated_at: `${elim_date}T11:00:00`,
   },
   {
     id: 'elim-04', pet_id: mockPetId, occurred_at: `${elim_date}T14:45:00`, local_date: elim_date,
     event_type: 'vomit', subtype: 'bile', duration_seconds: 20, note: 'Yellow bile, small amount',
-    source_type: 'manual', is_auto_categorized: false, created_at: `${elim_date}T14:45:00`, updated_at: `${elim_date}T14:45:00`,
+    source_type: 'manual', is_auto_categorized: false, auto_categorize_confidence: null, created_at: `${elim_date}T14:45:00`, updated_at: `${elim_date}T14:45:00`,
   },
   {
     id: 'elim-05', pet_id: mockPetId, occurred_at: `${elim_date}T19:20:00`, local_date: elim_date,
     event_type: 'urination', subtype: null, duration_seconds: 55, note: null,
-    source_type: 'manual', is_auto_categorized: false, created_at: `${elim_date}T19:20:00`, updated_at: `${elim_date}T19:20:00`,
+    source_type: 'manual', is_auto_categorized: false, auto_categorize_confidence: null, created_at: `${elim_date}T19:20:00`, updated_at: `${elim_date}T19:20:00`,
   },
 ];
 
@@ -395,6 +395,33 @@ export const mockEliminationDurationProfileSparse: EliminationDurationProfile = 
   pet_id: mockPetId,
   wee: { sample_count: 1, avg_duration_seconds: 52 },
   poo: null,
+};
+
+export const mockEliminationClassifierStatus: EliminationClassifierStatus = {
+  pet_id: mockPetId,
+  enabled: true,
+  model: {
+    trained_at: '2026-06-01T12:00:00Z',
+    sample_count: 142,
+    wee_samples: 98,
+    poop_samples: 44,
+    metrics: { accuracy: 0.91, log_loss: 0.28, ambiguous_rate: 0.08 },
+  },
+  baselines: {
+    p50_wees_per_day: 4,
+    p90_wees_per_day: 6,
+    p50_poops_per_day: 1,
+    p90_poops_per_day: 2,
+    wee_duration: { mean: 52, std: 10, median: 48, n: 98 },
+    poop_duration: { mean: 118, std: 15, median: 115, n: 44 },
+  },
+  fallback_active: false,
+};
+
+export const mockEliminationClassifierStatusFallback: EliminationClassifierStatus = {
+  ...mockEliminationClassifierStatus,
+  model: null,
+  fallback_active: true,
 };
 
 /** Range summary with only wee duration averages populated (poo charts/cards hidden). */

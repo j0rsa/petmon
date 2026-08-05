@@ -1,4 +1,5 @@
 import type { Meta, StoryObj } from '@storybook/react-vite';
+import { expect, userEvent, within } from 'storybook/test';
 import { withPetInfoPage } from '../stories/decorators';
 import PetInfoPage from './PetInfoPage';
 
@@ -15,14 +16,46 @@ type Story = StoryObj<typeof meta>;
 /** Full pet profile with weight chart. */
 export const WithWeightHistory: Story = {
   decorators: [withPetInfoPage()],
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    await expect(canvas.getByRole('heading', { name: 'Mittens' })).toBeInTheDocument();
+    await expect(canvas.getByText('Auto-tag by duration')).toBeInTheDocument();
+    await expect(canvas.getByText('Disabled')).toBeInTheDocument();
+  },
 };
 
 /** Pet with no weight records — chart panel shows empty state. */
 export const NoWeightData: Story = {
   decorators: [withPetInfoPage(undefined, false)],
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    await expect(canvas.getByText('No weight records yet.')).toBeInTheDocument();
+  },
 };
 
+/** Auto-tag enabled: view mode shows classifier baselines and model status. */
 export const AutoTagEnabled: Story = {
   name: 'Auto-tag enabled',
   decorators: [withPetInfoPage(undefined, true, true)],
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    await expect(canvas.getByRole('heading', { name: 'Mittens' })).toBeInTheDocument();
+    await expect(canvas.getByText('Enabled')).toBeInTheDocument();
+    await expect(canvas.getByText(/Typical day:/)).toBeInTheDocument();
+    await expect(canvas.getByText(/Model: 142 visits/)).toBeInTheDocument();
+    await expect(canvas.getByRole('button', { name: 'Retrain now' })).toBeInTheDocument();
+  },
+};
+
+/** Edit mode with auto-tag checkbox and classifier panel. */
+export const AutoTagEditMode: Story = {
+  name: 'Auto-tag edit mode',
+  decorators: [withPetInfoPage(undefined, true, true)],
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    await userEvent.click(canvas.getByRole('button', { name: 'Edit profile' }));
+    await expect(canvas.getByLabelText('Auto-tag by duration')).toBeChecked();
+    await expect(canvas.getByText(/Typical day:/)).toBeInTheDocument();
+    await expect(canvas.getByRole('button', { name: 'Retrain now' })).toBeInTheDocument();
+  },
 };

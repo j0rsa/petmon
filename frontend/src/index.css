@@ -21,6 +21,7 @@
 
   --surface:           #242422;
   --surface-elevated:  #2c2c2a;
+  --surface-raised:    #2c2c2a;
   --surface-sidebar:   #1e1e1c;
   --surface-inset:     #1a1a18;
   --surface-nested:    rgba(255, 255, 255, 0.03);
@@ -306,6 +307,13 @@ pre {
   padding: 1.5rem;
 }
 
+.empty-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.75rem;
+}
+
 .summary-grid {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(min(140px, 100%), 1fr));
@@ -454,25 +462,29 @@ pre {
   color: var(--badge-fallback-text);
 }
 
+.auto-tag-icon {
+  display: inline-grid;
+  place-items: center;
+  box-sizing: border-box;
+  min-width: 1.15rem;
+  height: 1.15rem;
+  padding: 0 0.32rem;
+  border-radius: 999px;
+  background: var(--accent-soft);
+  color: var(--accent);
+  font-size: 0.56rem;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  line-height: 1;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
 .type-badge-wrap {
   display: inline-flex;
   align-items: center;
   gap: 0.25rem;
-}
-
-.auto-tag-icon {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 0.95rem;
-  height: 0.95rem;
-  border-radius: 999px;
-  background: var(--accent-soft);
-  color: var(--accent);
-  font-size: 0.62rem;
-  font-weight: 700;
   line-height: 1;
-  flex-shrink: 0;
 }
 
 .status-pill {
@@ -1141,7 +1153,7 @@ pre {
   flex-direction: column;
   border: 1px solid var(--border-subtle);
   border-radius: 0.75rem;
-  background: var(--surface-raised);
+  background: var(--surface-elevated);
   box-shadow: 0 12px 32px rgba(0, 0, 0, 0.28);
 }
 
@@ -1152,6 +1164,7 @@ pre {
   gap: 0.75rem;
   padding: 0.85rem 1rem;
   border-bottom: 1px solid var(--border-subtle);
+  background: var(--surface-elevated);
 }
 
 .notification-panel-header h3 {
@@ -1190,6 +1203,7 @@ pre {
   overflow-y: auto;
   display: flex;
   flex-direction: column;
+  background: var(--surface-elevated);
 }
 
 .notification-item {
@@ -1215,7 +1229,7 @@ pre {
 }
 
 .notification-item-unread {
-  background: color-mix(in srgb, var(--accent-soft) 65%, transparent);
+  background: color-mix(in srgb, var(--accent-soft) 80%, var(--surface-elevated));
 }
 
 .notification-item-header {
@@ -1857,6 +1871,15 @@ pre {
   margin-top: 0.75rem;
 }
 
+.record-entry-form > .button {
+  min-height: 2.75rem;
+  box-sizing: border-box;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  align-self: end;
+}
+
 .record-entry-form--health {
   grid-template-columns: minmax(17rem, 1.15fr) minmax(0, 2fr) auto;
 }
@@ -1911,10 +1934,13 @@ pre {
 
 .record-entry-form .form-row {
   min-width: 0;
+  justify-content: flex-end;
 }
 
 .record-entry-form .form-row label {
   font-size: 0.82rem;
+  line-height: 1.2;
+  min-height: 1rem;
 }
 
 .record-entry-form input,
@@ -1924,11 +1950,17 @@ pre {
   min-height: 2.75rem;
   box-sizing: border-box;
   font-size: inherit;
-  padding: 0.8rem 0.9rem;
+  padding: 0.625rem 0.9rem;
   border-radius: 12px;
   border: 1px solid var(--border);
   background: var(--input-bg);
   color: var(--input-text);
+  line-height: 1.5;
+}
+
+.record-entry-form .record-entry-duration {
+  text-align: center;
+  font-variant-numeric: tabular-nums;
 }
 
 .record-entry-form input[type="time"],

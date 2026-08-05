@@ -188,9 +188,9 @@ export function PetInfoForm({
           <input id="pet-info-tg-thread" placeholder="e.g. 42" value={form.telegram_thread_id} onChange={(event) => setForm((current) => ({ ...current, telegram_thread_id: event.target.value }))} />
         </div>
         <div className="form-row form-row-full">
-          <span className="eyebrow">Toileting</span>
+          <span className="eyebrow">Toileting auto-tag</span>
           <p className="muted-text" style={{ fontSize: '0.82rem', marginTop: '0.15rem' }}>
-            When enabled, general visits with a logged duration are tagged as Wee or Poop when they match this pet&apos;s history.
+            When enabled, general visits with a logged duration are tagged as Wee or Poop using this pet&apos;s duration history and recent visit patterns. Manage the model below after enabling.
           </p>
         </div>
         <div className="form-row form-row-full">

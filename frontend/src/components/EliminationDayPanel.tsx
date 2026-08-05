@@ -66,8 +66,8 @@ function DurationInput({ digits, onChange }: DurationInputProps) {
     <input
       type="text"
       inputMode="numeric"
+      className="record-entry-duration"
       aria-label="Duration (MM:SS)"
-      style={{ textAlign: 'center', fontVariantNumeric: 'tabular-nums' }}
       value={digitsToDisplay(digits)}
       onKeyDown={(e) => {
         if (e.key === 'Backspace') {
@@ -114,10 +114,19 @@ function invalidateDayData(queryClient: ReturnType<typeof useQueryClient>, date:
 function TypeBadge({
   eventType,
   autoCategorized = false,
+  autoCategorizeConfidence = null,
 }: {
   eventType: EliminationEventType;
   autoCategorized?: boolean;
+  autoCategorizeConfidence?: number | null;
 }) {
+  const confidencePct =
+    autoCategorizeConfidence != null ? Math.round(autoCategorizeConfidence * 100) : null;
+  const autoLabel =
+    confidencePct != null
+      ? `Auto-detected (${confidencePct}% confidence)`
+      : 'Auto-detected';
+
   return (
     <span className="type-badge-wrap">
       <span
@@ -127,8 +136,8 @@ function TypeBadge({
         {EVENT_TYPE_LABELS[eventType]}
       </span>
       {autoCategorized && (
-        <span className="auto-tag-icon" title="Auto-detected" aria-label="Auto-detected">
-          A
+        <span className="auto-tag-icon" title={autoLabel} aria-label={autoLabel}>
+          {confidencePct != null ? `${confidencePct}%` : 'A'}
         </span>
       )}
     </span>
@@ -409,7 +418,11 @@ function RecordRow({
     <div className="entry-row-wrap" id={`record-${record.id}`}>
       <div className="entry-row">
         <span className="entry-time">{formatTime(record.occurred_at)}</span>
-        <TypeBadge eventType={record.event_type} autoCategorized={record.is_auto_categorized} />
+        <TypeBadge
+          eventType={record.event_type}
+          autoCategorized={record.is_auto_categorized}
+          autoCategorizeConfidence={record.auto_categorize_confidence}
+        />
         <span className="entry-amount" style={{ color: 'var(--text-muted)', fontSize: '0.82rem' }}>
           {record.subtype ? record.subtype : ''}
           {record.duration_seconds != null ? ` ${fmtDurationSecs(record.duration_seconds)}` : ''}

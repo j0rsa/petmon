@@ -1,17 +1,19 @@
 use crate::domain::elimination::EliminationEventType;
 use crate::error::AppResult;
-use crate::repo::{elimination_records, pets};
+use crate::repo::{elimination_classifiers, elimination_records, pets};
+use crate::services::elimination_classifier::{self, ClassifierDecision, MIN_SAMPLES_PER_CLASS};
+use crate::services::elimination_classifier_context::build_feature_context;
 use sqlx::SqlitePool;
 use uuid::Uuid;
 
-/// Minimum categorized records with duration before a bucket is used for matching.
-pub const MIN_SAMPLES_PER_BUCKET: i64 = 2;
-
-/// Relative deviation from bucket center (25%).
+/// Relative deviation from bucket center (25%) — legacy fallback only.
 pub const DEVIATION_RATIO: f64 = 0.25;
 
 /// Minimum absolute deviation in seconds regardless of bucket center.
 pub const MIN_ABSOLUTE_DEVIATION_SECS: f64 = 10.0;
+
+/// Minimum categorized records with duration before a bucket is used for matching.
+pub const MIN_SAMPLES_PER_BUCKET: i64 = 2;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum AutoCategorizeFailureReason {
@@ -20,11 +22,12 @@ pub enum AutoCategorizeFailureReason {
     NoMatch,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq)]
 pub struct AutoCategorizeAttempt {
     pub event_type: EliminationEventType,
     pub failure: Option<AutoCategorizeFailureReason>,
     pub is_auto_categorized: bool,
+    pub auto_categorize_confidence: Option<f32>,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq)]
@@ -138,34 +141,78 @@ pub async fn load_duration_buckets(pool: &SqlitePool, pet_id: Uuid) -> AppResult
     })
 }
 
+fn map_classifier_decision(
+    decision: ClassifierDecision,
+) -> Result<EliminationEventType, AutoCategorizeFailureReason> {
+    match decision {
+        ClassifierDecision::Wee => Ok(EliminationEventType::Urination),
+        ClassifierDecision::Poop => Ok(EliminationEventType::Defecation),
+        ClassifierDecision::Ambiguous => Err(AutoCategorizeFailureReason::Ambiguous),
+        ClassifierDecision::InsufficientHistory => {
+            Err(AutoCategorizeFailureReason::InsufficientHistory)
+        }
+    }
+}
+
+fn attempt_without_auto(event_type: EliminationEventType) -> AutoCategorizeAttempt {
+    AutoCategorizeAttempt {
+        event_type,
+        failure: None,
+        is_auto_categorized: false,
+        auto_categorize_confidence: None,
+    }
+}
+
+fn attempt_failed(reason: AutoCategorizeFailureReason) -> AutoCategorizeAttempt {
+    AutoCategorizeAttempt {
+        event_type: EliminationEventType::General,
+        failure: Some(reason),
+        is_auto_categorized: false,
+        auto_categorize_confidence: None,
+    }
+}
+
 pub async fn attempt_auto_categorize(
     pool: &SqlitePool,
     pet_id: Uuid,
     event_type: EliminationEventType,
     duration_seconds: Option<i64>,
+    occurred_at: &str,
 ) -> AppResult<AutoCategorizeAttempt> {
     if event_type != EliminationEventType::General {
-        return Ok(AutoCategorizeAttempt {
-            event_type,
-            failure: None,
-            is_auto_categorized: false,
-        });
+        return Ok(attempt_without_auto(event_type));
     }
     let Some(duration) = duration_seconds else {
-        return Ok(AutoCategorizeAttempt {
-            event_type,
-            failure: None,
-            is_auto_categorized: false,
-        });
+        return Ok(attempt_without_auto(event_type));
     };
 
     let pet = pets::get_pet(pool, pet_id).await?;
     if !pet.elimination_auto_categorize_by_duration {
-        return Ok(AutoCategorizeAttempt {
-            event_type,
-            failure: None,
-            is_auto_categorized: false,
-        });
+        return Ok(attempt_without_auto(event_type));
+    }
+
+    if let Some(model) = elimination_classifiers::get(pool, pet_id).await? {
+        if model.wee_samples >= MIN_SAMPLES_PER_CLASS && model.poop_samples >= MIN_SAMPLES_PER_CLASS
+        {
+            let ctx = build_feature_context(pool, pet_id, occurred_at, duration).await?;
+            let decision = elimination_classifier::classify(&model, &ctx);
+            match map_classifier_decision(decision) {
+                Ok(event_type) => {
+                    let prediction = elimination_classifier::explain(&model, &ctx);
+                    return Ok(AutoCategorizeAttempt {
+                        event_type,
+                        failure: None,
+                        is_auto_categorized: true,
+                        auto_categorize_confidence: Some(prediction.confidence),
+                    });
+                }
+                Err(AutoCategorizeFailureReason::Ambiguous) => {
+                    return Ok(attempt_failed(AutoCategorizeFailureReason::Ambiguous));
+                }
+                Err(AutoCategorizeFailureReason::InsufficientHistory) => {}
+                Err(AutoCategorizeFailureReason::NoMatch) => {}
+            }
+        }
     }
 
     let buckets = load_duration_buckets(pool, pet_id).await?;
@@ -174,22 +221,13 @@ pub async fn attempt_auto_categorize(
             event_type,
             failure: None,
             is_auto_categorized: true,
+            auto_categorize_confidence: None,
         }),
-        ClassifyOutcome::Ambiguous => Ok(AutoCategorizeAttempt {
-            event_type: EliminationEventType::General,
-            failure: Some(AutoCategorizeFailureReason::Ambiguous),
-            is_auto_categorized: false,
-        }),
-        ClassifyOutcome::NoMatch => Ok(AutoCategorizeAttempt {
-            event_type: EliminationEventType::General,
-            failure: Some(AutoCategorizeFailureReason::NoMatch),
-            is_auto_categorized: false,
-        }),
-        ClassifyOutcome::InsufficientHistory => Ok(AutoCategorizeAttempt {
-            event_type: EliminationEventType::General,
-            failure: Some(AutoCategorizeFailureReason::InsufficientHistory),
-            is_auto_categorized: false,
-        }),
+        ClassifyOutcome::Ambiguous => Ok(attempt_failed(AutoCategorizeFailureReason::Ambiguous)),
+        ClassifyOutcome::NoMatch => Ok(attempt_failed(AutoCategorizeFailureReason::NoMatch)),
+        ClassifyOutcome::InsufficientHistory => Ok(attempt_failed(
+            AutoCategorizeFailureReason::InsufficientHistory,
+        )),
     }
 }
 

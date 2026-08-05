@@ -15,6 +15,8 @@ export interface EliminationRecord {
   note: string | null;
   source_type: string;
   is_auto_categorized: boolean;
+  /** Classifier confidence 0–1 when auto-tagged by the contextual model; null for manual or legacy bucket match. */
+  auto_categorize_confidence: number | null;
   created_at: string;
   updated_at: string;
 }
@@ -86,6 +88,51 @@ export interface EliminationDurationProfile {
   poo: EliminationDurationBucket | null;
 }
 
+export interface EliminationClassifierMetrics {
+  accuracy: number;
+  log_loss: number;
+  ambiguous_rate: number;
+}
+
+export interface EliminationDurationDist {
+  mean: number;
+  std: number;
+  median: number;
+  n: number;
+}
+
+export interface EliminationClassifierBaselines {
+  p50_wees_per_day: number;
+  p90_wees_per_day: number;
+  p50_poops_per_day: number;
+  p90_poops_per_day: number;
+  wee_duration: EliminationDurationDist | null;
+  poop_duration: EliminationDurationDist | null;
+}
+
+export interface EliminationClassifierModelSummary {
+  trained_at: string;
+  sample_count: number;
+  wee_samples: number;
+  poop_samples: number;
+  metrics: EliminationClassifierMetrics | null;
+}
+
+export interface EliminationClassifierStatus {
+  pet_id: string;
+  enabled: boolean;
+  model: EliminationClassifierModelSummary | null;
+  baselines: EliminationClassifierBaselines;
+  fallback_active: boolean;
+}
+
+export interface EliminationClassifierRetrainResult {
+  pet_id: string;
+  trained: boolean;
+  model: EliminationClassifierModelSummary | null;
+  message: string;
+}
+
 export function categorizedDurationValues(summary: EliminationDailySummary): number[] {
   return [
     summary.urination_avg_duration_seconds,
@@ -131,4 +178,11 @@ export const eliminationApi = {
     ),
   durationProfile: (petId: string) =>
     api.get<EliminationDurationProfile>(`/elimination/duration-profile?pet_id=${petId}`),
+  classifierStatus: (petId: string) =>
+    api.get<EliminationClassifierStatus>(`/elimination/classifier/status?pet_id=${petId}`),
+  classifierRetrain: (petId: string) =>
+    api.post<EliminationClassifierRetrainResult>(
+      `/elimination/classifier/retrain?pet_id=${petId}`,
+      {},
+    ),
 };

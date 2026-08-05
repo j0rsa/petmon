@@ -1,5 +1,6 @@
 pub mod analytics;
 pub mod elimination;
+pub mod elimination_classifier;
 pub mod health_state;
 pub mod notification;
 pub mod nutrition_record;

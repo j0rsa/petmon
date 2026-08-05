@@ -50,6 +50,8 @@ pub struct EliminationRecord {
     pub note: Option<String>,
     pub source_type: String,
     pub is_auto_categorized: bool,
+    /// Classifier confidence (0–1) when auto-tagged by the contextual model; null for manual or legacy bucket match.
+    pub auto_categorize_confidence: Option<f32>,
     pub created_at: String,
     pub updated_at: String,
 }
