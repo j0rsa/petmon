@@ -181,5 +181,8 @@ export const eliminationApi = {
   classifierStatus: (petId: string) =>
     api.get<EliminationClassifierStatus>(`/elimination/classifier/status?pet_id=${petId}`),
   classifierRetrain: (petId: string) =>
-    api.post<EliminationClassifierRetrainResult>(`/elimination/classifier/retrain?pet_id=${petId}`),
+    api.post<EliminationClassifierRetrainResult>(
+      `/elimination/classifier/retrain?pet_id=${petId}`,
+      {},
+    ),
 };
