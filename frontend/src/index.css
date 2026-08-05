@@ -464,14 +464,18 @@ pre {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 0.95rem;
-  height: 0.95rem;
+  box-sizing: border-box;
+  min-width: 0.95rem;
+  height: 1rem;
+  padding: 0 0.28rem;
   border-radius: 999px;
   background: var(--accent-soft);
   color: var(--accent);
-  font-size: 0.62rem;
+  font-size: 0.58rem;
   font-weight: 700;
   line-height: 1;
+  letter-spacing: -0.02em;
+  white-space: nowrap;
   flex-shrink: 0;
 }
 
