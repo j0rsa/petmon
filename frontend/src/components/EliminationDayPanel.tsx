@@ -66,8 +66,8 @@ function DurationInput({ digits, onChange }: DurationInputProps) {
     <input
       type="text"
       inputMode="numeric"
+      className="record-entry-duration"
       aria-label="Duration (MM:SS)"
-      style={{ textAlign: 'center', fontVariantNumeric: 'tabular-nums' }}
       value={digitsToDisplay(digits)}
       onKeyDown={(e) => {
         if (e.key === 'Backspace') {
