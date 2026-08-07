@@ -45,6 +45,13 @@ describe('parseWetFoodLiquidPair', () => {
   it('allows zero on either side', () => {
     expect(parseWetFoodLiquidPair('0,123')).toEqual({ wetFood: 0, liquids: 123 });
     expect(parseWetFoodLiquidPair('123,0')).toEqual({ wetFood: 123, liquids: 0 });
+    expect(parseWetFoodLiquidPair(',456')).toEqual({ wetFood: 0, liquids: 456 });
+    expect(parseWetFoodLiquidPair('123,')).toEqual({ wetFood: 123, liquids: 0 });
+  });
+
+  it('treats a single value as wet food only', () => {
+    expect(parseWetFoodLiquidPair('123')).toEqual({ wetFood: 123, liquids: 0 });
+    expect(parseWetFoodLiquidPair('450 - 320')).toEqual({ wetFood: 130, liquids: 0 });
   });
 
   it('allows expressions on each side', () => {
@@ -53,9 +60,7 @@ describe('parseWetFoodLiquidPair', () => {
 
   it('rejects invalid pairs', () => {
     expect(parseWetFoodLiquidPair('')).toBeNull();
-    expect(parseWetFoodLiquidPair('123')).toBeNull();
-    expect(parseWetFoodLiquidPair('123,')).toBeNull();
-    expect(parseWetFoodLiquidPair(',456')).toBeNull();
+    expect(parseWetFoodLiquidPair('0')).toBeNull();
     expect(parseWetFoodLiquidPair('0,0')).toBeNull();
     expect(parseWetFoodLiquidPair('-1,10')).toBeNull();
     expect(parseWetFoodLiquidPair('10,-1')).toBeNull();
