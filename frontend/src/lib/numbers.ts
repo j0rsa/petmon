@@ -30,18 +30,28 @@ export function parseAmountExpression(raw: string): number {
   }
 }
 
-/** Parse a wet-food + liquid pair like "123,456" → { wetFood: 123, liquids: 456 }.
+/** Parse wet food and/or liquid amounts for the combined entry mode.
+ *  "123,456" → wet + liquid; "123" or "123,0" → wet only; "0,456" or ",456" → liquid only.
  *  Each side accepts the same expressions as parseAmountExpression.
  *  Zero is allowed on either side (that create is skipped by the caller).
- *  Returns null when the input is not exactly two non-negative amounts with at least one positive. */
+ *  Returns null when input is invalid or both sides are zero. */
 export function parseWetFoodLiquidPair(
   raw: string,
 ): { wetFood: number; liquids: number } | null {
-  const parts = raw.split(',').map((part) => part.trim());
-  if (parts.length !== 2 || parts[0] === '' || parts[1] === '') return null;
+  const trimmed = raw.trim();
+  if (!trimmed) return null;
 
-  const wetFood = parseAmountExpression(parts[0]!);
-  const liquids = parseAmountExpression(parts[1]!);
+  if (!trimmed.includes(',')) {
+    const wetFood = parseAmountExpression(trimmed);
+    if (isNaN(wetFood) || wetFood < 0 || wetFood === 0) return null;
+    return { wetFood, liquids: 0 };
+  }
+
+  const parts = trimmed.split(',').map((part) => part.trim());
+  if (parts.length !== 2) return null;
+
+  const wetFood = parts[0] === '' ? 0 : parseAmountExpression(parts[0]!);
+  const liquids = parts[1] === '' ? 0 : parseAmountExpression(parts[1]!);
   if (isNaN(wetFood) || wetFood < 0 || isNaN(liquids) || liquids < 0) return null;
   if (wetFood === 0 && liquids === 0) return null;
   return { wetFood, liquids };
