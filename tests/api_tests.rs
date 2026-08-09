@@ -179,11 +179,8 @@ async fn frontend_static_files_include_cache_control_headers() {
         Some("no-cache")
     );
 
-    let sw_resp = test::call_service(
-        &app,
-        test::TestRequest::get().uri("/sw.js").to_request(),
-    )
-    .await;
+    let sw_resp =
+        test::call_service(&app, test::TestRequest::get().uri("/sw.js").to_request()).await;
     assert_eq!(sw_resp.status(), 200);
     assert_eq!(
         sw_resp
@@ -195,9 +192,7 @@ async fn frontend_static_files_include_cache_control_headers() {
 
     let asset_resp = test::call_service(
         &app,
-        test::TestRequest::get()
-            .uri("/assets/app.js")
-            .to_request(),
+        test::TestRequest::get().uri("/assets/app.js").to_request(),
     )
     .await;
     assert_eq!(asset_resp.status(), 200);
