@@ -151,6 +151,84 @@ async fn frontend_spa_path_is_served_without_auth() {
 }
 
 #[actix_web::test]
+async fn frontend_static_files_include_cache_control_headers() {
+    use std::fs;
+
+    let dir = std::env::temp_dir().join(format!("petmon-static-{}", uuid::Uuid::new_v4()));
+    fs::create_dir_all(dir.join("assets")).unwrap();
+    fs::write(dir.join("index.html"), "<html></html>").unwrap();
+    fs::write(dir.join("sw.js"), "// sw").unwrap();
+    fs::write(dir.join("assets/app.js"), "console.log(1)").unwrap();
+
+    let pool = setup_pool().await;
+    let static_dir = dir.to_string_lossy().into_owned();
+    let state = web::Data::new(AppState::new(pool, false, None, Some(static_dir)));
+    let app = build_full_app!(state);
+
+    let index_resp = test::call_service(
+        &app,
+        test::TestRequest::get().uri("/index.html").to_request(),
+    )
+    .await;
+    assert_eq!(index_resp.status(), 200);
+    assert_eq!(
+        index_resp
+            .headers()
+            .get("cache-control")
+            .and_then(|v| v.to_str().ok()),
+        Some("no-cache")
+    );
+
+    let sw_resp = test::call_service(
+        &app,
+        test::TestRequest::get().uri("/sw.js").to_request(),
+    )
+    .await;
+    assert_eq!(sw_resp.status(), 200);
+    assert_eq!(
+        sw_resp
+            .headers()
+            .get("cache-control")
+            .and_then(|v| v.to_str().ok()),
+        Some("no-cache")
+    );
+
+    let asset_resp = test::call_service(
+        &app,
+        test::TestRequest::get()
+            .uri("/assets/app.js")
+            .to_request(),
+    )
+    .await;
+    assert_eq!(asset_resp.status(), 200);
+    assert_eq!(
+        asset_resp
+            .headers()
+            .get("cache-control")
+            .and_then(|v| v.to_str().ok()),
+        Some("public, max-age=31536000, immutable")
+    );
+
+    let spa_resp = test::call_service(
+        &app,
+        test::TestRequest::get()
+            .uri("/nutrition/2025-01-01")
+            .to_request(),
+    )
+    .await;
+    assert_eq!(spa_resp.status(), 200);
+    assert_eq!(
+        spa_resp
+            .headers()
+            .get("cache-control")
+            .and_then(|v| v.to_str().ok()),
+        Some("no-cache")
+    );
+
+    let _ = fs::remove_dir_all(&dir);
+}
+
+#[actix_web::test]
 async fn mcp_endpoint_requires_auth() {
     let pool = setup_pool().await;
     // seed a token so auth is "configured"

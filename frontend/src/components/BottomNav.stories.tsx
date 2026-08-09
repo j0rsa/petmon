@@ -3,7 +3,7 @@ import { expect, userEvent, within, waitFor } from 'storybook/test';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { BottomNav } from './BottomNav';
 import { withMemoryRouter } from '../stories/decorators';
-import { mockNotifications, mockPets, mockPetId } from '../stories/fixtures';
+import { mockNotifications, mockPets, mockPetId, mockAppInfo } from '../stories/fixtures';
 import { SelectedPetProvider } from '../context/SelectedPetContext';
 
 function bottomNavClient(unreadCount: number, notifications = mockNotifications) {
@@ -21,6 +21,7 @@ function bottomNavClient(unreadCount: number, notifications = mockNotifications)
   client.setQueryData(['me'], { subject: 'dev', email: null, name: 'Dev', display_name: 'Dev', kind: 'dev', scopes: [] });
   client.setQueryData(['notifications-unread-count'], { count: unreadCount });
   client.setQueryData(['notifications'], notifications);
+  client.setQueryData(['app-info'], mockAppInfo);
   return client;
 }
 
@@ -38,6 +39,7 @@ const withNoPets: Decorator = (Story) => {
   client.setQueryData(['pets'], []);
   client.setQueryData(['me'], { subject: 'dev', email: null, name: 'Dev', display_name: 'Dev', kind: 'dev', scopes: [] });
   client.setQueryData(['notifications-unread-count'], { count: 0 });
+  client.setQueryData(['app-info'], mockAppInfo);
 
   localStorage.removeItem('pm_selected_pet_id');
 
@@ -101,6 +103,7 @@ export const PetSheetWithNotifications: Story = {
     await expect(canvas.getByText('Switch pet')).toBeInTheDocument();
     await expect(canvas.getByText('Manage pets')).toBeInTheDocument();
     await expect(canvas.getByText('Settings')).toBeInTheDocument();
+    await expect(canvas.getByText(`v${mockAppInfo.version} · ${mockAppInfo.git_sha}`)).toBeInTheDocument();
     await expect(canvas.getByText('Notifications')).toBeInTheDocument();
     await expect(canvas.getByText('Visit duration did not match history for Mittens')).toBeInTheDocument();
     await expect(canvas.getByRole('button', { name: 'Mark all read' })).toBeInTheDocument();

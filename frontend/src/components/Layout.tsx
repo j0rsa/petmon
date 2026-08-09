@@ -5,7 +5,6 @@ import { NavBar, SidebarUserChip } from './NavBar';
 import { NotificationCenter } from './NotificationCenter';
 import { SidebarPetPicker } from './SidebarPetPicker';
 import { BottomNav } from './BottomNav';
-import { PwaUpdateBanner } from './PwaUpdateBanner';
 import { usePushNotifications } from '../hooks/usePushNotifications';
 import { useScrollToTopOnNavigate } from '../hooks/useScrollToTopOnNavigate';
 
@@ -14,7 +13,6 @@ export function Layout() {
   useScrollToTopOnNavigate();
   return (
     <SelectedPetProvider>
-      <PwaUpdateBanner />
       <NotificationCenter />
       <div className="app-shell">
         <aside className="sidebar">
