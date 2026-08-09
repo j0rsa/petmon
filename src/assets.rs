@@ -1,4 +1,4 @@
-use actix_web::{get, web, HttpRequest, HttpResponse};
+use actix_web::{get, http::header, web, HttpRequest, HttpResponse};
 use mime_guess::from_path;
 use rust_embed::RustEmbed;
 use std::path::PathBuf;
@@ -9,6 +9,31 @@ use crate::auth::AppState;
 #[folder = "docs"]
 #[include = "openapi.yaml"]
 pub struct DocsAssets;
+
+/// Cache policy for frontend static files (Vite build output).
+fn cache_control_for_path(path: &str) -> Option<&'static str> {
+    let path = path.trim_start_matches('/');
+    if path == "index.html"
+        || path == "sw.js"
+        || path.ends_with(".webmanifest")
+        || path == "manifest.webmanifest"
+    {
+        return Some("no-cache");
+    }
+    if path.starts_with("assets/") {
+        return Some("public, max-age=31536000, immutable");
+    }
+    None
+}
+
+fn static_file_response(path: &str, bytes: Vec<u8>, mime: mime_guess::Mime) -> HttpResponse {
+    let mut builder = HttpResponse::Ok();
+    builder.content_type(mime.as_ref());
+    if let Some(value) = cache_control_for_path(path) {
+        builder.insert_header((header::CACHE_CONTROL, value));
+    }
+    builder.body(bytes)
+}
 
 pub async fn serve_frontend(req: HttpRequest, state: web::Data<AppState>) -> HttpResponse {
     let path = req.path().trim_start_matches('/');
@@ -25,7 +50,7 @@ pub async fn serve_frontend(req: HttpRequest, state: web::Data<AppState>) -> Htt
         return match std::fs::read(&file_path) {
             Ok(bytes) => {
                 let mime = from_path(&file_path).first_or_octet_stream();
-                HttpResponse::Ok().content_type(mime.as_ref()).body(bytes)
+                static_file_response(path, bytes, mime)
             }
             Err(_) => HttpResponse::InternalServerError().body("Failed to read file"),
         };
@@ -34,9 +59,14 @@ pub async fn serve_frontend(req: HttpRequest, state: web::Data<AppState>) -> Htt
     // SPA fallback
     let index = base.join("index.html");
     match std::fs::read(&index) {
-        Ok(bytes) => HttpResponse::Ok()
-            .content_type("text/html; charset=utf-8")
-            .body(bytes),
+        Ok(bytes) => {
+            let mut builder = HttpResponse::Ok();
+            builder.content_type("text/html; charset=utf-8");
+            if let Some(value) = cache_control_for_path("index.html") {
+                builder.insert_header((header::CACHE_CONTROL, value));
+            }
+            builder.body(bytes)
+        }
         Err(_) => HttpResponse::NotFound().body("index.html not found in STATIC_DIR"),
     }
 }
@@ -84,4 +114,32 @@ pub fn configure(cfg: &mut web::ServiceConfig) {
     cfg.service(serve_api_docs)
         .service(serve_openapi_yaml)
         .default_service(web::get().to(serve_frontend));
+}
+
+#[cfg(test)]
+mod tests {
+    use super::cache_control_for_path;
+
+    #[test]
+    fn shell_and_sw_are_not_cached() {
+        assert_eq!(cache_control_for_path("index.html"), Some("no-cache"));
+        assert_eq!(cache_control_for_path("sw.js"), Some("no-cache"));
+        assert_eq!(
+            cache_control_for_path("manifest.webmanifest"),
+            Some("no-cache")
+        );
+    }
+
+    #[test]
+    fn hashed_assets_are_immutable() {
+        assert_eq!(
+            cache_control_for_path("assets/index-abc123.js"),
+            Some("public, max-age=31536000, immutable")
+        );
+    }
+
+    #[test]
+    fn unversioned_icons_have_no_special_policy() {
+        assert_eq!(cache_control_for_path("icons/192x192.png"), None);
+    }
 }

@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { clearPwaCaches, isPwaCacheSupported, refreshPwaApp, setPwaUpdateHandler } from './pwaCache';
+import { clearPwaCaches, isPwaCacheSupported } from './pwaCache';
 
 describe('pwaCache', () => {
   const unregister = vi.fn().mockResolvedValue(true);
@@ -11,7 +11,6 @@ describe('pwaCache', () => {
     vi.stubGlobal('navigator', { serviceWorker: { getRegistrations } });
     vi.stubGlobal('caches', { keys, delete: deleteCache });
     vi.stubGlobal('location', { reload: vi.fn() });
-    setPwaUpdateHandler(async () => {});
     unregister.mockClear();
     getRegistrations.mockClear();
     deleteCache.mockClear();
@@ -34,23 +33,5 @@ describe('pwaCache', () => {
     expect(keys).toHaveBeenCalledOnce();
     expect(deleteCache).toHaveBeenCalledWith('workbox-precache-v2');
     expect(deleteCache).toHaveBeenCalledWith('pages-cache');
-  });
-
-  it('uses the registered update handler when refreshing', async () => {
-    const update = vi.fn().mockResolvedValue(undefined);
-    setPwaUpdateHandler(update);
-
-    await refreshPwaApp();
-
-    expect(update).toHaveBeenCalledWith(true);
-  });
-
-  it('falls back to location.reload when no update handler is set', async () => {
-    vi.resetModules();
-    const { refreshPwaApp: refreshWithoutHandler } = await import('./pwaCache');
-
-    await refreshWithoutHandler();
-
-    expect(location.reload).toHaveBeenCalledOnce();
   });
 });

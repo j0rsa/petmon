@@ -3,7 +3,6 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { settingsApi } from '../api/settings';
 import type { ApiTokenCreated, ApiTokenPublic, ApiTokenScope, DisplaySettings, OidcConfigPublic, TelegramConfigPublic } from '../api/settings';
 import { API_TOKEN_SCOPES } from '../api/settings';
-import { infoApi } from '../api/info';
 import { deriveDeviceAlias, getStoredToken, storeToken } from '../lib/auth';
 import { clearPwaCachesAndReload, isPwaCacheSupported } from '../lib/pwaCache';
 import { getPushSupportStatus, isPushSupported, sendTestPushNotification, watchNotificationPermission } from '../lib/pushNotifications';
@@ -11,8 +10,6 @@ import { TagInput } from '../components/TagInput';
 import { usePermissions } from '../context/usePermissions';
 
 export default function SettingsPage() {
-  const { data: info } = useQuery({ queryKey: ['app-info'], queryFn: infoApi.get, staleTime: Infinity, retry: false });
-
   return (
     <div className="page-stack">
       <DisplaySection />
@@ -21,11 +18,6 @@ export default function SettingsPage() {
       <OidcSection />
       <TelegramSection />
       <ApiTokensSection />
-      {info && (
-        <p style={{ textAlign: 'center', fontSize: '0.72rem', color: 'var(--text-subtle)', letterSpacing: '0.02em', paddingBottom: '0.5rem' }}>
-          v{info.version} · {info.git_sha}
-        </p>
-      )}
     </div>
   );
 }
@@ -337,7 +329,7 @@ function AppCacheSection() {
 
       <p style={{ fontSize: '0.88rem', color: 'var(--text-muted)' }}>
         Petmon installs as a PWA and caches JavaScript, CSS, and icons via a service worker (Workbox).
-        If you see a partial update after a new version, clear the cache to fetch everything fresh.
+        New versions reload automatically; use the button below only if the app still looks outdated after an update.
         This does not remove your sign-in or pet data.
       </p>
 

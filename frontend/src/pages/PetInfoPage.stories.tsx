@@ -47,6 +47,19 @@ export const AutoTagEnabled: Story = {
   },
 };
 
+/** Auto-tag panel stays left-aligned on narrow screens (classifier stats are not centered). */
+export const AutoTagEnabledMobile: Story = {
+  name: 'Auto-tag enabled (mobile)',
+  parameters: { viewport: { defaultViewport: 'pwaMobile' } },
+  decorators: [withPetInfoPage(undefined, true, true)],
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    const panel = canvas.getByText(/Typical day:/).closest('.pet-elimination-auto-tag');
+    expect(panel).toBeTruthy();
+    expect(getComputedStyle(panel!).textAlign).toBe('left');
+  },
+};
+
 /** Edit mode with auto-tag checkbox and classifier panel. */
 export const AutoTagEditMode: Story = {
   name: 'Auto-tag edit mode',

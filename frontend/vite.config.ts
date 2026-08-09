@@ -1,14 +1,30 @@
 /// <reference types="vitest/config" />
+import { execSync } from 'node:child_process';
+import fs from 'node:fs';
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { defineConfig } from 'vite';
 import react from '@vitejs/plugin-react';
 import { VitePWA } from 'vite-plugin-pwa';
 
 // https://vite.dev/config/
-import path from 'node:path';
-import { fileURLToPath } from 'node:url';
+
 import { storybookTest } from '@storybook/addon-vitest/vitest-plugin';
 import { playwright } from '@vitest/browser-playwright';
+
 const dirname = typeof __dirname !== 'undefined' ? __dirname : path.dirname(fileURLToPath(import.meta.url));
+
+function readPetmonBuildInfo(): { version: string; gitSha: string } {
+  const cargoToml = fs.readFileSync(path.join(dirname, '..', 'Cargo.toml'), 'utf-8');
+  const version = cargoToml.match(/^version\s*=\s*"([^"]+)"/m)?.[1] ?? 'unknown';
+  let gitSha = 'unknown';
+  try {
+    gitSha = execSync('git rev-parse --short HEAD', { encoding: 'utf-8' }).trim();
+  } catch {
+    // Non-git checkout (e.g. published crate tarball).
+  }
+  return { version, gitSha };
+}
 
 const isStorybookBuild =
   process.env.STORYBOOK === 'true' ||
@@ -17,14 +33,19 @@ const isStorybookBuild =
 
 const enablePwa = !isStorybookBuild && !process.env.VITEST;
 
+const petmonBuild = readPetmonBuildInfo();
+
 // More info at: https://storybook.js.org/docs/next/writing-tests/integrations/vitest-addon
 export default defineConfig({
+  define: {
+    __PETMON_BUILD__: JSON.stringify(petmonBuild),
+  },
   plugins: [
     react(),
     ...(enablePwa
       ? [
           VitePWA({
-            registerType: 'prompt',
+            registerType: 'autoUpdate',
             strategies: 'injectManifest',
             srcDir: 'src',
             filename: 'sw.ts',
@@ -36,8 +57,6 @@ export default defineConfig({
               type: 'module',
             },
             workbox: {
-              skipWaiting: true,
-              clientsClaim: true,
               navigateFallback: '/index.html',
               navigateFallbackDenylist: [/^\/api/, /^\/mcp/],
             },

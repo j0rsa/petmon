@@ -10,6 +10,7 @@ import {
 import { resolvePetColor } from '../lib/petColors';
 import { NotificationRow } from './NotificationRow';
 import { PetAvatar } from './pet/PetAvatar';
+import { AppVersionFooter } from './AppVersionFooter';
 import { BottomNavLink } from './BottomNavLink';
 
 export function BottomNav() {
@@ -103,6 +104,7 @@ export function BottomNav() {
                 <span>Settings</span>
                 <ChevronRight size={16} style={{ marginLeft: 'auto', opacity: 0.4 }} />
               </Link>
+              <AppVersionFooter className="bottom-nav-sheet-version" />
             </>
           )}
 

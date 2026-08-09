@@ -1,12 +1,12 @@
 import { NavLink } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { meApi } from '../api/me';
-import { infoApi } from '../api/info';
 import { authApi } from '../api/auth';
 import { clearToken } from '../lib/auth';
 import { unsubscribePushNotifications } from '../lib/pushNotifications';
 import { PawPrint, Utensils, HeartPulse } from 'lucide-react';
 import { PILLARS, type MonitoringPillar } from '../types/pillars';
+import { AppVersionFooter } from './AppVersionFooter';
 import { ExternalLinks } from './ExternalLinks';
 
 const PILLAR_ICONS: Record<MonitoringPillar, React.ReactNode> = {
@@ -64,13 +64,6 @@ export function SidebarUserChip() {
     retry: false,
   });
 
-  const { data: info } = useQuery({
-    queryKey: ['app-info'],
-    queryFn: infoApi.get,
-    staleTime: Infinity,
-    retry: false,
-  });
-
   if (!me) return null;
 
   async function handleSignOut() {
@@ -116,11 +109,7 @@ export function SidebarUserChip() {
           sign out
         </button>
       )}
-      {info && (
-        <span style={{ fontSize: '0.7rem', color: 'var(--text-subtle)', letterSpacing: '0.02em' }}>
-          v{info.version} · {info.git_sha}
-        </span>
-      )}
+      <AppVersionFooter />
     </div>
   );
 }

@@ -958,6 +958,12 @@ pre {
   margin-top: 0.25rem;
 }
 
+.bottom-nav-sheet-version {
+  margin: 0.35rem 1rem 0;
+  padding-bottom: 0.15rem;
+  text-align: center;
+}
+
 .bottom-nav-sheet-check {
   margin-left: auto;
   color: var(--accent);
@@ -1322,6 +1328,17 @@ pre {
   color: var(--accent);
 }
 
+.app-version-footer {
+  margin: 0;
+  font-size: 0.7rem;
+  color: var(--text-subtle);
+  letter-spacing: 0.02em;
+}
+
+.sidebar-user .app-version-footer {
+  margin-top: 0.15rem;
+}
+
 .pillar-tab-bar {
   display: flex;
   gap: 0;
@@ -1478,6 +1495,10 @@ pre {
   align-items: start;
 }
 
+.pet-info-page .pet-info-card > .pet-elimination-auto-tag {
+  grid-column: 2;
+}
+
 .pet-info-fields {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
@@ -1506,6 +1527,33 @@ pre {
 
 .pet-info-row-full {
   grid-column: 1 / -1;
+}
+
+.pet-elimination-auto-tag {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 0.35rem;
+  width: 100%;
+  margin-top: 0.5rem;
+  font-size: 0.82rem;
+  color: var(--text-muted);
+  text-align: left;
+}
+
+.pet-elimination-auto-tag--loading {
+  margin: 0.5rem 0 0;
+}
+
+.pet-elimination-auto-tag__retrain {
+  align-self: flex-start;
+  margin-top: 0.25rem;
+  font-size: 0.78rem;
+  padding: 0.25rem 0.6rem;
+}
+
+.pet-elimination-auto-tag__message {
+  color: var(--warning, #b8860b);
 }
 
 .color-picker-field {
@@ -2220,48 +2268,19 @@ pre {
 
   .pet-info-page .pet-info-card {
     grid-template-columns: 1fr;
-    justify-items: center;
-    text-align: center;
   }
 
-  .pet-info-fields {
+  .pet-info-page .pet-info-card > .pet-avatar {
+    justify-self: center;
+  }
+
+  .pet-info-fields,
+  .pet-elimination-auto-tag {
     width: 100%;
-    text-align: left;
   }
 }
 
 /* ── PWA update banner ───────────────────────────────────────── */
-
-.pwa-update-banner {
-  position: fixed;
-  top: 0;
-  left: 0;
-  right: 0;
-  z-index: 200;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 1rem;
-  padding: 0.65rem 1.25rem;
-  padding-top: calc(0.65rem + env(safe-area-inset-top));
-  background: var(--accent);
-  color: #fff;
-  font-size: 0.88rem;
-  font-weight: 500;
-}
-
-.pwa-update-btn {
-  background: rgba(255, 255, 255, 0.2);
-  border: 1px solid rgba(255, 255, 255, 0.4);
-  color: #fff;
-  border-radius: 8px;
-  padding: 0.3rem 0.85rem;
-  font-size: 0.82rem;
-  font-weight: 600;
-  cursor: pointer;
-  white-space: nowrap;
-  width: auto;
-}
 
 /* ── Health state picker ─────────────────────────────────────────────────── */
 

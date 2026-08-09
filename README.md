@@ -13,7 +13,7 @@ Pet monitoring system — a single deployable service with a React SPA frontend 
 - **SQLite** persistence via SQLx with automatic migrations on startup
 - **Stateless MCP** (JSON-RPC) endpoint at `/mcp` for agent/LLM integrations
 - **Embedded OpenAPI spec** (`/api/docs`) via `rust-embed`; frontend is served from `STATIC_DIR` at runtime
-- **PWA** — installable on iOS and Android, with service worker update banner
+- **PWA** — installable on iOS and Android, with automatic service worker updates
 - **Structured JSON logging** with `tracing`, optional OTLP export
 - **Environment-based configuration**
 
@@ -49,7 +49,7 @@ Weight history per pet — log measurements, view a 30-day trend chart on the pe
 The app is installable as a PWA on iOS and Android. After installing:
 
 - **Stay signed in**: go to Settings → API tokens → **Remember this device**. This creates a long-lived API token stored on the device, eliminating repeated SSO redirects.
-- **Updates**: when a new version is deployed, a banner appears at the top of the screen. Tap **Update** to reload with the latest assets.
+- **Updates**: when a new version is deployed, the installed PWA reloads automatically with the latest assets. If something still looks stale, use Settings → **Clear cache and reload**.
 
 ## API Overview
 
