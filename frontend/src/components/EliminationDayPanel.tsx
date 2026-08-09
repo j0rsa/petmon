@@ -150,7 +150,7 @@ function TypeBadge({
 // ── Categorize last general visit ─────────────────────────────────────────────
 
 interface CategorizeBarProps {
-  onCategorize: (eventType: 'urination' | 'defecation') => void;
+  onCategorize: (eventType: 'urination' | 'defecation' | 'no_output') => void;
   pending: boolean;
 }
 
@@ -174,6 +174,14 @@ function CategorizeBar({ onCategorize, pending }: CategorizeBarProps) {
           onClick={() => onCategorize('defecation')}
         >
           Poop
+        </button>
+        <button
+          className="button categorize-button categorize-button-nothing"
+          type="button"
+          disabled={pending}
+          onClick={() => onCategorize('no_output')}
+        >
+          Nothing
         </button>
       </div>
     </div>
