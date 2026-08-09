@@ -5,6 +5,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { daysApi } from '../api/days';
 import {
   eliminationApi,
+  isAlarmingEliminationType,
   type CreateEliminationRecord,
   type EliminationEventType,
   type EliminationRecord,
@@ -25,6 +26,7 @@ const EVENT_TYPE_LABELS: Record<EliminationEventType, string> = {
   urination: 'Wee',
   defecation: 'Poop',
   vomit: 'Vomit',
+  no_output: 'Nothing',
 };
 
 const EVENT_TYPE_BADGE_COLOR: Record<EliminationEventType, string> = {
@@ -32,6 +34,7 @@ const EVENT_TYPE_BADGE_COLOR: Record<EliminationEventType, string> = {
   urination:  'var(--metric-water)',
   defecation: 'var(--metric-wet)',
   vomit:      'var(--error-text)',
+  no_output:  'var(--error-text)',
 };
 
 const DEFECATION_SUBTYPES: Array<{ value: string; label: string }> = [
@@ -51,7 +54,7 @@ const VOMIT_SUBTYPES: Array<{ value: string; label: string }> = [
   { value: 'other', label: 'Other' },
 ];
 
-const EVENT_TYPES: EliminationEventType[] = ['general', 'urination', 'defecation', 'vomit'];
+const EVENT_TYPES: EliminationEventType[] = ['general', 'urination', 'defecation', 'vomit', 'no_output'];
 
 
 // ── DurationInput ─────────────────────────────────────────────────────────────
@@ -489,10 +492,11 @@ export function EliminationDayPanel({ date, petId }: EliminationDayPanelProps) {
     setNoteDraft(summaryQuery.data?.note ?? '');
   }, [summaryQuery.data?.note]);
 
-  // Derived metrics — vomit is shown separately, not counted as a visit
-  const totalCount = records.filter((r) => r.event_type !== 'vomit').length;
+  // Derived metrics — vomit and no-output are shown separately, not counted as visits
+  const totalCount = records.filter((r) => !isAlarmingEliminationType(r.event_type)).length;
   const defecationCount = records.filter((r) => r.event_type === 'defecation').length;
   const vomitCount = records.filter((r) => r.event_type === 'vomit').length;
+  const noOutputCount = records.filter((r) => r.event_type === 'no_output').length;
   const durRecords = records.filter((r) => r.duration_seconds != null);
   const avgDurationSec = durRecords.length > 0
     ? durRecords.reduce((s, r) => s + (r.duration_seconds ?? 0), 0) / durRecords.length
@@ -549,8 +553,8 @@ export function EliminationDayPanel({ date, petId }: EliminationDayPanelProps) {
         )}
       </div>
 
-      {/* Metric cards — 4 per row, compact */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, minmax(0, max-content))', gap: '0.75rem' }}>
+      {/* Metric cards — alarming types shown separately from visits */}
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, minmax(0, max-content))', gap: '0.75rem' }}>
         <article className="metric-card">
           <span className="metric-label">Visits</span>
           <strong style={{ fontFamily: 'monospace', fontSize: '1.65rem' }}>
@@ -573,6 +577,12 @@ export function EliminationDayPanel({ date, petId }: EliminationDayPanelProps) {
           <span className="metric-label">Vomit</span>
           <strong style={{ fontFamily: 'monospace', fontSize: '1.65rem', color: vomitCount > 0 ? 'var(--error-text)' : 'var(--text-subtle)' }}>
             {vomitCount}
+          </strong>
+        </article>
+        <article className="metric-card">
+          <span className="metric-label">Nothing</span>
+          <strong style={{ fontFamily: 'monospace', fontSize: '1.65rem', color: noOutputCount > 0 ? 'var(--error-text)' : 'var(--text-subtle)' }}>
+            {noOutputCount}
           </strong>
         </article>
       </div>

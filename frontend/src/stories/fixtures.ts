@@ -350,8 +350,10 @@ export const mockEliminationDaySummary: EliminationDailySummary = {
   urination_count: 3,
   defecation_count: 1,
   vomit_count: 1,
+  no_output_count: 0,
   general_count: 0,
   has_vomit: true,
+  has_no_output: false,
   urination_avg_duration_seconds: 55,
   defecation_avg_duration_seconds: 90,
   general_avg_duration_seconds: null,
@@ -359,9 +361,9 @@ export const mockEliminationDaySummary: EliminationDailySummary = {
 
 export function mockEliminationCalendarHighlights(month = '2024-06'): Map<string, DayEliminationHighlight> {
   const map = new Map<string, DayEliminationHighlight>();
-  map.set(`${month}-15`, { totalCount: 5, hasVomit: true, hasDefecation: true, avgDurationSec: 95 });
-  map.set(`${month}-14`, { totalCount: 4, hasVomit: false, hasDefecation: true, avgDurationSec: 72 });
-  map.set(`${month}-10`, { totalCount: 3, hasVomit: false, hasDefecation: false, avgDurationSec: null });
+  map.set(`${month}-15`, { totalCount: 5, hasVomit: true, hasNoOutput: false, hasDefecation: true, avgDurationSec: 95 });
+  map.set(`${month}-14`, { totalCount: 4, hasVomit: false, hasNoOutput: false, hasDefecation: true, avgDurationSec: 72 });
+  map.set(`${month}-10`, { totalCount: 3, hasVomit: false, hasNoOutput: false, hasDefecation: false, avgDurationSec: null });
   return map;
 }
 
@@ -370,15 +372,15 @@ export const mockEliminationRangeSummary: EliminationRangeSummary = {
   date_to: localToday(),
   pet_id: mockPetId,
   daily_summaries: [
-    { local_date: shiftDate(localToday(), -6), pet_id: mockPetId, total_count: 4, urination_count: 2, defecation_count: 1, vomit_count: 0, general_count: 1, has_vomit: false, urination_avg_duration_seconds: 50, defecation_avg_duration_seconds: 85, general_avg_duration_seconds: 120 },
-    { local_date: shiftDate(localToday(), -5), pet_id: mockPetId, total_count: 3, urination_count: 2, defecation_count: 1, vomit_count: 0, general_count: 0, has_vomit: false, urination_avg_duration_seconds: null, defecation_avg_duration_seconds: null, general_avg_duration_seconds: null },
-    { local_date: shiftDate(localToday(), -4), pet_id: mockPetId, total_count: 5, urination_count: 3, defecation_count: 1, vomit_count: 1, general_count: 0, has_vomit: true, urination_avg_duration_seconds: 60, defecation_avg_duration_seconds: 100, general_avg_duration_seconds: null },
-    { local_date: shiftDate(localToday(), -3), pet_id: mockPetId, total_count: 4, urination_count: 2, defecation_count: 2, vomit_count: 0, general_count: 0, has_vomit: false, urination_avg_duration_seconds: 55, defecation_avg_duration_seconds: 88, general_avg_duration_seconds: null },
-    { local_date: shiftDate(localToday(), -2), pet_id: mockPetId, total_count: 6, urination_count: 4, defecation_count: 1, vomit_count: 0, general_count: 1, has_vomit: false, urination_avg_duration_seconds: 45, defecation_avg_duration_seconds: 75, general_avg_duration_seconds: 110 },
-    { local_date: shiftDate(localToday(), -1), pet_id: mockPetId, total_count: 4, urination_count: 3, defecation_count: 1, vomit_count: 0, general_count: 0, has_vomit: false, urination_avg_duration_seconds: null, defecation_avg_duration_seconds: null, general_avg_duration_seconds: null },
-    { local_date: localToday(), pet_id: mockPetId, total_count: 5, urination_count: 3, defecation_count: 1, vomit_count: 1, general_count: 0, has_vomit: true, urination_avg_duration_seconds: 58, defecation_avg_duration_seconds: 92, general_avg_duration_seconds: null },
+    { local_date: shiftDate(localToday(), -6), pet_id: mockPetId, total_count: 4, urination_count: 2, defecation_count: 1, vomit_count: 0, no_output_count: 0, general_count: 1, has_vomit: false, has_no_output: false, urination_avg_duration_seconds: 50, defecation_avg_duration_seconds: 85, general_avg_duration_seconds: 120 },
+    { local_date: shiftDate(localToday(), -5), pet_id: mockPetId, total_count: 3, urination_count: 2, defecation_count: 1, vomit_count: 0, no_output_count: 0, general_count: 0, has_vomit: false, has_no_output: false, urination_avg_duration_seconds: null, defecation_avg_duration_seconds: null, general_avg_duration_seconds: null },
+    { local_date: shiftDate(localToday(), -4), pet_id: mockPetId, total_count: 5, urination_count: 3, defecation_count: 1, vomit_count: 1, no_output_count: 0, general_count: 0, has_vomit: true, has_no_output: false, urination_avg_duration_seconds: 60, defecation_avg_duration_seconds: 100, general_avg_duration_seconds: null },
+    { local_date: shiftDate(localToday(), -3), pet_id: mockPetId, total_count: 4, urination_count: 2, defecation_count: 2, vomit_count: 0, no_output_count: 0, general_count: 0, has_vomit: false, has_no_output: false, urination_avg_duration_seconds: 55, defecation_avg_duration_seconds: 88, general_avg_duration_seconds: null },
+    { local_date: shiftDate(localToday(), -2), pet_id: mockPetId, total_count: 6, urination_count: 4, defecation_count: 1, vomit_count: 0, no_output_count: 0, general_count: 1, has_vomit: false, has_no_output: false, urination_avg_duration_seconds: 45, defecation_avg_duration_seconds: 75, general_avg_duration_seconds: 110 },
+    { local_date: shiftDate(localToday(), -1), pet_id: mockPetId, total_count: 4, urination_count: 3, defecation_count: 1, vomit_count: 0, no_output_count: 0, general_count: 0, has_vomit: false, has_no_output: false, urination_avg_duration_seconds: null, defecation_avg_duration_seconds: null, general_avg_duration_seconds: null },
+    { local_date: localToday(), pet_id: mockPetId, total_count: 5, urination_count: 3, defecation_count: 1, vomit_count: 1, no_output_count: 0, general_count: 0, has_vomit: true, has_no_output: false, urination_avg_duration_seconds: 58, defecation_avg_duration_seconds: 92, general_avg_duration_seconds: null },
   ],
-  type_totals: { urination: 19, defecation: 8, vomit: 2, general: 2 },
+  type_totals: { urination: 19, defecation: 8, vomit: 2, no_output: 0, general: 2 },
   avg_per_day: 4.4,
   p50_per_day: 4.0,
   p90_per_day: 5.8,

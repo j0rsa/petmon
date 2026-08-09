@@ -1,7 +1,7 @@
 import { Link } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { daysApi } from '../api/days';
-import { eliminationApi } from '../api/elimination';
+import { eliminationApi, isAlarmingEliminationType } from '../api/elimination';
 import { weightApi } from '../api/weight';
 import { healthStateApi } from '../api/healthState';
 import { healthStateEmoji, healthStateLabel } from '../lib/healthState';
@@ -162,9 +162,10 @@ export default function OverviewPage() {
               const wees = records.filter(r => r.event_type === 'urination').length;
               const poops = records.filter(r => r.event_type === 'defecation').length;
               const vomits = records.filter(r => r.event_type === 'vomit').length;
-              const total = records.length;
+              const nothings = records.filter(r => r.event_type === 'no_output').length;
+              const total = records.filter(r => !isAlarmingEliminationType(r.event_type)).length;
 
-              if (total === 0) {
+              if (total === 0 && vomits === 0 && nothings === 0) {
                 return <p className="muted-text" style={{ fontSize: '0.88rem' }}>No visits logged today yet.</p>;
               }
 
@@ -184,6 +185,9 @@ export default function OverviewPage() {
                   )}
                   {vomits > 0 && (
                     <span style={{ fontSize: '0.88rem', color: 'var(--error-text)', fontWeight: 600 }}>⚠ {vomits} vomit{vomits === 1 ? '' : 's'}</span>
+                  )}
+                  {nothings > 0 && (
+                    <span style={{ fontSize: '0.88rem', color: 'var(--error-text)', fontWeight: 600 }}>⚠ {nothings} nothing visit{nothings === 1 ? '' : 's'}</span>
                   )}
                 </div>
               );

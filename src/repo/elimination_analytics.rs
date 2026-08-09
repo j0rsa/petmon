@@ -84,43 +84,49 @@ pub async fn daily_summaries(
     }
 
     // Aggregate event counts by date
-    let mut by_date: BTreeMap<String, (i64, i64, i64, i64)> = BTreeMap::new();
-    // (urination, defecation, vomit, general)
+    let mut by_date: BTreeMap<String, (i64, i64, i64, i64, i64)> = BTreeMap::new();
+    // (urination, defecation, vomit, no_output, general)
     for row in &rows {
         let entry = by_date
             .entry(row.local_date.clone())
-            .or_insert((0, 0, 0, 0));
+            .or_insert((0, 0, 0, 0, 0));
         match row.event_type.as_str() {
             "urination" => entry.0 += row.cnt,
             "defecation" => entry.1 += row.cnt,
             "vomit" => entry.2 += row.cnt,
-            _ => entry.3 += row.cnt,
+            "no_output" => entry.3 += row.cnt,
+            "general" => entry.4 += row.cnt,
+            _ => {}
         }
     }
 
     let pet_id_owned = pet_id.map(str::to_owned);
     let summaries = by_date
         .into_iter()
-        .map(|(local_date, (urination, defecation, vomit, general))| {
-            let total_count = urination + defecation + vomit + general;
-            let type_durations = avg_duration_by_date_type
-                .get(&local_date)
-                .copied()
-                .unwrap_or_default();
-            EliminationDailySummary {
-                local_date,
-                pet_id: pet_id_owned.clone(),
-                total_count,
-                urination_count: urination,
-                defecation_count: defecation,
-                vomit_count: vomit,
-                general_count: general,
-                has_vomit: vomit > 0,
-                urination_avg_duration_seconds: type_durations.urination,
-                defecation_avg_duration_seconds: type_durations.defecation,
-                general_avg_duration_seconds: type_durations.general,
-            }
-        })
+        .map(
+            |(local_date, (urination, defecation, vomit, no_output, general))| {
+                let total_count = urination + defecation + vomit + no_output + general;
+                let type_durations = avg_duration_by_date_type
+                    .get(&local_date)
+                    .copied()
+                    .unwrap_or_default();
+                EliminationDailySummary {
+                    local_date,
+                    pet_id: pet_id_owned.clone(),
+                    total_count,
+                    urination_count: urination,
+                    defecation_count: defecation,
+                    vomit_count: vomit,
+                    no_output_count: no_output,
+                    general_count: general,
+                    has_vomit: vomit > 0,
+                    has_no_output: no_output > 0,
+                    urination_avg_duration_seconds: type_durations.urination,
+                    defecation_avg_duration_seconds: type_durations.defecation,
+                    general_avg_duration_seconds: type_durations.general,
+                }
+            },
+        )
         .collect();
 
     Ok(summaries)

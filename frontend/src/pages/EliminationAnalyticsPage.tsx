@@ -25,6 +25,7 @@ const EVENT_TYPE_COLORS: Record<string, string> = {
   urination:  'var(--metric-water)',
   defecation: 'var(--metric-wet)',
   vomit:      'var(--error-text)',
+  no_output:  'var(--error-text)',
   general:    'var(--text-muted)',
 };
 
@@ -32,14 +33,15 @@ const EVENT_TYPE_LABELS: Record<string, string> = {
   urination:  'Wee',
   defecation: 'Poop',
   vomit:      'Vomit',
+  no_output:  'Nothing',
   general:    'General',
 };
 
 /** Bottom-to-top stack in the daily visits chart. */
-const EVENT_TYPE_STACK_ORDER = ['defecation', 'vomit', 'urination', 'general'] as const;
+const EVENT_TYPE_STACK_ORDER = ['defecation', 'vomit', 'no_output', 'urination', 'general'] as const;
 
 /** Legend order (independent of stack order). */
-const EVENT_TYPE_LEGEND_ORDER = ['general', 'defecation', 'vomit', 'urination'] as const;
+const EVENT_TYPE_LEGEND_ORDER = ['general', 'defecation', 'vomit', 'no_output', 'urination'] as const;
 
 type EventType = typeof EVENT_TYPE_STACK_ORDER[number];
 
@@ -124,7 +126,7 @@ export default function EliminationAnalyticsPage() {
   const dailyData = useMemo(() => {
     const summaryMap = new Map<string, {
       total: number; urination: number; defecation: number;
-      vomit: number; general: number;
+      vomit: number; no_output: number; general: number;
       urinationAvgDuration: number | null;
       defecationAvgDuration: number | null;
       generalAvgDuration: number | null;
@@ -136,6 +138,7 @@ export default function EliminationAnalyticsPage() {
         urination: s.urination_count,
         defecation: s.defecation_count,
         vomit: s.vomit_count,
+        no_output: s.no_output_count,
         general: s.general_count,
         urinationAvgDuration: s.urination_avg_duration_seconds ?? null,
         defecationAvgDuration: s.defecation_avg_duration_seconds ?? null,
@@ -153,6 +156,7 @@ export default function EliminationAnalyticsPage() {
         urination: row?.urination ?? 0,
         defecation: row?.defecation ?? 0,
         vomit: row?.vomit ?? 0,
+        no_output: row?.no_output ?? 0,
         general: row?.general ?? 0,
         toiletVisits: (row?.urination ?? 0) + (row?.defecation ?? 0) + (row?.general ?? 0),
         urinationAvgDuration: row?.urinationAvgDuration ?? null,
@@ -163,12 +167,13 @@ export default function EliminationAnalyticsPage() {
     return result;
   }, [analyticsQuery.data, days, today]);
 
-  // Stats: p50 (median) + vomit days + deviation from avg
+  // Stats: p50 (median) + alarming days + deviation from avg
   const stats = useMemo(() => {
     const data = analyticsQuery.data;
     if (!data) return null;
     const vomitDays = data.daily_summaries.filter((s) => s.has_vomit).length;
-    return { median: data.p50_per_day, avg: data.avg_per_day, vomitDays };
+    const noOutputDays = data.daily_summaries.filter((s) => s.has_no_output).length;
+    return { median: data.p50_per_day, avg: data.avg_per_day, vomitDays, noOutputDays };
   }, [analyticsQuery.data]);
 
   // Regression trend lines
@@ -223,6 +228,12 @@ export default function EliminationAnalyticsPage() {
   const vomitDays = useMemo(() => {
     return (analyticsQuery.data?.daily_summaries ?? [])
       .filter((s) => s.has_vomit)
+      .sort((a, b) => b.local_date.localeCompare(a.local_date));
+  }, [analyticsQuery.data]);
+
+  const noOutputDays = useMemo(() => {
+    return (analyticsQuery.data?.daily_summaries ?? [])
+      .filter((s) => s.has_no_output)
       .sort((a, b) => b.local_date.localeCompare(a.local_date));
   }, [analyticsQuery.data]);
 
@@ -287,6 +298,13 @@ export default function EliminationAnalyticsPage() {
                 color="var(--error-text)"
                 icon={<AlertIcon />}
                 note={days > 0 ? `${Math.round((stats.vomitDays / days) * 100)}% of period` : undefined}
+              />
+              <StatCard
+                label="nothing days"
+                value={String(stats.noOutputDays)}
+                color="var(--error-text)"
+                icon={<AlertIcon />}
+                note={days > 0 ? `${Math.round((stats.noOutputDays / days) * 100)}% of period` : undefined}
               />
             </div>
           )}
@@ -440,6 +458,22 @@ export default function EliminationAnalyticsPage() {
                   <div key={s.local_date} style={{ display: 'flex', alignItems: 'center', gap: '1rem', padding: '0.5rem 0', borderBottom: '1px solid var(--border-subtle)' }}>
                     <span style={{ fontFamily: 'monospace', fontSize: '0.88rem' }}>{s.local_date}</span>
                     <span style={{ color: 'var(--error-text)', fontSize: '0.82rem' }}>{s.vomit_count} vomit{s.vomit_count === 1 ? '' : 's'}</span>
+                    <span style={{ color: 'var(--text-muted)', fontSize: '0.82rem' }}>{s.total_count} total</span>
+                  </div>
+                ))}
+              </div>
+            </section>
+          )}
+          {noOutputDays.length > 0 && (
+            <section className="panel">
+              <p className="eyebrow" style={{ marginBottom: '0.5rem' }}>
+                nothing days ({noOutputDays.length})
+              </p>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+                {noOutputDays.map((s) => (
+                  <div key={s.local_date} style={{ display: 'flex', alignItems: 'center', gap: '1rem', padding: '0.5rem 0', borderBottom: '1px solid var(--border-subtle)' }}>
+                    <span style={{ fontFamily: 'monospace', fontSize: '0.88rem' }}>{s.local_date}</span>
+                    <span style={{ color: 'var(--error-text)', fontSize: '0.82rem' }}>{s.no_output_count} nothing visit{s.no_output_count === 1 ? '' : 's'}</span>
                     <span style={{ color: 'var(--text-muted)', fontSize: '0.82rem' }}>{s.total_count} total</span>
                   </div>
                 ))}

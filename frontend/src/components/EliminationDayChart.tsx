@@ -2,13 +2,14 @@ import { useMemo } from 'react';
 import { Bar, BarChart, CartesianGrid, Legend, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
 import type { EliminationEventType, EliminationRecord } from '../api/elimination';
 
-const CHART_KEYS: EliminationEventType[] = ['urination', 'defecation', 'general', 'vomit'];
+const CHART_KEYS: EliminationEventType[] = ['urination', 'defecation', 'general', 'vomit', 'no_output'];
 
 const CHART_COLORS: Record<EliminationEventType, string> = {
   urination: 'var(--metric-water)',
   defecation: 'var(--metric-wet)',
   general: 'var(--text-muted)',
   vomit: 'var(--error-text)',
+  no_output: 'var(--error-text)',
 };
 
 const CHART_LABELS: Record<EliminationEventType, string> = {
@@ -16,6 +17,7 @@ const CHART_LABELS: Record<EliminationEventType, string> = {
   defecation: 'Poop',
   general: 'General',
   vomit: 'Vomit',
+  no_output: 'Nothing',
 };
 
 const DEFAULT_DURATION_SECONDS = 30;
