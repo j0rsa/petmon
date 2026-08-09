@@ -103,10 +103,10 @@ export const PetSheetWithNotifications: Story = {
     await expect(canvas.getByText('Switch pet')).toBeInTheDocument();
     await expect(canvas.getByText('Manage pets')).toBeInTheDocument();
     await expect(canvas.getByText('Settings')).toBeInTheDocument();
-    await expect(canvas.getByText(`v${mockAppInfo.version} · ${mockAppInfo.git_sha}`)).toBeInTheDocument();
     await expect(canvas.getByText('Notifications')).toBeInTheDocument();
     await expect(canvas.getByText('Visit duration did not match history for Mittens')).toBeInTheDocument();
     await expect(canvas.getByRole('button', { name: 'Mark all read' })).toBeInTheDocument();
+    await expect(canvas.getByText(`v${mockAppInfo.version} · ${mockAppInfo.git_sha}`)).toBeInTheDocument();
   },
 };
 
