@@ -32,7 +32,7 @@ export function PetEliminationAutoTagBuckets({ petId }: PetEliminationAutoTagBuc
   });
 
   if (statusQuery.isLoading) {
-    return <p className="muted-text" style={{ fontSize: '0.82rem', margin: '0.5rem 0 0' }}>Loading auto-tag model…</p>;
+    return <p className="pet-elimination-auto-tag pet-elimination-auto-tag--loading">Loading auto-tag model…</p>;
   }
 
   const baselines = statusQuery.data?.baselines;
@@ -40,16 +40,7 @@ export function PetEliminationAutoTagBuckets({ petId }: PetEliminationAutoTagBuc
   const fallback = statusQuery.data?.fallback_active ?? true;
 
   return (
-    <div
-      style={{
-        marginTop: '0.5rem',
-        fontSize: '0.82rem',
-        color: 'var(--text-muted)',
-        display: 'flex',
-        flexDirection: 'column',
-        gap: '0.35rem',
-      }}
-    >
+    <div className="pet-elimination-auto-tag">
       <span>
         Typical day: ~{baselines?.p50_wees_per_day.toFixed(0) ?? '?'} wees, ~{baselines?.p50_poops_per_day.toFixed(0) ?? '?'} poops
       </span>
@@ -65,15 +56,14 @@ export function PetEliminationAutoTagBuckets({ petId }: PetEliminationAutoTagBuc
       )}
       <button
         type="button"
-        className="button button-secondary"
-        style={{ alignSelf: 'flex-start', marginTop: '0.25rem', fontSize: '0.78rem', padding: '0.25rem 0.6rem' }}
+        className="button button-secondary pet-elimination-auto-tag__retrain"
         disabled={retrainMutation.isPending}
         onClick={() => retrainMutation.mutate()}
       >
         {retrainMutation.isPending ? 'Retraining…' : 'Retrain now'}
       </button>
       {retrainMutation.data && !retrainMutation.data.trained && (
-        <span style={{ color: 'var(--warning, #b8860b)' }}>{retrainMutation.data.message}</span>
+        <span className="pet-elimination-auto-tag__message">{retrainMutation.data.message}</span>
       )}
     </div>
   );

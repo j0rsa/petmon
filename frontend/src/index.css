@@ -1495,6 +1495,10 @@ pre {
   align-items: start;
 }
 
+.pet-info-page .pet-info-card > .pet-elimination-auto-tag {
+  grid-column: 2;
+}
+
 .pet-info-fields {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
@@ -1523,6 +1527,33 @@ pre {
 
 .pet-info-row-full {
   grid-column: 1 / -1;
+}
+
+.pet-elimination-auto-tag {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 0.35rem;
+  width: 100%;
+  margin-top: 0.5rem;
+  font-size: 0.82rem;
+  color: var(--text-muted);
+  text-align: left;
+}
+
+.pet-elimination-auto-tag--loading {
+  margin: 0.5rem 0 0;
+}
+
+.pet-elimination-auto-tag__retrain {
+  align-self: flex-start;
+  margin-top: 0.25rem;
+  font-size: 0.78rem;
+  padding: 0.25rem 0.6rem;
+}
+
+.pet-elimination-auto-tag__message {
+  color: var(--warning, #b8860b);
 }
 
 .color-picker-field {
@@ -2237,13 +2268,15 @@ pre {
 
   .pet-info-page .pet-info-card {
     grid-template-columns: 1fr;
-    justify-items: center;
-    text-align: center;
   }
 
-  .pet-info-fields {
+  .pet-info-page .pet-info-card > .pet-avatar {
+    justify-self: center;
+  }
+
+  .pet-info-fields,
+  .pet-elimination-auto-tag {
     width: 100%;
-    text-align: left;
   }
 }
 
