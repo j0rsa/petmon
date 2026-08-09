@@ -384,7 +384,7 @@ fn tool_list() -> Value {
             // ── Elimination / toileting records ──────────────────────────────
             {
                 "name": "elimination.records.list",
-                "description": "List toileting/elimination records for a pet. event_type: general|urination|defecation|vomit",
+                "description": "List toileting/elimination records for a pet. event_type: general|urination|defecation|vomit|no_output",
                 "inputSchema": {
                     "type": "object",
                     "properties": {
@@ -392,7 +392,7 @@ fn tool_list() -> Value {
                         "date":       { "type": "string", "format": "date" },
                         "date_from":  { "type": "string", "format": "date" },
                         "date_to":    { "type": "string", "format": "date" },
-                        "event_type": { "type": "string", "enum": ["general", "urination", "defecation", "vomit"] },
+                        "event_type": { "type": "string", "enum": ["general", "urination", "defecation", "vomit", "no_output"] },
                         "limit":      { "type": "integer" },
                         "offset":     { "type": "integer" }
                     }
@@ -406,7 +406,7 @@ fn tool_list() -> Value {
                     "required": ["pet_id", "event_type"],
                     "properties": {
                         "pet_id":           { "type": "string", "format": "uuid" },
-                        "event_type":       { "type": "string", "enum": ["general", "urination", "defecation", "vomit"] },
+                        "event_type":       { "type": "string", "enum": ["general", "urination", "defecation", "vomit", "no_output"] },
                         "subtype":          { "type": "string" },
                         "duration_seconds": { "type": "integer" },
                         "occurred_at":      { "type": "string", "format": "date-time" },
@@ -422,7 +422,7 @@ fn tool_list() -> Value {
                     "required": ["id"],
                     "properties": {
                         "id":               { "type": "string" },
-                        "event_type":       { "type": "string", "enum": ["general", "urination", "defecation", "vomit"] },
+                        "event_type":       { "type": "string", "enum": ["general", "urination", "defecation", "vomit", "no_output"] },
                         "subtype":          { "type": ["string", "null"] },
                         "duration_seconds": { "type": ["integer", "null"] },
                         "occurred_at":      { "type": "string" },
@@ -456,7 +456,7 @@ fn tool_list() -> Value {
             // ── Elimination context ──────────────────────────────────────────
             {
                 "name": "pets.elimination-context",
-                "description": "Returns a complete toileting context for a single pet in one call: pet profile, today's elimination records with type breakdown, and a 7-day trend summary (avg visits/day, vomit days, p50/p90 per day). Use this as the starting point for any question about a pet's toileting habits — it answers 'how many times today?', 'any vomit recently?', 'is the frequency normal?', and 'what types occurred?' without additional tool calls. Event types use informal labels: urination=wee, defecation=poop.",
+                "description": "Returns a complete toileting context for a single pet in one call: pet profile, today's elimination records with type breakdown, and a 7-day trend summary (avg visits/day, vomit days, no-output days, p50/p90 per day). Use this as the starting point for any question about a pet's toileting habits — it answers 'how many times today?', 'any vomit or unproductive visits recently?', 'is the frequency normal?', and 'what types occurred?' without additional tool calls. Event types use informal labels: urination=wee, defecation=poop, no_output=nothing.",
                 "inputSchema": {
                     "type": "object",
                     "required": ["pet_id"],
@@ -933,6 +933,10 @@ pub async fn dispatch(
                 .iter()
                 .filter(|r| r.event_type.to_string() == "vomit")
                 .count();
+            let no_output_count = today_records
+                .iter()
+                .filter(|r| r.event_type.to_string() == "no_output")
+                .count();
 
             Ok(json!({
                 "pet": pet,
@@ -942,7 +946,8 @@ pub async fn dispatch(
                     "wee": wee_count,
                     "poop": poop_count,
                     "vomit": vomit_count,
-                    "general": today_records.len() - wee_count - poop_count - vomit_count,
+                    "no_output": no_output_count,
+                    "general": today_records.len() - wee_count - poop_count - vomit_count - no_output_count,
                     "records": today_records
                 },
                 "trend_7d": trend

@@ -1807,6 +1807,47 @@ async fn elimination_range_summary_includes_per_type_avg_duration() {
     );
 }
 
+/// no_output events are tracked separately in analytics like vomit (alarming, not a normal visit).
+#[actix_web::test]
+async fn elimination_no_output_tracked_in_analytics() {
+    let (app, _state) = build_dev_app!();
+    let pet_id = api_create_pet!(&app, "EliminationNoOutput");
+
+    let local_date = "2026-06-02";
+    for (event_type, duration_seconds) in [("urination", 40), ("no_output", 90), ("no_output", 60)]
+    {
+        let req = test::TestRequest::post()
+            .uri("/api/v1/elimination/records")
+            .set_json(serde_json::json!({
+                "pet_id": pet_id,
+                "event_type": event_type,
+                "duration_seconds": duration_seconds,
+                "occurred_at": format!("{local_date}T09:00:00"),
+                "local_date": local_date,
+            }))
+            .to_request();
+        let resp = test::call_service(&app, req).await;
+        assert_eq!(resp.status(), 201, "create {event_type} failed");
+        let body: serde_json::Value = test::read_body_json(resp).await;
+        assert_eq!(body["event_type"].as_str(), Some(event_type));
+    }
+
+    let req = test::TestRequest::get()
+        .uri(&format!(
+            "/api/v1/elimination/analytics/range-summary?date_from={local_date}&date_to={local_date}&pet_id={pet_id}"
+        ))
+        .to_request();
+    let resp = test::call_service(&app, req).await;
+    assert_eq!(resp.status(), 200);
+    let body: serde_json::Value = test::read_body_json(resp).await;
+    let summary = &body["daily_summaries"][0];
+    assert_eq!(summary["urination_count"].as_i64(), Some(1));
+    assert_eq!(summary["no_output_count"].as_i64(), Some(2));
+    assert_eq!(summary["has_no_output"].as_bool(), Some(true));
+    assert_eq!(summary["total_count"].as_i64(), Some(3));
+    assert_eq!(body["type_totals"]["no_output"].as_i64(), Some(2));
+}
+
 #[actix_web::test]
 async fn elimination_records_returns_json_not_spa() {
     let pool = setup_pool().await;

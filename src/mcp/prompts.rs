@@ -31,7 +31,7 @@ Using petmon MCP tools, prepare a caregiver-friendly daily summary for \"{pet_na
 2. Call pets.nutrition-context, pets.elimination-context, and pets.health-context for that pet.
 3. Summarize in plain language (not clinical jargon):
    - Nutrition: use status.on_track from pets.nutrition-context (or nutrition.on-track); note weekly trend if relevant
-   - Toileting: today's wee/poop/vomit counts; anything unusual in the 7-day trend
+   - Toileting: today's wee/poop/vomit/nothing counts; anything unusual in the 7-day trend
    - Health: latest weight and 30-day trend; recent wellbeing check-ins and notes
 4. Flag anything worth watching; keep it concise.",
     },
@@ -64,8 +64,8 @@ Using petmon MCP tools, check toileting for \"{pet_name}\":
 
 1. Resolve the pet via pets.list if needed.
 2. Call pets.elimination-context for that pet.
-3. Summarize today's wee, poop, and vomit counts. Note anything unusual in the 7-day trend.
-Use casual terms (wee, poop, vomit) in your reply — not urination/defecation.",
+3. Summarize today's wee, poop, vomit, and nothing (no-output) counts. Note anything unusual in the 7-day trend.
+Use casual terms (wee, poop, vomit, nothing) in your reply — not urination/defecation/no_output.",
     },
     PromptDef {
         name: "health-check",
@@ -139,7 +139,7 @@ Using petmon MCP tools, prepare a vet/caregiver handoff brief for \"{pet_name}\"
    - Pet profile (species, breed, feeding notes if relevant)
    - Weight: latest, trend over the period
    - Wellbeing: recent check-in levels and caregiver notes
-   - Toileting: vomit episodes, frequency changes, concerning subtypes
+   - Toileting: vomit episodes, unproductive visits (nothing), frequency changes, concerning subtypes
    - Nutrition: average daily fluid/food intake vs schedule
 4. Use clear headings; flag concerns explicitly; suitable to copy into a message for a vet.",
     },

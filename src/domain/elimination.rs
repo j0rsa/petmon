@@ -11,6 +11,8 @@ pub enum EliminationEventType {
     Urination,
     Defecation,
     Vomit,
+    /// Pet went to the toilet but produced nothing.
+    NoOutput,
 }
 
 impl std::fmt::Display for EliminationEventType {
@@ -20,6 +22,7 @@ impl std::fmt::Display for EliminationEventType {
             EliminationEventType::Urination => write!(f, "urination"),
             EliminationEventType::Defecation => write!(f, "defecation"),
             EliminationEventType::Vomit => write!(f, "vomit"),
+            EliminationEventType::NoOutput => write!(f, "no_output"),
         }
     }
 }
@@ -33,6 +36,7 @@ impl std::str::FromStr for EliminationEventType {
             "urination" => Ok(Self::Urination),
             "defecation" => Ok(Self::Defecation),
             "vomit" => Ok(Self::Vomit),
+            "no_output" => Ok(Self::NoOutput),
             _ => Err(()),
         }
     }
@@ -128,8 +132,10 @@ pub struct EliminationDailySummary {
     pub urination_count: i64,
     pub defecation_count: i64,
     pub vomit_count: i64,
+    pub no_output_count: i64,
     pub general_count: i64,
     pub has_vomit: bool,
+    pub has_no_output: bool,
     /// Average duration in seconds for urination records with duration logged.
     pub urination_avg_duration_seconds: Option<f64>,
     /// Average duration in seconds for defecation records with duration logged.

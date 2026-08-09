@@ -1,8 +1,15 @@
 import { api } from './client';
 
-export type EliminationEventType = 'general' | 'urination' | 'defecation' | 'vomit';
+export type EliminationEventType = 'general' | 'urination' | 'defecation' | 'vomit' | 'no_output';
 export type DefecationSubtype = 'normal' | 'soft' | 'liquid' | 'hard' | 'blood' | 'mucus';
 export type VomitSubtype = 'food' | 'fur' | 'bile' | 'other';
+
+/** Health-concerning types excluded from normal visit counts (same treatment as vomit). */
+export const ALARMING_ELIMINATION_TYPES: readonly EliminationEventType[] = ['vomit', 'no_output'];
+
+export function isAlarmingEliminationType(type: EliminationEventType): boolean {
+  return ALARMING_ELIMINATION_TYPES.includes(type);
+}
 
 export interface EliminationRecord {
   id: string;
@@ -58,11 +65,17 @@ export interface EliminationDailySummary {
   urination_count: number;
   defecation_count: number;
   vomit_count: number;
+  no_output_count: number;
   general_count: number;
   has_vomit: boolean;
+  has_no_output: boolean;
   urination_avg_duration_seconds: number | null;
   defecation_avg_duration_seconds: number | null;
   general_avg_duration_seconds: number | null;
+}
+
+export function toiletVisitCountFromSummary(summary: EliminationDailySummary): number {
+  return summary.total_count - summary.vomit_count - summary.no_output_count;
 }
 
 export interface EliminationRangeSummary {

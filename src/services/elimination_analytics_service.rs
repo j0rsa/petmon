@@ -21,6 +21,7 @@ pub async fn range_summary(
         *type_totals.entry("urination".to_string()).or_insert(0) += s.urination_count;
         *type_totals.entry("defecation".to_string()).or_insert(0) += s.defecation_count;
         *type_totals.entry("vomit".to_string()).or_insert(0) += s.vomit_count;
+        *type_totals.entry("no_output".to_string()).or_insert(0) += s.no_output_count;
         *type_totals.entry("general".to_string()).or_insert(0) += s.general_count;
         total_sum += s.total_count;
     }

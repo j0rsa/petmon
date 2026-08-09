@@ -3140,7 +3140,8 @@ components:
         - urination
         - defecation
         - vomit
-      description: "Type of elimination event. Subtypes for defecation: normal|soft|liquid|hard|blood|mucus. Subtypes for vomit: food|fur|fur_with_food|bile|other."
+        - no_output
+      description: "Type of elimination event. Subtypes for defecation: normal|soft|liquid|hard|blood|mucus. Subtypes for vomit: food|fur|fur_with_food|bile|other. no_output = pet went to the toilet but produced nothing."
 
     EliminationRecord:
       type: object
@@ -3500,10 +3501,15 @@ components:
         vomit_count:
           type: integer
           format: int64
+        no_output_count:
+          type: integer
+          format: int64
         general_count:
           type: integer
           format: int64
         has_vomit:
+          type: boolean
+        has_no_output:
           type: boolean
         urination_avg_duration_seconds:
           type: number
@@ -3526,8 +3532,10 @@ components:
         - urination_count
         - defecation_count
         - vomit_count
+        - no_output_count
         - general_count
         - has_vomit
+        - has_no_output
 
     EliminationRangeSummary:
       type: object

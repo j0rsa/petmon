@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState, useSyncExternalStore } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
-import { eliminationApi, categorizedAvgDuration } from '../api/elimination';
+import { eliminationApi, categorizedAvgDuration, toiletVisitCountFromSummary } from '../api/elimination';
 import { MonthCalendar } from '../components/MonthCalendar';
 import { NoPetSelected } from '../components/NoPetSelected';
 import { EliminationDayPanel } from '../components/EliminationDayPanel';
@@ -41,8 +41,9 @@ export default function EliminationJournalPage() {
     const map = new Map<string, DayEliminationHighlight>();
     for (const summary of calendarQuery.data ?? []) {
       map.set(summary.local_date, {
-        totalCount: summary.total_count - summary.vomit_count,
+        totalCount: toiletVisitCountFromSummary(summary),
         hasVomit: summary.has_vomit,
+        hasNoOutput: summary.has_no_output,
         hasDefecation: summary.defecation_count > 0,
         avgDurationSec: categorizedAvgDuration(summary),
       });
@@ -56,7 +57,7 @@ export default function EliminationJournalPage() {
 
   function renderDayHints(date: string) {
     const h = highlights.get(date);
-    if (!h || (h.totalCount === 0 && !h.hasVomit && !h.hasDefecation)) return { hasData: false, lines: [] };
+    if (!h || (h.totalCount === 0 && !h.hasVomit && !h.hasNoOutput && !h.hasDefecation)) return { hasData: false, lines: [] };
     const visitLabel = isMobile ? `${h.totalCount}×` : `${h.totalCount} visit${h.totalCount === 1 ? '' : 's'}`;
     const lines = [visitLabel];
     if (h.avgDurationSec != null) {
@@ -68,6 +69,7 @@ export default function EliminationJournalPage() {
       <>
         {h.hasDefecation && <span key="poop-dot" style={{ display: 'inline-block', width: 6, height: 6, borderRadius: '50%', background: 'var(--metric-wet)', marginTop: 2 }} title="poop" />}
         {h.hasVomit && <span key="vomit-dot" style={{ display: 'inline-block', width: 6, height: 6, borderRadius: '50%', background: 'var(--error-text)', marginTop: 2 }} title="vomit" />}
+        {h.hasNoOutput && <span key="nothing-dot" style={{ display: 'inline-block', width: 6, height: 6, borderRadius: '50%', boxShadow: 'inset 0 0 0 1.5px var(--error-text)', marginTop: 2 }} title="nothing" />}
       </>
     );
     return {
@@ -98,7 +100,7 @@ export default function EliminationJournalPage() {
         compact={isMobile}
         calendarConfig={displaySettings}
         weekStart={displaySettings.calendar_week_start}
-        footnote="Visits exclude vomit. Blue dot = poop, red dot = vomit. Select a day to open its log."
+        footnote="Visits exclude vomit and nothing. Blue dot = poop, filled red = vomit, ring = nothing. Select a day to open its log."
       />
       <EliminationDayPanel date={selectedDate} petId={selectedPetId} />
     </div>

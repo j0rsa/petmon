@@ -35,7 +35,7 @@ export const DeepLinkHighlight: Story = {
   },
 };
 
-/** Latest entry is general — shows one-press Wee/Poop categorization. */
+/** Latest entry is general — shows one-press Wee/Poop/Nothing categorization. */
 export const GeneralLatestRecord: Story = {
   decorators: [
     withEliminationDayPanel('2024-06-15', mockPetId, false, {
@@ -73,6 +73,10 @@ export const GeneralLatestRecord: Story = {
       ],
     }),
   ],
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    await expect(canvas.getByRole('button', { name: 'Nothing' })).toBeInTheDocument();
+  },
 };
 
 export const AutoCategorizedRecord: Story = {
@@ -166,7 +170,7 @@ export const EditingNarrow: Story = {
 };
 
 /**
- * Uncategorized latest visit normally shows Wee/Poop — but not while that row is open for edit.
+ * Uncategorized latest visit normally shows Wee/Poop/Nothing — but not while that row is open for edit.
  */
 export const EditingHidesCategorizeBar: Story = {
   decorators: [
