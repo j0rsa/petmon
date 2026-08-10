@@ -20,7 +20,7 @@ fn hash_token(raw: &str) -> String {
 
 pub async fn list(pool: &SqlitePool) -> AppResult<Vec<ApiToken>> {
     Ok(sqlx::query_as::<_, ApiToken>(
-        "SELECT id, alias, token_hash, active, scopes, created_by, created_at, last_used_at
+        "SELECT id, alias, token_hash, active, scopes, created_by, owner_subject, created_at, last_used_at
          FROM api_tokens ORDER BY created_at DESC",
     )
     .fetch_all(pool)
@@ -36,8 +36,8 @@ pub async fn create(
     let token = ApiToken::new(req, hash);
 
     sqlx::query(
-        "INSERT INTO api_tokens (id, alias, token_hash, active, scopes, created_by, created_at)
-         VALUES (?, ?, ?, ?, ?, ?, ?)",
+        "INSERT INTO api_tokens (id, alias, token_hash, active, scopes, created_by, owner_subject, created_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
     )
     .bind(&token.id)
     .bind(&token.alias)
@@ -45,6 +45,7 @@ pub async fn create(
     .bind(token.active)
     .bind(&token.scopes)
     .bind(&token.created_by)
+    .bind(&token.owner_subject)
     .bind(&token.created_at)
     .execute(pool)
     .await?;
@@ -100,7 +101,7 @@ pub async fn update_scopes(
         return Err(AppError::NotFound(format!("API token '{id}' not found")));
     }
     sqlx::query_as::<_, ApiToken>(
-        "SELECT id, alias, token_hash, active, scopes, created_by, created_at, last_used_at
+        "SELECT id, alias, token_hash, active, scopes, created_by, owner_subject, created_at, last_used_at
          FROM api_tokens WHERE id = ?",
     )
     .bind(id)
@@ -147,7 +148,7 @@ pub async fn has_active_tokens(pool: &SqlitePool) -> bool {
 pub async fn find_by_hash(pool: &SqlitePool, raw_token: &str) -> AppResult<Option<ApiToken>> {
     let hash = hash_token(raw_token);
     let token = sqlx::query_as::<_, ApiToken>(
-        "SELECT id, alias, token_hash, active, scopes, created_by, created_at, last_used_at
+        "SELECT id, alias, token_hash, active, scopes, created_by, owner_subject, created_at, last_used_at
          FROM api_tokens WHERE token_hash = ? AND active = 1",
     )
     .bind(&hash)

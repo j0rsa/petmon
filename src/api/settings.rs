@@ -127,6 +127,7 @@ pub async fn create_token(
 
     let mut req_body = body.into_inner();
     req_body.created_by = Some(identity.display_name().to_string());
+    req_body.owner_subject = Some(identity.subject.clone());
 
     let (_, created) = api_tokens::create(&state.pool, req_body).await?;
     Ok(HttpResponse::Created().json(created))

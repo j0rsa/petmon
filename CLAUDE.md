@@ -11,7 +11,12 @@
 
 User settings API: `GET/POST /api/v1/me/settings/{key}` where `key` is e.g. `display`, `nutrition_calendar`, `cumulative_fluid_chart`.
 
-`reader_key` identifies the authenticated caller — OIDC `sub`, `api_token:{id}`, or `dev` in DEV_MODE. It is not a device id; push subscriptions are keyed separately by browser endpoint.
+`reader_key` identifies the human user for per-user state:
+- **OIDC:** JWT `sub` — same settings on web and mobile.
+- **API token:** `owner_subject` (creator's `sub` at mint time) when set; legacy tokens fall back to `api_token:{id}`.
+- **DEV_MODE:** `"dev"`.
+
+Push subscriptions remain per browser endpoint; notification read state follows `reader_key`.
 
 ---
 1. **Tests** — update or add integration tests in `tests/api_tests.rs` covering the changed behaviour.

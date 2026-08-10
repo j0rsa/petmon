@@ -190,6 +190,8 @@ pub struct ApiToken {
     pub active: bool,
     pub scopes: String,
     pub created_by: Option<String>,
+    /// OIDC `sub` (or `dev`) of the user who minted this token — drives per-user settings sync.
+    pub owner_subject: Option<String>,
     pub created_at: String,
     pub last_used_at: Option<String>,
 }
@@ -226,6 +228,8 @@ pub struct CreateApiToken {
     /// Set by the server from the caller's Identity — not accepted from the request body.
     #[serde(skip_deserializing)]
     pub created_by: Option<String>,
+    #[serde(skip_deserializing)]
+    pub owner_subject: Option<String>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -247,6 +251,7 @@ impl ApiToken {
             active: true,
             scopes,
             created_by: req.created_by,
+            owner_subject: req.owner_subject,
             created_at: now,
             last_used_at: None,
         }

@@ -243,6 +243,7 @@ impl OidcValidator {
             kind: IdentityKind::Oidc,
             scopes,
             token_created_by: None,
+            owner_subject: None,
         })
     }
 
