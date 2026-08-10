@@ -104,7 +104,6 @@ export function BottomNav() {
                 <span>Settings</span>
                 <ChevronRight size={16} style={{ marginLeft: 'auto', opacity: 0.4 }} />
               </Link>
-              <AppVersionFooter className="bottom-nav-sheet-version" />
             </>
           )}
 
@@ -152,6 +151,8 @@ export function BottomNav() {
               />
             ))}
           </div>
+
+          <AppVersionFooter className="bottom-nav-sheet-version" />
         </div>
       )}
 

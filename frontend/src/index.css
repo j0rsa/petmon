@@ -958,12 +958,6 @@ pre {
   margin-top: 0.25rem;
 }
 
-.bottom-nav-sheet-version {
-  margin: 0.35rem 1rem 0;
-  padding-bottom: 0.15rem;
-  text-align: center;
-}
-
 .bottom-nav-sheet-check {
   margin-left: auto;
   color: var(--accent);
@@ -1006,7 +1000,13 @@ pre {
 .bottom-nav-sheet-notifications {
   display: flex;
   flex-direction: column;
-  padding-bottom: 0.5rem;
+  padding-bottom: 0.25rem;
+}
+
+.bottom-nav-sheet-version {
+  margin: 0.25rem 1rem 0.75rem;
+  padding-bottom: calc(0.25rem + env(safe-area-inset-bottom));
+  text-align: center;
 }
 
 .bottom-nav-sheet-notifications .notification-item {
@@ -2272,6 +2272,10 @@ pre {
 
   .pet-info-page .pet-info-card > .pet-avatar {
     justify-self: center;
+  }
+
+  .pet-info-page .pet-info-card > .pet-elimination-auto-tag {
+    grid-column: 1;
   }
 
   .pet-info-fields,
