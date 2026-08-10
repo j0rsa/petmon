@@ -4,7 +4,6 @@ import { useUserWidgetSettings } from '../api/userSettings';
 import {
   buildCumulativeFluidChart,
   enabledFluidSeries,
-  FLUID_SERIES,
   formatRefMs,
   nowToRefMs,
   type FluidSeriesKey,
@@ -101,11 +100,13 @@ export function CumulativeFluidChart({ records, focusDate, schedules = [], bestD
     return <div className="empty-state compact-empty">No fluid records for {focusDate} in this range.</div>;
   }
 
-  function handleLegendClick(entry: { dataKey?: string | number }) {
-    const key = entry.dataKey;
-    if (typeof key !== 'string') return;
-    if (!FLUID_SERIES.some((series) => series.key === key)) return;
-    setSoloSeriesKey((current) => (current === key ? null : (key as FluidSeriesKey)));
+  function handleLegendClick(entry: { value?: string }) {
+    const series = exposedSeries.find((item) => {
+      const label = item.key.startsWith('bestDay') && bestDayDate ? `${item.label} (${bestDayDate})` : item.label;
+      return label === entry.value;
+    });
+    if (!series) return;
+    setSoloSeriesKey((current) => (current === series.key ? null : series.key));
   }
 
   return (

@@ -1,5 +1,5 @@
 import type { CalendarDisplayConfig } from '../lib/nutritionMetrics';
-import type { NutritionCalendarSettings, WeekStart } from './userSettings';
+import type { NutritionCalendarSettings, WeekStart } from '../api/userSettings';
 
 export function nutritionCalendarToDisplayConfig(settings: NutritionCalendarSettings): CalendarDisplayConfig {
   return {
