@@ -1,4 +1,5 @@
 import type { FluidCurvePoint, NutritionRecord, NutritionSchedule } from '../types';
+import type { CumulativeFluidChartSettings } from '../api/userSettings';
 
 export const WET_FOOD_FLUID_RATIO = 0.77;
 
@@ -13,7 +14,9 @@ export interface CumulativeFluidPoint extends TimePoint {
   liquids: number;
   foodFluid: number;
   total: number;
-  bestDay: number | null;
+  bestDayLiquids: number | null;
+  bestDayFoodFluid: number | null;
+  bestDayTotal: number | null;
   schedule: number | null;
 }
 
@@ -30,14 +33,29 @@ interface ParsedScheduleRules {
   windows?: ScheduleWindow[];
 }
 
-export type FluidSeriesKey = 'liquids' | 'foodFluid' | 'total' | 'bestDay' | 'schedule';
+export type FluidSeriesKey =
+  | 'liquids'
+  | 'foodFluid'
+  | 'total'
+  | 'bestDayLiquids'
+  | 'bestDayFoodFluid'
+  | 'bestDayTotal'
+  | 'schedule';
 
-export const FLUID_SERIES: Array<{ key: FluidSeriesKey; label: string; color: string; dashed?: boolean }> = [
-  { key: 'liquids', label: 'liquids', color: '#4fd8f8' },
-  { key: 'foodFluid', label: 'food fluid', color: '#4fc8a0' },
-  { key: 'total', label: 'total', color: '#d9612a' },
-  { key: 'bestDay', label: 'best day', color: '#888882', dashed: true },
-  { key: 'schedule', label: 'schedule', color: '#d9612a', dashed: true },
+export const FLUID_SERIES: Array<{
+  key: FluidSeriesKey;
+  label: string;
+  color: string;
+  dashed?: boolean;
+  settingsKey: keyof CumulativeFluidChartSettings;
+}> = [
+  { key: 'liquids', label: 'liquids', color: '#4fd8f8', settingsKey: 'show_current_liquids' },
+  { key: 'foodFluid', label: 'food fluid', color: '#4fc8a0', settingsKey: 'show_current_food_fluid' },
+  { key: 'total', label: 'total', color: '#d9612a', settingsKey: 'show_current_total' },
+  { key: 'bestDayLiquids', label: 'best day — liquids', color: '#888882', dashed: true, settingsKey: 'show_best_day_liquids' },
+  { key: 'bestDayFoodFluid', label: 'best day — food fluid', color: '#7a9e8e', dashed: true, settingsKey: 'show_best_day_food_fluid' },
+  { key: 'bestDayTotal', label: 'best day — total', color: '#6b6b66', dashed: true, settingsKey: 'show_best_day_total' },
+  { key: 'schedule', label: 'schedule', color: '#d9612a', dashed: true, settingsKey: 'show_schedule' },
 ];
 
 function pad(value: number) {
@@ -101,13 +119,16 @@ function buildStepCurve(records: NutritionRecord[]) {
   return points;
 }
 
-export function bestDayCurveFromApi(points: FluidCurvePoint[]): Array<{ x: number; total: number }> {
+export function bestDayCurvesFromApi(points: FluidCurvePoint[]): Array<{ x: number; liquids: number; foodFluid: number; total: number }> {
   if (points.length === 0) return [];
-  const result: Array<{ x: number; total: number }> = [];
+  const result: Array<{ x: number; liquids: number; foodFluid: number; total: number }> = [];
   const leadIn = timeToRefMs(points[0].time) - 20 * 60 * 1000;
-  result.push({ x: leadIn, total: 0 });
-  for (const p of points) {
-    result.push({ x: timeToRefMs(p.time), total: p.cumulative_liquids_ml });
+  result.push({ x: leadIn, liquids: 0, foodFluid: 0, total: 0 });
+  for (const point of points) {
+    const total = point.cumulative_fluid_ml;
+    const liquids = point.cumulative_liquids_ml;
+    const foodFluid = Math.max(0, total - liquids);
+    result.push({ x: timeToRefMs(point.time), liquids, foodFluid, total });
   }
   return result;
 }
@@ -138,7 +159,6 @@ export function buildScheduleCurve(windows: ScheduleWindow[]) {
   points.push({ x: leadIn, total: 0 });
 
   for (const w of active) {
-    // step up at the midpoint of the window — "expected by ~this time"
     const midX = Math.round((timeToRefMs(w.from) + timeToRefMs(w.to)) / 2);
     cumulative += w.max;
     points.push({ x: midX, total: cumulative });
@@ -193,7 +213,7 @@ export function buildCumulativeFluidChart(
   bestDayDate?: string,
 ) {
   const dayCurve = buildStepCurve(records);
-  const bestDayCurve = bestDayCurvePoints ? bestDayCurveFromApi(bestDayCurvePoints) : [];
+  const bestDayCurve = bestDayCurvePoints ? bestDayCurvesFromApi(bestDayCurvePoints) : [];
 
   const liquidSchedule = schedules.find((s) => s.active && s.rules_json.includes('"type":"liquid"'))
     ?? schedules.find((s) => s.rules_json.includes('"type":"liquid"'));
@@ -215,7 +235,9 @@ export function buildCumulativeFluidChart(
   const liquids = projectSeries(dayCurve, allX, 'liquids');
   const foodFluid = projectSeries(dayCurve, allX, 'foodFluid');
   const total = projectSeries(dayCurve, allX, 'total');
-  const best = bestDayCurve.length > 0 ? projectTotalSeries(bestDayCurve, allX) : allX.map((x) => ({ x, value: null as number | null }));
+  const bestLiquids = bestDayCurve.length > 0 ? projectSeries(bestDayCurve, allX, 'liquids') : allX.map((x) => ({ x, value: null as number | null }));
+  const bestFoodFluid = bestDayCurve.length > 0 ? projectSeries(bestDayCurve, allX, 'foodFluid') : allX.map((x) => ({ x, value: null as number | null }));
+  const bestTotal = bestDayCurve.length > 0 ? projectSeries(bestDayCurve, allX, 'total') : allX.map((x) => ({ x, value: null as number | null }));
   const schedule = projectTotalSeries(scheduleCurve, allX);
 
   const points: CumulativeFluidPoint[] = allX.map((x, index) => ({
@@ -224,12 +246,21 @@ export function buildCumulativeFluidChart(
     liquids: liquids[index].value ?? 0,
     foodFluid: foodFluid[index].value ?? 0,
     total: total[index].value ?? 0,
-    bestDay: best[index].value,
+    bestDayLiquids: bestLiquids[index].value,
+    bestDayFoodFluid: bestFoodFluid[index].value,
+    bestDayTotal: bestTotal[index].value,
     schedule: schedule[index].value,
   }));
 
-  const bestDayLiquidsMl = bestDayCurve.at(-1)?.total ?? 0;
-  const bestDayLabel = bestDayDate ? `best day — ${bestDayDate} (~${Math.round(bestDayLiquidsMl)} ml liquids)` : null;
+  const bestDayLiquidsMl = bestDayCurve.at(-1)?.liquids ?? 0;
+  const bestDayTotalMl = bestDayCurve.at(-1)?.total ?? 0;
+  const bestDayLabel = bestDayDate
+    ? `best day — ${bestDayDate} (~${Math.round(bestDayLiquidsMl)} ml liquids, ~${Math.round(bestDayTotalMl)} ml total)`
+    : null;
 
   return { points, bestDayLabel };
+}
+
+export function enabledFluidSeries(settings: CumulativeFluidChartSettings) {
+  return FLUID_SERIES.filter((series) => settings[series.settingsKey]);
 }

@@ -1,12 +1,24 @@
 import type { Meta, StoryObj } from '@storybook/react-vite';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { fn } from 'storybook/test';
-import { mockCalendarHighlights } from '../stories/fixtures';
+import { mockCalendarHighlights, mockNutritionCalendarSettings } from '../stories/fixtures';
 import { MonthCalendar } from './MonthCalendar';
 
 const meta = {
   title: 'Calendar/MonthCalendar',
   component: MonthCalendar,
   tags: ['autodocs'],
+  decorators: [
+    (Story) => {
+      const client = new QueryClient({ defaultOptions: { queries: { retry: false, staleTime: Infinity } } });
+      client.setQueryData(['user-widget-settings', 'nutrition_calendar'], mockNutritionCalendarSettings);
+      return (
+        <QueryClientProvider client={client}>
+          <Story />
+        </QueryClientProvider>
+      );
+    },
+  ],
   args: {
     month: '2024-06',
     selectedDate: '2024-06-15',

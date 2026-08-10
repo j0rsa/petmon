@@ -20,6 +20,8 @@ import {
   mockEmptyDaySummary,
   mockEmptyRangeSummary,
   mockNotifications,
+  mockNutritionCalendarSettings,
+  mockCumulativeFluidChartSettings,
   mockNutritionRecords,
   mockNutritionSchedules,
   mockOidcConfigured,
@@ -43,6 +45,11 @@ export const withMemoryRouter: Decorator = (Story, { parameters }) => (
   </MemoryRouter>
 );
 
+function seedWidgetSettings(client: QueryClient) {
+  client.setQueryData(['user-widget-settings', 'nutrition_calendar'], mockNutritionCalendarSettings);
+  client.setQueryData(['user-widget-settings', 'cumulative_fluid_chart'], mockCumulativeFluidChartSettings);
+}
+
 /** Seeds the minimum query data needed for Layout (me, pets, app-info, display settings). */
 export const withLayoutData: Decorator = (Story) => {
   const client = makeMockClient();
@@ -50,6 +57,7 @@ export const withLayoutData: Decorator = (Story) => {
   client.setQueryData(['me'], { subject: 'dev', email: null, name: 'Dev', display_name: 'Dev', kind: 'dev', scopes: [] });
   client.setQueryData(['app-info'], mockAppInfo);
   client.setQueryData(['settings-display'], mockDisplaySettings);
+  seedWidgetSettings(client);
   client.setQueryData(['notifications-unread-count'], { count: 1 });
   client.setQueryData(['notifications'], mockNotifications);
   return (
@@ -81,7 +89,7 @@ export function withSelectedPet(petId = mockPetId): Decorator {
 const noopQueryFn = () => Promise.resolve(undefined);
 
 function makeMockClient() {
-  return new QueryClient({
+  const client = new QueryClient({
     defaultOptions: {
       queries: {
         retry: false,
@@ -93,6 +101,8 @@ function makeMockClient() {
       },
     },
   });
+  seedWidgetSettings(client);
+  return client;
 }
 
 export function withNutritionDayPanel(date: string, petId: string, empty = false): Decorator {

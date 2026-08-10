@@ -25,26 +25,12 @@ export interface DisplaySettings {
   time_format: 'h24' | 'h12';
   date_format: 'dmy' | 'mmm_dd_yyyy';
   show_water_card: boolean;
-  calendar_show_wet_food: boolean;
-  calendar_show_liquids: boolean;
-  calendar_show_water: boolean;
-  calendar_show_dry_food: boolean;
-  calendar_show_record_count: boolean;
-  calendar_show_total_fluid: boolean;
-  calendar_week_start: 'sunday' | 'monday';
 }
 
 export interface UpdateDisplaySettings {
   time_format?: 'h24' | 'h12';
   date_format?: 'dmy' | 'mmm_dd_yyyy';
   show_water_card?: boolean;
-  calendar_show_wet_food?: boolean;
-  calendar_show_liquids?: boolean;
-  calendar_show_water?: boolean;
-  calendar_show_dry_food?: boolean;
-  calendar_show_record_count?: boolean;
-  calendar_show_total_fluid?: boolean;
-  calendar_week_start?: 'sunday' | 'monday';
 }
 
 export interface TelegramConfigPublic {

@@ -3,6 +3,7 @@ import type { BestFluidDay, Category, NutritionDaySummary, NutritionRangeSummary
 import type { DayNutritionHighlight, DayEliminationHighlight } from '../types/pillars';
 import type { AppInfo } from '../api/info';
 import type { ApiTokenCreated, ApiTokenPublic, DisplaySettings, OidcConfigPublic, TelegramConfigPublic } from '../api/settings';
+import { DEFAULT_CUMULATIVE_FLUID_CHART_SETTINGS, DEFAULT_NUTRITION_CALENDAR_SETTINGS } from '../api/userSettings';
 import type { EliminationRecord, EliminationDailySummary, EliminationRangeSummary, EliminationDurationProfile, EliminationClassifierStatus } from '../api/elimination';
 import type { NotificationItem } from '../api/notifications';
 import type { WeightRecord, WeightSummaryBucket } from '../api/weight';
@@ -231,14 +232,10 @@ export const mockDisplaySettings: DisplaySettings = {
   time_format: 'h24',
   date_format: 'dmy',
   show_water_card: true,
-  calendar_show_wet_food: true,
-  calendar_show_liquids: true,
-  calendar_show_water: true,
-  calendar_show_dry_food: true,
-  calendar_show_record_count: true,
-  calendar_show_total_fluid: true,
-  calendar_week_start: 'sunday',
 };
+
+export const mockNutritionCalendarSettings = DEFAULT_NUTRITION_CALENDAR_SETTINGS;
+export const mockCumulativeFluidChartSettings = DEFAULT_CUMULATIVE_FLUID_CHART_SETTINGS;
 
 // ── Settings fixtures ─────────────────────────────────────────────────────────
 

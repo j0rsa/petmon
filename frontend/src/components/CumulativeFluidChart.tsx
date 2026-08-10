@@ -1,6 +1,16 @@
 import { useMemo, useState } from 'react';
-import { CartesianGrid, Legend, Line, LineChart, ReferenceLine, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
-import { buildCumulativeFluidChart, FLUID_SERIES, formatRefMs, nowToRefMs, type FluidSeriesKey } from '../lib/cumulativeFluid';
+import { CartesianGrid, DefaultLegendContent, Legend, Line, LineChart, ReferenceLine, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
+import { useUserWidgetSettings } from '../api/userSettings';
+import {
+  buildCumulativeFluidChart,
+  enabledFluidSeries,
+  FLUID_SERIES,
+  formatRefMs,
+  nowToRefMs,
+  type FluidSeriesKey,
+} from '../lib/cumulativeFluid';
+import { CumulativeFluidChartSettingsFields } from './CumulativeFluidChartSettingsFields';
+import { WidgetSettingsGear } from './WidgetSettingsGear';
 import type { FluidCurvePoint, NutritionRecord, NutritionSchedule } from '../types';
 
 interface TooltipEntry {
@@ -27,13 +37,13 @@ function ChartTooltip({ active, payload, label }: ChartTooltipProps) {
       <p className="fluid-tooltip-time">{formatRefMs(label)}</p>
       {rows.map((entry) => {
         let valueLabel: string;
-        if (entry.dataKey === 'total') {
+        if (entry.dataKey === 'total' || entry.dataKey === 'bestDayTotal') {
           valueLabel = `~${entry.value} ml`;
         } else {
           valueLabel = `${entry.value} ml`;
         }
         let detail: string | null = null;
-        if (entry.dataKey === 'foodFluid') {
+        if (entry.dataKey === 'foodFluid' || entry.dataKey === 'bestDayFoodFluid') {
           detail = 'wet food × 77%';
         }
         return (
@@ -59,20 +69,30 @@ interface CumulativeFluidChartProps {
   bestDayDate?: string;
 }
 
-const DEFAULT_VISIBLE: Record<FluidSeriesKey, boolean> = {
-  liquids: true,
-  foodFluid: false,
-  total: false,
-  bestDay: true,
-  schedule: true,
-};
-
 export function CumulativeFluidChart({ records, focusDate, schedules = [], bestDayCurve, bestDayDate }: CumulativeFluidChartProps) {
-  const [visible, setVisible] = useState(DEFAULT_VISIBLE);
+  const { settings, update } = useUserWidgetSettings('cumulative_fluid_chart');
+  const [soloSeriesKey, setSoloSeriesKey] = useState<FluidSeriesKey | null>(null);
 
   const { points, bestDayLabel } = useMemo(
     () => buildCumulativeFluidChart(records, focusDate, schedules, bestDayCurve, bestDayDate),
     [records, focusDate, schedules, bestDayCurve, bestDayDate],
+  );
+
+  const exposedSeries = useMemo(() => enabledFluidSeries(settings), [settings]);
+  const visibleSeries = useMemo(
+    () => exposedSeries.filter((series) => soloSeriesKey === null || soloSeriesKey === series.key),
+    [exposedSeries, soloSeriesKey],
+  );
+
+  const legendPayload = useMemo(
+    () => exposedSeries.map((series) => ({
+      value: series.key.startsWith('bestDay') && bestDayDate ? `${series.label} (${bestDayDate})` : series.label,
+      type: 'line' as const,
+      color: series.color,
+      inactive: soloSeriesKey !== null && soloSeriesKey !== series.key,
+      dataKey: series.key,
+    })),
+    [exposedSeries, soloSeriesKey, bestDayDate],
   );
 
   const nowX = nowToRefMs();
@@ -81,28 +101,20 @@ export function CumulativeFluidChart({ records, focusDate, schedules = [], bestD
     return <div className="empty-state compact-empty">No fluid records for {focusDate} in this range.</div>;
   }
 
+  function handleLegendClick(entry: { dataKey?: string | number }) {
+    const key = entry.dataKey;
+    if (typeof key !== 'string') return;
+    if (!FLUID_SERIES.some((series) => series.key === key)) return;
+    setSoloSeriesKey((current) => (current === key ? null : (key as FluidSeriesKey)));
+  }
+
   return (
     <div className="cumulative-fluid-chart">
-      <div className="fluid-series-toggles">
-        {FLUID_SERIES.map((series) => (
-          <button
-            key={series.key}
-            type="button"
-            className={`fluid-series-pill${visible[series.key] ? ' active' : ''}`}
-            style={
-              visible[series.key]
-                ? {
-                    borderColor: series.color,
-                    color: series.color,
-                    backgroundColor: `${series.color}22`,
-                  }
-                : undefined
-            }
-            onClick={() => setVisible((current) => ({ ...current, [series.key]: !current[series.key] }))}
-          >
-            {series.label}
-          </button>
-        ))}
+      <div className="cumulative-fluid-chart-toolbar">
+        {bestDayLabel && <p className="muted-text fluid-chart-best-day-label">{bestDayLabel}</p>}
+        <WidgetSettingsGear label="Cumulative fluid chart settings">
+          <CumulativeFluidChartSettingsFields settings={settings} onChange={update} />
+        </WidgetSettingsGear>
       </div>
 
       <div className="chart-wrapper chart-wrapper-fluid">
@@ -125,61 +137,41 @@ export function CumulativeFluidChart({ records, focusDate, schedules = [], bestD
               unit=" ml"
             />
             <Tooltip content={<ChartTooltip />} />
-            <Legend />
-            <ReferenceLine
-              x={nowX}
-              stroke="rgba(251,191,36,0.85)"
-              strokeWidth={2}
-              strokeDasharray="5 4"
-              label={{ value: 'now', fill: 'rgba(251,191,36,0.85)', fontSize: 11, fontFamily: 'DM Mono, monospace' }}
-            />
-            {visible.liquids && (
-              <Line
-                type="stepAfter"
-                dataKey="liquids"
-                name="liquids"
-                stroke="#4fd8f8"
-                strokeWidth={2}
-                dot={false}
+            {exposedSeries.length > 0 && (
+              <Legend
+                className="chart-legend-interactive"
+                wrapperStyle={{ fontFamily: 'DM Mono, monospace', fontSize: 12 }}
+                content={(props) => (
+                  <DefaultLegendContent
+                    {...props}
+                    payload={legendPayload}
+                    onClick={(entry) => handleLegendClick(entry)}
+                  />
+                )}
               />
             )}
-            {visible.foodFluid && (
-              <Line
-                type="stepAfter"
-                dataKey="foodFluid"
-                name="food fluid"
-                stroke="#4fc8a0"
+            {settings.show_now_bar && (
+              <ReferenceLine
+                x={nowX}
+                stroke="rgba(251,191,36,0.85)"
                 strokeWidth={2}
-                dot={false}
+                strokeDasharray="5 4"
+                label={{ value: 'now', fill: 'rgba(251,191,36,0.85)', fontSize: 11, fontFamily: 'DM Mono, monospace' }}
               />
             )}
-            {visible.total && (
-              <Line type="stepAfter" dataKey="total" name="total" stroke="#d9612a" strokeWidth={2.5} dot={false} />
-            )}
-            {visible.bestDay && (
+            {visibleSeries.map((series) => (
               <Line
+                key={series.key}
                 type="stepAfter"
-                dataKey="bestDay"
-                name={bestDayLabel ?? 'best day'}
-                stroke="#888882"
-                strokeWidth={2}
-                strokeDasharray="6 4"
+                dataKey={series.key}
+                name={series.label}
+                stroke={series.color}
+                strokeWidth={series.key === 'total' || series.key === 'bestDayTotal' ? 2.5 : 2}
+                strokeDasharray={series.dashed ? '6 4' : undefined}
                 dot={false}
                 connectNulls
               />
-            )}
-            {visible.schedule && (
-              <Line
-                type="stepAfter"
-                dataKey="schedule"
-                name="schedule"
-                stroke="#d9612a"
-                strokeWidth={2}
-                strokeDasharray="4 3"
-                dot={false}
-                connectNulls
-              />
-            )}
+            ))}
           </LineChart>
         </ResponsiveContainer>
       </div>

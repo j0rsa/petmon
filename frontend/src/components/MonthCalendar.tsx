@@ -1,8 +1,11 @@
 import type React from 'react';
+import { useUserWidgetSettings } from '../api/userSettings';
 import { calendarCells, localToday, shiftMonth } from '../lib/dates';
 import { formatDayHint, formatDayHintCompact } from '../lib/nutritionMetrics';
-import type { CalendarDisplayConfig } from '../lib/nutritionMetrics';
+import { nutritionCalendarToDisplayConfig, weekStartFromSettings } from '../lib/widgetSettings';
 import type { DayNutritionHighlight } from '../types/pillars';
+import { NutritionCalendarSettingsFields } from './NutritionCalendarSettingsFields';
+import { WidgetSettingsGear } from './WidgetSettingsGear';
 
 interface MonthCalendarProps {
   month: string;
@@ -12,17 +15,31 @@ interface MonthCalendarProps {
   onSelectDate: (date: string) => void;
   onGoToToday?: () => void;
   compact?: boolean;
-  calendarConfig?: CalendarDisplayConfig;
-  weekStart?: 'sunday' | 'monday';
   /** Optional override: render custom hint content for a given date cell. */
   renderDayHints?: (date: string) => { hasData: boolean; lines: string[]; extra?: React.ReactNode };
   footnote?: string;
+  /** When false, calendar widget settings gear is hidden (e.g. elimination journal). */
+  showSettings?: boolean;
 }
 
 const WEEKDAYS_SUN = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 const WEEKDAYS_MON = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
 
-export function MonthCalendar({ month, selectedDate, highlights, onMonthChange, onSelectDate, onGoToToday, compact = false, calendarConfig, weekStart = 'sunday', renderDayHints, footnote }: MonthCalendarProps) {
+export function MonthCalendar({
+  month,
+  selectedDate,
+  highlights,
+  onMonthChange,
+  onSelectDate,
+  onGoToToday,
+  compact = false,
+  renderDayHints,
+  footnote,
+  showSettings = true,
+}: MonthCalendarProps) {
+  const { settings, update } = useUserWidgetSettings('nutrition_calendar');
+  const weekStart = weekStartFromSettings(settings);
+  const calendarConfig = nutritionCalendarToDisplayConfig(settings);
   const cells = calendarCells(month, weekStart);
   const weekdays = weekStart === 'monday' ? WEEKDAYS_MON : WEEKDAYS_SUN;
   const today = localToday();
@@ -41,7 +58,12 @@ export function MonthCalendar({ month, selectedDate, highlights, onMonthChange, 
           <p className="eyebrow">Journal</p>
           <h3>{displayMonth}</h3>
         </div>
-        <div style={{ display: 'flex', gap: '0.5rem' }}>
+        <div className="calendar-header-actions">
+          {showSettings && (
+            <WidgetSettingsGear label="Calendar display settings">
+              <NutritionCalendarSettingsFields settings={settings} onChange={update} />
+            </WidgetSettingsGear>
+          )}
           {onGoToToday && (
             <button
               className={`button button-compact${isOnToday ? '' : ' button-secondary'}`}

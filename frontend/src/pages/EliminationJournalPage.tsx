@@ -6,7 +6,6 @@ import { MonthCalendar } from '../components/MonthCalendar';
 import { NoPetSelected } from '../components/NoPetSelected';
 import { EliminationDayPanel } from '../components/EliminationDayPanel';
 import { useSelectedPet } from '../context/SelectedPetContext';
-import { useDisplaySettings } from '../context/useDisplaySettings';
 import { localToday, monthBounds, monthKey } from '../lib/dates';
 import type { DayEliminationHighlight } from '../types/pillars';
 
@@ -16,7 +15,6 @@ export default function EliminationJournalPage() {
   const navigate = useNavigate();
   const { date: routeDate } = useParams();
   const { selectedPetId, petsLoading } = useSelectedPet();
-  const displaySettings = useDisplaySettings();
   const isMobile = useSyncExternalStore(
     (cb) => { mq.addEventListener('change', cb); return () => mq.removeEventListener('change', cb); },
     () => mq.matches,
@@ -98,8 +96,7 @@ export default function EliminationJournalPage() {
         onSelectDate={selectDate}
         onGoToToday={() => selectDate(localToday())}
         compact={isMobile}
-        calendarConfig={displaySettings}
-        weekStart={displaySettings.calendar_week_start}
+        showSettings={false}
         footnote="Visits exclude vomit and nothing. Blue dot = poop, filled red = vomit, ring = nothing. Select a day to open its log."
       />
       <EliminationDayPanel date={selectedDate} petId={selectedPetId} />

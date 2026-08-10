@@ -105,7 +105,8 @@ async fn main() -> anyhow::Result<()> {
                     .configure(api::notifications::configure)
                     .configure(api::push::configure)
                     .configure(api::settings::configure)
-                    .configure(api::settings::configure_api_tokens),
+                    .configure(api::settings::configure_api_tokens)
+                    .configure(api::user_settings::configure),
             )
             .service(
                 web::scope("/mcp")

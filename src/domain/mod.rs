@@ -12,6 +12,7 @@ pub mod pillar;
 pub mod push;
 pub mod settings;
 pub mod species;
+pub mod user_settings;
 pub mod weight;
 
 /// Deserializer for `Option<Option<T>>` that correctly distinguishes a JSON
