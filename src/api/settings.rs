@@ -6,9 +6,8 @@ use crate::auth::{
     AppState,
 };
 use crate::domain::settings::{
-    ApiTokenPublic, CreateApiToken, DisplaySettings, OidcConfig, OidcConfigPublic, TelegramConfig,
-    TelegramConfigPublic, UpdateApiTokenScopes, UpdateDisplaySettings, UpdateOidcConfig,
-    UpdateTelegramConfig,
+    ApiTokenPublic, CreateApiToken, OidcConfig, OidcConfigPublic, TelegramConfig,
+    TelegramConfigPublic, UpdateApiTokenScopes, UpdateOidcConfig, UpdateTelegramConfig,
 };
 use crate::error::{AppError, AppResult};
 use crate::repo::{api_tokens, settings};
@@ -36,27 +35,6 @@ pub async fn update_oidc(
         oidc.invalidate();
     }
     Ok(HttpResponse::Ok().json(OidcConfigPublic::from(merged)))
-}
-
-// ── Display settings ─────────────────────────────────────────────────────────
-
-#[get("/display")]
-#[require_scope("api_read")]
-pub async fn get_display(state: web::Data<AppState>) -> AppResult<HttpResponse> {
-    let cfg: DisplaySettings = settings::get(&state.pool, "display").await?;
-    Ok(HttpResponse::Ok().json(cfg))
-}
-
-#[post("/display")]
-#[require_scope("api_write")]
-pub async fn update_display(
-    state: web::Data<AppState>,
-    body: web::Json<UpdateDisplaySettings>,
-) -> AppResult<HttpResponse> {
-    let existing: DisplaySettings = settings::get(&state.pool, "display").await?;
-    let merged = body.into_inner().apply(existing);
-    settings::upsert(&state.pool, "display", &merged).await?;
-    Ok(HttpResponse::Ok().json(merged))
 }
 
 // ── Telegram ──────────────────────────────────────────────────────────────────
@@ -222,8 +200,6 @@ pub fn configure(cfg: &mut web::ServiceConfig) {
         web::scope("/settings")
             .service(get_oidc)
             .service(update_oidc)
-            .service(get_display)
-            .service(update_display)
             .service(get_telegram)
             .service(update_telegram),
     );

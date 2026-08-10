@@ -1,9 +1,21 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { api } from './client';
 
-export type WidgetSettingsKey = 'nutrition_calendar' | 'cumulative_fluid_chart';
+export type UserSettingsKey = 'display' | 'nutrition_calendar' | 'cumulative_fluid_chart';
+
+/** @deprecated Use UserSettingsKey */
+export type WidgetSettingsKey = Exclude<UserSettingsKey, 'display'>;
 
 export type WeekStart = 'sunday' | 'monday';
+export type TimeFormat = 'h24' | 'h12';
+export type DateFormat = 'dmy' | 'mmm_dd_yyyy';
+
+/** Per-user display preferences (time/date formatting, page toggles). */
+export interface UserDisplaySettings {
+  time_format: TimeFormat;
+  date_format: DateFormat;
+  show_water_card: boolean;
+}
 
 export interface NutritionCalendarSettings {
   week_start: WeekStart;
@@ -26,9 +38,16 @@ export interface CumulativeFluidChartSettings {
   show_now_bar: boolean;
 }
 
-export type WidgetSettingsMap = {
+export type UserSettingsMap = {
+  display: UserDisplaySettings;
   nutrition_calendar: NutritionCalendarSettings;
   cumulative_fluid_chart: CumulativeFluidChartSettings;
+};
+
+export const DEFAULT_USER_DISPLAY_SETTINGS: UserDisplaySettings = {
+  time_format: 'h24',
+  date_format: 'dmy',
+  show_water_card: true,
 };
 
 export const DEFAULT_NUTRITION_CALENDAR_SETTINGS: NutritionCalendarSettings = {
@@ -52,45 +71,55 @@ export const DEFAULT_CUMULATIVE_FLUID_CHART_SETTINGS: CumulativeFluidChartSettin
   show_now_bar: true,
 };
 
-export const WIDGET_SETTINGS_DEFAULTS: WidgetSettingsMap = {
+export const USER_SETTINGS_DEFAULTS: UserSettingsMap = {
+  display: DEFAULT_USER_DISPLAY_SETTINGS,
   nutrition_calendar: DEFAULT_NUTRITION_CALENDAR_SETTINGS,
   cumulative_fluid_chart: DEFAULT_CUMULATIVE_FLUID_CHART_SETTINGS,
 };
 
 export const userSettingsApi = {
-  getWidget: <K extends WidgetSettingsKey>(key: K) =>
-    api.get<WidgetSettingsMap[K]>(`/me/widget-settings/${key}`),
+  get: <K extends UserSettingsKey>(key: K) =>
+    api.get<UserSettingsMap[K]>(`/me/settings/${key}`),
 
-  updateWidget: <K extends WidgetSettingsKey>(key: K, body: Partial<WidgetSettingsMap[K]>) =>
-    api.post<WidgetSettingsMap[K]>(`/me/widget-settings/${key}`, body),
+  update: <K extends UserSettingsKey>(key: K, body: Partial<UserSettingsMap[K]>) =>
+    api.post<UserSettingsMap[K]>(`/me/settings/${key}`, body),
 };
 
-export function widgetSettingsQueryKey(key: WidgetSettingsKey) {
-  return ['user-widget-settings', key] as const;
+export function userSettingsQueryKey(key: UserSettingsKey) {
+  return ['user-settings', key] as const;
 }
 
-export function useUserWidgetSettings<K extends WidgetSettingsKey>(key: K) {
+export function useUserSettings<K extends UserSettingsKey>(key: K) {
   const queryClient = useQueryClient();
-  const queryKey = widgetSettingsQueryKey(key);
+  const queryKey = userSettingsQueryKey(key);
 
   const query = useQuery({
     queryKey,
-    queryFn: () => userSettingsApi.getWidget(key),
+    queryFn: () => userSettingsApi.get(key),
     staleTime: Infinity,
   });
 
   const mutation = useMutation({
-    mutationFn: (patch: Partial<WidgetSettingsMap[K]>) => userSettingsApi.updateWidget(key, patch),
+    mutationFn: (patch: Partial<UserSettingsMap[K]>) => userSettingsApi.update(key, patch),
     onSuccess: (updated) => {
       queryClient.setQueryData(queryKey, updated);
     },
   });
 
-  const settings = query.data ?? WIDGET_SETTINGS_DEFAULTS[key];
+  const settings = query.data ?? USER_SETTINGS_DEFAULTS[key];
 
-  function update(patch: Partial<WidgetSettingsMap[K]>) {
+  function update(patch: Partial<UserSettingsMap[K]>) {
     mutation.mutate(patch);
   }
 
   return { settings, update, isLoading: query.isLoading, isSaving: mutation.isPending, error: mutation.error ?? query.error };
+}
+
+/** Widget-only alias — calendar and chart gear controls. */
+export function useUserWidgetSettings<K extends WidgetSettingsKey>(key: K) {
+  return useUserSettings(key);
+}
+
+export function widgetSettingsQueryKey(key: WidgetSettingsKey) {
+  return userSettingsQueryKey(key);
 }

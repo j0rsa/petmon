@@ -127,7 +127,7 @@ impl UpdateTelegramConfig {
     }
 }
 
-// ── Display ───────────────────────────────────────────────────────────────────
+// ── Display enums (used by per-user display settings) ─────────────────────────
 
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
 #[serde(rename_all = "snake_case")]
@@ -153,37 +153,6 @@ pub enum WeekStart {
     #[default]
     Sunday,
     Monday,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize, Default)]
-pub struct DisplaySettings {
-    #[serde(default)]
-    pub time_format: TimeFormat,
-    #[serde(default)]
-    pub date_format: DateFormat,
-    #[serde(default = "default_true")]
-    pub show_water_card: bool,
-}
-
-fn default_true() -> bool {
-    true
-}
-
-#[derive(Debug, Deserialize)]
-pub struct UpdateDisplaySettings {
-    pub time_format: Option<TimeFormat>,
-    pub date_format: Option<DateFormat>,
-    pub show_water_card: Option<bool>,
-}
-
-impl UpdateDisplaySettings {
-    pub fn apply(self, existing: DisplaySettings) -> DisplaySettings {
-        DisplaySettings {
-            time_format: self.time_format.unwrap_or(existing.time_format),
-            date_format: self.date_format.unwrap_or(existing.date_format),
-            show_water_card: self.show_water_card.unwrap_or(existing.show_water_card),
-        }
-    }
 }
 
 // ── API tokens ────────────────────────────────────────────────────────────────

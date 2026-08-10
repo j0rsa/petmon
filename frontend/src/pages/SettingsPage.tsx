@@ -1,7 +1,8 @@
 import { useEffect, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { settingsApi } from '../api/settings';
-import type { ApiTokenCreated, ApiTokenPublic, ApiTokenScope, DisplaySettings, OidcConfigPublic, TelegramConfigPublic } from '../api/settings';
+import type { ApiTokenCreated, ApiTokenPublic, ApiTokenScope, OidcConfigPublic, TelegramConfigPublic } from '../api/settings';
+import { useUserSettings } from '../api/userSettings';
 import { API_TOKEN_SCOPES } from '../api/settings';
 import { deriveDeviceAlias, getStoredToken, storeToken } from '../lib/auth';
 import { clearPwaCachesAndReload, isPwaCacheSupported } from '../lib/pwaCache';
@@ -25,21 +26,7 @@ export default function SettingsPage() {
 // ── Display ───────────────────────────────────────────────────────────────────
 
 function DisplaySection() {
-  const queryClient = useQueryClient();
-  const { data, isLoading } = useQuery({ queryKey: ['settings-display'], queryFn: settingsApi.getDisplay });
-
-  const current: DisplaySettings = data ?? {
-    time_format: 'h24',
-    date_format: 'dmy',
-    show_water_card: true,
-  };
-
-  const mutation = useMutation({
-    mutationFn: settingsApi.updateDisplay,
-    onSuccess: (updated) => {
-      queryClient.setQueryData(['settings-display'], updated);
-    },
-  });
+  const { settings: current, update, isLoading, error, isSaving } = useUserSettings('display');
 
   if (isLoading) return <div className="loading-state">Loading display settings…</div>;
 
@@ -62,7 +49,8 @@ function DisplaySection() {
                   type="radio"
                   name="time_format"
                   checked={current.time_format === v}
-                  onChange={() => mutation.mutate({ time_format: v })}
+                  onChange={() => update({ time_format: v })}
+                  disabled={isSaving}
                 />
                 {v === 'h24' ? '24h' : '12h'}
               </label>
@@ -79,7 +67,8 @@ function DisplaySection() {
                   type="radio"
                   name="date_format"
                   checked={current.date_format === v}
-                  onChange={() => mutation.mutate({ date_format: v })}
+                  onChange={() => update({ date_format: v })}
+                  disabled={isSaving}
                 />
                 {v === 'dmy' ? 'DD.MM.YYYY' : 'MMM DD, YYYY'}
               </label>
@@ -94,7 +83,8 @@ function DisplaySection() {
               <input
                 type="checkbox"
                 checked={current.show_water_card}
-                onChange={(e) => mutation.mutate({ show_water_card: e.target.checked })}
+                onChange={(e) => update({ show_water_card: e.target.checked })}
+                disabled={isSaving}
               />
               Show water metric card
             </label>
@@ -103,9 +93,9 @@ function DisplaySection() {
 
       </div>
 
-      {mutation.isError && (
+      {error && (
         <div className="error-state">
-          {mutation.error instanceof Error ? mutation.error.message : 'Failed to save display settings.'}
+          {error instanceof Error ? error.message : 'Failed to save display settings.'}
         </div>
       )}
     </section>

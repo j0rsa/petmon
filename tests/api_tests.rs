@@ -1755,13 +1755,13 @@ async fn push_stale_subscriptions_are_cleaned_up() {
 // HTML), which proves actix matched the route.
 
 #[actix_web::test]
-async fn user_widget_settings_nutrition_calendar_roundtrip() {
+async fn user_settings_nutrition_calendar_roundtrip() {
     let pool = setup_pool().await;
     let state = web::Data::new(AppState::new(pool, true, None, None));
     let app = build_app!(state);
 
     let get_req = test::TestRequest::get()
-        .uri("/api/v1/me/widget-settings/nutrition_calendar")
+        .uri("/api/v1/me/settings/nutrition_calendar")
         .to_request();
     let get_resp = test::call_service(&app, get_req).await;
     assert_eq!(get_resp.status(), 200);
@@ -1770,7 +1770,7 @@ async fn user_widget_settings_nutrition_calendar_roundtrip() {
     assert_eq!(initial["show_total_fluid"], true);
 
     let post_req = test::TestRequest::post()
-        .uri("/api/v1/me/widget-settings/nutrition_calendar")
+        .uri("/api/v1/me/settings/nutrition_calendar")
         .set_json(serde_json::json!({
             "week_start": "monday",
             "show_water": false
@@ -1784,7 +1784,7 @@ async fn user_widget_settings_nutrition_calendar_roundtrip() {
     assert_eq!(updated["show_liquids"], true);
 
     let get_req2 = test::TestRequest::get()
-        .uri("/api/v1/me/widget-settings/nutrition_calendar")
+        .uri("/api/v1/me/settings/nutrition_calendar")
         .to_request();
     let get_resp2 = test::call_service(&app, get_req2).await;
     assert_eq!(get_resp2.status(), 200);
@@ -1794,20 +1794,77 @@ async fn user_widget_settings_nutrition_calendar_roundtrip() {
 }
 
 #[actix_web::test]
-async fn user_widget_settings_unknown_key_returns_404() {
+async fn user_settings_display_roundtrip() {
+    let pool = setup_pool().await;
+    let state = web::Data::new(AppState::new(pool, true, None, None));
+    let app = build_app!(state);
+
+    let get_req = test::TestRequest::get()
+        .uri("/api/v1/me/settings/display")
+        .to_request();
+    let get_resp = test::call_service(&app, get_req).await;
+    assert_eq!(get_resp.status(), 200);
+    let initial: serde_json::Value = test::read_body_json(get_resp).await;
+    assert_eq!(initial["time_format"], "h24");
+    assert_eq!(initial["show_water_card"], true);
+
+    let post_req = test::TestRequest::post()
+        .uri("/api/v1/me/settings/display")
+        .set_json(serde_json::json!({
+            "date_format": "mmm_dd_yyyy",
+            "show_water_card": false
+        }))
+        .to_request();
+    let post_resp = test::call_service(&app, post_req).await;
+    assert_eq!(post_resp.status(), 200);
+    let updated: serde_json::Value = test::read_body_json(post_resp).await;
+    assert_eq!(updated["date_format"], "mmm_dd_yyyy");
+    assert_eq!(updated["show_water_card"], false);
+    assert_eq!(updated["time_format"], "h24");
+}
+
+#[actix_web::test]
+async fn user_settings_unknown_key_returns_404() {
     let pool = setup_pool().await;
     let state = web::Data::new(AppState::new(pool, true, None, None));
     let app = build_app!(state);
 
     let req = test::TestRequest::get()
-        .uri("/api/v1/me/widget-settings/unknown_widget")
+        .uri("/api/v1/me/settings/unknown_widget")
         .to_request();
     let resp = test::call_service(&app, req).await;
     assert_eq!(resp.status(), 404);
 }
 
 #[actix_web::test]
-async fn settings_display_returns_json_not_spa() {
+async fn user_settings_display_returns_json_not_spa() {
+    let pool = setup_pool().await;
+    let state = web::Data::new(AppState::new(pool, true, None, None));
+    let app = build_app!(state);
+
+    let req = test::TestRequest::get()
+        .uri("/api/v1/me/settings/display")
+        .to_request();
+    let resp = test::call_service(&app, req).await;
+    assert_eq!(
+        resp.status(),
+        200,
+        "GET /api/v1/me/settings/display must return 200"
+    );
+    let ct = resp
+        .headers()
+        .get("content-type")
+        .unwrap()
+        .to_str()
+        .unwrap();
+    assert!(
+        ct.contains("application/json"),
+        "me/settings/display must return JSON, got: {ct}"
+    );
+}
+
+#[actix_web::test]
+async fn settings_display_route_removed() {
     let pool = setup_pool().await;
     let state = web::Data::new(AppState::new(pool, true, None, None));
     let app = build_app!(state);
@@ -1818,18 +1875,8 @@ async fn settings_display_returns_json_not_spa() {
     let resp = test::call_service(&app, req).await;
     assert_eq!(
         resp.status(),
-        200,
-        "GET /api/v1/settings/display must return 200"
-    );
-    let ct = resp
-        .headers()
-        .get("content-type")
-        .unwrap()
-        .to_str()
-        .unwrap();
-    assert!(
-        ct.contains("application/json"),
-        "settings/display must return JSON, got: {ct}"
+        404,
+        "GET /api/v1/settings/display must be removed (use /me/settings/display)"
     );
 }
 

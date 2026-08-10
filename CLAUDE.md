@@ -2,7 +2,18 @@
 
 ## Change checklists
 
-### Touching backend (Rust `src/`, `migrations/`, `tests/`)
+### Settings: instance vs user
+
+| Layer | Storage | Scope | Examples |
+|-------|---------|-------|----------|
+| **Instance** | `app_settings` | Shared by all users on this deployment | OIDC config, Telegram bot token, VAPID keys |
+| **User** | `user_settings` keyed by `reader_key` | Per authenticated identity | Display format, widget prefs, (future) per-user integrations |
+
+User settings API: `GET/POST /api/v1/me/settings/{key}` where `key` is e.g. `display`, `nutrition_calendar`, `cumulative_fluid_chart`.
+
+`reader_key` identifies the authenticated caller — OIDC `sub`, `api_token:{id}`, or `dev` in DEV_MODE. It is not a device id; push subscriptions are keyed separately by browser endpoint.
+
+---
 1. **Tests** — update or add integration tests in `tests/api_tests.rs` covering the changed behaviour.
 2. **API spec** — reflect any new/changed/removed endpoints or fields in `docs/openapi.yaml`.
 3. **MCP** — if the change adds or changes a capability a Claude agent might use, update `src/mcp/`.

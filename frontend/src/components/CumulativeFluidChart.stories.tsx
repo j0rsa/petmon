@@ -10,7 +10,7 @@ const meta = {
   decorators: [
     (Story) => {
       const client = new QueryClient({ defaultOptions: { queries: { retry: false, staleTime: Infinity } } });
-      client.setQueryData(['user-widget-settings', 'cumulative_fluid_chart'], mockCumulativeFluidChartSettings);
+      client.setQueryData(['user-settings', 'cumulative_fluid_chart'], mockCumulativeFluidChartSettings);
       return (
         <QueryClientProvider client={client}>
           <Story />

@@ -1,9 +1,48 @@
 use serde::{Deserialize, Serialize};
 
-use super::settings::WeekStart;
+use super::settings::{DateFormat, TimeFormat, WeekStart};
 
+pub const DISPLAY_KEY: &str = "display";
 pub const NUTRITION_CALENDAR_KEY: &str = "nutrition_calendar";
 pub const CUMULATIVE_FLUID_CHART_KEY: &str = "cumulative_fluid_chart";
+
+/// Per-user display preferences (global UI formatting, page toggles).
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct UserDisplaySettings {
+    #[serde(default)]
+    pub time_format: TimeFormat,
+    #[serde(default)]
+    pub date_format: DateFormat,
+    #[serde(default = "default_true")]
+    pub show_water_card: bool,
+}
+
+impl Default for UserDisplaySettings {
+    fn default() -> Self {
+        UserDisplaySettings {
+            time_format: TimeFormat::default(),
+            date_format: DateFormat::default(),
+            show_water_card: true,
+        }
+    }
+}
+
+#[derive(Debug, Deserialize)]
+pub struct UpdateUserDisplaySettings {
+    pub time_format: Option<TimeFormat>,
+    pub date_format: Option<DateFormat>,
+    pub show_water_card: Option<bool>,
+}
+
+impl UpdateUserDisplaySettings {
+    pub fn apply(self, existing: UserDisplaySettings) -> UserDisplaySettings {
+        UserDisplaySettings {
+            time_format: self.time_format.unwrap_or(existing.time_format),
+            date_format: self.date_format.unwrap_or(existing.date_format),
+            show_water_card: self.show_water_card.unwrap_or(existing.show_water_card),
+        }
+    }
+}
 
 /// Per-user nutrition journal calendar widget preferences.
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -146,6 +185,9 @@ fn default_false() -> bool {
     false
 }
 
-pub fn is_known_widget_key(key: &str) -> bool {
-    matches!(key, NUTRITION_CALENDAR_KEY | CUMULATIVE_FLUID_CHART_KEY)
+pub fn is_known_user_settings_key(key: &str) -> bool {
+    matches!(
+        key,
+        DISPLAY_KEY | NUTRITION_CALENDAR_KEY | CUMULATIVE_FLUID_CHART_KEY
+    )
 }

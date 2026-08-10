@@ -586,13 +586,13 @@ paths:
         '401':
           $ref: '#/components/responses/Unauthorized'
 
-  /me/widget-settings/{key}:
+  /me/settings/{key}:
     get:
       tags:
         - Settings
-      summary: Get per-user widget settings
+      summary: Get per-user settings
       x-required-scope: api_read
-      description: Retrieve widget display preferences for the authenticated user (calendar, charts, etc.)
+      description: Retrieve preferences for the authenticated user (display formatting, widget configs, etc.)
       parameters:
         - name: key
           in: path
@@ -600,15 +600,17 @@ paths:
           schema:
             type: string
             enum:
+              - display
               - nutrition_calendar
               - cumulative_fluid_chart
       responses:
         '200':
-          description: Widget settings
+          description: User settings
           content:
             application/json:
               schema:
                 oneOf:
+                  - $ref: '#/components/schemas/UserDisplaySettings'
                   - $ref: '#/components/schemas/NutritionCalendarSettings'
                   - $ref: '#/components/schemas/CumulativeFluidChartSettings'
         '404':
@@ -621,9 +623,9 @@ paths:
     post:
       tags:
         - Settings
-      summary: Update per-user widget settings
+      summary: Update per-user settings
       x-required-scope: api_write
-      description: Partially update widget display preferences for the authenticated user. Omitted fields keep their existing values.
+      description: Partially update preferences for the authenticated user. Omitted fields keep their existing values.
       parameters:
         - name: key
           in: path
@@ -631,6 +633,7 @@ paths:
           schema:
             type: string
             enum:
+              - display
               - nutrition_calendar
               - cumulative_fluid_chart
       requestBody:
@@ -639,66 +642,23 @@ paths:
           application/json:
             schema:
               oneOf:
+                - $ref: '#/components/schemas/UpdateUserDisplaySettings'
                 - $ref: '#/components/schemas/UpdateNutritionCalendarSettings'
                 - $ref: '#/components/schemas/UpdateCumulativeFluidChartSettings'
       responses:
         '200':
-          description: Widget settings updated
+          description: User settings updated
           content:
             application/json:
               schema:
                 oneOf:
+                  - $ref: '#/components/schemas/UserDisplaySettings'
                   - $ref: '#/components/schemas/NutritionCalendarSettings'
                   - $ref: '#/components/schemas/CumulativeFluidChartSettings'
         '400':
           $ref: '#/components/responses/BadRequest'
         '404':
           $ref: '#/components/responses/NotFound'
-        '403':
-          $ref: '#/components/responses/Forbidden'
-        '401':
-          $ref: '#/components/responses/Unauthorized'
-
-  /settings/display:
-    get:
-      tags:
-        - Settings
-      summary: Get display settings
-      x-required-scope: api_read
-      description: Retrieve display preferences (time format, date format, water card visibility)
-      responses:
-        '200':
-          description: Display settings
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/DisplaySettings'
-        '403':
-          $ref: '#/components/responses/Forbidden'
-        '401':
-          $ref: '#/components/responses/Unauthorized'
-
-    post:
-      tags:
-        - Settings
-      summary: Update display settings
-      x-required-scope: api_write
-      description: Update display preferences. Omitted fields keep their existing values.
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              $ref: '#/components/schemas/UpdateDisplaySettings'
-      responses:
-        '200':
-          description: Display settings updated
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/DisplaySettings'
-        '400':
-          $ref: '#/components/responses/BadRequest'
         '403':
           $ref: '#/components/responses/Forbidden'
         '401':
@@ -2969,7 +2929,7 @@ components:
         - monday
       description: First day of the week for calendar display
 
-    DisplaySettings:
+    UserDisplaySettings:
       type: object
       properties:
         time_format:
@@ -2978,13 +2938,13 @@ components:
           $ref: '#/components/schemas/DateFormat'
         show_water_card:
           type: boolean
-          description: Whether to show the water metric card on the day panel
+          description: Whether to show the water metric card on the nutrition day panel
       required:
         - time_format
         - date_format
         - show_water_card
 
-    UpdateDisplaySettings:
+    UpdateUserDisplaySettings:
       type: object
       properties:
         time_format:

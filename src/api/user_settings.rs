@@ -5,9 +5,9 @@ use serde_json::Value;
 use crate::auth::identity::Identity;
 use crate::auth::AppState;
 use crate::domain::user_settings::{
-    is_known_widget_key, CumulativeFluidChartSettings, NutritionCalendarSettings,
-    UpdateCumulativeFluidChartSettings, UpdateNutritionCalendarSettings,
-    CUMULATIVE_FLUID_CHART_KEY, NUTRITION_CALENDAR_KEY,
+    is_known_user_settings_key, CumulativeFluidChartSettings, NutritionCalendarSettings,
+    UpdateCumulativeFluidChartSettings, UpdateNutritionCalendarSettings, UpdateUserDisplaySettings,
+    UserDisplaySettings, CUMULATIVE_FLUID_CHART_KEY, DISPLAY_KEY, NUTRITION_CALENDAR_KEY,
 };
 use crate::error::{AppError, AppResult};
 use crate::repo::user_settings;
@@ -21,20 +21,25 @@ fn reader_key(req: &HttpRequest) -> AppResult<String> {
 
 #[get("/{key}")]
 #[require_scope("api_read")]
-pub async fn get_widget_settings(
+pub async fn get_user_settings(
     req: HttpRequest,
     state: web::Data<AppState>,
     path: web::Path<String>,
 ) -> AppResult<HttpResponse> {
     let key = path.into_inner();
-    if !is_known_widget_key(&key) {
+    if !is_known_user_settings_key(&key) {
         return Err(AppError::NotFound(format!(
-            "unknown widget settings key '{key}'"
+            "unknown user settings key '{key}'"
         )));
     }
 
     let reader_key = reader_key(&req)?;
     let value: Value = match key.as_str() {
+        DISPLAY_KEY => {
+            let settings: UserDisplaySettings =
+                user_settings::get(&state.pool, &reader_key, &key).await?;
+            serde_json::to_value(settings).map_err(|e| AppError::Internal(e.to_string()))?
+        }
         NUTRITION_CALENDAR_KEY => {
             let settings: NutritionCalendarSettings =
                 user_settings::get(&state.pool, &reader_key, &key).await?;
@@ -53,21 +58,30 @@ pub async fn get_widget_settings(
 
 #[post("/{key}")]
 #[require_scope("api_write")]
-pub async fn update_widget_settings(
+pub async fn update_user_settings(
     req: HttpRequest,
     state: web::Data<AppState>,
     path: web::Path<String>,
     body: web::Json<Value>,
 ) -> AppResult<HttpResponse> {
     let key = path.into_inner();
-    if !is_known_widget_key(&key) {
+    if !is_known_user_settings_key(&key) {
         return Err(AppError::NotFound(format!(
-            "unknown widget settings key '{key}'"
+            "unknown user settings key '{key}'"
         )));
     }
 
     let reader_key = reader_key(&req)?;
     let merged: Value = match key.as_str() {
+        DISPLAY_KEY => {
+            let existing: UserDisplaySettings =
+                user_settings::get(&state.pool, &reader_key, &key).await?;
+            let update: UpdateUserDisplaySettings = serde_json::from_value(body.into_inner())
+                .map_err(|e| AppError::BadRequest(format!("invalid display settings: {e}")))?;
+            let merged = update.apply(existing);
+            user_settings::upsert(&state.pool, &reader_key, &key, &merged).await?;
+            serde_json::to_value(merged).map_err(|e| AppError::Internal(e.to_string()))?
+        }
         NUTRITION_CALENDAR_KEY => {
             let existing: NutritionCalendarSettings =
                 user_settings::get(&state.pool, &reader_key, &key).await?;
@@ -98,8 +112,8 @@ pub async fn update_widget_settings(
 
 pub fn configure(cfg: &mut web::ServiceConfig) {
     cfg.service(
-        web::scope("/me/widget-settings")
-            .service(get_widget_settings)
-            .service(update_widget_settings),
+        web::scope("/me/settings")
+            .service(get_user_settings)
+            .service(update_user_settings),
     );
 }

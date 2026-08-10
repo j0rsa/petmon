@@ -11,7 +11,7 @@ const meta = {
   decorators: [
     (Story) => {
       const client = new QueryClient({ defaultOptions: { queries: { retry: false, staleTime: Infinity } } });
-      client.setQueryData(['user-widget-settings', 'nutrition_calendar'], mockNutritionCalendarSettings);
+      client.setQueryData(['user-settings', 'nutrition_calendar'], mockNutritionCalendarSettings);
       return (
         <QueryClientProvider client={client}>
           <Story />
