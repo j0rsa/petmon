@@ -224,6 +224,7 @@ export const mockBestFluidDay: BestFluidDay = {
 export const mockAppInfo: AppInfo = {
   version: '0.0.0-storybook',
   git_sha: 'abc1234',
+  demo_mode: false,
 };
 
 // ── Display settings fixtures ─────────────────────────────────────────────────

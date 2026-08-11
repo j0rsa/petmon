@@ -236,7 +236,9 @@ make seed-demo
 
 This clears existing rows and seeds Mittens, Rex, Pepper, and Clover. Demo pet IDs match the Storybook fixtures.
 
-Alternatively, set `DEMO_MODE=true` when running the server: if the database is empty after migrations, the same demo dataset is loaded once (append-only; existing data is never wiped). Useful for PR preview hosts with a fresh SQLite volume.
+Alternatively, set `DEMO_MODE=true` when running the server: if the database is empty after migrations, the same demo dataset is loaded once (append-only; existing data is never wiped). Useful for PR preview hosts with a fresh SQLite volume. The UI shows a sticky demo banner (`/api/v1/info` → `demo_mode: true`).
+
+PR preview builds use `VITE_APP_FLAVOR=pr` for grayscale icons and a “Petmon PR” install name.
 
 ## Quick Start
 

@@ -163,6 +163,22 @@ pre {
   min-height: 100vh;
 }
 
+.demo-banner {
+  position: sticky;
+  top: 0;
+  z-index: 200;
+  width: 100%;
+  padding: 0.45rem 1rem;
+  text-align: center;
+  font-size: 0.78rem;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--accent-bright);
+  background: var(--warning-bg);
+  border-bottom: 1px solid var(--warning-border);
+}
+
 .sidebar {
   padding: 1.5rem 1.25rem;
   border-right: 1px solid var(--border-subtle);

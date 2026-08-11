@@ -6,6 +6,7 @@ import { fileURLToPath } from 'node:url';
 import { defineConfig } from 'vite';
 import react from '@vitejs/plugin-react';
 import { VitePWA } from 'vite-plugin-pwa';
+import { flavorAssetsPlugin } from './scripts/flavorAssetsPlugin';
 
 // https://vite.dev/config/
 
@@ -35,12 +36,23 @@ const enablePwa = !isStorybookBuild && !process.env.VITEST;
 
 const petmonBuild = readPetmonBuildInfo();
 
+const appFlavor = process.env.VITE_APP_FLAVOR ?? '';
+const flavorManifest = {
+  default: { name: 'Petmon', short_name: 'Petmon' },
+  pr: { name: 'Petmon PR', short_name: 'Petmon PR' },
+} as const;
+const manifestLabels =
+  appFlavor in flavorManifest
+    ? flavorManifest[appFlavor as keyof typeof flavorManifest]
+    : flavorManifest.default;
+
 // More info at: https://storybook.js.org/docs/next/writing-tests/integrations/vitest-addon
 export default defineConfig({
   define: {
     __PETMON_BUILD__: JSON.stringify(petmonBuild),
   },
   plugins: [
+    flavorAssetsPlugin(appFlavor || undefined, path.join(dirname, 'public')),
     react(),
     ...(enablePwa
       ? [
@@ -62,8 +74,8 @@ export default defineConfig({
             },
             includeAssets: ['favicon.svg', 'icons/*.png'],
             manifest: {
-              name: 'Petmon',
-              short_name: 'Petmon',
+              name: manifestLabels.name,
+              short_name: manifestLabels.short_name,
               description: 'Pet monitoring app',
               theme_color: '#1e1e1c',
               background_color: '#1c1c1a',

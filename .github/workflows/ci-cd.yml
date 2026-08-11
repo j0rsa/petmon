@@ -83,6 +83,8 @@ jobs:
         run: npx vitest run
 
       - name: Build
+        env:
+          VITE_APP_FLAVOR: ${{ github.event_name == 'pull_request' && 'pr' || '' }}
         run: npm run build
 
       - name: Upload dist artifact

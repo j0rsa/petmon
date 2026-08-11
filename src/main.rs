@@ -71,6 +71,7 @@ async fn main() -> anyhow::Result<()> {
         oidc_validator,
         config.static_dir.clone(),
         timezone,
+        config.demo_mode,
     ));
     let bind_addr = format!("{}:{}", config.host, config.port);
 

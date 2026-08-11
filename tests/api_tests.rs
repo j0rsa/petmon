@@ -614,6 +614,33 @@ async fn app_info_is_public() {
         body.get("version").is_some(),
         "response must contain version field"
     );
+    assert_eq!(
+        body.get("demo_mode").and_then(|v| v.as_bool()),
+        Some(false)
+    );
+}
+
+#[actix_web::test]
+async fn app_info_reports_demo_mode() {
+    let pool = setup_pool().await;
+    let state = web::Data::new(AppState::new_with_tz(
+        pool,
+        false,
+        None,
+        None,
+        chrono_tz::UTC,
+        true,
+    ));
+    let app = build_full_app!(state);
+
+    let req = test::TestRequest::get().uri("/api/v1/info").to_request();
+    let resp = test::call_service(&app, req).await;
+    assert_eq!(resp.status(), 200);
+    let body: serde_json::Value = test::read_body_json(resp).await;
+    assert_eq!(
+        body.get("demo_mode").and_then(|v| v.as_bool()),
+        Some(true)
+    );
 }
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
@@ -704,6 +731,7 @@ async fn nutrition_record_default_occurred_at_uses_configured_timezone() {
         None,
         None,
         "Asia/Tokyo".parse().unwrap(),
+        false,
     ));
     let app = build_app!(state);
     let pet_id = api_create_pet!(&app, "TzTest");

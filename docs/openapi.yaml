@@ -35,6 +35,21 @@ paths:
                     type: string
                     example: ok
 
+  /info:
+    get:
+      tags:
+        - Health
+      summary: Application metadata
+      description: Returns build version, git SHA, and whether demo mode is enabled. No authentication required.
+      security: []
+      responses:
+        '200':
+          description: Application information
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AppInfo'
+
   /auth/info:
     get:
       tags:
@@ -2074,6 +2089,19 @@ components:
             $ref: '#/components/schemas/ErrorResponse'
 
   schemas:
+    AppInfo:
+      type: object
+      required: [version, git_sha, demo_mode]
+      properties:
+        version:
+          type: string
+          example: "0.17.0"
+        git_sha:
+          type: string
+          example: "abc1234"
+        demo_mode:
+          type: boolean
+          description: True when the server started with DEMO_MODE (demo seed + UI banner).
     ErrorResponse:
       type: object
       properties:
