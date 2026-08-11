@@ -445,6 +445,8 @@ jobs:
           TAGS=()
           if [ "${{ github.event_name }}" = "pull_request" ]; then
             TAGS+=("${IMAGE}:pr-${{ github.event.pull_request.number }}-${VERSION}-${SHORT_SHA}")
+            # Stable tag for single-PR preview hosts (e.g. petmon-pr.j0rsa.com)
+            TAGS+=("${IMAGE}:pr-preview")
           elif [ "${{ github.ref }}" = "refs/heads/main" ] && [ "${{ github.event_name }}" = "push" ]; then
             TAGS+=("${IMAGE}:v${VERSION}")
             TAGS+=("${IMAGE}:sha-${SHORT_SHA}")
