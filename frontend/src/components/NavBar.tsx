@@ -64,8 +64,10 @@ export function SidebarUserChip() {
 
   if (!me) return null;
 
+  const sessionKind = me.kind as 'oidc' | 'api_token' | 'dev';
+
   function handleSignOut() {
-    void performSignOut(me.kind as 'oidc' | 'api_token' | 'dev');
+    void performSignOut(sessionKind);
   }
 
   return (
