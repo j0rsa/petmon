@@ -614,10 +614,7 @@ async fn app_info_is_public() {
         body.get("version").is_some(),
         "response must contain version field"
     );
-    assert_eq!(
-        body.get("demo_mode").and_then(|v| v.as_bool()),
-        Some(false)
-    );
+    assert_eq!(body.get("demo_mode").and_then(|v| v.as_bool()), Some(false));
 }
 
 #[actix_web::test]
@@ -637,10 +634,7 @@ async fn app_info_reports_demo_mode() {
     let resp = test::call_service(&app, req).await;
     assert_eq!(resp.status(), 200);
     let body: serde_json::Value = test::read_body_json(resp).await;
-    assert_eq!(
-        body.get("demo_mode").and_then(|v| v.as_bool()),
-        Some(true)
-    );
+    assert_eq!(body.get("demo_mode").and_then(|v| v.as_bool()), Some(true));
 }
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
