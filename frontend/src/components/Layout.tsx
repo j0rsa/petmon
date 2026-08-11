@@ -5,6 +5,7 @@ import { NavBar, SidebarUserChip } from './NavBar';
 import { NotificationCenter } from './NotificationCenter';
 import { SidebarPetPicker } from './SidebarPetPicker';
 import { BottomNav } from './BottomNav';
+import { DemoBanner } from './DemoBanner';
 import { usePushNotifications } from '../hooks/usePushNotifications';
 import { useScrollToTopOnNavigate } from '../hooks/useScrollToTopOnNavigate';
 
@@ -14,6 +15,7 @@ export function Layout() {
   return (
     <SelectedPetProvider>
       <NotificationCenter />
+      <DemoBanner />
       <div className="app-shell">
         <aside className="sidebar">
           <span className="sidebar-wordmark">

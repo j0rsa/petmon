@@ -2,7 +2,8 @@ import { localToday, shiftDate } from '../lib/dates';
 import type { BestFluidDay, Category, NutritionDaySummary, NutritionRangeSummary, NutritionRecord, NutritionSchedule, Pet } from '../types';
 import type { DayNutritionHighlight, DayEliminationHighlight } from '../types/pillars';
 import type { AppInfo } from '../api/info';
-import type { ApiTokenCreated, ApiTokenPublic, DisplaySettings, OidcConfigPublic, TelegramConfigPublic } from '../api/settings';
+import type { ApiTokenCreated, ApiTokenPublic, OidcConfigPublic, TelegramConfigPublic } from '../api/settings';
+import { DEFAULT_CUMULATIVE_FLUID_CHART_SETTINGS, DEFAULT_NUTRITION_CALENDAR_SETTINGS, DEFAULT_USER_DISPLAY_SETTINGS, type UserDisplaySettings } from '../api/userSettings';
 import type { EliminationRecord, EliminationDailySummary, EliminationRangeSummary, EliminationDurationProfile, EliminationClassifierStatus } from '../api/elimination';
 import type { NotificationItem } from '../api/notifications';
 import type { WeightRecord, WeightSummaryBucket } from '../api/weight';
@@ -223,22 +224,15 @@ export const mockBestFluidDay: BestFluidDay = {
 export const mockAppInfo: AppInfo = {
   version: '0.0.0-storybook',
   git_sha: 'abc1234',
+  demo_mode: false,
 };
 
 // ── Display settings fixtures ─────────────────────────────────────────────────
 
-export const mockDisplaySettings: DisplaySettings = {
-  time_format: 'h24',
-  date_format: 'dmy',
-  show_water_card: true,
-  calendar_show_wet_food: true,
-  calendar_show_liquids: true,
-  calendar_show_water: true,
-  calendar_show_dry_food: true,
-  calendar_show_record_count: true,
-  calendar_show_total_fluid: true,
-  calendar_week_start: 'sunday',
-};
+export const mockDisplaySettings: UserDisplaySettings = DEFAULT_USER_DISPLAY_SETTINGS;
+
+export const mockNutritionCalendarSettings = DEFAULT_NUTRITION_CALENDAR_SETTINGS;
+export const mockCumulativeFluidChartSettings = DEFAULT_CUMULATIVE_FLUID_CHART_SETTINGS;
 
 // ── Settings fixtures ─────────────────────────────────────────────────────────
 

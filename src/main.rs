@@ -22,6 +22,7 @@ async fn main() -> anyhow::Result<()> {
         host = %config.host,
         port = config.port,
         timezone = %config.timezone,
+        demo_mode = config.demo_mode,
         otlp = ?config.otlp_endpoint,
         "starting petmon",
     );
@@ -30,6 +31,7 @@ async fn main() -> anyhow::Result<()> {
     db::run_migrations(&pool).await?;
     tracing::info!(database_url = %config.database_url, "database migrations applied");
 
+    services::startup::maybe_seed_demo(&pool, config.demo_mode).await;
     services::startup::sync_oidc_from_env(&pool).await;
     services::startup::cleanup_push_subscriptions(&pool).await;
     services::elimination_classifier_retrain::spawn(pool.clone());
@@ -69,6 +71,7 @@ async fn main() -> anyhow::Result<()> {
         oidc_validator,
         config.static_dir.clone(),
         timezone,
+        config.demo_mode,
     ));
     let bind_addr = format!("{}:{}", config.host, config.port);
 
@@ -105,7 +108,8 @@ async fn main() -> anyhow::Result<()> {
                     .configure(api::notifications::configure)
                     .configure(api::push::configure)
                     .configure(api::settings::configure)
-                    .configure(api::settings::configure_api_tokens),
+                    .configure(api::settings::configure_api_tokens)
+                    .configure(api::user_settings::configure),
             )
             .service(
                 web::scope("/mcp")

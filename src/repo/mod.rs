@@ -11,4 +11,5 @@ pub mod nutrition_schedules;
 pub mod pets;
 pub mod push_subscriptions;
 pub mod settings;
+pub mod user_settings;
 pub mod weight_records;

@@ -14,6 +14,8 @@ pub struct Config {
     /// If set, serve frontend files from this directory instead of embedded assets.
     /// Useful for development or when shipping the FE separately alongside the binary.
     pub static_dir: Option<String>,
+    /// When true, seed demo pets and sample data on first startup if the database is empty.
+    pub demo_mode: bool,
 }
 
 impl Config {
@@ -37,6 +39,13 @@ impl Config {
             otlp_endpoint: env::var("OTEL_EXPORTER_OTLP_ENDPOINT").ok(),
             service_name: env::var("OTEL_SERVICE_NAME").unwrap_or_else(|_| "petmon".to_string()),
             static_dir: env::var("STATIC_DIR").ok(),
+            demo_mode: env_flag("DEMO_MODE"),
         }
     }
+}
+
+fn env_flag(name: &str) -> bool {
+    std::env::var(name)
+        .map(|v| matches!(v.to_lowercase().as_str(), "1" | "true" | "yes"))
+        .unwrap_or(false)
 }

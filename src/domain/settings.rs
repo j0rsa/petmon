@@ -127,7 +127,7 @@ impl UpdateTelegramConfig {
     }
 }
 
-// ── Display ───────────────────────────────────────────────────────────────────
+// ── Display enums (used by per-user display settings) ─────────────────────────
 
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
 #[serde(rename_all = "snake_case")]
@@ -153,80 +153,6 @@ pub enum WeekStart {
     #[default]
     Sunday,
     Monday,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize, Default)]
-pub struct DisplaySettings {
-    #[serde(default)]
-    pub time_format: TimeFormat,
-    #[serde(default)]
-    pub date_format: DateFormat,
-    #[serde(default = "default_true")]
-    pub show_water_card: bool,
-    // Calendar cell metrics
-    #[serde(default = "default_true")]
-    pub calendar_show_wet_food: bool,
-    #[serde(default = "default_true")]
-    pub calendar_show_liquids: bool,
-    #[serde(default = "default_true")]
-    pub calendar_show_water: bool,
-    #[serde(default = "default_true")]
-    pub calendar_show_dry_food: bool,
-    #[serde(default = "default_true")]
-    pub calendar_show_record_count: bool,
-    #[serde(default = "default_true")]
-    pub calendar_show_total_fluid: bool,
-    #[serde(default)]
-    pub calendar_week_start: WeekStart,
-}
-
-fn default_true() -> bool {
-    true
-}
-
-#[derive(Debug, Deserialize)]
-pub struct UpdateDisplaySettings {
-    pub time_format: Option<TimeFormat>,
-    pub date_format: Option<DateFormat>,
-    pub show_water_card: Option<bool>,
-    pub calendar_show_wet_food: Option<bool>,
-    pub calendar_show_liquids: Option<bool>,
-    pub calendar_show_water: Option<bool>,
-    pub calendar_show_dry_food: Option<bool>,
-    pub calendar_show_record_count: Option<bool>,
-    pub calendar_show_total_fluid: Option<bool>,
-    pub calendar_week_start: Option<WeekStart>,
-}
-
-impl UpdateDisplaySettings {
-    pub fn apply(self, existing: DisplaySettings) -> DisplaySettings {
-        DisplaySettings {
-            time_format: self.time_format.unwrap_or(existing.time_format),
-            date_format: self.date_format.unwrap_or(existing.date_format),
-            show_water_card: self.show_water_card.unwrap_or(existing.show_water_card),
-            calendar_show_wet_food: self
-                .calendar_show_wet_food
-                .unwrap_or(existing.calendar_show_wet_food),
-            calendar_show_liquids: self
-                .calendar_show_liquids
-                .unwrap_or(existing.calendar_show_liquids),
-            calendar_show_water: self
-                .calendar_show_water
-                .unwrap_or(existing.calendar_show_water),
-            calendar_show_dry_food: self
-                .calendar_show_dry_food
-                .unwrap_or(existing.calendar_show_dry_food),
-            calendar_show_record_count: self
-                .calendar_show_record_count
-                .unwrap_or(existing.calendar_show_record_count),
-            calendar_show_total_fluid: self
-                .calendar_show_total_fluid
-                .unwrap_or(existing.calendar_show_total_fluid),
-            calendar_week_start: self
-                .calendar_week_start
-                .unwrap_or(existing.calendar_week_start),
-        }
-    }
 }
 
 // ── API tokens ────────────────────────────────────────────────────────────────
@@ -264,6 +190,8 @@ pub struct ApiToken {
     pub active: bool,
     pub scopes: String,
     pub created_by: Option<String>,
+    /// OIDC `sub` (or `dev`) of the user who minted this token — drives per-user settings sync.
+    pub owner_subject: Option<String>,
     pub created_at: String,
     pub last_used_at: Option<String>,
 }
@@ -300,6 +228,8 @@ pub struct CreateApiToken {
     /// Set by the server from the caller's Identity — not accepted from the request body.
     #[serde(skip_deserializing)]
     pub created_by: Option<String>,
+    #[serde(skip_deserializing)]
+    pub owner_subject: Option<String>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -321,6 +251,7 @@ impl ApiToken {
             active: true,
             scopes,
             created_by: req.created_by,
+            owner_subject: req.owner_subject,
             created_at: now,
             last_used_at: None,
         }

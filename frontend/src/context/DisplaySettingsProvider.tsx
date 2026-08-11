@@ -1,11 +1,11 @@
 import { useQuery } from '@tanstack/react-query';
-import { settingsApi } from '../api/settings';
+import { DEFAULT_USER_DISPLAY_SETTINGS, userSettingsApi, userSettingsQueryKey } from '../api/userSettings';
 import { DEFAULT_DISPLAY_SETTINGS, DisplaySettingsContext } from './DisplaySettingsContext';
 
 export function DisplaySettingsProvider({ children }: { children: React.ReactNode }) {
   const { data } = useQuery({
-    queryKey: ['settings-display'],
-    queryFn: settingsApi.getDisplay,
+    queryKey: userSettingsQueryKey('display'),
+    queryFn: () => userSettingsApi.get('display'),
     staleTime: Infinity,
   });
 
@@ -15,3 +15,5 @@ export function DisplaySettingsProvider({ children }: { children: React.ReactNod
     </DisplaySettingsContext.Provider>
   );
 }
+
+export { DEFAULT_USER_DISPLAY_SETTINGS };

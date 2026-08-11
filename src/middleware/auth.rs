@@ -118,6 +118,7 @@ where
                             },
                             scopes,
                             token_created_by: api_token.created_by.clone(),
+                            owner_subject: api_token.owner_subject.clone(),
                         };
                         req.extensions_mut().insert(identity);
                         let res = service.call(req).await?;

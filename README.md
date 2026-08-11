@@ -215,6 +215,7 @@ petmon supports two auth methods:
 | `DATABASE_URL` | `sqlite:petmon.db` | SQLite path |
 | `TIMEZONE` / `TZ` | `UTC` | Local timezone for day bucketing |
 | `DEV_MODE` | `false` | Skip all auth (local dev only) |
+| `DEMO_MODE` | `false` | On first startup with an empty database (no pets), load demo seed automatically |
 | `IMPORT_MAX_BYTES` | `1048576` | Max JSON request body size |
 | `STATIC_DIR` | *(unset)* | Serve frontend from this directory instead of embedded assets |
 | `OIDC_ISSUER_URL` | *(unset)* | Merged over DB config at startup |
@@ -234,6 +235,10 @@ make seed-demo
 ```
 
 This clears existing rows and seeds Mittens, Rex, Pepper, and Clover. Demo pet IDs match the Storybook fixtures.
+
+Alternatively, set `DEMO_MODE=true` when running the server: if the database is empty after migrations, the same demo dataset is loaded once (append-only; existing data is never wiped). Useful for PR preview hosts with a fresh SQLite volume. The UI shows a sticky demo banner (`/api/v1/info` → `demo_mode: true`).
+
+PR preview builds use `VITE_APP_FLAVOR=pr` for grayscale icons and a “Petmon PR” install name.
 
 ## Quick Start
 

@@ -2,6 +2,7 @@ const TOKEN_KEY = 'pm_id_token';
 const VERIFIER_KEY = 'pm_pkce_verifier';
 const STATE_KEY = 'pm_oauth_state';
 const REDIRECT_KEY = 'pm_redirect_after_login';
+const SIGNED_OUT_KEY = 'pm_signed_out';
 
 // ── Token storage ─────────────────────────────────────────────────────────────
 
@@ -15,6 +16,19 @@ export function storeToken(token: string): void {
 
 export function clearToken(): void {
   localStorage.removeItem(TOKEN_KEY);
+}
+
+/** Set after an explicit sign-out so AuthGuard does not immediately SSO back in. */
+export function markSignedOut(): void {
+  sessionStorage.setItem(SIGNED_OUT_KEY, '1');
+}
+
+export function isSignedOut(): boolean {
+  return sessionStorage.getItem(SIGNED_OUT_KEY) === '1';
+}
+
+export function clearSignedOut(): void {
+  sessionStorage.removeItem(SIGNED_OUT_KEY);
 }
 
 // ── Redirect path ─────────────────────────────────────────────────────────────
@@ -109,6 +123,7 @@ export interface AuthInfo {
   authorization_endpoint?: string;
   client_id?: string;
   token_endpoint?: string;
+  end_session_endpoint?: string;
 }
 
 export async function fetchAuthInfo(): Promise<AuthInfo> {
@@ -123,6 +138,7 @@ export async function redirectToLogin(authInfo: AuthInfo, redirectTo?: string): 
 
   // Clear any stale token so the callback page starts with a clean slate.
   clearToken();
+  clearSignedOut();
 
   const verifier = await generateCodeVerifier();
   const challenge = await generateCodeChallenge(verifier);

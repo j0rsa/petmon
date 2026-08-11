@@ -15,6 +15,8 @@ pub struct AppState {
     pub oidc: Option<Arc<OidcValidator>>,
     pub static_dir: Option<String>,
     pub timezone: Tz,
+    /// True when `DEMO_MODE` env is set (demo seed + UI banner).
+    pub demo_mode: bool,
 }
 
 impl AppState {
@@ -24,7 +26,7 @@ impl AppState {
         oidc: Option<OidcValidator>,
         static_dir: Option<String>,
     ) -> Self {
-        AppState::new_with_tz(pool, dev_mode, oidc, static_dir, chrono_tz::UTC)
+        AppState::new_with_tz(pool, dev_mode, oidc, static_dir, chrono_tz::UTC, false)
     }
 
     pub fn new_with_tz(
@@ -33,6 +35,7 @@ impl AppState {
         oidc: Option<OidcValidator>,
         static_dir: Option<String>,
         timezone: Tz,
+        demo_mode: bool,
     ) -> Self {
         AppState {
             pool,
@@ -40,6 +43,7 @@ impl AppState {
             oidc: oidc.map(Arc::new),
             static_dir,
             timezone,
+            demo_mode,
         }
     }
 }

@@ -10,6 +10,7 @@ pub mod nutrition;
 pub mod pets;
 pub mod push;
 pub mod settings;
+pub mod user_settings;
 pub mod weight;
 
 use actix_web::web;
@@ -28,6 +29,7 @@ pub fn configure(cfg: &mut web::ServiceConfig) {
             .configure(notes::configure)
             .configure(notifications::configure)
             .configure(push::configure)
-            .configure(settings::configure),
+            .configure(settings::configure)
+            .configure(user_settings::configure),
     );
 }

@@ -83,6 +83,8 @@ jobs:
         run: npx vitest run
 
       - name: Build
+        env:
+          VITE_APP_FLAVOR: ${{ github.event_name == 'pull_request' && 'pr' || '' }}
         run: npm run build
 
       - name: Upload dist artifact
@@ -383,7 +385,7 @@ jobs:
       needs.backend-amd64.result == 'success' &&
       needs.backend-arm64.result == 'success' &&
       !cancelled()
-    # Main pushes publish v<version>, latest, and sha-*. PRs publish pr-<number>-<version> only.
+    # Main pushes publish v<version>, latest, and sha-*. PRs publish pr-<number>-<run>-<sha>.
     permissions:
       contents: read
       packages: write
@@ -444,7 +446,7 @@ jobs:
 
           TAGS=()
           if [ "${{ github.event_name }}" = "pull_request" ]; then
-            TAGS+=("${IMAGE}:pr-${{ github.event.pull_request.number }}-${VERSION}-${SHORT_SHA}")
+            TAGS+=("${IMAGE}:pr-${{ github.event.pull_request.number }}-${{ github.run_number }}-$(printf '%.7s' '${{ github.event.pull_request.head.sha }}')")
           elif [ "${{ github.ref }}" = "refs/heads/main" ] && [ "${{ github.event_name }}" = "push" ]; then
             TAGS+=("${IMAGE}:v${VERSION}")
             TAGS+=("${IMAGE}:sha-${SHORT_SHA}")
@@ -495,7 +497,9 @@ jobs:
           fi
 
       - name: Trigger Renovate
-        if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+        if: |
+          (github.ref == 'refs/heads/main' && github.event_name == 'push') ||
+          github.event_name == 'pull_request'
         env:
           RENOVATE_TRIGGER_API_SECRET: ${{ secrets.RENOVATE_TRIGGER_API_SECRET }}
         run: |

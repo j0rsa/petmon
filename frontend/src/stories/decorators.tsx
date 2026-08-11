@@ -20,6 +20,8 @@ import {
   mockEmptyDaySummary,
   mockEmptyRangeSummary,
   mockNotifications,
+  mockNutritionCalendarSettings,
+  mockCumulativeFluidChartSettings,
   mockNutritionRecords,
   mockNutritionSchedules,
   mockOidcConfigured,
@@ -43,13 +45,19 @@ export const withMemoryRouter: Decorator = (Story, { parameters }) => (
   </MemoryRouter>
 );
 
+function seedUserSettings(client: QueryClient) {
+  client.setQueryData(['user-settings', 'display'], mockDisplaySettings);
+  client.setQueryData(['user-settings', 'nutrition_calendar'], mockNutritionCalendarSettings);
+  client.setQueryData(['user-settings', 'cumulative_fluid_chart'], mockCumulativeFluidChartSettings);
+}
+
 /** Seeds the minimum query data needed for Layout (me, pets, app-info, display settings). */
 export const withLayoutData: Decorator = (Story) => {
   const client = makeMockClient();
   client.setQueryData(['pets'], mockPets);
   client.setQueryData(['me'], { subject: 'dev', email: null, name: 'Dev', display_name: 'Dev', kind: 'dev', scopes: [] });
   client.setQueryData(['app-info'], mockAppInfo);
-  client.setQueryData(['settings-display'], mockDisplaySettings);
+  seedUserSettings(client);
   client.setQueryData(['notifications-unread-count'], { count: 1 });
   client.setQueryData(['notifications'], mockNotifications);
   return (
@@ -81,7 +89,7 @@ export function withSelectedPet(petId = mockPetId): Decorator {
 const noopQueryFn = () => Promise.resolve(undefined);
 
 function makeMockClient() {
-  return new QueryClient({
+  const client = new QueryClient({
     defaultOptions: {
       queries: {
         retry: false,
@@ -93,6 +101,8 @@ function makeMockClient() {
       },
     },
   });
+  seedUserSettings(client);
+  return client;
 }
 
 export function withNutritionDayPanel(date: string, petId: string, empty = false): Decorator {
@@ -100,7 +110,6 @@ export function withNutritionDayPanel(date: string, petId: string, empty = false
     const client = makeMockClient();
     client.setQueryData(['pets'], mockPets);
     client.setQueryData(['me'], { subject: 'dev', email: null, name: 'Dev', display_name: 'Dev', kind: 'dev', scopes: [] });
-    client.setQueryData(['settings-display'], mockDisplaySettings);
     client.setQueryData(['app-info'], mockAppInfo);
     client.setQueryData(['day-summary', date, petId], empty ? { ...mockEmptyDaySummary, local_date: date } : { ...mockDaySummary, local_date: date });
     client.setQueryData(['nutrition-records-day', date, petId], empty ? [] : mockNutritionRecords);
@@ -190,7 +199,6 @@ export function withEliminationDayPanel(
     const client = makeMockClient();
     client.setQueryData(['pets'], mockPets);
     client.setQueryData(['me'], { subject: 'dev', email: null, name: 'Dev', display_name: 'Dev', kind: 'dev', scopes: [] });
-    client.setQueryData(['settings-display'], mockDisplaySettings);
     client.setQueryData(['app-info'], mockAppInfo);
     const records = options?.recordsOverride
       ?? (empty ? [] : mockEliminationRecords.map((r) => ({ ...r, local_date: date })));
@@ -227,7 +235,6 @@ export function withEliminationJournalPage(
     const client = makeMockClient();
     client.setQueryData(['pets'], mockPets);
     client.setQueryData(['me'], { subject: 'dev', email: null, name: 'Dev', display_name: 'Dev', kind: 'dev', scopes: [] });
-    client.setQueryData(['settings-display'], mockDisplaySettings);
     client.setQueryData(['app-info'], mockAppInfo);
     client.setQueryData(
       ['elimination-records-day', date, mockPetId],
@@ -499,12 +506,11 @@ export function withSettings({
 
     if (loading) {
       const pending = () => new Promise(() => {});
-      client.setQueryDefaults(['settings-display'], { queryFn: pending });
+      client.setQueryDefaults(['user-settings', 'display'], { queryFn: pending });
       client.setQueryDefaults(['settings-oidc'], { queryFn: pending });
       client.setQueryDefaults(['settings-telegram'], { queryFn: pending });
       client.setQueryDefaults(['api-tokens'], { queryFn: pending });
     } else {
-      client.setQueryData(['settings-display'], mockDisplaySettings);
       client.setQueryData(['settings-oidc'], oidc === 'configured' ? mockOidcConfigured : mockOidcEmpty);
       client.setQueryData(['settings-telegram'], telegram === 'configured' ? mockTelegramConfigured : mockTelegramEmpty);
       client.setQueryData(['api-tokens'], tokens === 'populated' ? mockApiTokens : []);
@@ -538,7 +544,6 @@ export function withOverviewPage({
     client.setQueryData(['pets'], mockPets);
     client.setQueryData(['me'], { subject: 'dev', email: null, name: 'Dev', display_name: 'Dev', kind: 'dev', scopes: [] });
     client.setQueryData(['app-info'], mockAppInfo);
-    client.setQueryData(['settings-display'], mockDisplaySettings);
     client.setQueryData(
       ['day-summary', today, petId],
       empty ? { ...mockEmptyDaySummary, local_date: today } : { ...mockDaySummary, local_date: today },

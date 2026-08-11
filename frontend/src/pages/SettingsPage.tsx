@@ -1,7 +1,8 @@
 import { useEffect, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { settingsApi } from '../api/settings';
-import type { ApiTokenCreated, ApiTokenPublic, ApiTokenScope, DisplaySettings, OidcConfigPublic, TelegramConfigPublic } from '../api/settings';
+import type { ApiTokenCreated, ApiTokenPublic, ApiTokenScope, OidcConfigPublic, TelegramConfigPublic } from '../api/settings';
+import { useUserSettings } from '../api/userSettings';
 import { API_TOKEN_SCOPES } from '../api/settings';
 import { deriveDeviceAlias, getStoredToken, storeToken } from '../lib/auth';
 import { clearPwaCachesAndReload, isPwaCacheSupported } from '../lib/pwaCache';
@@ -25,28 +26,7 @@ export default function SettingsPage() {
 // ── Display ───────────────────────────────────────────────────────────────────
 
 function DisplaySection() {
-  const queryClient = useQueryClient();
-  const { data, isLoading } = useQuery({ queryKey: ['settings-display'], queryFn: settingsApi.getDisplay });
-
-  const current: DisplaySettings = data ?? {
-    time_format: 'h24',
-    date_format: 'dmy',
-    show_water_card: true,
-    calendar_show_wet_food: true,
-    calendar_show_liquids: true,
-    calendar_show_water: true,
-    calendar_show_dry_food: true,
-    calendar_show_record_count: true,
-    calendar_show_total_fluid: true,
-    calendar_week_start: 'sunday',
-  };
-
-  const mutation = useMutation({
-    mutationFn: settingsApi.updateDisplay,
-    onSuccess: (updated) => {
-      queryClient.setQueryData(['settings-display'], updated);
-    },
-  });
+  const { settings: current, update, isLoading, error, isSaving } = useUserSettings('display');
 
   if (isLoading) return <div className="loading-state">Loading display settings…</div>;
 
@@ -69,7 +49,8 @@ function DisplaySection() {
                   type="radio"
                   name="time_format"
                   checked={current.time_format === v}
-                  onChange={() => mutation.mutate({ time_format: v })}
+                  onChange={() => update({ time_format: v })}
+                  disabled={isSaving}
                 />
                 {v === 'h24' ? '24h' : '12h'}
               </label>
@@ -86,7 +67,8 @@ function DisplaySection() {
                   type="radio"
                   name="date_format"
                   checked={current.date_format === v}
-                  onChange={() => mutation.mutate({ date_format: v })}
+                  onChange={() => update({ date_format: v })}
+                  disabled={isSaving}
                 />
                 {v === 'dmy' ? 'DD.MM.YYYY' : 'MMM DD, YYYY'}
               </label>
@@ -101,59 +83,19 @@ function DisplaySection() {
               <input
                 type="checkbox"
                 checked={current.show_water_card}
-                onChange={(e) => mutation.mutate({ show_water_card: e.target.checked })}
+                onChange={(e) => update({ show_water_card: e.target.checked })}
+                disabled={isSaving}
               />
               Show water metric card
             </label>
           </div>
         </div>
 
-        <div className="display-option-row">
-          <span className="display-option-label">Week starts on</span>
-          <div className="display-option-choices">
-            {(['sunday', 'monday'] as const).map((v) => (
-              <label key={v} className="checkbox-row" style={{ paddingTop: 0 }}>
-                <input
-                  type="radio"
-                  name="calendar_week_start"
-                  checked={current.calendar_week_start === v}
-                  onChange={() => mutation.mutate({ calendar_week_start: v })}
-                />
-                {v === 'sunday' ? 'Sunday' : 'Monday'}
-              </label>
-            ))}
-          </div>
-        </div>
-
-        <div className="display-option-row" style={{ alignItems: 'flex-start' }}>
-          <span className="display-option-label" style={{ paddingTop: '0.15rem' }}>Calendar metrics</span>
-          <div className="display-option-choices" style={{ flexDirection: 'column', alignItems: 'flex-start', gap: '0.5rem' }}>
-            {(
-              [
-                ['calendar_show_total_fluid',   'Total fluid (ml)'],
-                ['calendar_show_wet_food',       'Wet food (g)'],
-                ['calendar_show_liquids',        'Liquids (ml)'],
-                ['calendar_show_water',          'Water (ml)'],
-                ['calendar_show_dry_food',       'Dry food (g)'],
-                ['calendar_show_record_count',   'Record count (fallback)'],
-              ] as const
-            ).map(([field, label]) => (
-              <label key={field} className="checkbox-row" style={{ paddingTop: 0 }}>
-                <input
-                  type="checkbox"
-                  checked={current[field]}
-                  onChange={(e) => mutation.mutate({ [field]: e.target.checked })}
-                />
-                {label}
-              </label>
-            ))}
-          </div>
-        </div>
       </div>
 
-      {mutation.isError && (
+      {error && (
         <div className="error-state">
-          {mutation.error instanceof Error ? mutation.error.message : 'Failed to save display settings.'}
+          {error instanceof Error ? error.message : 'Failed to save display settings.'}
         </div>
       )}
     </section>

@@ -54,6 +54,14 @@ pub async fn run(pool: &SqlitePool, fresh: bool) -> AppResult<SeedSummary> {
     })
 }
 
+/// True when the database has no pets yet (fresh after migrations).
+pub async fn is_empty_database(pool: &SqlitePool) -> AppResult<bool> {
+    let count: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM pets")
+        .fetch_one(pool)
+        .await?;
+    Ok(count == 0)
+}
+
 async fn clear_all(pool: &SqlitePool) -> AppResult<()> {
     sqlx::query("DELETE FROM nutrition_records")
         .execute(pool)
@@ -779,6 +787,7 @@ mod tests {
             otlp_endpoint: None,
             service_name: "petmon-test".to_string(),
             static_dir: None,
+            demo_mode: false,
         };
         let pool = db::create_pool(&config).await.expect("pool");
         db::run_migrations(&pool).await.expect("migrate");

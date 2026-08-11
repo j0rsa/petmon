@@ -21,32 +21,6 @@ export interface UpdateOidcConfig {
   readonly_group?: string | null;
 }
 
-export interface DisplaySettings {
-  time_format: 'h24' | 'h12';
-  date_format: 'dmy' | 'mmm_dd_yyyy';
-  show_water_card: boolean;
-  calendar_show_wet_food: boolean;
-  calendar_show_liquids: boolean;
-  calendar_show_water: boolean;
-  calendar_show_dry_food: boolean;
-  calendar_show_record_count: boolean;
-  calendar_show_total_fluid: boolean;
-  calendar_week_start: 'sunday' | 'monday';
-}
-
-export interface UpdateDisplaySettings {
-  time_format?: 'h24' | 'h12';
-  date_format?: 'dmy' | 'mmm_dd_yyyy';
-  show_water_card?: boolean;
-  calendar_show_wet_food?: boolean;
-  calendar_show_liquids?: boolean;
-  calendar_show_water?: boolean;
-  calendar_show_dry_food?: boolean;
-  calendar_show_record_count?: boolean;
-  calendar_show_total_fluid?: boolean;
-  calendar_week_start?: 'sunday' | 'monday';
-}
-
 export interface TelegramConfigPublic {
   enabled: boolean;
   has_bot_token: boolean;
@@ -91,8 +65,6 @@ export interface UpdateApiTokenScopes {
 export const settingsApi = {
   getOidc: () => api.get<OidcConfigPublic>('/settings/oidc'),
   updateOidc: (body: UpdateOidcConfig) => api.post<OidcConfigPublic>('/settings/oidc', body),
-  getDisplay: () => api.get<DisplaySettings>('/settings/display'),
-  updateDisplay: (body: UpdateDisplaySettings) => api.post<DisplaySettings>('/settings/display', body),
   getTelegram: () => api.get<TelegramConfigPublic>('/settings/telegram'),
   updateTelegram: (body: UpdateTelegramConfig) => api.post<TelegramConfigPublic>('/settings/telegram', body),
   listTokens: () => api.get<ApiTokenPublic[]>('/api-tokens'),

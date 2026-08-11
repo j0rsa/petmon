@@ -84,6 +84,8 @@ export default function AuthCallbackPage() {
       }
 
       storeToken(idToken);
+      const { clearSignedOut } = await import('../lib/auth');
+      clearSignedOut();
       window.location.replace(consumeRedirectPath());
     }
 
