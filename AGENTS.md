@@ -16,4 +16,5 @@ petmon is a single product: a Rust/Actix Web backend (crate `petmon`) that serve
 - Backend tests/clippy expect `DATABASE_URL="sqlite::memory:"` (see `make check-be`). Tests run via `cargo nextest` (installed separately: `cargo install cargo-nextest --locked`); `cargo test` also works.
 - Frontend tests (`npx vitest run`) include Storybook browser-mode tests that need Playwright Chromium; the update script runs `npx playwright install chromium --with-deps`.
 - `make seed-demo` wipes the DB (`sqlite:petmon.db`) before loading 4 demo pets (Mittens, Rex, Pepper, Clover). Use `ARGS='--append'` to keep existing data.
+- **`DEMO_MODE=true`** — on startup, if the database has no pets yet (fresh volume after migrations), demo seed runs automatically (append-only; never wipes). Use for PR preview hosts such as `petmon-pr.j0rsa.com` with OIDC. Pair with a persistent `DATABASE_URL` volume so re-deploys keep data; wipe the volume to re-seed.
 - Standard commands live in the `Makefile` (`check`, `check-fe`, `check-be`, `build-fe`, `run-be`, `run-dev-fe`, `seed-demo`) — reference those rather than re-deriving.

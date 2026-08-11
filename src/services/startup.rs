@@ -51,3 +51,35 @@ pub async fn cleanup_push_subscriptions(pool: &SqlitePool) {
         Err(e) => tracing::warn!(error = %e, "push subscription cleanup failed"),
     }
 }
+
+/// When `demo_mode` is on and the database has no pets yet, load demo seed data (append-only).
+pub async fn maybe_seed_demo(pool: &SqlitePool, demo_mode: bool) {
+    if !demo_mode {
+        return;
+    }
+
+    match crate::demo_seed::is_empty_database(pool).await {
+        Ok(true) => {}
+        Ok(false) => {
+            tracing::info!("DEMO_MODE enabled — database already has data, skipping demo seed");
+            return;
+        }
+        Err(e) => {
+            tracing::warn!(error = %e, "DEMO_MODE enabled but failed to check database state");
+            return;
+        }
+    }
+
+    match crate::demo_seed::run(pool, false).await {
+        Ok(summary) => tracing::info!(
+            pets = summary.pets,
+            nutrition_records = summary.nutrition_records,
+            elimination_records = summary.elimination_records,
+            weight_records = summary.weight_records,
+            day_notes = summary.day_notes,
+            schedules = summary.schedules,
+            "DEMO_MODE loaded demo seed data into empty database"
+        ),
+        Err(e) => tracing::error!(error = %e, "DEMO_MODE failed to load demo seed data"),
+    }
+}

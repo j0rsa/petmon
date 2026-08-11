@@ -1793,6 +1793,35 @@ async fn user_settings_nutrition_calendar_roundtrip() {
     assert_eq!(persisted["show_water"], false);
 }
 
+#[tokio::test]
+async fn demo_mode_seeds_empty_database_once() {
+    let pool = setup_pool().await;
+    assert!(petmon::demo_seed::is_empty_database(&pool).await.unwrap());
+
+    petmon::services::startup::maybe_seed_demo(&pool, true).await;
+
+    assert!(!petmon::demo_seed::is_empty_database(&pool).await.unwrap());
+    let count: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM pets")
+        .fetch_one(&pool)
+        .await
+        .unwrap();
+    assert_eq!(count, 4);
+
+    petmon::services::startup::maybe_seed_demo(&pool, true).await;
+    let count_again: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM pets")
+        .fetch_one(&pool)
+        .await
+        .unwrap();
+    assert_eq!(count_again, 4);
+}
+
+#[tokio::test]
+async fn demo_mode_off_leaves_empty_database() {
+    let pool = setup_pool().await;
+    petmon::services::startup::maybe_seed_demo(&pool, false).await;
+    assert!(petmon::demo_seed::is_empty_database(&pool).await.unwrap());
+}
+
 #[actix_web::test]
 async fn user_settings_display_roundtrip() {
     let pool = setup_pool().await;
