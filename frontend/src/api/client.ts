@@ -1,4 +1,4 @@
-import { clearToken, fetchAuthInfo, getStoredToken, redirectToLogin } from '../lib/auth';
+import { clearToken, fetchAuthInfo, getStoredToken, isSignedOut, redirectToLogin } from '../lib/auth';
 
 const BASE = '/api/v1';
 
@@ -46,6 +46,9 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
       throw new ApiError(res.status, await parseBody());
     }
     clearToken();
+    if (isSignedOut()) {
+      throw new ApiError(res.status, await parseBody());
+    }
     try {
       const authInfo = await fetchAuthInfo();
       if (authInfo.mode === 'oidc') {

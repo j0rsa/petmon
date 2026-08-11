@@ -1,9 +1,7 @@
 import { NavLink } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { meApi } from '../api/me';
-import { authApi } from '../api/auth';
-import { clearToken } from '../lib/auth';
-import { unsubscribePushNotifications } from '../lib/pushNotifications';
+import { performSignOut } from '../lib/signOut';
 import { PawPrint, Utensils, HeartPulse } from 'lucide-react';
 import { PILLARS, type MonitoringPillar } from '../types/pillars';
 import { AppVersionFooter } from './AppVersionFooter';
@@ -66,21 +64,8 @@ export function SidebarUserChip() {
 
   if (!me) return null;
 
-  async function handleSignOut() {
-    try {
-      await unsubscribePushNotifications();
-    } catch {
-      // Still sign out even if push cleanup fails.
-    }
-    if (me?.kind === 'api_token') {
-      try {
-        await authApi.signOut();
-      } catch {
-        // Still clear local storage even if the server call fails.
-      }
-    }
-    clearToken();
-    window.location.href = '/';
+  function handleSignOut() {
+    void performSignOut(me.kind as 'oidc' | 'api_token' | 'dev');
   }
 
   return (
@@ -104,7 +89,7 @@ export function SidebarUserChip() {
         <button
           className="sidebar-user-logout"
           type="button"
-          onClick={() => { void handleSignOut(); }}
+          onClick={handleSignOut}
         >
           sign out
         </button>

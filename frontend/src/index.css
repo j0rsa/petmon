@@ -163,6 +163,13 @@ pre {
   min-height: 100vh;
 }
 
+.signed-out-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 1rem;
+}
+
 .demo-banner {
   position: sticky;
   top: 0;

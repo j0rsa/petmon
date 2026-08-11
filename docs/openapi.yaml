@@ -2136,6 +2136,10 @@ components:
           type: string
           nullable: true
           description: OAuth2 token endpoint URL
+        end_session_endpoint:
+          type: string
+          nullable: true
+          description: OIDC RP-initiated logout (end_session) endpoint URL
       required:
         - mode
 

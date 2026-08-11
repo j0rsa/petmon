@@ -1,13 +1,21 @@
 import { useEffect, useRef, useState } from 'react';
 import { Outlet } from 'react-router-dom';
-import { fetchAuthInfo, getStoredToken, redirectToLogin, storeRedirectPath } from '../lib/auth';
+import {
+  fetchAuthInfo,
+  getStoredToken,
+  isSignedOut,
+  redirectToLogin,
+  storeRedirectPath,
+} from '../lib/auth';
+import { signInFromSignedOut } from '../lib/signOut';
 
-type State = 'checking' | 'authenticated' | 'redirecting' | 'offline';
+type State = 'checking' | 'authenticated' | 'redirecting' | 'offline' | 'signed-out';
 
 export function AuthGuard() {
   const [state, setState] = useState<State>(() => {
     if (getStoredToken()) return 'authenticated';
     if (!navigator.onLine) return 'offline';
+    if (isSignedOut()) return 'signed-out';
     return 'checking';
   });
   const ran = useRef(false);
@@ -59,6 +67,21 @@ export function AuthGuard() {
     return (
       <div className="loading-state" role="status" aria-live="polite">
         No connection — waiting to sign in…
+      </div>
+    );
+  }
+
+  if (state === 'signed-out') {
+    return (
+      <div className="loading-state signed-out-state" role="status" aria-live="polite">
+        <p>Signed out.</p>
+        <button
+          className="button button-secondary"
+          type="button"
+          onClick={() => { void signInFromSignedOut(); }}
+        >
+          Sign in
+        </button>
       </div>
     );
   }

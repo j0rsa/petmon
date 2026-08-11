@@ -1,5 +1,5 @@
 use actix_web::{get, post, web, HttpMessage, HttpRequest, HttpResponse};
-use openidconnect::{core::CoreProviderMetadata, reqwest::async_http_client, IssuerUrl};
+use openidconnect::{reqwest::async_http_client, IssuerUrl, ProviderMetadataWithLogout};
 use serde::Serialize;
 
 use crate::auth::{
@@ -32,6 +32,9 @@ pub struct AuthInfo {
     /// Token endpoint the FE POSTs to during the PKCE code exchange.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub token_endpoint: Option<String>,
+    /// RP-initiated logout endpoint (OIDC end_session).
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub end_session_endpoint: Option<String>,
 }
 
 #[get("/auth/info")]
@@ -42,6 +45,7 @@ pub async fn auth_info(state: web::Data<AppState>) -> AppResult<HttpResponse> {
             authorization_endpoint: None,
             client_id: None,
             token_endpoint: None,
+            end_session_endpoint: None,
         }));
     }
 
@@ -53,6 +57,7 @@ pub async fn auth_info(state: web::Data<AppState>) -> AppResult<HttpResponse> {
             authorization_endpoint: None,
             client_id: None,
             token_endpoint: None,
+            end_session_endpoint: None,
         }));
     }
 
@@ -64,6 +69,7 @@ pub async fn auth_info(state: web::Data<AppState>) -> AppResult<HttpResponse> {
                 authorization_endpoint: None,
                 client_id: None,
                 token_endpoint: None,
+                end_session_endpoint: None,
             }));
         }
     };
@@ -71,7 +77,7 @@ pub async fn auth_info(state: web::Data<AppState>) -> AppResult<HttpResponse> {
     let issuer = IssuerUrl::new(issuer_url)
         .map_err(|e| AppError::Internal(format!("invalid issuer URL: {e}")))?;
 
-    let metadata = CoreProviderMetadata::discover_async(issuer, async_http_client)
+    let metadata = ProviderMetadataWithLogout::discover_async(issuer, async_http_client)
         .await
         .map_err(|e| AppError::Internal(format!("OIDC discovery failed: {e}")))?;
 
@@ -80,6 +86,11 @@ pub async fn auth_info(state: web::Data<AppState>) -> AppResult<HttpResponse> {
         authorization_endpoint: Some(metadata.authorization_endpoint().url().to_string()),
         client_id: Some(client_id),
         token_endpoint: metadata.token_endpoint().map(|u| u.url().to_string()),
+        end_session_endpoint: metadata
+            .additional_metadata()
+            .end_session_endpoint
+            .as_ref()
+            .map(|u| u.url().to_string()),
     }))
 }
 
