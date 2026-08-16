@@ -1,6 +1,6 @@
 # Home Assistant Integration
 
-Log toileting events (and optionally weight) from Home Assistant automations using the petmon REST API.
+Log toileting events, nutrition intake, and optionally weight from Home Assistant automations using the petmon REST API.
 
 ## Prerequisites
 
@@ -73,11 +73,30 @@ rest_command:
         "note": {{ ('\"' ~ note ~ '\"') if note else 'null' }},
         "occurred_at": "{{ occurred_at | default('') }}"
       }
+
+  # Log a nutrition record (wet food / dry food / water / liquids)
+  petmon_log_nutrition:
+    url: "http://PETMON_HOST/api/v1/nutrition/records"
+    method: POST
+    content_type: "application/json"
+    headers:
+      Authorization: !secret petmon_auth_header
+    payload: >
+      {
+        "pet_id": "{{ pet_id }}",
+        "category": "{{ category }}",
+        "amount": {{ amount | string | replace(',', '.') | float }},
+        "unit": {{ ('\"' ~ unit ~ '\"') if unit else ('"ml"' if category in ['water', 'liquids'] else '"g"') }},
+        "note": {{ ('\"' ~ note ~ '\"') if note else 'null' }},
+        "occurred_at": {{ ('\"' ~ occurred_at ~ '\"') if occurred_at else 'null' }}
+      }
 ```
 
 > **`occurred_at`** accepts a naive local datetime string `YYYY-MM-DDTHH:MM:SS`. When omitted or empty the server defaults to the current time in the configured timezone. For automations triggered by a sensor you can pass the sensor's last-changed time; for manual button presses you can omit it entirely.
 
-> **`weight_kg` decimal separator:** the payload renders through `| replace(',', '.') | float`, so both `4.2` and `4,2` are accepted regardless of locale.
+> **Decimal separator:** `weight_kg` and nutrition `amount` render through `| replace(',', '.') | float`, so both `4.2` and `4,2` are accepted regardless of locale.
+
+> **`unit`:** omit it to default to `ml` for `water` / `liquids` and `g` for `wet_food` / `dry_food`. Pass an explicit value to override.
 
 ---
 
@@ -145,6 +164,27 @@ automation:
 
 ---
 
+## Example: automation triggered by a smart feeder
+
+```yaml
+automation:
+  - alias: "Mittens ate from the feeder"
+    trigger:
+      - platform: state
+        entity_id: sensor.pet_feeder_last_portion
+    action:
+      - service: rest_command.petmon_log_nutrition
+        data:
+          pet_id: "550e8400-e29b-41d4-a716-446655440000"
+          category: "dry_food"
+          amount: "{{ states('sensor.pet_feeder_last_portion') }}"
+          note: ""
+```
+
+The same command works for a water fountain or a dashboard button — change `category` to `water`, `liquids`, or `wet_food` and pass the measured amount.
+
+---
+
 ## Event types and subtypes
 
 | `event_type` | `subtype` values |
@@ -158,9 +198,22 @@ Leave `subtype` empty or omit it when not applicable.
 
 ---
 
+## Nutrition categories
+
+| `category` | Typical `unit` | Use for |
+|---|---|---|
+| `wet_food` | `g` | Wet / canned food |
+| `dry_food` | `g` | Kibble |
+| `water` | `ml` | Plain water |
+| `liquids` | `ml` | Other fluids (broth, gravy, oral rehydration) |
+
+`pet_id`, `category`, and `amount` are required. `amount` must be non-negative. `occurred_at`, `unit`, and `note` are optional.
+
+---
+
 ## Troubleshooting
 
 - **401 Unauthorized** — verify `secrets.yaml` has `petmon_auth_header: "Bearer pm_api_YOURTOKEN"` (the full value including `Bearer `). Using `"Bearer !secret petmon_token"` won't work — `!secret` inside a quoted string is not resolved.
-- **400 Bad Request** — verify `pet_id` is a valid UUID and `event_type` is one of the values above.
+- **400 Bad Request** — verify `pet_id` is a valid UUID; for toileting, `event_type` is one of the values above; for nutrition, `category` is one of `wet_food` / `dry_food` / `water` / `liquids` and `amount` is a non-negative number.
 - **No records appearing** — confirm the request reaches petmon (check logs with `RUST_LOG=petmon=debug`).
-- Test a command manually from HA's Developer Tools → Services → `rest_command.petmon_log_elimination`.
+- Test a command manually from HA's Developer Tools → Services → `rest_command.petmon_log_elimination` or `rest_command.petmon_log_nutrition`.
