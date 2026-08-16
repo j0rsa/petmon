@@ -55,6 +55,33 @@ export const DisplayWithNote: Story = {
   args: {
     record: mockNutritionRecords[1],
   },
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    const note = canvas.getByText('chicken pate');
+    await expect(note.closest('.entry-row')).not.toBeNull();
+    await expect(note).toHaveClass('entry-record-note');
+  },
+};
+
+export const DisplayWithLongNote: Story = {
+  args: {
+    record: {
+      ...mockNutritionRecords[1],
+      note: 'Katovit mit Ente, col — leftover from the evening bowl plus a little extra gravy',
+    },
+  },
+  parameters: {
+    docs: {
+      description: {
+        story: 'Long notes stay on the same row as category and amount, truncating with an ellipsis.',
+      },
+    },
+  },
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    const note = canvas.getByText(/Katovit mit Ente/);
+    await expect(note.closest('.entry-row')).not.toBeNull();
+  },
 };
 
 export const Editing: Story = {

@@ -203,6 +203,9 @@ function RecordRow({ record, viewDate, onSave, onDelete, saving, savingPaused, d
         <span className="entry-time">{formatTime(record.occurred_at)}</span>
         <CategoryBadge category={record.category} />
         <span className="entry-amount">{record.amount} {record.unit ?? ''}</span>
+        {record.note && (
+          <span className="entry-record-note" title={record.note}>{record.note}</span>
+        )}
         {canWrite && (
           <div className="entry-row-actions">
             <button className="icon-button" type="button" title="Edit" aria-label="Edit" onClick={startEdit}>✎</button>
@@ -219,9 +222,6 @@ function RecordRow({ record, viewDate, onSave, onDelete, saving, savingPaused, d
           </div>
         )}
       </div>
-      {record.note && (
-        <p className="entry-record-note">{record.note}</p>
-      )}
     </div>
   );
 }
