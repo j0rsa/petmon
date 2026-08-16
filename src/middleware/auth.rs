@@ -103,6 +103,15 @@ where
             if token.starts_with("pm_api_") {
                 match api_tokens::find_by_hash(&state.pool, &token).await {
                     Ok(Some(api_token)) => {
+                        let Some(owner_subject) =
+                            api_token.owner_subject.clone().filter(|s| !s.is_empty())
+                        else {
+                            let resp = HttpResponse::Unauthorized().json(serde_json::json!({
+                                "error": "UNAUTHORIZED",
+                                "message": "API token has no owner. Sign in with OIDC and mint a new token."
+                            }));
+                            return Ok(req.into_response(resp).map_into_right_body());
+                        };
                         let display = api_token
                             .alias
                             .clone()
@@ -110,7 +119,7 @@ where
                             .unwrap_or_else(|| api_token.id.clone());
                         let scopes = api_token.scopes_vec().into_iter().collect();
                         let identity = Identity {
-                            subject: display.clone(),
+                            subject: owner_subject.clone(),
                             email: None,
                             name: Some(display),
                             kind: crate::auth::identity::IdentityKind::ApiToken {
@@ -118,7 +127,7 @@ where
                             },
                             scopes,
                             token_created_by: api_token.created_by.clone(),
-                            owner_subject: api_token.owner_subject.clone(),
+                            owner_subject: Some(owner_subject),
                         };
                         req.extensions_mut().insert(identity);
                         let res = service.call(req).await?;

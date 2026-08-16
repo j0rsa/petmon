@@ -11,12 +11,12 @@
 
 User settings API: `GET/POST /api/v1/me/settings/{key}` where `key` is e.g. `display`, `nutrition_calendar`, `cumulative_fluid_chart`.
 
-`reader_key` identifies the human user for per-user state:
-- **OIDC:** JWT `sub` — same settings on web and mobile.
-- **API token:** `owner_subject` (creator's `sub` at mint time) when set; legacy tokens fall back to `api_token:{id}`.
+`reader_key` is always the user id (`Identity.subject`):
+- **OIDC:** JWT `sub` — same settings on web, mobile, and API-token sessions.
+- **API token:** `api_tokens.owner_subject` (the minting user's `sub`). Tokens without `owner_subject` cannot authenticate.
 - **DEV_MODE:** `"dev"`.
 
-Push subscriptions remain per browser endpoint; notification read state follows `reader_key`.
+Push subscriptions remain per browser endpoint; notification read state and push ownership follow `reader_key`.
 
 ---
 1. **Tests** — update or add integration tests in `tests/api_tests.rs` covering the changed behaviour.
