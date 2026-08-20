@@ -2,7 +2,7 @@ import { api } from './client';
 
 export type MedType = 'pill' | 'liquid';
 export type PillShape = 'round_1_precut' | 'round_2_precut' | 'ellipse_1_precut';
-export type PillFraction = 'half' | 'quarter' | 'eighth' | 'sixteenth';
+export type DoseFraction = 'whole' | 'half' | 'quarter' | 'three_quarter' | 'eighth' | 'sixteenth';
 
 export interface MedFrequency {
   times: string[];
@@ -13,18 +13,30 @@ export interface Medication {
   pet_id: string;
   name: string;
   med_type: MedType;
-  pill_shape: PillShape | null;
-  pill_fraction: PillFraction | null;
   color: string;
   created_at: string;
   updated_at: string;
+}
+
+export interface MedFormulation {
+  id: string;
+  medication_id: string;
+  tablet_strength_mg: number | null;
+  pill_shape: PillShape | null;
+  liquid_concentration_mg_per_ml: number | null;
+  created_at: string;
 }
 
 export interface MedAssignment {
   id: string;
   medication_id: string;
   pet_id: string;
-  dosage: string;
+  formulation_id: string;
+  formulation: MedFormulation;
+  dose_fraction: DoseFraction | null;
+  liquid_dose_ml: number | null;
+  effective_dose_mg: number | null;
+  dose_label: string;
   frequency: MedFrequency;
   date_from: string;
   date_to: string | null;
@@ -37,10 +49,15 @@ export interface MedIntakeRecord {
   id: string;
   pet_id: string;
   medication_id: string;
-  assignment_id: string | null;
+  assignment_id: string;
+  assignment: MedAssignment;
+  dose_fraction_override: DoseFraction | null;
+  liquid_dose_ml_override: number | null;
+  effective_dose_fraction: DoseFraction | null;
+  effective_dose_mg: number | null;
+  dose_label: string;
   occurred_at: string;
   local_date: string;
-  dosage: string;
   taken: boolean;
   note: string | null;
   source_type: string;
@@ -57,21 +74,22 @@ export interface CreateMedication {
   pet_id: string;
   name: string;
   med_type: MedType;
-  pill_shape?: PillShape;
-  pill_fraction?: PillFraction;
   color?: string;
 }
 
 export interface UpdateMedication {
   name?: string;
-  pill_shape?: PillShape;
-  pill_fraction?: PillFraction;
   color?: string;
 }
 
 export interface CreateMedAssignment {
   medication_id: string;
-  dosage: string;
+  formulation_id?: string;
+  tablet_strength_mg?: number;
+  pill_shape?: PillShape;
+  liquid_concentration_mg_per_ml?: number;
+  dose_fraction?: DoseFraction;
+  liquid_dose_ml?: number;
   frequency?: MedFrequency;
   date_from: string;
   date_to?: string | null;
@@ -79,7 +97,12 @@ export interface CreateMedAssignment {
 }
 
 export interface ReviseMedAssignment {
-  dosage: string;
+  formulation_id?: string;
+  tablet_strength_mg?: number;
+  pill_shape?: PillShape;
+  liquid_concentration_mg_per_ml?: number;
+  dose_fraction?: DoseFraction;
+  liquid_dose_ml?: number;
   frequency?: MedFrequency;
   effective_from: string;
   date_to?: string | null;
@@ -89,7 +112,9 @@ export interface ReviseMedAssignment {
 export interface CreateMedIntakeRecord {
   pet_id: string;
   medication_id: string;
-  dosage?: string;
+  assignment_id?: string;
+  dose_fraction_override?: DoseFraction;
+  liquid_dose_ml_override?: number;
   taken?: boolean;
   occurred_at?: string;
   local_date?: string;
@@ -114,6 +139,9 @@ export const medicationsApi = {
   update: (id: string, data: UpdateMedication) => api.patch<Medication>(`/health/meds/${id}`, data),
   delete: (id: string) => api.delete(`/health/meds/${id}`),
 
+  listFormulations: (medicationId: string) =>
+    api.get<MedFormulation[]>(`/health/meds/formulations?medication_id=${medicationId}`),
+
   listAssignments: (filters: { pet_id?: string; medication_id?: string } = {}) =>
     api.get<MedAssignment[]>(`/health/meds/assignments${toQueryString(filters)}`),
 
@@ -125,8 +153,6 @@ export const medicationsApi = {
 
   reviseAssignment: (id: string, data: ReviseMedAssignment) =>
     api.post<MedAssignment>(`/health/meds/assignments/${id}/revise`, data),
-
-  deleteAssignment: (id: string) => api.delete(`/health/meds/assignments/${id}`),
 
   listIntake: (filters: {
     pet_id?: string;

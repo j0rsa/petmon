@@ -16,27 +16,27 @@ export const PillHalf: Story = {
     medType: 'pill',
     color: '#6366f1',
     pillShape: 'round_1_precut',
-    pillFraction: 'half',
+    doseFraction: 'half',
     size: 48,
   },
 };
 
-export const PillQuarterCross: Story = {
+export const PillThreeQuarter: Story = {
+  args: {
+    medType: 'pill',
+    color: '#ec4899',
+    pillShape: 'round_2_precut',
+    doseFraction: 'three_quarter',
+    size: 48,
+  },
+};
+
+export const PillWhole: Story = {
   args: {
     medType: 'pill',
     color: '#22c55e',
     pillShape: 'round_2_precut',
-    pillFraction: 'quarter',
-    size: 48,
-  },
-};
-
-export const PillEighth: Story = {
-  args: {
-    medType: 'pill',
-    color: '#ec4899',
-    pillShape: 'ellipse_1_precut',
-    pillFraction: 'eighth',
+    doseFraction: 'whole',
     size: 48,
   },
 };

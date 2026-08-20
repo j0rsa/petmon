@@ -5,6 +5,7 @@ pub mod elimination_classifiers;
 pub mod elimination_records;
 pub mod health_state_records;
 pub mod med_assignments;
+pub mod med_formulations;
 pub mod med_intake_records;
 pub mod medications;
 pub mod notifications;

@@ -3,18 +3,22 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import {
   medicationsApi,
   type CreateMedAssignment,
-  type CreateMedication,
   type MedAssignment,
   type Medication,
   type ReviseMedAssignment,
 } from '../api/medications';
 import { NoPetSelected } from '../components/NoPetSelected';
 import { MedIcon } from '../components/health/MedIcon';
-import { MedIconPicker, defaultMedIconPickerValue, type MedIconPickerValue } from '../components/health/MedIconPicker';
+import {
+  FormulationPicker,
+  defaultFormulationPickerValue,
+  type FormulationPickerValue,
+} from '../components/health/FormulationPicker';
 import { useSelectedPet } from '../context/SelectedPetContext';
 import { usePermissions } from '../context/usePermissions';
 import { localToday } from '../lib/dates';
-import { formatFrequency } from '../lib/medications';
+import { formatFrequency, formulationLabel } from '../lib/medications';
+import { parseDecimal } from '../lib/numbers';
 
 interface MedPlanRow {
   medication: Medication;
@@ -29,9 +33,7 @@ function buildPlanRows(meds: Medication[], assignments: MedAssignment[], today: 
       .sort((a, b) => b.date_from.localeCompare(a.date_from));
     const currentAssignment =
       history.find(
-        (a) =>
-          a.date_from <= today &&
-          (a.date_to == null || a.date_to >= today),
+        (a) => a.date_from <= today && (a.date_to == null || a.date_to >= today),
       ) ?? null;
     return { medication, currentAssignment, history };
   });
@@ -45,10 +47,14 @@ export default function HealthTreatmentPlanPage() {
 
   const [showCreateMed, setShowCreateMed] = useState(false);
   const [medName, setMedName] = useState('');
-  const [iconValue, setIconValue] = useState<MedIconPickerValue>(defaultMedIconPickerValue);
+  const [medType, setMedType] = useState<'pill' | 'liquid'>('pill');
+  const [medColor, setMedColor] = useState('#6366f1');
 
   const [planMedId, setPlanMedId] = useState<string | null>(null);
-  const [planDosage, setPlanDosage] = useState('');
+  const [formulation, setFormulation] = useState<FormulationPickerValue>(defaultFormulationPickerValue);
+  const [reuseFormulationId, setReuseFormulationId] = useState<string | null>(null);
+  const [liquidDoseMl, setLiquidDoseMl] = useState('2.5');
+  const [liquidConcentration, setLiquidConcentration] = useState('');
   const [planTimes, setPlanTimes] = useState('08:00, 20:00');
   const [planFrom, setPlanFrom] = useState(today);
   const [planTo, setPlanTo] = useState('');
@@ -56,6 +62,7 @@ export default function HealthTreatmentPlanPage() {
 
   const [reviseId, setReviseId] = useState<string | null>(null);
   const [reviseFrom, setReviseFrom] = useState(today);
+  const [newFormulationOnRevise, setNewFormulationOnRevise] = useState(false);
 
   const medsQuery = useQuery({
     queryKey: ['medications', selectedPetId],
@@ -76,71 +83,111 @@ export default function HealthTreatmentPlanPage() {
   };
 
   const createMedMutation = useMutation({
-    mutationFn: () => {
-      const payload: CreateMedication = {
+    mutationFn: () =>
+      medicationsApi.create({
         pet_id: selectedPetId!,
         name: medName.trim(),
-        med_type: iconValue.medType,
-        color: iconValue.color,
-      };
-      if (iconValue.medType === 'pill') {
-        payload.pill_shape = iconValue.pillShape;
-        payload.pill_fraction = iconValue.pillFraction;
-      }
-      return medicationsApi.create(payload);
-    },
+        med_type: medType,
+        color: medColor,
+      }),
     onSuccess: () => {
       setMedName('');
-      setIconValue(defaultMedIconPickerValue);
+      setMedType('pill');
+      setMedColor('#6366f1');
       setShowCreateMed(false);
       invalidate();
     },
   });
 
-  const createPlanMutation = useMutation({
-    mutationFn: () => {
-      const times = planTimes
-        .split(',')
-        .map((t) => t.trim())
-        .filter(Boolean);
-      const payload: CreateMedAssignment = {
-        medication_id: planMedId!,
-        dosage: planDosage.trim(),
-        frequency: { times },
-        date_from: planFrom,
-        date_to: planTo.trim() || null,
-        optional: planOptional,
+  function buildPlanBase() {
+    return {
+      frequency: { times: planTimes.split(',').map((t) => t.trim()).filter(Boolean) },
+      date_to: planTo.trim() || null,
+      optional: planOptional,
+    };
+  }
+
+  function buildCreatePayload(): CreateMedAssignment {
+    const selectedMed = (medsQuery.data ?? []).find((m) => m.id === planMedId);
+    const base = {
+      medication_id: planMedId!,
+      date_from: planFrom,
+      ...buildPlanBase(),
+    };
+    if (selectedMed?.med_type === 'liquid') {
+      return {
+        ...base,
+        liquid_dose_ml: parseDecimal(liquidDoseMl),
+        liquid_concentration_mg_per_ml: liquidConcentration.trim()
+          ? parseDecimal(liquidConcentration)
+          : undefined,
+        ...(reuseFormulationId ? { formulation_id: reuseFormulationId } : {}),
       };
-      return medicationsApi.createAssignment(payload);
-    },
+    }
+
+    const strength = parseDecimal(formulation.tabletStrengthMg);
+    if (reuseFormulationId) {
+      return {
+        ...base,
+        formulation_id: reuseFormulationId,
+        dose_fraction: formulation.doseFraction,
+      };
+    }
+    return {
+      ...base,
+      tablet_strength_mg: strength,
+      pill_shape: formulation.pillShape,
+      dose_fraction: formulation.doseFraction,
+    };
+  }
+
+  function buildRevisePayload(): ReviseMedAssignment {
+    const selectedMed = (medsQuery.data ?? []).find((m) => m.id === planMedId);
+    const base = {
+      ...buildPlanBase(),
+      effective_from: reviseFrom,
+    };
+
+    if (selectedMed?.med_type === 'liquid') {
+      return {
+        ...base,
+        liquid_dose_ml: parseDecimal(liquidDoseMl),
+        liquid_concentration_mg_per_ml: liquidConcentration.trim()
+          ? parseDecimal(liquidConcentration)
+          : undefined,
+        ...(reuseFormulationId && !newFormulationOnRevise ? { formulation_id: reuseFormulationId } : {}),
+      };
+    }
+
+    const strength = parseDecimal(formulation.tabletStrengthMg);
+    if (reuseFormulationId && !newFormulationOnRevise) {
+      return {
+        ...base,
+        formulation_id: reuseFormulationId,
+        dose_fraction: formulation.doseFraction,
+      };
+    }
+    return {
+      ...base,
+      tablet_strength_mg: strength,
+      pill_shape: formulation.pillShape,
+      dose_fraction: formulation.doseFraction,
+    };
+  }
+
+  const createPlanMutation = useMutation({
+    mutationFn: () => medicationsApi.createAssignment(buildCreatePayload()),
     onSuccess: () => {
-      setPlanMedId(null);
-      setPlanDosage('');
-      setPlanTimes('08:00, 20:00');
-      setPlanFrom(today);
-      setPlanTo('');
-      setPlanOptional(false);
+      resetPlanForm();
       invalidate();
     },
   });
 
   const reviseMutation = useMutation({
-    mutationFn: (assignmentId: string) => {
-      const times = planTimes
-        .split(',')
-        .map((t) => t.trim())
-        .filter(Boolean);
-      const payload: ReviseMedAssignment = {
-        dosage: planDosage.trim(),
-        frequency: { times },
-        effective_from: reviseFrom,
-        date_to: planTo.trim() || null,
-        optional: planOptional,
-      };
-      return medicationsApi.reviseAssignment(assignmentId, payload);
-    },
+    mutationFn: (assignmentId: string) =>
+      medicationsApi.reviseAssignment(assignmentId, buildRevisePayload()),
     onSuccess: () => {
-      setReviseId(null);
+      resetPlanForm();
       invalidate();
     },
   });
@@ -150,6 +197,20 @@ export default function HealthTreatmentPlanPage() {
     onSuccess: invalidate,
   });
 
+  function resetPlanForm() {
+    setPlanMedId(null);
+    setReviseId(null);
+    setReuseFormulationId(null);
+    setNewFormulationOnRevise(false);
+    setFormulation(defaultFormulationPickerValue);
+    setLiquidDoseMl('2.5');
+    setLiquidConcentration('');
+    setPlanTimes('08:00, 20:00');
+    setPlanFrom(today);
+    setPlanTo('');
+    setPlanOptional(false);
+  }
+
   const planRows = useMemo(
     () => buildPlanRows(medsQuery.data ?? [], assignmentsQuery.data ?? [], today),
     [medsQuery.data, assignmentsQuery.data, today],
@@ -158,14 +219,28 @@ export default function HealthTreatmentPlanPage() {
   if (petsLoading) return <div className="loading-state">Loading…</div>;
   if (!selectedPetId) return <NoPetSelected />;
 
+  const planMed = (medsQuery.data ?? []).find((m) => m.id === planMedId);
+
   function startRevise(row: MedPlanRow) {
-    if (!row.currentAssignment) return;
-    setReviseId(row.currentAssignment.id);
+    const a = row.currentAssignment!;
+    setReviseId(a.id);
     setPlanMedId(row.medication.id);
-    setPlanDosage(row.currentAssignment.dosage);
-    setPlanTimes(row.currentAssignment.frequency.times.join(', '));
-    setPlanOptional(row.currentAssignment.optional);
-    setPlanTo(row.currentAssignment.date_to ?? '');
+    setReuseFormulationId(a.formulation_id);
+    setNewFormulationOnRevise(false);
+    setFormulation({
+      tabletStrengthMg: String(a.formulation.tablet_strength_mg ?? '5'),
+      pillShape: a.formulation.pill_shape ?? 'round_1_precut',
+      doseFraction: a.dose_fraction ?? 'half',
+    });
+    setLiquidDoseMl(String(a.liquid_dose_ml ?? '2.5'));
+    setLiquidConcentration(
+      a.formulation.liquid_concentration_mg_per_ml != null
+        ? String(a.formulation.liquid_concentration_mg_per_ml)
+        : '',
+    );
+    setPlanTimes(a.frequency.times.join(', '));
+    setPlanOptional(a.optional);
+    setPlanTo(a.date_to ?? '');
     setReviseFrom(today);
   }
 
@@ -188,35 +263,36 @@ export default function HealthTreatmentPlanPage() {
           <h3 style={{ marginBottom: '0.75rem' }}>Register medication</h3>
           <div className="form-row" style={{ marginBottom: '0.75rem' }}>
             <label style={{ fontSize: '0.82rem' }}>Name</label>
-            <input
-              type="text"
-              value={medName}
-              onChange={(e) => setMedName(e.target.value)}
-              placeholder="e.g. Metronidazole"
-            />
+            <input type="text" value={medName} onChange={(e) => setMedName(e.target.value)} placeholder="e.g. Prednisolone" />
           </div>
-          <MedIconPicker value={iconValue} onChange={setIconValue} />
+          <div style={{ display: 'flex', gap: '0.5rem', marginBottom: '0.75rem' }}>
+            {(['pill', 'liquid'] as const).map((type) => (
+              <button
+                key={type}
+                type="button"
+                className={`button${medType === type ? '' : ' button-secondary'}`}
+                onClick={() => setMedType(type)}
+              >
+                {type === 'pill' ? 'Pill' : 'Liquid'}
+              </button>
+            ))}
+          </div>
+          <div className="form-row">
+            <label style={{ fontSize: '0.82rem' }}>Accent color</label>
+            <input type="color" value={medColor} onChange={(e) => setMedColor(e.target.value)} />
+          </div>
           <div style={{ display: 'flex', gap: '0.5rem', marginTop: '1rem' }}>
-            <button
-              type="button"
-              className="button"
-              disabled={!medName.trim() || createMedMutation.isPending}
-              onClick={() => createMedMutation.mutate()}
-            >
+            <button type="button" className="button" disabled={!medName.trim() || createMedMutation.isPending} onClick={() => createMedMutation.mutate()}>
               {createMedMutation.isPending ? 'Saving…' : 'Save medication'}
             </button>
-            <button type="button" className="button button-secondary" onClick={() => setShowCreateMed(false)}>
-              Cancel
-            </button>
+            <button type="button" className="button button-secondary" onClick={() => setShowCreateMed(false)}>Cancel</button>
           </div>
         </section>
       )}
 
-      {(planMedId || reviseId) && canWrite && (
+      {(planMedId || reviseId) && canWrite && planMed && (
         <section className="panel">
-          <h3 style={{ marginBottom: '0.75rem' }}>
-            {reviseId ? 'Revise assignment' : 'New treatment plan'}
-          </h3>
+          <h3 style={{ marginBottom: '0.75rem' }}>{reviseId ? 'Revise assignment' : 'New treatment plan'}</h3>
           {!reviseId && (
             <div className="form-row" style={{ marginBottom: '0.75rem' }}>
               <label style={{ fontSize: '0.82rem' }}>Medication</label>
@@ -228,22 +304,44 @@ export default function HealthTreatmentPlanPage() {
               </select>
             </div>
           )}
-          <div style={{ display: 'grid', gap: '0.65rem', gridTemplateColumns: 'repeat(auto-fit, minmax(10rem, 1fr))' }}>
-            <div className="form-row">
-              <label style={{ fontSize: '0.82rem' }}>Dosage</label>
-              <input type="text" value={planDosage} onChange={(e) => setPlanDosage(e.target.value)} placeholder="e.g. 1 pill, 5ml" />
+
+          {reviseId && (
+            <label style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', marginBottom: '0.75rem', fontSize: '0.82rem' }}>
+              <input
+                type="checkbox"
+                checked={newFormulationOnRevise}
+                onChange={(e) => setNewFormulationOnRevise(e.target.checked)}
+              />
+              Change tablet strength or pill shape (e.g. 5mg → 1mg)
+            </label>
+          )}
+
+          {planMed.med_type === 'pill' ? (
+            <FormulationPicker color={planMed.color} value={formulation} onChange={setFormulation} />
+          ) : (
+            <div style={{ display: 'grid', gap: '0.65rem' }}>
+              <div className="form-row">
+                <label style={{ fontSize: '0.82rem' }}>Dose (ml)</label>
+                <input type="text" inputMode="decimal" value={liquidDoseMl} onChange={(e) => setLiquidDoseMl(e.target.value)} />
+              </div>
+              <div className="form-row">
+                <label style={{ fontSize: '0.82rem' }}>Concentration (mg/ml, optional)</label>
+                <input type="text" inputMode="decimal" value={liquidConcentration} onChange={(e) => setLiquidConcentration(e.target.value)} />
+              </div>
             </div>
+          )}
+
+          <div style={{ display: 'grid', gap: '0.65rem', gridTemplateColumns: 'repeat(auto-fit, minmax(10rem, 1fr))', marginTop: '0.75rem' }}>
             <div className="form-row">
               <label style={{ fontSize: '0.82rem' }}>Times (comma-separated)</label>
               <input type="text" value={planTimes} onChange={(e) => setPlanTimes(e.target.value)} />
             </div>
-            {!reviseId && (
+            {!reviseId ? (
               <div className="form-row">
                 <label style={{ fontSize: '0.82rem' }}>From</label>
                 <input type="date" value={planFrom} onChange={(e) => setPlanFrom(e.target.value)} />
               </div>
-            )}
-            {reviseId && (
+            ) : (
               <div className="form-row">
                 <label style={{ fontSize: '0.82rem' }}>Effective from</label>
                 <input type="date" value={reviseFrom} onChange={(e) => setReviseFrom(e.target.value)} />
@@ -262,12 +360,7 @@ export default function HealthTreatmentPlanPage() {
             <button
               type="button"
               className="button"
-              disabled={
-                !planMedId ||
-                !planDosage.trim() ||
-                createPlanMutation.isPending ||
-                reviseMutation.isPending
-              }
+              disabled={!planMedId || createPlanMutation.isPending || reviseMutation.isPending}
               onClick={() => {
                 if (reviseId) reviseMutation.mutate(reviseId);
                 else createPlanMutation.mutate();
@@ -275,16 +368,7 @@ export default function HealthTreatmentPlanPage() {
             >
               {reviseId ? 'Save revision' : 'Create plan'}
             </button>
-            <button
-              type="button"
-              className="button button-secondary"
-              onClick={() => {
-                setPlanMedId(null);
-                setReviseId(null);
-              }}
-            >
-              Cancel
-            </button>
+            <button type="button" className="button button-secondary" onClick={resetPlanForm}>Cancel</button>
           </div>
         </section>
       )}
@@ -308,34 +392,37 @@ export default function HealthTreatmentPlanPage() {
                 <MedIcon
                   medType={row.medication.med_type}
                   color={row.medication.color}
-                  pillShape={row.medication.pill_shape}
-                  pillFraction={row.medication.pill_fraction}
+                  pillShape={row.currentAssignment?.formulation.pill_shape}
+                  doseFraction={row.currentAssignment?.dose_fraction}
                   size={44}
                 />
                 <div style={{ flex: 1 }}>
                   <strong>{row.medication.name}</strong>
                   {row.currentAssignment ? (
                     <p className="muted-text" style={{ fontSize: '0.82rem', margin: '0.2rem 0 0' }}>
-                      {row.currentAssignment.dosage} · {formatFrequency(row.currentAssignment.frequency.times)}
+                      {row.currentAssignment.dose_label}
+                      {' · '}
+                      {formulationLabel(
+                        row.currentAssignment.formulation.tablet_strength_mg,
+                        row.currentAssignment.formulation.pill_shape,
+                      )}
+                      {' · '}
+                      {formatFrequency(row.currentAssignment.frequency.times)}
                       {' · '}
                       {row.currentAssignment.date_from}
                       {row.currentAssignment.date_to ? ` → ${row.currentAssignment.date_to}` : ' → ongoing'}
                       {row.currentAssignment.optional ? ' · Optional' : ''}
                     </p>
                   ) : (
-                    <p className="muted-text" style={{ fontSize: '0.82rem', margin: '0.2rem 0 0' }}>
-                      No active assignment
-                    </p>
+                    <p className="muted-text" style={{ fontSize: '0.82rem', margin: '0.2rem 0 0' }}>No active assignment</p>
                   )}
                   {row.history.length > 1 && (
                     <details style={{ marginTop: '0.4rem', fontSize: '0.78rem' }}>
-                      <summary className="muted-text" style={{ cursor: 'pointer' }}>
-                        {row.history.length} assignment records
-                      </summary>
+                      <summary className="muted-text" style={{ cursor: 'pointer' }}>{row.history.length} assignment records</summary>
                       <ul style={{ margin: '0.35rem 0 0', paddingLeft: '1.1rem' }}>
                         {row.history.map((a) => (
                           <li key={a.id} className="muted-text">
-                            {a.dosage} · {a.date_from}{a.date_to ? ` → ${a.date_to}` : ' → ongoing'}
+                            {a.dose_label} · {a.date_from}{a.date_to ? ` → ${a.date_to}` : ' → ongoing'}
                           </li>
                         ))}
                       </ul>
@@ -345,30 +432,12 @@ export default function HealthTreatmentPlanPage() {
                 {canWrite && (
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '0.35rem' }}>
                     {!row.currentAssignment && (
-                      <button
-                        type="button"
-                        className="button"
-                        style={{ padding: '0.25rem 0.6rem', fontSize: '0.78rem' }}
-                        onClick={() => {
-                          setReviseId(null);
-                          setPlanMedId(row.medication.id);
-                          setPlanDosage('');
-                          setPlanTimes('08:00');
-                          setPlanFrom(today);
-                          setPlanTo('');
-                          setPlanOptional(false);
-                        }}
-                      >
+                      <button type="button" className="button" style={{ padding: '0.25rem 0.6rem', fontSize: '0.78rem' }} onClick={() => { resetPlanForm(); setPlanMedId(row.medication.id); }}>
                         Add plan
                       </button>
                     )}
                     {row.currentAssignment && (
-                      <button
-                        type="button"
-                        className="button button-secondary"
-                        style={{ padding: '0.25rem 0.6rem', fontSize: '0.78rem' }}
-                        onClick={() => startRevise(row)}
-                      >
+                      <button type="button" className="button button-secondary" style={{ padding: '0.25rem 0.6rem', fontSize: '0.78rem' }} onClick={() => startRevise(row)}>
                         Revise
                       </button>
                     )}
@@ -377,11 +446,7 @@ export default function HealthTreatmentPlanPage() {
                       className="button button-danger"
                       style={{ padding: '0.25rem 0.6rem', fontSize: '0.78rem' }}
                       disabled={deleteMedMutation.isPending}
-                      onClick={() => {
-                        if (window.confirm(`Delete ${row.medication.name} and all related records?`)) {
-                          deleteMedMutation.mutate(row.medication.id);
-                        }
-                      }}
+                      onClick={() => { if (window.confirm(`Delete ${row.medication.name}?`)) deleteMedMutation.mutate(row.medication.id); }}
                     >
                       Delete
                     </button>

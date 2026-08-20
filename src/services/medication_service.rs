@@ -73,8 +73,12 @@ pub async fn revise_assignment(
 }
 
 #[tracing::instrument(skip(pool))]
-pub async fn delete_assignment(pool: &SqlitePool, id: &str) -> AppResult<()> {
-    med_assignments::delete(pool, id).await
+pub async fn list_formulations(
+    pool: &SqlitePool,
+    medication_id: &str,
+) -> AppResult<Vec<crate::domain::medication::MedFormulation>> {
+    medications::get(pool, medication_id).await?;
+    crate::repo::med_formulations::list_for_medication(pool, medication_id).await
 }
 
 #[tracing::instrument(skip(pool))]
