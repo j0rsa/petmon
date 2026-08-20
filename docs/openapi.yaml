@@ -1497,6 +1497,246 @@ paths:
         '404':
           $ref: '#/components/responses/NotFound'
 
+  /health/meds:
+    get:
+      tags: [Medications]
+      summary: List medications for a pet
+      x-required-scope: api_read
+      parameters:
+        - name: pet_id
+          in: query
+          required: true
+          schema: { type: string, format: uuid }
+      responses:
+        '200':
+          description: List of medications
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: '#/components/schemas/Medication' }
+    post:
+      tags: [Medications]
+      summary: Register a medication
+      x-required-scope: api_write
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/CreateMedication' }
+      responses:
+        '201':
+          description: Medication created
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Medication' }
+
+  /health/meds/{id}:
+    get:
+      tags: [Medications]
+      summary: Get medication by ID
+      x-required-scope: api_read
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string }
+      responses:
+        '200':
+          description: Medication
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Medication' }
+    patch:
+      tags: [Medications]
+      summary: Update medication
+      x-required-scope: api_write
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/UpdateMedication' }
+      responses:
+        '200':
+          description: Updated medication
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Medication' }
+    delete:
+      tags: [Medications]
+      summary: Delete medication
+      x-required-scope: api_write
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string }
+      responses:
+        '204':
+          description: Medication deleted
+
+  /health/meds/assignments:
+    get:
+      tags: [Medications]
+      summary: List treatment plan assignments
+      x-required-scope: api_read
+      parameters:
+        - name: pet_id
+          in: query
+          schema: { type: string, format: uuid }
+        - name: medication_id
+          in: query
+          schema: { type: string }
+      responses:
+        '200':
+          description: Assignment history
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: '#/components/schemas/MedAssignment' }
+    post:
+      tags: [Medications]
+      summary: Create treatment plan assignment
+      x-required-scope: api_write
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/CreateMedAssignment' }
+      responses:
+        '201':
+          description: Assignment created
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/MedAssignment' }
+
+  /health/meds/assignments/daily:
+    get:
+      tags: [Medications]
+      summary: Daily active medication assignments with intake records
+      x-required-scope: api_read
+      parameters:
+        - name: pet_id
+          in: query
+          required: true
+          schema: { type: string, format: uuid }
+        - name: date
+          in: query
+          required: true
+          schema: { type: string, format: date }
+      responses:
+        '200':
+          description: Daily assignments
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: '#/components/schemas/DailyMedAssignment' }
+
+  /health/meds/assignments/{id}/revise:
+    post:
+      tags: [Medications]
+      summary: Revise assignment (ends previous one day before effective_from)
+      x-required-scope: api_write
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/ReviseMedAssignment' }
+      responses:
+        '201':
+          description: New assignment created
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/MedAssignment' }
+
+  /health/meds/assignments/{id}:
+    delete:
+      tags: [Medications]
+      summary: Delete assignment
+      x-required-scope: api_write
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string }
+      responses:
+        '204':
+          description: Assignment deleted
+
+  /health/meds/intake:
+    get:
+      tags: [Medications]
+      summary: List medication intake records
+      x-required-scope: api_read
+      parameters:
+        - name: pet_id
+          in: query
+          schema: { type: string, format: uuid }
+        - name: medication_id
+          in: query
+          schema: { type: string }
+        - name: date_from
+          in: query
+          schema: { type: string, format: date }
+        - name: date_to
+          in: query
+          schema: { type: string, format: date }
+        - name: limit
+          in: query
+          schema: { type: integer }
+        - name: offset
+          in: query
+          schema: { type: integer }
+      responses:
+        '200':
+          description: Intake records
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: '#/components/schemas/MedIntakeRecord' }
+    post:
+      tags: [Medications]
+      summary: Log medication intake
+      x-required-scope: api_write
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/CreateMedIntakeRecord' }
+      responses:
+        '201':
+          description: Intake logged
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/MedIntakeRecord' }
+
+  /health/meds/intake/{id}:
+    delete:
+      tags: [Medications]
+      summary: Delete intake record
+      x-required-scope: api_write
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string }
+      responses:
+        '204':
+          description: Intake record deleted
+
   /nutrition/records:
     get:
       tags:
@@ -3839,6 +4079,134 @@ components:
       required:
         - pet_id
         - level
+
+    MedType:
+      type: string
+      enum: [pill, liquid]
+
+    PillShape:
+      type: string
+      enum: [round_1_precut, round_2_precut, ellipse_1_precut]
+
+    PillFraction:
+      type: string
+      enum: [half, quarter, eighth, sixteenth]
+
+    MedFrequency:
+      type: object
+      properties:
+        times:
+          type: array
+          items: { type: string }
+      required: [times]
+
+    Medication:
+      type: object
+      properties:
+        id: { type: string }
+        pet_id: { type: string, format: uuid }
+        name: { type: string }
+        med_type: { $ref: '#/components/schemas/MedType' }
+        pill_shape: { $ref: '#/components/schemas/PillShape', nullable: true }
+        pill_fraction: { $ref: '#/components/schemas/PillFraction', nullable: true }
+        color: { type: string }
+        created_at: { type: string, format: date-time }
+        updated_at: { type: string, format: date-time }
+      required: [id, pet_id, name, med_type, color, created_at, updated_at]
+
+    CreateMedication:
+      type: object
+      properties:
+        pet_id: { type: string, format: uuid }
+        name: { type: string }
+        med_type: { $ref: '#/components/schemas/MedType' }
+        pill_shape: { $ref: '#/components/schemas/PillShape' }
+        pill_fraction: { $ref: '#/components/schemas/PillFraction' }
+        color: { type: string }
+      required: [pet_id, name, med_type]
+
+    UpdateMedication:
+      type: object
+      properties:
+        name: { type: string }
+        pill_shape: { $ref: '#/components/schemas/PillShape' }
+        pill_fraction: { $ref: '#/components/schemas/PillFraction' }
+        color: { type: string }
+
+    MedAssignment:
+      type: object
+      properties:
+        id: { type: string }
+        medication_id: { type: string }
+        pet_id: { type: string, format: uuid }
+        dosage: { type: string }
+        frequency: { $ref: '#/components/schemas/MedFrequency' }
+        date_from: { type: string, format: date }
+        date_to: { type: string, format: date, nullable: true }
+        optional: { type: boolean }
+        created_at: { type: string, format: date-time }
+        updated_at: { type: string, format: date-time }
+      required: [id, medication_id, pet_id, dosage, frequency, date_from, optional, created_at, updated_at]
+
+    CreateMedAssignment:
+      type: object
+      properties:
+        medication_id: { type: string }
+        dosage: { type: string }
+        frequency: { $ref: '#/components/schemas/MedFrequency' }
+        date_from: { type: string, format: date }
+        date_to: { type: string, format: date, nullable: true }
+        optional: { type: boolean }
+      required: [medication_id, dosage, date_from]
+
+    ReviseMedAssignment:
+      type: object
+      properties:
+        dosage: { type: string }
+        frequency: { $ref: '#/components/schemas/MedFrequency' }
+        effective_from: { type: string, format: date }
+        date_to: { type: string, format: date, nullable: true }
+        optional: { type: boolean }
+      required: [dosage, effective_from]
+
+    MedIntakeRecord:
+      type: object
+      properties:
+        id: { type: string }
+        pet_id: { type: string, format: uuid }
+        medication_id: { type: string }
+        assignment_id: { type: string, nullable: true }
+        occurred_at: { type: string }
+        local_date: { type: string, format: date }
+        dosage: { type: string }
+        taken: { type: boolean }
+        note: { type: string, nullable: true }
+        source_type: { type: string }
+        created_at: { type: string, format: date-time }
+      required: [id, pet_id, medication_id, occurred_at, local_date, dosage, taken, source_type, created_at]
+
+    CreateMedIntakeRecord:
+      type: object
+      properties:
+        pet_id: { type: string, format: uuid }
+        medication_id: { type: string }
+        dosage: { type: string }
+        taken: { type: boolean }
+        occurred_at: { type: string }
+        local_date: { type: string, format: date }
+        note: { type: string }
+        source_type: { type: string }
+      required: [pet_id, medication_id]
+
+    DailyMedAssignment:
+      type: object
+      properties:
+        medication: { $ref: '#/components/schemas/Medication' }
+        assignment: { $ref: '#/components/schemas/MedAssignment' }
+        intakes:
+          type: array
+          items: { $ref: '#/components/schemas/MedIntakeRecord' }
+      required: [medication, assignment, intakes]
 
     WeightSummaryBucket:
       type: object

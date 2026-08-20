@@ -2,6 +2,10 @@ use crate::domain::elimination::{
     CreateEliminationRecord, EliminationRecordFilters, UpdateEliminationRecord,
 };
 use crate::domain::health_state::{CreateHealthStateRecord, HealthStateRecordFilters};
+use crate::domain::medication::{
+    CreateMedAssignment, CreateMedication, CreateMedIntakeRecord, MedAssignmentFilters,
+    MedIntakeRecordFilters, ReviseMedAssignment, UpdateMedication,
+};
 use crate::domain::nutrition_record::BatchCreateNutritionRecords;
 use crate::domain::nutrition_record::{
     CreateNutritionRecord, NutritionRecordFilters, UpdateNutritionRecord,
@@ -12,8 +16,8 @@ use crate::domain::weight::{CreateWeightRecord, WeightRecordFilters};
 use crate::error::{AppError, AppResult};
 use crate::services::{
     day_service, elimination_analytics_service, elimination_record_service, health_state_service,
-    nutrition_analytics_service, nutrition_record_service, nutrition_schedule_service,
-    nutrition_status_service, pet_service, weight_service,
+    medication_service, nutrition_analytics_service, nutrition_record_service,
+    nutrition_schedule_service, nutrition_status_service, pet_service, weight_service,
 };
 use chrono::Utc;
 use chrono_tz::Tz;
@@ -575,6 +579,153 @@ fn tool_list() -> Value {
                 }
             },
 
+            // ── Medications ──────────────────────────────────────────────────
+            {
+                "name": "health.meds.list",
+                "description": "List medications registered for a pet.",
+                "inputSchema": {
+                    "type": "object",
+                    "required": ["pet_id"],
+                    "properties": { "pet_id": { "type": "string", "format": "uuid" } }
+                }
+            },
+            {
+                "name": "health.meds.create",
+                "description": "Register a medication (pill or liquid) with icon and color.",
+                "inputSchema": {
+                    "type": "object",
+                    "required": ["pet_id", "name", "med_type"],
+                    "properties": {
+                        "pet_id":        { "type": "string", "format": "uuid" },
+                        "name":          { "type": "string" },
+                        "med_type":      { "type": "string", "enum": ["pill", "liquid"] },
+                        "pill_shape":    { "type": "string", "enum": ["round_1_precut", "round_2_precut", "ellipse_1_precut"] },
+                        "pill_fraction": { "type": "string", "enum": ["half", "quarter", "eighth", "sixteenth"] },
+                        "color":         { "type": "string", "description": "CSS hex color, e.g. #6366f1" }
+                    }
+                }
+            },
+            {
+                "name": "health.meds.update",
+                "description": "Update medication name, icon, or color.",
+                "inputSchema": {
+                    "type": "object",
+                    "required": ["id"],
+                    "properties": {
+                        "id":            { "type": "string" },
+                        "name":          { "type": "string" },
+                        "pill_shape":    { "type": "string", "enum": ["round_1_precut", "round_2_precut", "ellipse_1_precut"] },
+                        "pill_fraction": { "type": "string", "enum": ["half", "quarter", "eighth", "sixteenth"] },
+                        "color":         { "type": "string" }
+                    }
+                }
+            },
+            {
+                "name": "health.meds.delete",
+                "description": "Delete a medication and its assignments/intake records.",
+                "inputSchema": {
+                    "type": "object",
+                    "required": ["id"],
+                    "properties": { "id": { "type": "string" } }
+                }
+            },
+            {
+                "name": "health.meds.assignments.list",
+                "description": "List treatment plan assignments (including history) for a pet or medication.",
+                "inputSchema": {
+                    "type": "object",
+                    "properties": {
+                        "pet_id":         { "type": "string", "format": "uuid" },
+                        "medication_id":  { "type": "string" }
+                    }
+                }
+            },
+            {
+                "name": "health.meds.assignments.create",
+                "description": "Create a treatment plan assignment with dosage, frequency, date range, and optional flag.",
+                "inputSchema": {
+                    "type": "object",
+                    "required": ["medication_id", "dosage", "date_from"],
+                    "properties": {
+                        "medication_id": { "type": "string" },
+                        "dosage":        { "type": "string" },
+                        "frequency":     { "type": "object", "properties": { "times": { "type": "array", "items": { "type": "string" } } } },
+                        "date_from":     { "type": "string", "format": "date" },
+                        "date_to":       { "type": "string", "format": "date", "description": "Omit for indefinite treatment" },
+                        "optional":      { "type": "boolean" }
+                    }
+                }
+            },
+            {
+                "name": "health.meds.assignments.revise",
+                "description": "Revise an assignment (new dosage/schedule). Ends the previous assignment one day before effective_from.",
+                "inputSchema": {
+                    "type": "object",
+                    "required": ["id", "dosage", "effective_from"],
+                    "properties": {
+                        "id":             { "type": "string" },
+                        "dosage":         { "type": "string" },
+                        "frequency":      { "type": "object", "properties": { "times": { "type": "array", "items": { "type": "string" } } } },
+                        "effective_from": { "type": "string", "format": "date" },
+                        "date_to":        { "type": "string", "format": "date" },
+                        "optional":       { "type": "boolean" }
+                    }
+                }
+            },
+            {
+                "name": "health.meds.assignments.daily",
+                "description": "Get today's active medication assignments with intake records for a pet.",
+                "inputSchema": {
+                    "type": "object",
+                    "required": ["pet_id", "date"],
+                    "properties": {
+                        "pet_id": { "type": "string", "format": "uuid" },
+                        "date":   { "type": "string", "format": "date" }
+                    }
+                }
+            },
+            {
+                "name": "health.meds.intake.list",
+                "description": "List medication intake records.",
+                "inputSchema": {
+                    "type": "object",
+                    "properties": {
+                        "pet_id":        { "type": "string", "format": "uuid" },
+                        "medication_id": { "type": "string" },
+                        "date_from":     { "type": "string", "format": "date" },
+                        "date_to":       { "type": "string", "format": "date" },
+                        "limit":         { "type": "integer" },
+                        "offset":        { "type": "integer" }
+                    }
+                }
+            },
+            {
+                "name": "health.meds.intake.create",
+                "description": "Log medication intake (taken or skipped). Dosage defaults from active assignment if omitted.",
+                "inputSchema": {
+                    "type": "object",
+                    "required": ["pet_id", "medication_id"],
+                    "properties": {
+                        "pet_id":        { "type": "string", "format": "uuid" },
+                        "medication_id": { "type": "string" },
+                        "dosage":        { "type": "string" },
+                        "taken":         { "type": "boolean", "default": true },
+                        "occurred_at":   { "type": "string" },
+                        "local_date":    { "type": "string", "format": "date" },
+                        "note":          { "type": "string" }
+                    }
+                }
+            },
+            {
+                "name": "health.meds.intake.delete",
+                "description": "Delete a medication intake record.",
+                "inputSchema": {
+                    "type": "object",
+                    "required": ["id"],
+                    "properties": { "id": { "type": "string" } }
+                }
+            },
+
             // ── Health context ───────────────────────────────────────────────
             {
                 "name": "pets.health-context",
@@ -1042,6 +1193,85 @@ pub async fn dispatch(
                 .as_str()
                 .ok_or_else(|| AppError::BadRequest("id required".to_string()))?;
             health_state_service::delete(pool, id).await?;
+            Ok(json!({ "deleted": true }))
+        }
+
+        // ── Medications ───────────────────────────────────────────────────────
+        "health.meds.list" => {
+            let pet_id = require_uuid(&params, "pet_id")?;
+            let meds = medication_service::list_medications(pool, pet_id).await?;
+            Ok(json!(meds))
+        }
+        "health.meds.create" => {
+            let req: CreateMedication =
+                serde_json::from_value(params).map_err(|e| AppError::BadRequest(e.to_string()))?;
+            let med = medication_service::create_medication(pool, req).await?;
+            Ok(json!(med))
+        }
+        "health.meds.update" => {
+            let id = params["id"]
+                .as_str()
+                .ok_or_else(|| AppError::BadRequest("id required".to_string()))?
+                .to_string();
+            let req: UpdateMedication =
+                serde_json::from_value(params).map_err(|e| AppError::BadRequest(e.to_string()))?;
+            let med = medication_service::update_medication(pool, &id, req).await?;
+            Ok(json!(med))
+        }
+        "health.meds.delete" => {
+            let id = params["id"]
+                .as_str()
+                .ok_or_else(|| AppError::BadRequest("id required".to_string()))?;
+            medication_service::delete_medication(pool, id).await?;
+            Ok(json!({ "deleted": true }))
+        }
+        "health.meds.assignments.list" => {
+            let filters: MedAssignmentFilters =
+                serde_json::from_value(params).map_err(|e| AppError::BadRequest(e.to_string()))?;
+            let assignments = medication_service::list_assignments(pool, filters).await?;
+            Ok(json!(assignments))
+        }
+        "health.meds.assignments.create" => {
+            let req: CreateMedAssignment =
+                serde_json::from_value(params).map_err(|e| AppError::BadRequest(e.to_string()))?;
+            let assignment = medication_service::create_assignment(pool, req).await?;
+            Ok(json!(assignment))
+        }
+        "health.meds.assignments.revise" => {
+            let id = params["id"]
+                .as_str()
+                .ok_or_else(|| AppError::BadRequest("id required".to_string()))?
+                .to_string();
+            let req: ReviseMedAssignment =
+                serde_json::from_value(params).map_err(|e| AppError::BadRequest(e.to_string()))?;
+            let assignment = medication_service::revise_assignment(pool, &id, req).await?;
+            Ok(json!(assignment))
+        }
+        "health.meds.assignments.daily" => {
+            let pet_id = require_uuid(&params, "pet_id")?;
+            let date = params["date"]
+                .as_str()
+                .ok_or_else(|| AppError::BadRequest("date required".to_string()))?;
+            let daily = medication_service::daily_assignments(pool, pet_id, date).await?;
+            Ok(json!(daily))
+        }
+        "health.meds.intake.list" => {
+            let filters: MedIntakeRecordFilters =
+                serde_json::from_value(params).map_err(|e| AppError::BadRequest(e.to_string()))?;
+            let records = medication_service::list_intake(pool, filters).await?;
+            Ok(json!(records))
+        }
+        "health.meds.intake.create" => {
+            let req: CreateMedIntakeRecord =
+                serde_json::from_value(params).map_err(|e| AppError::BadRequest(e.to_string()))?;
+            let record = medication_service::create_intake(pool, req, timezone).await?;
+            Ok(json!(record))
+        }
+        "health.meds.intake.delete" => {
+            let id = params["id"]
+                .as_str()
+                .ok_or_else(|| AppError::BadRequest("id required".to_string()))?;
+            medication_service::delete_intake(pool, id).await?;
             Ok(json!({ "deleted": true }))
         }
 

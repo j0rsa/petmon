@@ -12,7 +12,9 @@ import EliminationJournalPage from './pages/EliminationJournalPage';
 import EliminationAnalyticsPage from './pages/EliminationAnalyticsPage';
 import ImportsPage from './pages/ImportsPage';
 import SchedulesPage from './pages/SchedulesPage';
+import { HealthLayout } from './layouts/HealthLayout';
 import HealthPage from './pages/HealthPage';
+import HealthTreatmentPlanPage from './pages/HealthTreatmentPlanPage';
 import SettingsPage from './pages/SettingsPage';
 import AuthCallbackPage from './pages/AuthCallbackPage';
 
@@ -37,7 +39,10 @@ export default function App() {
             <Route path="analytics" element={<EliminationAnalyticsPage />} />
             <Route path=":date" element={<EliminationJournalPage />} />
           </Route>
-          <Route path="/health" element={<HealthPage />} />
+          <Route path="/health" element={<HealthLayout />}>
+            <Route index element={<HealthPage />} />
+            <Route path="treatment-plan" element={<HealthTreatmentPlanPage />} />
+          </Route>
           <Route path="/pets" element={<PetsPage />} />
           <Route path="/pets/:id" element={<PetInfoPage />} />
           <Route path="/settings" element={<SettingsPage />} />

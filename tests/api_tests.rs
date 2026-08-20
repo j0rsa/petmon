@@ -3058,3 +3058,91 @@ async fn scope_api_read_denies_mcp_endpoint() {
     .await;
     assert_eq!(resp.status(), 403, "api_read token must be denied /mcp");
 }
+
+#[actix_web::test]
+async fn medication_system_crud_and_revise() {
+    let (app, _state) = build_dev_app!();
+    let pet_id = api_create_pet!(&app, "MedTest");
+
+    let req = test::TestRequest::post()
+        .uri("/api/v1/health/meds")
+        .set_json(serde_json::json!({
+            "pet_id": pet_id,
+            "name": "Prednisolone",
+            "med_type": "pill",
+            "pill_shape": "round_1_precut",
+            "pill_fraction": "half",
+            "color": "#6366f1"
+        }))
+        .to_request();
+    let resp = test::call_service(&app, req).await;
+    assert_eq!(resp.status(), 201);
+    let med: serde_json::Value = test::read_body_json(resp).await;
+    let med_id = med["id"].as_str().unwrap().to_string();
+
+    let req = test::TestRequest::post()
+        .uri("/api/v1/health/meds/assignments")
+        .set_json(serde_json::json!({
+            "medication_id": med_id,
+            "dosage": "1/2 tablet",
+            "frequency": { "times": ["08:00", "20:00"] },
+            "date_from": "2026-03-01",
+            "optional": false
+        }))
+        .to_request();
+    let resp = test::call_service(&app, req).await;
+    assert_eq!(resp.status(), 201);
+    let assignment: serde_json::Value = test::read_body_json(resp).await;
+    let assignment_id = assignment["id"].as_str().unwrap().to_string();
+    assert_eq!(assignment["date_to"].as_str(), None);
+
+    let req = test::TestRequest::get()
+        .uri(&format!("/api/v1/health/meds/assignments/daily?pet_id={pet_id}&date=2026-03-10"))
+        .to_request();
+    let resp = test::call_service(&app, req).await;
+    assert_eq!(resp.status(), 200);
+    let daily: serde_json::Value = test::read_body_json(resp).await;
+    assert_eq!(daily.as_array().unwrap().len(), 1);
+
+    let req = test::TestRequest::post()
+        .uri("/api/v1/health/meds/intake")
+        .set_json(serde_json::json!({
+            "pet_id": pet_id,
+            "medication_id": med_id,
+            "taken": true,
+            "local_date": "2026-03-10"
+        }))
+        .to_request();
+    let resp = test::call_service(&app, req).await;
+    assert_eq!(resp.status(), 201);
+    let intake: serde_json::Value = test::read_body_json(resp).await;
+    assert_eq!(intake["dosage"].as_str(), Some("1/2 tablet"));
+    assert_eq!(intake["taken"].as_bool(), Some(true));
+
+    let req = test::TestRequest::post()
+        .uri(&format!("/api/v1/health/meds/assignments/{assignment_id}/revise"))
+        .set_json(serde_json::json!({
+            "dosage": "1/4 tablet",
+            "frequency": { "times": ["08:00"] },
+            "effective_from": "2026-03-15"
+        }))
+        .to_request();
+    let resp = test::call_service(&app, req).await;
+    assert_eq!(resp.status(), 201);
+    let revised: serde_json::Value = test::read_body_json(resp).await;
+    assert_eq!(revised["dosage"].as_str(), Some("1/4 tablet"));
+    assert_eq!(revised["date_from"].as_str(), Some("2026-03-15"));
+
+    let req = test::TestRequest::get()
+        .uri(&format!("/api/v1/health/meds/assignments?medication_id={med_id}"))
+        .to_request();
+    let resp = test::call_service(&app, req).await;
+    let history: serde_json::Value = test::read_body_json(resp).await;
+    let records = history.as_array().unwrap();
+    assert_eq!(records.len(), 2);
+    let ended = records
+        .iter()
+        .find(|r| r["id"].as_str() == Some(assignment_id.as_str()))
+        .unwrap();
+    assert_eq!(ended["date_to"].as_str(), Some("2026-03-14"));
+}
