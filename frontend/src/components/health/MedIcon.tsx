@@ -1,16 +1,19 @@
-import type { MedType, PillFraction, PillShape } from '../../api/medications';
+import type { MedType, DoseFraction, PillShape } from '../../api/medications';
 import { fractionAngle } from '../../lib/medications';
 
 export interface MedIconProps {
   medType: MedType;
   color: string;
   pillShape?: PillShape | null;
-  pillFraction?: PillFraction | null;
+  doseFraction?: DoseFraction | null;
   size?: number;
   className?: string;
 }
 
 function wedgePath(cx: number, cy: number, r: number, angleDeg: number): string {
+  if (angleDeg >= 360) {
+    return `M ${cx - r} ${cy} A ${r} ${r} 0 1 1 ${cx + r} ${cy} A ${r} ${r} 0 1 1 ${cx - r} ${cy} Z`;
+  }
   const start = -Math.PI / 2;
   const end = start + (angleDeg * Math.PI) / 180;
   const x1 = cx + r * Math.cos(start);
@@ -29,7 +32,7 @@ function PillIcon({
 }: {
   color: string;
   shape: PillShape;
-  fraction: PillFraction;
+  fraction: DoseFraction;
   size: number;
 }) {
   const angle = fractionAngle(fraction);
@@ -89,7 +92,7 @@ export function MedIcon({
   medType,
   color,
   pillShape,
-  pillFraction,
+  doseFraction,
   size = 36,
   className,
 }: MedIconProps) {
@@ -102,7 +105,7 @@ export function MedIcon({
   }
 
   const shape = pillShape ?? 'round_1_precut';
-  const fraction = pillFraction ?? 'half';
+  const fraction = doseFraction ?? 'half';
 
   return (
     <span className={className} style={{ display: 'inline-flex', lineHeight: 0 }}>

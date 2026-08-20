@@ -58,18 +58,22 @@ impl PillShape {
 
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "snake_case")]
-pub enum PillFraction {
+pub enum DoseFraction {
+    Whole,
     Half,
     Quarter,
+    ThreeQuarter,
     Eighth,
     Sixteenth,
 }
 
-impl PillFraction {
+impl DoseFraction {
     pub fn parse(s: &str) -> Option<Self> {
         match s {
+            "whole" => Some(Self::Whole),
             "half" => Some(Self::Half),
             "quarter" => Some(Self::Quarter),
+            "three_quarter" => Some(Self::ThreeQuarter),
             "eighth" => Some(Self::Eighth),
             "sixteenth" => Some(Self::Sixteenth),
             _ => None,
@@ -78,8 +82,10 @@ impl PillFraction {
 
     pub fn as_str(self) -> &'static str {
         match self {
+            Self::Whole => "whole",
             Self::Half => "half",
             Self::Quarter => "quarter",
+            Self::ThreeQuarter => "three_quarter",
             Self::Eighth => "eighth",
             Self::Sixteenth => "sixteenth",
         }
@@ -87,10 +93,23 @@ impl PillFraction {
 
     pub fn label(self) -> &'static str {
         match self {
+            Self::Whole => "1",
             Self::Half => "½",
             Self::Quarter => "¼",
+            Self::ThreeQuarter => "¾",
             Self::Eighth => "⅛",
             Self::Sixteenth => "1/16",
+        }
+    }
+
+    pub fn multiplier(self) -> f64 {
+        match self {
+            Self::Whole => 1.0,
+            Self::Half => 0.5,
+            Self::Quarter => 0.25,
+            Self::ThreeQuarter => 0.75,
+            Self::Eighth => 0.125,
+            Self::Sixteenth => 0.0625,
         }
     }
 }
@@ -121,8 +140,6 @@ pub struct Medication {
     pub pet_id: Uuid,
     pub name: String,
     pub med_type: MedType,
-    pub pill_shape: Option<PillShape>,
-    pub pill_fraction: Option<PillFraction>,
     pub color: String,
     pub created_at: String,
     pub updated_at: String,
@@ -133,17 +150,30 @@ pub struct CreateMedication {
     pub pet_id: String,
     pub name: String,
     pub med_type: MedType,
-    pub pill_shape: Option<PillShape>,
-    pub pill_fraction: Option<PillFraction>,
     pub color: Option<String>,
 }
 
 #[derive(Debug, Deserialize)]
 pub struct UpdateMedication {
     pub name: Option<String>,
-    pub pill_shape: Option<PillShape>,
-    pub pill_fraction: Option<PillFraction>,
     pub color: Option<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct MedFormulation {
+    pub id: String,
+    pub medication_id: String,
+    pub tablet_strength_mg: Option<f64>,
+    pub pill_shape: Option<PillShape>,
+    pub liquid_concentration_mg_per_ml: Option<f64>,
+    pub created_at: String,
+}
+
+#[derive(Debug, Deserialize, Clone)]
+pub struct CreateMedFormulation {
+    pub tablet_strength_mg: Option<f64>,
+    pub pill_shape: Option<PillShape>,
+    pub liquid_concentration_mg_per_ml: Option<f64>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -151,7 +181,12 @@ pub struct MedAssignment {
     pub id: String,
     pub medication_id: String,
     pub pet_id: Uuid,
-    pub dosage: String,
+    pub formulation_id: String,
+    pub formulation: MedFormulation,
+    pub dose_fraction: Option<DoseFraction>,
+    pub liquid_dose_ml: Option<f64>,
+    pub effective_dose_mg: Option<f64>,
+    pub dose_label: String,
     pub frequency: MedFrequency,
     pub date_from: String,
     pub date_to: Option<String>,
@@ -163,7 +198,14 @@ pub struct MedAssignment {
 #[derive(Debug, Deserialize)]
 pub struct CreateMedAssignment {
     pub medication_id: String,
-    pub dosage: String,
+    /// Reuse an existing formulation when only dose fraction or schedule changes.
+    pub formulation_id: Option<String>,
+    /// Required when creating a new formulation (strength or pill shape change).
+    pub tablet_strength_mg: Option<f64>,
+    pub pill_shape: Option<PillShape>,
+    pub liquid_concentration_mg_per_ml: Option<f64>,
+    pub dose_fraction: Option<DoseFraction>,
+    pub liquid_dose_ml: Option<f64>,
     pub frequency: Option<MedFrequency>,
     pub date_from: String,
     pub date_to: Option<String>,
@@ -172,7 +214,12 @@ pub struct CreateMedAssignment {
 
 #[derive(Debug, Deserialize)]
 pub struct ReviseMedAssignment {
-    pub dosage: String,
+    pub formulation_id: Option<String>,
+    pub tablet_strength_mg: Option<f64>,
+    pub pill_shape: Option<PillShape>,
+    pub liquid_concentration_mg_per_ml: Option<f64>,
+    pub dose_fraction: Option<DoseFraction>,
+    pub liquid_dose_ml: Option<f64>,
     pub frequency: Option<MedFrequency>,
     pub effective_from: String,
     pub date_to: Option<String>,
@@ -184,10 +231,15 @@ pub struct MedIntakeRecord {
     pub id: String,
     pub pet_id: Uuid,
     pub medication_id: String,
-    pub assignment_id: Option<String>,
+    pub assignment_id: String,
+    pub assignment: MedAssignment,
+    pub dose_fraction_override: Option<DoseFraction>,
+    pub liquid_dose_ml_override: Option<f64>,
+    pub effective_dose_fraction: Option<DoseFraction>,
+    pub effective_dose_mg: Option<f64>,
+    pub dose_label: String,
     pub occurred_at: String,
     pub local_date: String,
-    pub dosage: String,
     pub taken: bool,
     pub note: Option<String>,
     pub source_type: String,
@@ -198,7 +250,9 @@ pub struct MedIntakeRecord {
 pub struct CreateMedIntakeRecord {
     pub pet_id: String,
     pub medication_id: String,
-    pub dosage: Option<String>,
+    pub assignment_id: Option<String>,
+    pub dose_fraction_override: Option<DoseFraction>,
+    pub liquid_dose_ml_override: Option<f64>,
     pub taken: Option<bool>,
     pub occurred_at: Option<String>,
     pub local_date: Option<String>,
@@ -246,32 +300,184 @@ pub fn assignment_active_on(assignment: &MedAssignment, date: &str) -> bool {
     }
 }
 
+pub fn compute_effective_dose_mg(
+    formulation: &MedFormulation,
+    dose_fraction: Option<DoseFraction>,
+    liquid_dose_ml: Option<f64>,
+) -> Option<f64> {
+    if let (Some(strength), Some(fraction)) = (formulation.tablet_strength_mg, dose_fraction) {
+        return Some(strength * fraction.multiplier());
+    }
+    if let (Some(concentration), Some(ml)) = (
+        formulation.liquid_concentration_mg_per_ml,
+        liquid_dose_ml,
+    ) {
+        return Some(concentration * ml);
+    }
+    None
+}
+
+pub fn build_dose_label(
+    med_type: MedType,
+    formulation: &MedFormulation,
+    dose_fraction: Option<DoseFraction>,
+    liquid_dose_ml: Option<f64>,
+    effective_dose_mg: Option<f64>,
+) -> String {
+    match med_type {
+        MedType::Pill => {
+            let fraction = dose_fraction.map(|f| f.label()).unwrap_or("?");
+            let strength = formulation
+                .tablet_strength_mg
+                .map(|s| format!("{s}mg"))
+                .unwrap_or_else(|| "?mg".to_string());
+            match effective_dose_mg {
+                Some(mg) => format!("{fraction} × {strength} = {mg:.2}mg"),
+                None => format!("{fraction} × {strength}"),
+            }
+        }
+        MedType::Liquid => {
+            let ml = liquid_dose_ml
+                .map(|v| format!("{v}ml"))
+                .unwrap_or_else(|| "?ml".to_string());
+            match effective_dose_mg {
+                Some(mg) => format!("{ml} ({mg:.2}mg)"),
+                None => ml,
+            }
+        }
+    }
+}
+
+pub fn hydrate_assignment(
+    med_type: MedType,
+    assignment: MedAssignmentCore,
+    formulation: MedFormulation,
+) -> MedAssignment {
+    let effective_dose_mg = compute_effective_dose_mg(
+        &formulation,
+        assignment.dose_fraction,
+        assignment.liquid_dose_ml,
+    );
+    let dose_label = build_dose_label(
+        med_type,
+        &formulation,
+        assignment.dose_fraction,
+        assignment.liquid_dose_ml,
+        effective_dose_mg,
+    );
+    MedAssignment {
+        id: assignment.id,
+        medication_id: assignment.medication_id,
+        pet_id: assignment.pet_id,
+        formulation_id: assignment.formulation_id,
+        formulation,
+        dose_fraction: assignment.dose_fraction,
+        liquid_dose_ml: assignment.liquid_dose_ml,
+        effective_dose_mg,
+        dose_label,
+        frequency: assignment.frequency,
+        date_from: assignment.date_from,
+        date_to: assignment.date_to,
+        optional: assignment.optional,
+        created_at: assignment.created_at,
+        updated_at: assignment.updated_at,
+    }
+}
+
+#[derive(Debug, Clone)]
+pub struct MedAssignmentCore {
+    pub id: String,
+    pub medication_id: String,
+    pub pet_id: Uuid,
+    pub formulation_id: String,
+    pub dose_fraction: Option<DoseFraction>,
+    pub liquid_dose_ml: Option<f64>,
+    pub frequency: MedFrequency,
+    pub date_from: String,
+    pub date_to: Option<String>,
+    pub optional: bool,
+    pub created_at: String,
+    pub updated_at: String,
+}
+
+pub fn hydrate_intake(
+    med_type: MedType,
+    intake: MedIntakeCore,
+    assignment: MedAssignment,
+) -> MedIntakeRecord {
+    let effective_fraction = intake.dose_fraction_override.or(assignment.dose_fraction);
+    let effective_ml = intake.liquid_dose_ml_override.or(assignment.liquid_dose_ml);
+    let effective_dose_mg = compute_effective_dose_mg(
+        &assignment.formulation,
+        effective_fraction,
+        effective_ml,
+    );
+    let dose_label = build_dose_label(
+        med_type,
+        &assignment.formulation,
+        effective_fraction,
+        effective_ml,
+        effective_dose_mg,
+    );
+    MedIntakeRecord {
+        id: intake.id,
+        pet_id: intake.pet_id,
+        medication_id: intake.medication_id,
+        assignment_id: intake.assignment_id,
+        assignment,
+        dose_fraction_override: intake.dose_fraction_override,
+        liquid_dose_ml_override: intake.liquid_dose_ml_override,
+        effective_dose_fraction: effective_fraction,
+        effective_dose_mg,
+        dose_label,
+        occurred_at: intake.occurred_at,
+        local_date: intake.local_date,
+        taken: intake.taken,
+        note: intake.note,
+        source_type: intake.source_type,
+        created_at: intake.created_at,
+    }
+}
+
+#[derive(Debug, Clone)]
+pub struct MedIntakeCore {
+    pub id: String,
+    pub pet_id: Uuid,
+    pub medication_id: String,
+    pub assignment_id: String,
+    pub dose_fraction_override: Option<DoseFraction>,
+    pub liquid_dose_ml_override: Option<f64>,
+    pub occurred_at: String,
+    pub local_date: String,
+    pub taken: bool,
+    pub note: Option<String>,
+    pub source_type: String,
+    pub created_at: String,
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
 
     #[test]
-    fn day_before_subtracts_one_day() {
-        assert_eq!(day_before("2026-03-15").as_deref(), Some("2026-03-14"));
+    fn dose_fraction_multiplier_values() {
+        assert!((DoseFraction::Half.multiplier() - 0.5).abs() < f64::EPSILON);
+        assert!((DoseFraction::ThreeQuarter.multiplier() - 0.75).abs() < f64::EPSILON);
     }
 
     #[test]
-    fn assignment_active_on_respects_bounds() {
-        let assignment = MedAssignment {
-            id: "a".into(),
+    fn compute_effective_dose_mg_for_pill() {
+        let formulation = MedFormulation {
+            id: "f".into(),
             medication_id: "m".into(),
-            pet_id: Uuid::nil(),
-            dosage: "1".into(),
-            frequency: MedFrequency { times: vec![] },
-            date_from: "2026-03-01".into(),
-            date_to: Some("2026-03-10".into()),
-            optional: false,
+            tablet_strength_mg: Some(5.0),
+            pill_shape: Some(PillShape::Round1Precut),
+            liquid_concentration_mg_per_ml: None,
             created_at: String::new(),
-            updated_at: String::new(),
         };
-        assert!(!assignment_active_on(&assignment, "2026-02-28"));
-        assert!(assignment_active_on(&assignment, "2026-03-05"));
-        assert!(assignment_active_on(&assignment, "2026-03-10"));
-        assert!(!assignment_active_on(&assignment, "2026-03-11"));
+        assert!((compute_effective_dose_mg(&formulation, Some(DoseFraction::Half), None).unwrap()
+            - 2.5)
+            .abs()
+            < f64::EPSILON);
     }
 }

@@ -3060,9 +3060,9 @@ async fn scope_api_read_denies_mcp_endpoint() {
 }
 
 #[actix_web::test]
-async fn medication_system_crud_and_revise() {
+async fn medication_system_formulations_and_intake_by_reference() {
     let (app, _state) = build_dev_app!();
-    let pet_id = api_create_pet!(&app, "MedTest");
+    let pet_id = api_create_pet!(&app, "MedFormTest");
 
     let req = test::TestRequest::post()
         .uri("/api/v1/health/meds")
@@ -3070,8 +3070,6 @@ async fn medication_system_crud_and_revise() {
             "pet_id": pet_id,
             "name": "Prednisolone",
             "med_type": "pill",
-            "pill_shape": "round_1_precut",
-            "pill_fraction": "half",
             "color": "#6366f1"
         }))
         .to_request();
@@ -3084,65 +3082,80 @@ async fn medication_system_crud_and_revise() {
         .uri("/api/v1/health/meds/assignments")
         .set_json(serde_json::json!({
             "medication_id": med_id,
-            "dosage": "1/2 tablet",
-            "frequency": { "times": ["08:00", "20:00"] },
-            "date_from": "2026-03-01",
-            "optional": false
-        }))
-        .to_request();
-    let resp = test::call_service(&app, req).await;
-    assert_eq!(resp.status(), 201);
-    let assignment: serde_json::Value = test::read_body_json(resp).await;
-    let assignment_id = assignment["id"].as_str().unwrap().to_string();
-    assert_eq!(assignment["date_to"].as_str(), None);
-
-    let req = test::TestRequest::get()
-        .uri(&format!("/api/v1/health/meds/assignments/daily?pet_id={pet_id}&date=2026-03-10"))
-        .to_request();
-    let resp = test::call_service(&app, req).await;
-    assert_eq!(resp.status(), 200);
-    let daily: serde_json::Value = test::read_body_json(resp).await;
-    assert_eq!(daily.as_array().unwrap().len(), 1);
-
-    let req = test::TestRequest::post()
-        .uri("/api/v1/health/meds/intake")
-        .set_json(serde_json::json!({
-            "pet_id": pet_id,
-            "medication_id": med_id,
-            "taken": true,
-            "local_date": "2026-03-10"
-        }))
-        .to_request();
-    let resp = test::call_service(&app, req).await;
-    assert_eq!(resp.status(), 201);
-    let intake: serde_json::Value = test::read_body_json(resp).await;
-    assert_eq!(intake["dosage"].as_str(), Some("1/2 tablet"));
-    assert_eq!(intake["taken"].as_bool(), Some(true));
-
-    let req = test::TestRequest::post()
-        .uri(&format!("/api/v1/health/meds/assignments/{assignment_id}/revise"))
-        .set_json(serde_json::json!({
-            "dosage": "1/4 tablet",
+            "tablet_strength_mg": 5.0,
+            "pill_shape": "round_1_precut",
+            "dose_fraction": "half",
             "frequency": { "times": ["08:00"] },
+            "date_from": "2026-03-01"
+        }))
+        .to_request();
+    let resp = test::call_service(&app, req).await;
+    assert_eq!(resp.status(), 201);
+    let assign1: serde_json::Value = test::read_body_json(resp).await;
+    let assign1_id = assign1["id"].as_str().unwrap().to_string();
+    let form1_id = assign1["formulation_id"].as_str().unwrap().to_string();
+    assert_eq!(assign1["effective_dose_mg"].as_f64().unwrap(), 2.5);
+
+    let req = test::TestRequest::post()
+        .uri(&format!("/api/v1/health/meds/assignments/{assign1_id}/revise"))
+        .set_json(serde_json::json!({
+            "formulation_id": form1_id,
+            "dose_fraction": "quarter",
+            "effective_from": "2026-03-10"
+        }))
+        .to_request();
+    let resp = test::call_service(&app, req).await;
+    assert_eq!(resp.status(), 201);
+    let assign2: serde_json::Value = test::read_body_json(resp).await;
+    assert_eq!(assign2["dose_fraction"].as_str(), Some("quarter"));
+    assert_eq!(assign2["formulation_id"].as_str(), Some(form1_id.as_str()));
+
+    let req = test::TestRequest::post()
+        .uri(&format!(
+            "/api/v1/health/meds/assignments/{}/revise",
+            assign2["id"].as_str().unwrap()
+        ))
+        .set_json(serde_json::json!({
+            "tablet_strength_mg": 1.0,
+            "pill_shape": "round_2_precut",
+            "dose_fraction": "whole",
             "effective_from": "2026-03-15"
         }))
         .to_request();
     let resp = test::call_service(&app, req).await;
     assert_eq!(resp.status(), 201);
-    let revised: serde_json::Value = test::read_body_json(resp).await;
-    assert_eq!(revised["dosage"].as_str(), Some("1/4 tablet"));
-    assert_eq!(revised["date_from"].as_str(), Some("2026-03-15"));
+    let assign3: serde_json::Value = test::read_body_json(resp).await;
+    assert_eq!(assign3["effective_dose_mg"].as_f64().unwrap(), 1.0);
+    assert_ne!(assign3["formulation_id"].as_str().unwrap(), form1_id);
+
+    let assign3_id = assign3["id"].as_str().unwrap();
+    let req = test::TestRequest::post()
+        .uri("/api/v1/health/meds/intake")
+        .set_json(serde_json::json!({
+            "pet_id": pet_id,
+            "medication_id": med_id,
+            "assignment_id": assign3_id,
+            "taken": true,
+            "local_date": "2026-03-15"
+        }))
+        .to_request();
+    let resp = test::call_service(&app, req).await;
+    assert_eq!(resp.status(), 201);
+    let intake: serde_json::Value = test::read_body_json(resp).await;
+    assert_eq!(intake["assignment_id"].as_str(), Some(assign3_id));
+    assert!(intake["dose_label"].as_str().unwrap().contains("1mg"));
+    assert!(intake.get("dosage").is_none());
 
     let req = test::TestRequest::get()
         .uri(&format!("/api/v1/health/meds/assignments?medication_id={med_id}"))
         .to_request();
     let resp = test::call_service(&app, req).await;
     let history: serde_json::Value = test::read_body_json(resp).await;
-    let records = history.as_array().unwrap();
-    assert_eq!(records.len(), 2);
-    let ended = records
+    let ended = history
+        .as_array()
+        .unwrap()
         .iter()
-        .find(|r| r["id"].as_str() == Some(assignment_id.as_str()))
+        .find(|r| r["id"] == assign1_id)
         .unwrap();
-    assert_eq!(ended["date_to"].as_str(), Some("2026-03-14"));
+    assert_eq!(ended["date_to"].as_str(), Some("2026-03-09"));
 }

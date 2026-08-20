@@ -1,4 +1,7 @@
-use crate::domain::medication::{CreateMedIntakeRecord, MedIntakeRecord, MedIntakeRecordFilters};
+use crate::domain::medication::{
+    CreateMedIntakeRecord, DoseFraction, MedIntakeCore, MedIntakeRecord, MedIntakeRecordFilters,
+    hydrate_intake,
+};
 use crate::error::{AppError, AppResult};
 use chrono::Utc;
 use chrono_tz::Tz;
@@ -10,30 +13,47 @@ struct MedIntakeRow {
     id: String,
     pet_id: Uuid,
     medication_id: String,
-    assignment_id: Option<String>,
+    assignment_id: String,
+    dose_fraction_override: Option<String>,
+    liquid_dose_ml_override: Option<f64>,
     occurred_at: String,
     local_date: String,
-    dosage: String,
     taken: i64,
     note: Option<String>,
     source_type: String,
     created_at: String,
 }
 
-fn row_to_record(row: MedIntakeRow) -> MedIntakeRecord {
-    MedIntakeRecord {
+fn parse_dose_fraction(raw: Option<String>) -> AppResult<Option<DoseFraction>> {
+    match raw {
+        None => Ok(None),
+        Some(value) => DoseFraction::parse(&value)
+            .map(Some)
+            .ok_or_else(|| AppError::Internal(format!("invalid dose_fraction: {value}"))),
+    }
+}
+
+fn row_to_core(row: MedIntakeRow) -> AppResult<MedIntakeCore> {
+    Ok(MedIntakeCore {
         id: row.id,
         pet_id: row.pet_id,
         medication_id: row.medication_id,
         assignment_id: row.assignment_id,
+        dose_fraction_override: parse_dose_fraction(row.dose_fraction_override)?,
+        liquid_dose_ml_override: row.liquid_dose_ml_override,
         occurred_at: row.occurred_at,
         local_date: row.local_date,
-        dosage: row.dosage,
         taken: row.taken != 0,
         note: row.note,
         source_type: row.source_type,
         created_at: row.created_at,
-    }
+    })
+}
+
+async fn load_hydrated(pool: &SqlitePool, core: MedIntakeCore) -> AppResult<MedIntakeRecord> {
+    let medication = crate::repo::medications::get(pool, &core.medication_id).await?;
+    let assignment = crate::repo::med_assignments::get(pool, &core.assignment_id).await?;
+    Ok(hydrate_intake(medication.med_type, core, assignment))
 }
 
 pub const DEFAULT_RECENT_LIMIT: i64 = 20;
@@ -52,7 +72,7 @@ pub async fn list(
     let order_desc = !has_date_range;
 
     let mut query = String::from(
-        "SELECT id, pet_id, medication_id, assignment_id, occurred_at, local_date, dosage, taken, note, source_type, created_at
+        "SELECT id, pet_id, medication_id, assignment_id, dose_fraction_override, liquid_dose_ml_override, occurred_at, local_date, taken, note, source_type, created_at
          FROM med_intake_records WHERE 1=1",
     );
     if filters.pet_id.is_some() {
@@ -96,20 +116,24 @@ pub async fn list(
     }
 
     let rows = q.fetch_all(pool).await?;
-    Ok(rows.into_iter().map(row_to_record).collect())
+    let mut out = Vec::new();
+    for row in rows {
+        out.push(load_hydrated(pool, row_to_core(row)?).await?);
+    }
+    Ok(out)
 }
 
 #[tracing::instrument(skip(pool))]
 pub async fn get(pool: &SqlitePool, id: &str) -> AppResult<MedIntakeRecord> {
     let row = sqlx::query_as::<_, MedIntakeRow>(
-        "SELECT id, pet_id, medication_id, assignment_id, occurred_at, local_date, dosage, taken, note, source_type, created_at
+        "SELECT id, pet_id, medication_id, assignment_id, dose_fraction_override, liquid_dose_ml_override, occurred_at, local_date, taken, note, source_type, created_at
          FROM med_intake_records WHERE id = ?",
     )
     .bind(id)
     .fetch_optional(pool)
     .await?
     .ok_or_else(|| AppError::NotFound(format!("Med intake record {id} not found")))?;
-    Ok(row_to_record(row))
+    load_hydrated(pool, row_to_core(row)?).await
 }
 
 #[tracing::instrument(skip(pool, req))]
@@ -137,24 +161,45 @@ pub async fn create(
         .local_date
         .unwrap_or_else(|| occurred_at.split('T').next().unwrap_or("").to_string());
 
-    let assignment = crate::repo::med_assignments::active_for_medication_on(
-        pool,
-        &req.medication_id,
-        &local_date,
-    )
-    .await?;
-
-    let dosage = match req.dosage {
-        Some(d) if !d.trim().is_empty() => d,
-        _ => assignment
-            .as_ref()
-            .map(|a| a.dosage.clone())
-            .ok_or_else(|| {
-                AppError::BadRequest(
-                    "dosage is required when no active assignment exists for this medication".into(),
-                )
-            })?,
+    let assignment = if let Some(id) = req.assignment_id {
+        let assignment = crate::repo::med_assignments::get(pool, &id).await?;
+        if assignment.medication_id != req.medication_id {
+            return Err(AppError::BadRequest(
+                "assignment does not belong to this medication".into(),
+            ));
+        }
+        if !crate::domain::medication::assignment_active_on(&assignment, &local_date) {
+            return Err(AppError::BadRequest(
+                "assignment is not active on the given date".into(),
+            ));
+        }
+        assignment
+    } else {
+        crate::repo::med_assignments::active_for_medication_on(
+            pool,
+            &req.medication_id,
+            &local_date,
+        )
+        .await?
+        .ok_or_else(|| {
+            AppError::BadRequest(
+                "no active assignment for this medication on the given date".into(),
+            )
+        })?
     };
+
+    if req.dose_fraction_override.is_some() && medication.med_type != crate::domain::medication::MedType::Pill {
+        return Err(AppError::BadRequest(
+            "dose_fraction_override applies to pill medications only".into(),
+        ));
+    }
+    if req.liquid_dose_ml_override.is_some()
+        && medication.med_type != crate::domain::medication::MedType::Liquid
+    {
+        return Err(AppError::BadRequest(
+            "liquid_dose_ml_override applies to liquid medications only".into(),
+        ));
+    }
 
     let taken = req.taken.unwrap_or(true);
     let now = Utc::now().to_rfc3339();
@@ -163,16 +208,17 @@ pub async fn create(
 
     sqlx::query(
         "INSERT INTO med_intake_records
-         (id, pet_id, medication_id, assignment_id, occurred_at, local_date, dosage, taken, note, source_type, created_at)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+         (id, pet_id, medication_id, assignment_id, dose_fraction_override, liquid_dose_ml_override, occurred_at, local_date, taken, note, source_type, created_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
     )
     .bind(&id)
     .bind(pet_id)
     .bind(&req.medication_id)
-    .bind(assignment.as_ref().map(|a| a.id.clone()))
+    .bind(&assignment.id)
+    .bind(req.dose_fraction_override.map(|f| f.as_str().to_string()))
+    .bind(req.liquid_dose_ml_override)
     .bind(&occurred_at)
     .bind(&local_date)
-    .bind(&dosage)
     .bind(if taken { 1 } else { 0 })
     .bind(&req.note)
     .bind(&source_type)

@@ -1661,19 +1661,24 @@ paths:
             application/json:
               schema: { $ref: '#/components/schemas/MedAssignment' }
 
-  /health/meds/assignments/{id}:
-    delete:
+  /health/meds/formulations:
+    get:
       tags: [Medications]
-      summary: Delete assignment
-      x-required-scope: api_write
+      summary: List formulations for a medication
+      x-required-scope: api_read
       parameters:
-        - name: id
-          in: path
+        - name: medication_id
+          in: query
           required: true
           schema: { type: string }
       responses:
-        '204':
-          description: Assignment deleted
+        '200':
+          description: Formulation history
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: '#/components/schemas/MedFormulation' }
 
   /health/meds/intake:
     get:
@@ -4088,9 +4093,9 @@ components:
       type: string
       enum: [round_1_precut, round_2_precut, ellipse_1_precut]
 
-    PillFraction:
+    DoseFraction:
       type: string
-      enum: [half, quarter, eighth, sixteenth]
+      enum: [whole, half, quarter, three_quarter, eighth, sixteenth]
 
     MedFrequency:
       type: object
@@ -4107,8 +4112,6 @@ components:
         pet_id: { type: string, format: uuid }
         name: { type: string }
         med_type: { $ref: '#/components/schemas/MedType' }
-        pill_shape: { $ref: '#/components/schemas/PillShape', nullable: true }
-        pill_fraction: { $ref: '#/components/schemas/PillFraction', nullable: true }
         color: { type: string }
         created_at: { type: string, format: date-time }
         updated_at: { type: string, format: date-time }
@@ -4120,8 +4123,6 @@ components:
         pet_id: { type: string, format: uuid }
         name: { type: string }
         med_type: { $ref: '#/components/schemas/MedType' }
-        pill_shape: { $ref: '#/components/schemas/PillShape' }
-        pill_fraction: { $ref: '#/components/schemas/PillFraction' }
         color: { type: string }
       required: [pet_id, name, med_type]
 
@@ -4129,9 +4130,18 @@ components:
       type: object
       properties:
         name: { type: string }
-        pill_shape: { $ref: '#/components/schemas/PillShape' }
-        pill_fraction: { $ref: '#/components/schemas/PillFraction' }
         color: { type: string }
+
+    MedFormulation:
+      type: object
+      properties:
+        id: { type: string }
+        medication_id: { type: string }
+        tablet_strength_mg: { type: number, nullable: true }
+        pill_shape: { $ref: '#/components/schemas/PillShape', nullable: true }
+        liquid_concentration_mg_per_ml: { type: number, nullable: true }
+        created_at: { type: string, format: date-time }
+      required: [id, medication_id, created_at]
 
     MedAssignment:
       type: object
@@ -4139,35 +4149,50 @@ components:
         id: { type: string }
         medication_id: { type: string }
         pet_id: { type: string, format: uuid }
-        dosage: { type: string }
+        formulation_id: { type: string }
+        formulation: { $ref: '#/components/schemas/MedFormulation' }
+        dose_fraction: { $ref: '#/components/schemas/DoseFraction', nullable: true }
+        liquid_dose_ml: { type: number, nullable: true }
+        effective_dose_mg: { type: number, nullable: true }
+        dose_label: { type: string }
         frequency: { $ref: '#/components/schemas/MedFrequency' }
         date_from: { type: string, format: date }
         date_to: { type: string, format: date, nullable: true }
         optional: { type: boolean }
         created_at: { type: string, format: date-time }
         updated_at: { type: string, format: date-time }
-      required: [id, medication_id, pet_id, dosage, frequency, date_from, optional, created_at, updated_at]
+      required: [id, medication_id, pet_id, formulation_id, formulation, dose_label, frequency, date_from, optional, created_at, updated_at]
 
     CreateMedAssignment:
       type: object
       properties:
         medication_id: { type: string }
-        dosage: { type: string }
+        formulation_id: { type: string }
+        tablet_strength_mg: { type: number }
+        pill_shape: { $ref: '#/components/schemas/PillShape' }
+        liquid_concentration_mg_per_ml: { type: number }
+        dose_fraction: { $ref: '#/components/schemas/DoseFraction' }
+        liquid_dose_ml: { type: number }
         frequency: { $ref: '#/components/schemas/MedFrequency' }
         date_from: { type: string, format: date }
         date_to: { type: string, format: date, nullable: true }
         optional: { type: boolean }
-      required: [medication_id, dosage, date_from]
+      required: [medication_id, date_from]
 
     ReviseMedAssignment:
       type: object
       properties:
-        dosage: { type: string }
+        formulation_id: { type: string }
+        tablet_strength_mg: { type: number }
+        pill_shape: { $ref: '#/components/schemas/PillShape' }
+        liquid_concentration_mg_per_ml: { type: number }
+        dose_fraction: { $ref: '#/components/schemas/DoseFraction' }
+        liquid_dose_ml: { type: number }
         frequency: { $ref: '#/components/schemas/MedFrequency' }
         effective_from: { type: string, format: date }
         date_to: { type: string, format: date, nullable: true }
         optional: { type: boolean }
-      required: [dosage, effective_from]
+      required: [effective_from]
 
     MedIntakeRecord:
       type: object
@@ -4175,22 +4200,29 @@ components:
         id: { type: string }
         pet_id: { type: string, format: uuid }
         medication_id: { type: string }
-        assignment_id: { type: string, nullable: true }
+        assignment_id: { type: string }
+        assignment: { $ref: '#/components/schemas/MedAssignment' }
+        dose_fraction_override: { $ref: '#/components/schemas/DoseFraction', nullable: true }
+        liquid_dose_ml_override: { type: number, nullable: true }
+        effective_dose_fraction: { $ref: '#/components/schemas/DoseFraction', nullable: true }
+        effective_dose_mg: { type: number, nullable: true }
+        dose_label: { type: string }
         occurred_at: { type: string }
         local_date: { type: string, format: date }
-        dosage: { type: string }
         taken: { type: boolean }
         note: { type: string, nullable: true }
         source_type: { type: string }
         created_at: { type: string, format: date-time }
-      required: [id, pet_id, medication_id, occurred_at, local_date, dosage, taken, source_type, created_at]
+      required: [id, pet_id, medication_id, assignment_id, assignment, dose_label, occurred_at, local_date, taken, source_type, created_at]
 
     CreateMedIntakeRecord:
       type: object
       properties:
         pet_id: { type: string, format: uuid }
         medication_id: { type: string }
-        dosage: { type: string }
+        assignment_id: { type: string }
+        dose_fraction_override: { $ref: '#/components/schemas/DoseFraction' }
+        liquid_dose_ml_override: { type: number }
         taken: { type: boolean }
         occurred_at: { type: string }
         local_date: { type: string, format: date }

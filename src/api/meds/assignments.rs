@@ -4,7 +4,7 @@ use crate::domain::medication::{
 };
 use crate::error::{AppError, AppResult};
 use crate::services::medication_service;
-use actix_web::{delete, get, post, web, HttpResponse};
+use actix_web::{get, post, web, HttpResponse};
 use petmon_macros::require_scope;
 use uuid::Uuid;
 
@@ -60,23 +60,12 @@ pub async fn revise_assignment(
     Ok(HttpResponse::Created().json(assignment))
 }
 
-#[delete("/{id}")]
-#[require_scope("api_write")]
-pub async fn delete_assignment(
-    state: web::Data<AppState>,
-    id: web::Path<String>,
-) -> AppResult<HttpResponse> {
-    medication_service::delete_assignment(&state.pool, &id).await?;
-    Ok(HttpResponse::NoContent().finish())
-}
-
 pub fn configure(cfg: &mut web::ServiceConfig) {
     cfg.service(
         web::scope("/assignments")
             .service(daily_assignments)
             .service(list_assignments)
             .service(create_assignment)
-            .service(revise_assignment)
-            .service(delete_assignment),
+            .service(revise_assignment),
     );
 }

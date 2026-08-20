@@ -591,32 +591,28 @@ fn tool_list() -> Value {
             },
             {
                 "name": "health.meds.create",
-                "description": "Register a medication (pill or liquid) with icon and color.",
+                "description": "Register a medication identity (name, type, accent color). Formulation and dose live on assignments.",
                 "inputSchema": {
                     "type": "object",
                     "required": ["pet_id", "name", "med_type"],
                     "properties": {
-                        "pet_id":        { "type": "string", "format": "uuid" },
-                        "name":          { "type": "string" },
-                        "med_type":      { "type": "string", "enum": ["pill", "liquid"] },
-                        "pill_shape":    { "type": "string", "enum": ["round_1_precut", "round_2_precut", "ellipse_1_precut"] },
-                        "pill_fraction": { "type": "string", "enum": ["half", "quarter", "eighth", "sixteenth"] },
-                        "color":         { "type": "string", "description": "CSS hex color, e.g. #6366f1" }
+                        "pet_id":   { "type": "string", "format": "uuid" },
+                        "name":     { "type": "string" },
+                        "med_type": { "type": "string", "enum": ["pill", "liquid"] },
+                        "color":    { "type": "string", "description": "CSS hex color, e.g. #6366f1" }
                     }
                 }
             },
             {
                 "name": "health.meds.update",
-                "description": "Update medication name, icon, or color.",
+                "description": "Update medication name or accent color.",
                 "inputSchema": {
                     "type": "object",
                     "required": ["id"],
                     "properties": {
-                        "id":            { "type": "string" },
-                        "name":          { "type": "string" },
-                        "pill_shape":    { "type": "string", "enum": ["round_1_precut", "round_2_precut", "ellipse_1_precut"] },
-                        "pill_fraction": { "type": "string", "enum": ["half", "quarter", "eighth", "sixteenth"] },
-                        "color":         { "type": "string" }
+                        "id":    { "type": "string" },
+                        "name":  { "type": "string" },
+                        "color": { "type": "string" }
                     }
                 }
             },
@@ -641,34 +637,53 @@ fn tool_list() -> Value {
                 }
             },
             {
-                "name": "health.meds.assignments.create",
-                "description": "Create a treatment plan assignment with dosage, frequency, date range, and optional flag.",
+                "name": "health.meds.formulations.list",
+                "description": "List tablet/liquid formulations registered for a medication.",
                 "inputSchema": {
                     "type": "object",
-                    "required": ["medication_id", "dosage", "date_from"],
+                    "required": ["medication_id"],
+                    "properties": { "medication_id": { "type": "string" } }
+                }
+            },
+            {
+                "name": "health.meds.assignments.create",
+                "description": "Create a treatment assignment: formulation (tablet strength + shape, or liquid concentration) plus dose fraction/volume and schedule.",
+                "inputSchema": {
+                    "type": "object",
+                    "required": ["medication_id", "date_from"],
                     "properties": {
                         "medication_id": { "type": "string" },
-                        "dosage":        { "type": "string" },
-                        "frequency":     { "type": "object", "properties": { "times": { "type": "array", "items": { "type": "string" } } } },
-                        "date_from":     { "type": "string", "format": "date" },
-                        "date_to":       { "type": "string", "format": "date", "description": "Omit for indefinite treatment" },
-                        "optional":      { "type": "boolean" }
+                        "formulation_id": { "type": "string", "description": "Reuse existing formulation when only dose fraction changes" },
+                        "tablet_strength_mg": { "type": "number" },
+                        "pill_shape": { "type": "string", "enum": ["round_1_precut", "round_2_precut", "ellipse_1_precut"] },
+                        "liquid_concentration_mg_per_ml": { "type": "number" },
+                        "dose_fraction": { "type": "string", "enum": ["whole", "half", "quarter", "three_quarter", "eighth", "sixteenth"] },
+                        "liquid_dose_ml": { "type": "number" },
+                        "frequency": { "type": "object", "properties": { "times": { "type": "array", "items": { "type": "string" } } } },
+                        "date_from": { "type": "string", "format": "date" },
+                        "date_to": { "type": "string", "format": "date" },
+                        "optional": { "type": "boolean" }
                     }
                 }
             },
             {
                 "name": "health.meds.assignments.revise",
-                "description": "Revise an assignment (new dosage/schedule). Ends the previous assignment one day before effective_from.",
+                "description": "Revise assignment (new dose fraction, new formulation, or schedule). Ends previous assignment one day before effective_from.",
                 "inputSchema": {
                     "type": "object",
-                    "required": ["id", "dosage", "effective_from"],
+                    "required": ["id", "effective_from"],
                     "properties": {
-                        "id":             { "type": "string" },
-                        "dosage":         { "type": "string" },
-                        "frequency":      { "type": "object", "properties": { "times": { "type": "array", "items": { "type": "string" } } } },
+                        "id": { "type": "string" },
+                        "formulation_id": { "type": "string" },
+                        "tablet_strength_mg": { "type": "number" },
+                        "pill_shape": { "type": "string", "enum": ["round_1_precut", "round_2_precut", "ellipse_1_precut"] },
+                        "liquid_concentration_mg_per_ml": { "type": "number" },
+                        "dose_fraction": { "type": "string", "enum": ["whole", "half", "quarter", "three_quarter", "eighth", "sixteenth"] },
+                        "liquid_dose_ml": { "type": "number" },
+                        "frequency": { "type": "object", "properties": { "times": { "type": "array", "items": { "type": "string" } } } },
                         "effective_from": { "type": "string", "format": "date" },
-                        "date_to":        { "type": "string", "format": "date" },
-                        "optional":       { "type": "boolean" }
+                        "date_to": { "type": "string", "format": "date" },
+                        "optional": { "type": "boolean" }
                     }
                 }
             },
@@ -701,18 +716,20 @@ fn tool_list() -> Value {
             },
             {
                 "name": "health.meds.intake.create",
-                "description": "Log medication intake (taken or skipped). Dosage defaults from active assignment if omitted.",
+                "description": "Log medication intake by referencing the active assignment. Use dose_fraction_override only when the given amount differed from the plan.",
                 "inputSchema": {
                     "type": "object",
                     "required": ["pet_id", "medication_id"],
                     "properties": {
-                        "pet_id":        { "type": "string", "format": "uuid" },
+                        "pet_id": { "type": "string", "format": "uuid" },
                         "medication_id": { "type": "string" },
-                        "dosage":        { "type": "string" },
-                        "taken":         { "type": "boolean", "default": true },
-                        "occurred_at":   { "type": "string" },
-                        "local_date":    { "type": "string", "format": "date" },
-                        "note":          { "type": "string" }
+                        "assignment_id": { "type": "string" },
+                        "dose_fraction_override": { "type": "string", "enum": ["whole", "half", "quarter", "three_quarter", "eighth", "sixteenth"] },
+                        "liquid_dose_ml_override": { "type": "number" },
+                        "taken": { "type": "boolean", "default": true },
+                        "occurred_at": { "type": "string" },
+                        "local_date": { "type": "string", "format": "date" },
+                        "note": { "type": "string" }
                     }
                 }
             },
@@ -1230,6 +1247,13 @@ pub async fn dispatch(
                 serde_json::from_value(params).map_err(|e| AppError::BadRequest(e.to_string()))?;
             let assignments = medication_service::list_assignments(pool, filters).await?;
             Ok(json!(assignments))
+        }
+        "health.meds.formulations.list" => {
+            let medication_id = params["medication_id"]
+                .as_str()
+                .ok_or_else(|| AppError::BadRequest("medication_id required".to_string()))?;
+            let formulations = medication_service::list_formulations(pool, medication_id).await?;
+            Ok(json!(formulations))
         }
         "health.meds.assignments.create" => {
             let req: CreateMedAssignment =

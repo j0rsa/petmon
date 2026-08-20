@@ -11,6 +11,7 @@ import type { HealthStateRecord } from '../api/healthState';
 import type {
   DailyMedAssignment,
   MedAssignment,
+  MedFormulation,
   Medication,
 } from '../api/medications';
 
@@ -565,14 +566,14 @@ export const mockHealthStateRecords: HealthStateRecord[] = [
 
 // ── Medication fixtures ───────────────────────────────────────────────────────
 
+const todayStr = localToday();
+
 export const mockMedications: Medication[] = [
   {
     id: 'med-pill-1',
     pet_id: mockPetId,
     name: 'Prednisolone',
     med_type: 'pill',
-    pill_shape: 'round_1_precut',
-    pill_fraction: 'half',
     color: '#6366f1',
     created_at: '2026-01-01T00:00:00Z',
     updated_at: '2026-01-01T00:00:00Z',
@@ -582,22 +583,42 @@ export const mockMedications: Medication[] = [
     pet_id: mockPetId,
     name: 'Metronidazole',
     med_type: 'liquid',
-    pill_shape: null,
-    pill_fraction: null,
     color: '#f97316',
     created_at: '2026-01-01T00:00:00Z',
     updated_at: '2026-01-01T00:00:00Z',
   },
 ];
 
-const todayStr = localToday();
+export const mockMedFormulations: MedFormulation[] = [
+  {
+    id: 'form-1',
+    medication_id: 'med-pill-1',
+    tablet_strength_mg: 5,
+    pill_shape: 'round_1_precut',
+    liquid_concentration_mg_per_ml: null,
+    created_at: '2026-01-01T00:00:00Z',
+  },
+  {
+    id: 'form-2',
+    medication_id: 'med-liquid-1',
+    tablet_strength_mg: null,
+    pill_shape: null,
+    liquid_concentration_mg_per_ml: 10,
+    created_at: '2026-01-08T00:00:00Z',
+  },
+];
 
 export const mockMedAssignments: MedAssignment[] = [
   {
     id: 'assign-1',
     medication_id: 'med-pill-1',
     pet_id: mockPetId,
-    dosage: '½ tablet',
+    formulation_id: 'form-1',
+    formulation: mockMedFormulations[0],
+    dose_fraction: 'half',
+    liquid_dose_ml: null,
+    effective_dose_mg: 2.5,
+    dose_label: '½ × 5mg = 2.50mg',
     frequency: { times: ['08:00', '20:00'] },
     date_from: shiftDate(todayStr, -14),
     date_to: null,
@@ -609,7 +630,12 @@ export const mockMedAssignments: MedAssignment[] = [
     id: 'assign-2',
     medication_id: 'med-liquid-1',
     pet_id: mockPetId,
-    dosage: '2.5 ml',
+    formulation_id: 'form-2',
+    formulation: mockMedFormulations[1],
+    dose_fraction: null,
+    liquid_dose_ml: 2.5,
+    effective_dose_mg: 25,
+    dose_label: '2.5ml (25.00mg)',
     frequency: { times: ['09:00'] },
     date_from: shiftDate(todayStr, -7),
     date_to: null,
@@ -628,9 +654,14 @@ export const mockDailyMedAssignments: DailyMedAssignment[] = mockMedications.map
         pet_id: mockPetId,
         medication_id: medication.id,
         assignment_id: mockMedAssignments[i].id,
+        assignment: mockMedAssignments[i],
+        dose_fraction_override: null,
+        liquid_dose_ml_override: null,
+        effective_dose_fraction: 'half',
+        effective_dose_mg: 2.5,
+        dose_label: mockMedAssignments[i].dose_label,
         occurred_at: `${todayStr}T08:05:00`,
         local_date: todayStr,
-        dosage: mockMedAssignments[i].dosage,
         taken: true,
         note: null,
         source_type: 'manual',

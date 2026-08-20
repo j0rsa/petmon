@@ -1,6 +1,8 @@
-import type { MedType, PillFraction, PillShape } from '../api/medications';
+import type { DoseFraction, MedType, PillShape } from '../api/medications';
 
-export const PILL_FRACTIONS: PillFraction[] = ['half', 'quarter', 'eighth', 'sixteenth'];
+export const DOSE_FRACTIONS: DoseFraction[] = [
+  'whole', 'half', 'quarter', 'three_quarter', 'eighth', 'sixteenth',
+];
 
 export const PILL_SHAPES: PillShape[] = ['round_1_precut', 'round_2_precut', 'ellipse_1_precut'];
 
@@ -9,10 +11,12 @@ export const MED_COLORS = [
   '#06b6d4', '#8b5cf6', '#ef4444', '#64748b', '#14b8a6',
 ];
 
-export function pillFractionLabel(fraction: PillFraction): string {
+export function doseFractionLabel(fraction: DoseFraction): string {
   switch (fraction) {
+    case 'whole': return '1';
     case 'half': return '½';
     case 'quarter': return '¼';
+    case 'three_quarter': return '¾';
     case 'eighth': return '⅛';
     case 'sixteenth': return '1/16';
   }
@@ -35,10 +39,12 @@ export function formatFrequency(times: string[]): string {
   return times.join(', ');
 }
 
-export function fractionAngle(fraction: PillFraction): number {
+export function fractionAngle(fraction: DoseFraction): number {
   switch (fraction) {
+    case 'whole': return 360;
     case 'half': return 180;
     case 'quarter': return 90;
+    case 'three_quarter': return 270;
     case 'eighth': return 45;
     case 'sixteenth': return 22.5;
   }
@@ -61,4 +67,10 @@ export function intakeStatusLabel(status: ReturnType<typeof intakeStatus>): stri
     case 'skipped': return 'Skipped';
     case 'pending': return 'Pending';
   }
+}
+
+export function formulationLabel(strengthMg: number | null | undefined, shape: PillShape | null | undefined): string {
+  if (strengthMg == null) return 'Liquid';
+  const shapeLabel = shape ? pillShapeLabel(shape) : 'Pill';
+  return `${strengthMg}mg · ${shapeLabel}`;
 }

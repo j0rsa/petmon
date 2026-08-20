@@ -1,4 +1,3 @@
-import { useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { medicationsApi, type CreateMedIntakeRecord, type DailyMedAssignment } from '../../api/medications';
 import { localToday } from '../../lib/dates';
@@ -23,34 +22,26 @@ function DailyMedRow({
   onLogged: () => void;
 }) {
   const formatTime = useFormatTime();
-  const [customDosage, setCustomDosage] = useState('');
-  const [showDosageInput, setShowDosageInput] = useState(false);
-
-  const expected = Math.max(1, item.assignment.frequency.times.length);
+  const { medication, assignment } = item;
+  const expected = Math.max(1, assignment.frequency.times.length);
   const status = intakeStatus(item.intakes, expected);
 
   const logMutation = useMutation({
     mutationFn: (payload: CreateMedIntakeRecord) => medicationsApi.createIntake(payload),
-    onSuccess: () => {
-      setCustomDosage('');
-      setShowDosageInput(false);
-      onLogged();
-    },
+    onSuccess: onLogged,
   });
 
   function logIntake(taken: boolean) {
-    const needsDosage = !item.assignment.dosage.trim();
-    if (needsDosage && !customDosage.trim()) {
-      setShowDosageInput(true);
-      return;
-    }
     logMutation.mutate({
       pet_id: petId,
-      medication_id: item.medication.id,
+      medication_id: medication.id,
+      assignment_id: assignment.id,
       taken,
-      dosage: customDosage.trim() || undefined,
     });
   }
+
+  const iconFraction = assignment.dose_fraction;
+  const iconShape = assignment.formulation.pill_shape;
 
   return (
     <div
@@ -63,16 +54,16 @@ function DailyMedRow({
       }}
     >
       <MedIcon
-        medType={item.medication.med_type}
-        color={item.medication.color}
-        pillShape={item.medication.pill_shape}
-        pillFraction={item.medication.pill_fraction}
+        medType={medication.med_type}
+        color={medication.color}
+        pillShape={iconShape}
+        doseFraction={iconFraction}
         size={40}
       />
       <div style={{ flex: 1, minWidth: 0 }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap' }}>
-          <strong style={{ fontSize: '0.92rem' }}>{item.medication.name}</strong>
-          {item.assignment.optional && (
+          <strong style={{ fontSize: '0.92rem' }}>{medication.name}</strong>
+          {assignment.optional && (
             <span className="muted-text" style={{ fontSize: '0.75rem' }}>Optional</span>
           )}
           <span
@@ -93,45 +84,34 @@ function DailyMedRow({
           </span>
         </div>
         <p className="muted-text" style={{ fontSize: '0.8rem', margin: '0.15rem 0 0' }}>
-          {item.assignment.dosage || 'No default dosage'} · {formatFrequency(item.assignment.frequency.times)}
+          {assignment.dose_label} · {formatFrequency(assignment.frequency.times)}
         </p>
         {item.intakes.length > 0 && (
           <p className="muted-text" style={{ fontSize: '0.75rem', margin: '0.2rem 0 0' }}>
-            {item.intakes.map((i) => `${i.taken ? 'Taken' : 'Skipped'} ${formatTime(i.occurred_at)} (${i.dosage})`).join(' · ')}
+            {item.intakes.map((i) => `${i.taken ? 'Taken' : 'Skipped'} ${formatTime(i.occurred_at)} (${i.dose_label})`).join(' · ')}
           </p>
         )}
       </div>
-      {canWrite && (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.35rem', alignItems: 'flex-end' }}>
-          {showDosageInput && (
-            <input
-              type="text"
-              placeholder="Dosage"
-              value={customDosage}
-              onChange={(e) => setCustomDosage(e.target.value)}
-              style={{ width: '7rem', fontSize: '0.8rem' }}
-            />
-          )}
-          <div style={{ display: 'flex', gap: '0.35rem' }}>
-            <button
-              type="button"
-              className="button"
-              style={{ padding: '0.25rem 0.65rem', fontSize: '0.78rem' }}
-              disabled={logMutation.isPending}
-              onClick={() => logIntake(true)}
-            >
-              Taken
-            </button>
-            <button
-              type="button"
-              className="button button-secondary"
-              style={{ padding: '0.25rem 0.65rem', fontSize: '0.78rem' }}
-              disabled={logMutation.isPending}
-              onClick={() => logIntake(false)}
-            >
-              Skip
-            </button>
-          </div>
+      {canWrite && status !== 'done' && (
+        <div style={{ display: 'flex', gap: '0.35rem' }}>
+          <button
+            type="button"
+            className="button"
+            style={{ padding: '0.25rem 0.65rem', fontSize: '0.78rem' }}
+            disabled={logMutation.isPending}
+            onClick={() => logIntake(true)}
+          >
+            Taken
+          </button>
+          <button
+            type="button"
+            className="button button-secondary"
+            style={{ padding: '0.25rem 0.65rem', fontSize: '0.78rem' }}
+            disabled={logMutation.isPending}
+            onClick={() => logIntake(false)}
+          >
+            Skip
+          </button>
         </div>
       )}
     </div>
