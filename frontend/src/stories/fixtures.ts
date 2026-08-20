@@ -8,6 +8,11 @@ import type { EliminationRecord, EliminationDailySummary, EliminationRangeSummar
 import type { NotificationItem } from '../api/notifications';
 import type { WeightRecord, WeightSummaryBucket } from '../api/weight';
 import type { HealthStateRecord } from '../api/healthState';
+import type {
+  DailyMedAssignment,
+  MedAssignment,
+  Medication,
+} from '../api/medications';
 
 export const mockPetId = '550e8400-e29b-41d4-a716-446655440000';
 
@@ -557,3 +562,79 @@ export const mockHealthStateRecords: HealthStateRecord[] = [
   mockHealthStateRecord('hs-04', 0, '10:30:00', 'amazing', 'Great energy after walk'),
   mockHealthStateRecord('hs-04b', 0, '20:00:00', 'good', 'Settled well overnight'),
 ];
+
+// ── Medication fixtures ───────────────────────────────────────────────────────
+
+export const mockMedications: Medication[] = [
+  {
+    id: 'med-pill-1',
+    pet_id: mockPetId,
+    name: 'Prednisolone',
+    med_type: 'pill',
+    pill_shape: 'round_1_precut',
+    pill_fraction: 'half',
+    color: '#6366f1',
+    created_at: '2026-01-01T00:00:00Z',
+    updated_at: '2026-01-01T00:00:00Z',
+  },
+  {
+    id: 'med-liquid-1',
+    pet_id: mockPetId,
+    name: 'Metronidazole',
+    med_type: 'liquid',
+    pill_shape: null,
+    pill_fraction: null,
+    color: '#f97316',
+    created_at: '2026-01-01T00:00:00Z',
+    updated_at: '2026-01-01T00:00:00Z',
+  },
+];
+
+const todayStr = localToday();
+
+export const mockMedAssignments: MedAssignment[] = [
+  {
+    id: 'assign-1',
+    medication_id: 'med-pill-1',
+    pet_id: mockPetId,
+    dosage: '½ tablet',
+    frequency: { times: ['08:00', '20:00'] },
+    date_from: shiftDate(todayStr, -14),
+    date_to: null,
+    optional: false,
+    created_at: '2026-01-01T00:00:00Z',
+    updated_at: '2026-01-01T00:00:00Z',
+  },
+  {
+    id: 'assign-2',
+    medication_id: 'med-liquid-1',
+    pet_id: mockPetId,
+    dosage: '2.5 ml',
+    frequency: { times: ['09:00'] },
+    date_from: shiftDate(todayStr, -7),
+    date_to: null,
+    optional: true,
+    created_at: '2026-01-08T00:00:00Z',
+    updated_at: '2026-01-08T00:00:00Z',
+  },
+];
+
+export const mockDailyMedAssignments: DailyMedAssignment[] = mockMedications.map((medication, i) => ({
+  medication,
+  assignment: mockMedAssignments[i],
+  intakes: i === 0
+    ? [{
+        id: 'intake-1',
+        pet_id: mockPetId,
+        medication_id: medication.id,
+        assignment_id: mockMedAssignments[i].id,
+        occurred_at: `${todayStr}T08:05:00`,
+        local_date: todayStr,
+        dosage: mockMedAssignments[i].dosage,
+        taken: true,
+        note: null,
+        source_type: 'manual',
+        created_at: `${todayStr}T08:05:00`,
+      }]
+    : [],
+}));

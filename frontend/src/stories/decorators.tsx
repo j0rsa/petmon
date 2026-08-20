@@ -36,6 +36,7 @@ import {
   mockWeightSummaryDaily,
   mockWeightSummaryWeekly,
   mockHealthStateRecords,
+  mockDailyMedAssignments,
 } from './fixtures';
 
 /** Single router wrapper — use `parameters.route` per story to set the active path. */
@@ -428,6 +429,7 @@ export function withHealthPage({ petId = mockPetId, loading = false, empty = fal
       client.setQueryDefaults(['weight-summary'], { queryFn: pending });
       client.setQueryDefaults(['health-state-records', petId], { queryFn: pending });
       client.setQueryDefaults(['health-state-chart', petId], { queryFn: pending });
+      client.setQueryDefaults(['med-daily', petId], { queryFn: pending });
     } else {
       client.setQueryData(
         ['weight-records', petId],
@@ -456,6 +458,15 @@ export function withHealthPage({ petId = mockPetId, loading = false, empty = fal
       client.setQueryData(['health-state-chart', petId, dailyFrom, todayStr, 'daily'], chartRecords);
       client.setQueryData(['health-state-chart', petId, yearFrom, todayStr, 'weekly'], chartRecords);
       client.setQueryData(['health-state-chart', petId, 'all', todayStr, 'weekly'], chartRecords);
+
+      client.setQueryData(
+        ['med-daily', petId, todayStr],
+        empty ? [] : mockDailyMedAssignments.map((d) => ({
+          ...d,
+          medication: { ...d.medication, pet_id: petId },
+          assignment: { ...d.assignment, pet_id: petId },
+        })),
+      );
     }
 
     return (

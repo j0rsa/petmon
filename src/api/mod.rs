@@ -3,6 +3,7 @@ pub mod days;
 pub mod elimination;
 pub mod health;
 pub mod health_state;
+pub mod meds;
 pub mod info;
 pub mod notes;
 pub mod notifications;
