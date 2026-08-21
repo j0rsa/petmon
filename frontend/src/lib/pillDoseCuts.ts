@@ -85,7 +85,7 @@ export const PILL_SHAPE_GEOMETRY: PillShapeGeometry[] = [
   {
     id: 'tear',
     label: 'Tear',
-    outline: 'M 50 18 C 68 34 72 58 50 82 C 28 58 32 34 50 18 Z',
+    outline: 'M 10 50 C 22 34 42 26 66 28 C 82 30 90 39 90 50 C 90 61 82 70 66 72 C 42 74 22 66 10 50 Z',
     scorePattern: 'none',
     scoreLines: '',
     halfSplit: 'left',
@@ -140,9 +140,9 @@ export const PILL_SHAPE_GEOMETRY: PillShapeGeometry[] = [
     id: 'trapezoid',
     label: 'Trapezoid',
     outline: 'M 30 28 H 70 L 78 72 H 22 Z',
-    scorePattern: 'vertical',
-    scoreLines: 'M 50 28 L 50 72',
-    halfSplit: 'left',
+    scorePattern: 'horizontal',
+    scoreLines: 'M 26 50 L 74 50',
+    halfSplit: 'top',
     supportedFractions: ['whole', 'half', 'third'],
   },
   {

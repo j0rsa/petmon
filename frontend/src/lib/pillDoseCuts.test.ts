@@ -10,6 +10,20 @@ describe('pillDoseCuts', () => {
     }
   });
 
+  it('draws Tear with a narrow head and wider rounded tail', () => {
+    const tear = pillShapeGeometry('tear');
+    expect(tear.outline).toContain('M 10 50');
+    expect(tear.outline).toContain('C 82 30 90 39 90 50');
+  });
+
+  it('cuts Trapezoid horizontally into top and bottom halves', () => {
+    const trapezoid = pillShapeGeometry('trapezoid');
+    expect(trapezoid.scorePattern).toBe('horizontal');
+    expect(trapezoid.halfSplit).toBe('top');
+    expect(trapezoid.scoreLines).toBe('M 26 50 L 74 50');
+    expect(doseRegionPath('trapezoid', 'half')).toBe('M 0 0 H 100 V 50 H 0 Z');
+  });
+
   it('both horizontal Oval variants use square-like cross cuts', () => {
     for (const shape of ['oval', 'oval_rounded'] as const) {
       expect(pillShapeGeometry(shape).scorePattern).toBe('cross');
