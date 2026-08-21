@@ -22,6 +22,7 @@ interface FormulationPickerProps {
   /** When revising: tablet strength/shape locked until user opts in. */
   formulationLocked?: boolean;
   onFormulationLockedChange?: (locked: boolean) => void;
+  showDose?: boolean;
 }
 
 export function FormulationPicker({
@@ -30,6 +31,7 @@ export function FormulationPicker({
   onChange,
   formulationLocked = false,
   onFormulationLockedChange,
+  showDose = true,
 }: FormulationPickerProps) {
   const tabletFieldsDisabled = formulationLocked;
 
@@ -41,11 +43,11 @@ export function FormulationPicker({
         <PillDoseIcon
           color={color}
           shape={value.pillShape}
-          fraction={value.doseFraction}
+          fraction={showDose ? value.doseFraction : 'whole'}
           size={56}
           showShapeName
         />
-        {doseHint && (
+        {showDose && doseHint && (
           <p className="muted-text" style={{ fontSize: '0.78rem', margin: '0.35rem 0 0' }}>{doseHint}</p>
         )}
       </div>
@@ -124,7 +126,7 @@ export function FormulationPicker({
           ))}
         </div>
       </div>
-      <div>
+      {showDose && <div>
         <label style={{ fontSize: '0.82rem', display: 'block', marginBottom: '0.45rem' }}>Dose per administration</label>
         <div style={{ display: 'flex', gap: '0.45rem', flexWrap: 'wrap' }}>
           {DOSE_FRACTIONS.map((fraction) => {
@@ -156,7 +158,7 @@ export function FormulationPicker({
             );
           })}
         </div>
-      </div>
+      </div>}
     </div>
   );
 }

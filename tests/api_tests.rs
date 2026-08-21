@@ -2936,4 +2936,70 @@ async fn medication_system_formulations_and_intake_by_reference() {
         .find(|r| r["id"] == assign1_id)
         .unwrap();
     assert_eq!(ended["date_to"].as_str(), Some("2026-03-09"));
+
+    let req = test::TestRequest::post()
+        .uri("/api/v1/health/meds")
+        .set_json(serde_json::json!({
+            "pet_id": pet_id,
+            "name": "Laxatract",
+            "med_type": "liquid",
+            "color": "#22c55e"
+        }))
+        .to_request();
+    let resp = test::call_service(&app, req).await;
+    assert_eq!(resp.status(), 201);
+    let laxatract: serde_json::Value = test::read_body_json(resp).await;
+    let laxatract_id = laxatract["id"].as_str().unwrap();
+
+    let req = test::TestRequest::post()
+        .uri("/api/v1/health/meds/assignments")
+        .set_json(serde_json::json!({
+            "medication_id": laxatract_id,
+            "date_from": "2026-03-01",
+            "optional": true
+        }))
+        .to_request();
+    let resp = test::call_service(&app, req).await;
+    assert_eq!(resp.status(), 201);
+    let optional_assignment: serde_json::Value = test::read_body_json(resp).await;
+    let optional_assignment_id = optional_assignment["id"].as_str().unwrap();
+    assert_eq!(optional_assignment["dose_label"], "As needed");
+    assert!(optional_assignment["liquid_dose_ml"].is_null());
+
+    let req = test::TestRequest::post()
+        .uri("/api/v1/health/meds/intake")
+        .set_json(serde_json::json!({
+            "pet_id": pet_id,
+            "medication_id": laxatract_id,
+            "assignment_id": optional_assignment_id,
+            "local_date": "2026-03-02"
+        }))
+        .to_request();
+    let resp = test::call_service(&app, req).await;
+    assert_eq!(resp.status(), 400);
+
+    let req = test::TestRequest::post()
+        .uri("/api/v1/health/meds/intake")
+        .set_json(serde_json::json!({
+            "pet_id": pet_id,
+            "medication_id": laxatract_id,
+            "assignment_id": optional_assignment_id,
+            "liquid_dose_ml_override": 0.6,
+            "local_date": "2026-03-02"
+        }))
+        .to_request();
+    let resp = test::call_service(&app, req).await;
+    assert_eq!(resp.status(), 201);
+    let optional_intake: serde_json::Value = test::read_body_json(resp).await;
+    assert!(optional_intake["dose_label"]
+        .as_str()
+        .unwrap()
+        .starts_with("0.6ml"));
+    let optional_intake_id = optional_intake["id"].as_str().unwrap();
+
+    let req = test::TestRequest::delete()
+        .uri(&format!("/api/v1/health/meds/intake/{optional_intake_id}"))
+        .to_request();
+    let resp = test::call_service(&app, req).await;
+    assert_eq!(resp.status(), 204);
 }

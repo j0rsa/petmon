@@ -467,13 +467,20 @@ pub fn hydrate_assignment(
         assignment.dose_fraction,
         assignment.liquid_dose_ml,
     );
-    let dose_label = build_dose_label(
-        med_type,
-        &formulation,
-        assignment.dose_fraction,
-        assignment.liquid_dose_ml,
-        effective_dose_mg,
-    );
+    let dose_label = if assignment.optional
+        && assignment.dose_fraction.is_none()
+        && assignment.liquid_dose_ml.is_none()
+    {
+        "As needed".to_string()
+    } else {
+        build_dose_label(
+            med_type,
+            &formulation,
+            assignment.dose_fraction,
+            assignment.liquid_dose_ml,
+            effective_dose_mg,
+        )
+    };
     MedAssignment {
         id: assignment.id,
         medication_id: assignment.medication_id,

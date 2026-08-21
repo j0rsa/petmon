@@ -188,10 +188,31 @@ pub async fn create(
         })?
     };
 
-    if !crate::domain::medication::assignment_due_on(&assignment, &local_date) {
+    if !assignment.optional
+        && !crate::domain::medication::assignment_due_on(&assignment, &local_date)
+    {
         return Err(AppError::BadRequest(
             "assignment is not due on the given date".into(),
         ));
+    }
+
+    if assignment.optional {
+        match medication.med_type {
+            crate::domain::medication::MedType::Pill if req.dose_fraction_override.is_none() => {
+                return Err(AppError::BadRequest(
+                    "dose_fraction_override is required for optional pill intake".into(),
+                ));
+            }
+            crate::domain::medication::MedType::Liquid
+                if req.liquid_dose_ml_override.is_none_or(|dose| dose <= 0.0) =>
+            {
+                return Err(AppError::BadRequest(
+                    "positive liquid_dose_ml_override is required for optional liquid intake"
+                        .into(),
+                ));
+            }
+            _ => {}
+        }
     }
 
     if req.dose_fraction_override.is_some()

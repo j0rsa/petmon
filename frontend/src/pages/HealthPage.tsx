@@ -164,12 +164,9 @@ export default function HealthPage() {
         )}
       </section>
 
-      <HealthStatePanel
-        petId={selectedPetId}
-        afterPrimary={
-          hasActiveTreatmentPlan ? <MedIntakePanel petId={selectedPetId} /> : null
-        }
-      />
+      {hasActiveTreatmentPlan && <MedIntakePanel petId={selectedPetId} />}
+
+      <HealthStatePanel petId={selectedPetId} />
 
       {/* Weight chart */}
       <section className="panel" id="weight">

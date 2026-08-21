@@ -70,10 +70,11 @@ fn validate_dose(
     med_type: MedType,
     dose_fraction: Option<DoseFraction>,
     liquid_dose_ml: Option<f64>,
+    optional: bool,
 ) -> AppResult<()> {
     match med_type {
         MedType::Pill => {
-            if dose_fraction.is_none() {
+            if !optional && dose_fraction.is_none() {
                 return Err(AppError::BadRequest(
                     "dose_fraction is required for pill assignments".into(),
                 ));
@@ -85,7 +86,7 @@ fn validate_dose(
             }
         }
         MedType::Liquid => {
-            if liquid_dose_ml.is_none() {
+            if !optional && liquid_dose_ml.is_none() {
                 return Err(AppError::BadRequest(
                     "liquid_dose_ml is required for liquid assignments".into(),
                 ));
@@ -93,6 +94,11 @@ fn validate_dose(
             if dose_fraction.is_some() {
                 return Err(AppError::BadRequest(
                     "dose_fraction must not be set for liquid assignments".into(),
+                ));
+            }
+            if liquid_dose_ml.is_some_and(|dose| dose <= 0.0) {
+                return Err(AppError::BadRequest(
+                    "liquid_dose_ml must be greater than 0".into(),
                 ));
             }
         }
@@ -127,6 +133,7 @@ async fn resolve_formulation_id(
     if tablet_strength_mg.is_none()
         && pill_shape.is_none()
         && liquid_concentration_mg_per_ml.is_none()
+        && med_type == MedType::Pill
     {
         return Err(AppError::BadRequest(
             "formulation_id or new formulation fields are required".into(),
@@ -223,9 +230,14 @@ pub async fn active_for_medication_on(
 #[tracing::instrument(skip(pool, req))]
 pub async fn create(pool: &SqlitePool, req: CreateMedAssignment) -> AppResult<MedAssignment> {
     let medication = crate::repo::medications::get(pool, &req.medication_id).await?;
-    validate_dose(medication.med_type, req.dose_fraction, req.liquid_dose_ml)?;
+    let optional = req.optional.unwrap_or(false);
+    let dose_fraction = if optional { None } else { req.dose_fraction };
+    let liquid_dose_ml = if optional { None } else { req.liquid_dose_ml };
+    validate_dose(medication.med_type, dose_fraction, liquid_dose_ml, optional)?;
     let frequency = req.frequency.clone().unwrap_or_default();
-    validate_frequency(&frequency)?;
+    if !optional {
+        validate_frequency(&frequency)?;
+    }
 
     let formulation_id = resolve_formulation_id(
         pool,
@@ -240,8 +252,6 @@ pub async fn create(pool: &SqlitePool, req: CreateMedAssignment) -> AppResult<Me
 
     let now = Utc::now().to_rfc3339();
     let id = Uuid::new_v4().to_string();
-    let optional = req.optional.unwrap_or(false);
-
     sqlx::query(
         "INSERT INTO med_assignments
          (id, medication_id, pet_id, formulation_id, dose_fraction, liquid_dose_ml, frequency_json, date_from, date_to, optional, created_at, updated_at)
@@ -251,8 +261,8 @@ pub async fn create(pool: &SqlitePool, req: CreateMedAssignment) -> AppResult<Me
     .bind(&req.medication_id)
     .bind(medication.pet_id)
     .bind(&formulation_id)
-    .bind(req.dose_fraction.map(|f| f.as_str().to_string()))
-    .bind(req.liquid_dose_ml)
+    .bind(dose_fraction.map(|f| f.as_str().to_string()))
+    .bind(liquid_dose_ml)
     .bind(frequency.to_json())
     .bind(&req.date_from)
     .bind(&req.date_to)
@@ -279,9 +289,18 @@ pub async fn revise(
     }
 
     let medication = crate::repo::medications::get(pool, &existing.medication_id).await?;
-    let dose_fraction = req.dose_fraction.or(existing.dose_fraction);
-    let liquid_dose_ml = req.liquid_dose_ml.or(existing.liquid_dose_ml);
-    validate_dose(medication.med_type, dose_fraction, liquid_dose_ml)?;
+    let optional = req.optional.unwrap_or(existing.optional);
+    let dose_fraction = if optional {
+        None
+    } else {
+        req.dose_fraction.or(existing.dose_fraction)
+    };
+    let liquid_dose_ml = if optional {
+        None
+    } else {
+        req.liquid_dose_ml.or(existing.liquid_dose_ml)
+    };
+    validate_dose(medication.med_type, dose_fraction, liquid_dose_ml, optional)?;
 
     let has_new_formulation = req.tablet_strength_mg.is_some()
         || req.pill_shape.is_some()
@@ -326,7 +345,7 @@ pub async fn revise(
             frequency: req.frequency.or(Some(existing.frequency)),
             date_from: req.effective_from,
             date_to: req.date_to,
-            optional: req.optional.or(Some(existing.optional)),
+            optional: Some(optional),
         },
     )
     .await
