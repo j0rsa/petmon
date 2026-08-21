@@ -1,8 +1,12 @@
 import type { DoseFraction, MedType, PillShape } from '../api/medications';
 
 export const DOSE_FRACTIONS: DoseFraction[] = [
-  'whole', 'half', 'third', 'quarter', 'three_quarter', 'eighth', 'sixteenth',
+  'whole', 'three_quarter', 'half', 'third', 'quarter', 'eighth', 'sixteenth',
 ];
+
+export const EMPHASIZED_DOSE_FRACTIONS: ReadonlySet<DoseFraction> = new Set([
+  'whole', 'half', 'quarter',
+]);
 
 export const PILL_SHAPES: PillShape[] = [
   'freedom', 'oval', 'oval_rounded', 'square', 'capsule', 'pentagon', 'tear', 'rectangle',
@@ -26,11 +30,11 @@ export function randomMedColor(): string {
 export function doseFractionLabel(fraction: DoseFraction): string {
   switch (fraction) {
     case 'whole': return '1';
-    case 'half': return '½';
-    case 'third': return '⅓';
-    case 'quarter': return '¼';
-    case 'three_quarter': return '¾';
-    case 'eighth': return '⅛';
+    case 'three_quarter': return '3/4';
+    case 'half': return '1/2';
+    case 'third': return '1/3';
+    case 'quarter': return '1/4';
+    case 'eighth': return '1/8';
     case 'sixteenth': return '1/16';
   }
 }

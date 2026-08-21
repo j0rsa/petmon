@@ -1,5 +1,11 @@
 import type { DoseFraction, PillShape } from '../../api/medications';
-import { DOSE_FRACTIONS, PILL_SHAPES, doseFractionLabel, pillShapeLabel } from '../../lib/medications';
+import {
+  DOSE_FRACTIONS,
+  EMPHASIZED_DOSE_FRACTIONS,
+  PILL_SHAPES,
+  doseFractionLabel,
+  pillShapeLabel,
+} from '../../lib/medications';
 import { isDoseSupported, pillDosePreviewHint, supportedDoseFractions } from '../../lib/pillDoseCuts';
 import { PillDoseIcon } from './PillDoseIcon';
 
@@ -132,10 +138,11 @@ export function FormulationPicker({
                 className={`button${value.doseFraction === fraction ? '' : ' button-secondary'}`}
                 style={{
                   padding: '0.45rem 0.85rem',
-                  fontSize: '1.05rem',
-                  fontWeight: 600,
-                  minWidth: '2.85rem',
+                  fontSize: '0.95rem',
+                  fontWeight: EMPHASIZED_DOSE_FRACTIONS.has(fraction) ? 700 : 400,
+                  width: '3.5rem',
                   lineHeight: 1.1,
+                  fontVariantNumeric: 'tabular-nums',
                   opacity: supported ? 1 : 0.4,
                 }}
                 onClick={() => onChange({ ...value, doseFraction: fraction })}
