@@ -13,14 +13,6 @@ const PARTS: { key: PartOfDay; label: string }[] = [
   { key: 'evening', label: 'Evening' },
 ];
 
-export const defaultMedFrequency: MedFrequency = {
-  morning: 1,
-  midday: 0,
-  evening: 0,
-  every: 1,
-  unit: 'days',
-};
-
 export function MedScheduleEditor({ value, onChange }: MedScheduleEditorProps) {
   function setPart(key: PartOfDay, count: number) {
     onChange({ ...value, [key]: Math.max(0, Math.min(9, count)) });

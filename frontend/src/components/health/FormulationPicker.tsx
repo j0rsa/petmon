@@ -160,9 +160,3 @@ export function FormulationPicker({
     </div>
   );
 }
-
-export const defaultFormulationPickerValue: FormulationPickerValue = {
-  tabletStrengthMg: '5',
-  pillShape: 'round',
-  doseFraction: 'half',
-};
