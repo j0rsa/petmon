@@ -43,7 +43,7 @@ export function pillShapeLabel(shape: PillShape): string {
     case 'capsule': return 'Capsule';
     case 'pentagon': return 'Pentagon';
     case 'tear': return 'Tear';
-    case 'rectangle': return 'Rectangle';
+    case 'rectangle': return 'Rounded rectangle';
     case 'hexagon': return 'Hexagon';
     case 'round': return 'Round';
     case 'triangle': return 'Triangle';

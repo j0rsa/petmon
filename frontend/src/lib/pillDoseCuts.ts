@@ -15,9 +15,13 @@ export interface PillShapeGeometry {
   supportedFractions: readonly DoseFraction[];
 }
 
-/** Upright oval (taller than wide) — ½ is the top half. */
-const OVAL_UPRIGHT =
-  'M 50 14 A 20 36 0 1 1 49.9 14 A 20 36 0 1 1 50 14 Z';
+/** Upright, tapered oval with pointed ends — ½ is the top half. */
+const POINTED_OVAL =
+  'M 50 12 C 66 25 72 38 72 50 C 72 62 66 75 50 88 C 34 75 28 62 28 50 C 28 38 34 25 50 12 Z';
+
+/** Two vertically stacked lobes joined directly at a narrow waist. */
+const CONNECTED_DOUBLE_CIRCLE =
+  'M 50 14 C 65 14 74 23 74 36 C 74 43 70 48 64 50 C 70 52 74 57 74 64 C 74 77 65 86 50 86 C 35 86 26 77 26 64 C 26 57 30 52 36 50 C 30 48 26 43 26 36 C 26 23 35 14 50 14 Z';
 
 export const PILL_SHAPE_GEOMETRY: PillShapeGeometry[] = [
   {
@@ -32,9 +36,9 @@ export const PILL_SHAPE_GEOMETRY: PillShapeGeometry[] = [
   {
     id: 'oval',
     label: 'Oval',
-    outline: OVAL_UPRIGHT,
+    outline: POINTED_OVAL,
     scorePattern: 'horizontal',
-    scoreLines: 'M 14 50 L 86 50',
+    scoreLines: 'M 28 50 L 72 50',
     halfSplit: 'top',
     supportedFractions: ['whole', 'half', 'third'],
   },
@@ -76,10 +80,10 @@ export const PILL_SHAPE_GEOMETRY: PillShapeGeometry[] = [
   },
   {
     id: 'rectangle',
-    label: 'Rectangle',
-    outline: 'M 22 30 H 78 A 6 6 0 0 1 84 36 V 64 A 6 6 0 0 1 78 70 H 22 A 6 6 0 0 1 16 64 V 36 A 6 6 0 0 1 22 30 Z',
+    label: 'Rounded rectangle',
+    outline: 'M 28 18 H 72 Q 82 18 82 28 V 72 Q 82 82 72 82 H 28 Q 18 82 18 72 V 28 Q 18 18 28 18 Z',
     scorePattern: 'vertical',
-    scoreLines: 'M 50 30 L 50 70',
+    scoreLines: 'M 50 18 L 50 82',
     halfSplit: 'left',
     supportedFractions: ['whole', 'half', 'third'],
   },
@@ -113,9 +117,9 @@ export const PILL_SHAPE_GEOMETRY: PillShapeGeometry[] = [
   {
     id: 'double_circle',
     label: 'Double circle',
-    outline: 'M 34 50 A 16 16 0 1 1 34 49.9 L 66 49.9 A 16 16 0 1 1 66 50 Z',
+    outline: CONNECTED_DOUBLE_CIRCLE,
     scorePattern: 'horizontal',
-    scoreLines: 'M 18 50 L 82 50',
+    scoreLines: 'M 36 50 L 64 50',
     halfSplit: 'top',
     supportedFractions: ['whole', 'half', 'third', 'quarter', 'three_quarter'],
   },
