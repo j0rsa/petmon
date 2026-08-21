@@ -503,6 +503,16 @@ jobs:
         env:
           RENOVATE_TRIGGER_API_SECRET: ${{ secrets.RENOVATE_TRIGGER_API_SECRET }}
         run: |
-          curl --fail -X POST \
+          status="$(
+            curl --silent --show-error --output /dev/null --write-out '%{http_code}' -X POST \
             -H "X-Api-Key: ${RENOVATE_TRIGGER_API_SECRET}" \
             https://renovate.j0rsa.com/trigger
+          )"
+          if [ "${status}" = "429" ]; then
+            echo "::warning::Renovate trigger is rate limited; continuing CI."
+            exit 0
+          fi
+          if [ "${status}" -lt 200 ] || [ "${status}" -ge 300 ]; then
+            echo "::error::Renovate trigger failed with HTTP ${status}."
+            exit 1
+          fi
