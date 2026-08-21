@@ -33,6 +33,23 @@ export function randomMedColor(): string {
   return MED_COLOR_PALETTE[Math.floor(Math.random() * MED_COLOR_PALETTE.length)]!;
 }
 
+export async function savePlanWithMedicationColor<T>({
+  currentColor,
+  selectedColor,
+  saveColor,
+  savePlan,
+}: {
+  currentColor: string;
+  selectedColor: string;
+  saveColor: () => Promise<unknown>;
+  savePlan: () => Promise<T>;
+}): Promise<T> {
+  if (currentColor !== selectedColor) {
+    await saveColor();
+  }
+  return savePlan();
+}
+
 export function doseFractionLabel(fraction: DoseFraction): string {
   switch (fraction) {
     case 'whole': return '1';

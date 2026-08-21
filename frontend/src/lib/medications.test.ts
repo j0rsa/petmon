@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import type { MedAssignment } from '../api/medications';
 import {
   DOSE_FRACTIONS,
@@ -7,6 +7,7 @@ import {
   expectedDoseCount,
   formatFrequency,
   hasActiveAssignmentOn,
+  savePlanWithMedicationColor,
 } from './medications';
 
 describe('medication dose buttons', () => {
@@ -66,5 +67,73 @@ describe('medication dose buttons', () => {
     ] as MedAssignment[];
     expect(hasActiveAssignmentOn(assignments, '2026-08-21')).toBe(true);
     expect(hasActiveAssignmentOn(assignments, '2026-09-01')).toBe(false);
+  });
+});
+
+describe('treatment plan medication color saving', () => {
+  it('persists a changed medication color before saving the plan', async () => {
+    const calls: string[] = [];
+    const saveColor = vi.fn(async () => { calls.push('color'); });
+    const savePlan = vi.fn(async () => {
+      calls.push('plan');
+      return 'assignment';
+    });
+
+    await expect(savePlanWithMedicationColor({
+      currentColor: '#f97316',
+      selectedColor: '#1d4ed8',
+      saveColor,
+      savePlan,
+    })).resolves.toBe('assignment');
+
+    expect(calls).toEqual(['color', 'plan']);
+  });
+
+  it('keeps the color persisted when assignment validation fails', async () => {
+    const saveColor = vi.fn(async () => undefined);
+    const savePlan = vi.fn(async () => {
+      throw new Error('invalid effective date');
+    });
+
+    await expect(savePlanWithMedicationColor({
+      currentColor: '#f97316',
+      selectedColor: '#1d4ed8',
+      saveColor,
+      savePlan,
+    })).rejects.toThrow('invalid effective date');
+
+    expect(saveColor).toHaveBeenCalledOnce();
+    expect(savePlan).toHaveBeenCalledOnce();
+  });
+
+  it('does not create a plan when saving its changed color fails', async () => {
+    const saveColor = vi.fn(async () => {
+      throw new Error('color update failed');
+    });
+    const savePlan = vi.fn(async () => 'assignment');
+
+    await expect(savePlanWithMedicationColor({
+      currentColor: '#f97316',
+      selectedColor: '#1d4ed8',
+      saveColor,
+      savePlan,
+    })).rejects.toThrow('color update failed');
+
+    expect(savePlan).not.toHaveBeenCalled();
+  });
+
+  it('skips an unchanged color update', async () => {
+    const saveColor = vi.fn(async () => undefined);
+    const savePlan = vi.fn(async () => 'assignment');
+
+    await savePlanWithMedicationColor({
+      currentColor: '#6366f1',
+      selectedColor: '#6366f1',
+      saveColor,
+      savePlan,
+    });
+
+    expect(saveColor).not.toHaveBeenCalled();
+    expect(savePlan).toHaveBeenCalledOnce();
   });
 });
