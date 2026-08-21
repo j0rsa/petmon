@@ -17,10 +17,13 @@ import {
   intakeStatusLabel,
 } from '../../lib/medications';
 import { buildMedIntakeCurl } from '../../lib/medIntakeCurl';
+import { parseDecimal } from '../../lib/numbers';
 import { isDoseSupported } from '../../lib/pillDoseCuts';
+import { isoFromDateAndTime, nowTimeString } from '../../lib/time';
 import { usePermissions } from '../../context/usePermissions';
 import { useFormatTime } from '../../context/useDisplaySettings';
 import { useUserSettings } from '../../api/userSettings';
+import { TimeInput } from '../TimeInput';
 import { MedIcon } from './MedIcon';
 
 export interface MedIntakePanelProps {
@@ -32,21 +35,23 @@ function DailyMedRow({
   petId,
   canWrite,
   developerMode,
-  localDate,
+  panelDate,
   onLogged,
 }: {
   item: DailyMedAssignment;
   petId: string;
   canWrite: boolean;
   developerMode: boolean;
-  localDate: string;
+  panelDate: string;
   onLogged: () => void;
 }) {
   const formatTime = useFormatTime();
   const { medication, assignment } = item;
   const expected = expectedDoseCount(assignment.frequency);
   const status = intakeStatus(item.intakes, expected);
-  const [showDosePrompt, setShowDosePrompt] = useState(false);
+  const [showIntakePrompt, setShowIntakePrompt] = useState(false);
+  const [intakeDate, setIntakeDate] = useState(panelDate);
+  const [intakeTime, setIntakeTime] = useState(nowTimeString);
   const [doseFraction, setDoseFraction] = useState<DoseFraction>('whole');
   const [liquidDoseMl, setLiquidDoseMl] = useState('');
   const [curlCopied, setCurlCopied] = useState(false);
@@ -61,38 +66,52 @@ function DailyMedRow({
     onSuccess: onLogged,
   });
 
+  function resetIntakePrompt() {
+    setShowIntakePrompt(false);
+    setIntakeDate(panelDate);
+    setIntakeTime(nowTimeString());
+    setLiquidDoseMl('');
+  }
+
+  function intakeTiming() {
+    return {
+      local_date: intakeDate,
+      occurred_at: isoFromDateAndTime(intakeDate, intakeTime),
+    };
+  }
+
   function logIntake(overrides: Partial<CreateMedIntakeRecord> = {}) {
     logMutation.mutate({
       pet_id: petId,
       medication_id: medication.id,
       assignment_id: assignment.id,
       taken: true,
+      ...intakeTiming(),
       ...overrides,
     }, {
-      onSuccess: () => {
-        setShowDosePrompt(false);
-        setLiquidDoseMl('');
-      },
+      onSuccess: resetIntakePrompt,
     });
   }
 
   function handleTake() {
+    setIntakeDate(panelDate);
+    setIntakeTime(nowTimeString());
+    setShowIntakePrompt(true);
+  }
+
+  function confirmIntake() {
     if (assignment.optional) {
-      setShowDosePrompt(true);
+      if (medication.med_type === 'pill') {
+        logIntake({ dose_fraction_override: doseFraction });
+        return;
+      }
+      const ml = parseDecimal(liquidDoseMl);
+      if (Number.isFinite(ml) && ml > 0) {
+        logIntake({ liquid_dose_ml_override: ml });
+      }
       return;
     }
     logIntake();
-  }
-
-  function confirmOptionalDose() {
-    if (medication.med_type === 'pill') {
-      logIntake({ dose_fraction_override: doseFraction });
-      return;
-    }
-    const ml = Number.parseFloat(liquidDoseMl);
-    if (Number.isFinite(ml) && ml > 0) {
-      logIntake({ liquid_dose_ml_override: ml });
-    }
   }
 
   const lastIntake = [...item.intakes]
@@ -100,9 +119,16 @@ function DailyMedRow({
 
   const iconFraction = assignment.optional ? 'whole' : assignment.dose_fraction;
   const iconShape = assignment.formulation.pill_shape;
+  const liquidDoseValid = parseDecimal(liquidDoseMl) > 0;
+  const canConfirmIntake = !assignment.optional
+    || medication.med_type === 'pill'
+    || liquidDoseValid;
 
   function handleCopyCurl() {
-    const curl = buildMedIntakeCurl(petId, item, localDate);
+    const timing = showIntakePrompt
+      ? intakeTiming()
+      : { local_date: panelDate, occurred_at: isoFromDateAndTime(panelDate, nowTimeString()) };
+    const curl = buildMedIntakeCurl(petId, item, timing);
     navigator.clipboard.writeText(curl).then(() => {
       setCurlCopied(true);
       setTimeout(() => setCurlCopied(false), 2000);
@@ -166,17 +192,6 @@ function DailyMedRow({
       </div>
       {showActions && (
         <div style={{ display: 'flex', gap: '0.35rem', alignItems: 'center' }}>
-          {canWrite && showTake && (
-            <button
-              type="button"
-              className="button"
-              style={{ padding: '0.25rem 0.65rem', fontSize: '0.78rem' }}
-              disabled={logMutation.isPending}
-              onClick={handleTake}
-            >
-              Take
-            </button>
-          )}
           {developerMode && (
             <button
               type="button"
@@ -187,6 +202,17 @@ function DailyMedRow({
               onClick={handleCopyCurl}
             >
               <Code size={15} aria-hidden="true" />
+            </button>
+          )}
+          {canWrite && showTake && (
+            <button
+              type="button"
+              className="button"
+              style={{ padding: '0.25rem 0.65rem', fontSize: '0.78rem' }}
+              disabled={logMutation.isPending}
+              onClick={handleTake}
+            >
+              Take
             </button>
           )}
           {canWrite && lastIntake && (
@@ -202,7 +228,7 @@ function DailyMedRow({
           )}
         </div>
       )}
-      {showDosePrompt && (
+      {showIntakePrompt && (
         <div
           style={{
             flexBasis: '100%',
@@ -213,58 +239,79 @@ function DailyMedRow({
           }}
         >
           <strong style={{ display: 'block', fontSize: '0.82rem', marginBottom: '0.45rem' }}>
-            Dosage taken
+            Log intake
           </strong>
-          {medication.med_type === 'pill' ? (
-            <div style={{ display: 'flex', gap: '0.35rem', flexWrap: 'wrap' }}>
-              {DOSE_FRACTIONS.map((fraction) => {
-                const supported = isDoseSupported(assignment.formulation.pill_shape ?? 'round', fraction);
-                return (
-                  <button
-                    key={fraction}
-                    type="button"
-                    className={`button${doseFraction === fraction ? '' : ' button-secondary'}`}
-                    disabled={!supported}
-                    style={{ padding: '0.3rem 0.55rem', fontSize: '0.78rem' }}
-                    onClick={() => setDoseFraction(fraction)}
-                  >
-                    {doseFractionLabel(fraction)}
-                  </button>
-                );
-              })}
-            </div>
-          ) : (
-            <div className="form-row" style={{ maxWidth: '10rem' }}>
-              <label style={{ fontSize: '0.78rem' }}>Amount (ml)</label>
+          <div style={{ display: 'flex', gap: '0.75rem', flexWrap: 'wrap', marginBottom: '0.55rem' }}>
+            <div className="form-row" style={{ flex: '0 0 auto' }}>
+              <label style={{ fontSize: '0.78rem' }}>Date</label>
               <input
-                type="number"
-                min="0.01"
-                step="0.1"
-                inputMode="decimal"
-                value={liquidDoseMl}
-                placeholder="e.g. 0.6"
-                autoFocus
-                onChange={(event) => setLiquidDoseMl(event.target.value)}
+                type="date"
+                value={intakeDate}
+                onChange={(event) => setIntakeDate(event.target.value)}
+                style={{ width: '10.5rem' }}
               />
             </div>
+            <div className="form-row" style={{ flex: '0 0 auto' }}>
+              <label style={{ fontSize: '0.78rem' }}>Time</label>
+              <TimeInput
+                variant="form"
+                aria-label="Intake time"
+                value={intakeTime}
+                onChange={setIntakeTime}
+              />
+            </div>
+          </div>
+          {assignment.optional && (
+            <>
+              <strong style={{ display: 'block', fontSize: '0.82rem', marginBottom: '0.45rem' }}>
+                Dosage taken
+              </strong>
+              {medication.med_type === 'pill' ? (
+                <div style={{ display: 'flex', gap: '0.35rem', flexWrap: 'wrap' }}>
+                  {DOSE_FRACTIONS.map((fraction) => {
+                    const supported = isDoseSupported(assignment.formulation.pill_shape ?? 'round', fraction);
+                    return (
+                      <button
+                        key={fraction}
+                        type="button"
+                        className={`button${doseFraction === fraction ? '' : ' button-secondary'}`}
+                        disabled={!supported}
+                        style={{ padding: '0.3rem 0.55rem', fontSize: '0.78rem' }}
+                        onClick={() => setDoseFraction(fraction)}
+                      >
+                        {doseFractionLabel(fraction)}
+                      </button>
+                    );
+                  })}
+                </div>
+              ) : (
+                <div className="form-row" style={{ maxWidth: '10rem' }}>
+                  <label style={{ fontSize: '0.78rem' }}>Amount (ml)</label>
+                  <input
+                    type="text"
+                    inputMode="decimal"
+                    value={liquidDoseMl}
+                    placeholder="e.g. 0,6"
+                    autoFocus
+                    onChange={(event) => setLiquidDoseMl(event.target.value)}
+                  />
+                </div>
+              )}
+            </>
           )}
           <div style={{ display: 'flex', gap: '0.4rem', marginTop: '0.55rem' }}>
             <button
               type="button"
               className="button"
-              disabled={
-                logMutation.isPending
-                || (medication.med_type === 'liquid'
-                  && !(Number.parseFloat(liquidDoseMl) > 0))
-              }
-              onClick={confirmOptionalDose}
+              disabled={logMutation.isPending || !canConfirmIntake}
+              onClick={confirmIntake}
             >
               Confirm
             </button>
             <button
               type="button"
               className="button button-secondary"
-              onClick={() => setShowDosePrompt(false)}
+              onClick={resetIntakePrompt}
             >
               Cancel
             </button>
@@ -318,7 +365,7 @@ export function MedIntakePanel({ petId }: MedIntakePanelProps) {
               petId={petId}
               canWrite={canWrite}
               developerMode={developerSettings.enabled}
-              localDate={today}
+              panelDate={today}
               onLogged={invalidate}
             />
           ))}

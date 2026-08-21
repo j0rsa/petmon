@@ -3010,6 +3010,10 @@ components:
           type: string
           nullable: true
           description: Optional day note
+      required:
+        - local_date
+        - records
+        - totals_by_category
 
     NutritionStatus:
       type: object
@@ -3114,10 +3118,6 @@ components:
         - daily_min_ml
         - daily_max_ml
         - delta_ml
-      required:
-        - local_date
-        - records
-        - totals_by_category
 
     FluidCurvePoint:
       type: object
@@ -4280,9 +4280,16 @@ components:
         liquid_dose_ml_override:
           type: number
           description: Required when taking an optional/as-needed liquid
-        taken: { type: boolean }
-        occurred_at: { type: string }
-        local_date: { type: string, format: date }
+        taken:
+          type: boolean
+          description: Whether the dose was taken (true) or skipped (false). Defaults to true.
+        occurred_at:
+          type: string
+          description: Naive local datetime when the dose was taken (YYYY-MM-DDTHH:MM:SS). Defaults to now in the server timezone.
+        local_date:
+          type: string
+          format: date
+          description: Calendar day the intake counts toward (assignment due/active checks). Defaults to the date portion of occurred_at.
         note: { type: string }
         source_type: { type: string }
       required: [pet_id, medication_id]

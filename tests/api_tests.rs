@@ -3293,3 +3293,58 @@ async fn medication_system_formulations_and_intake_by_reference() {
     let resp = test::call_service(&app, req).await;
     assert_eq!(resp.status(), 204);
 }
+
+#[actix_web::test]
+async fn med_intake_explicit_occurred_at_is_preserved() {
+    let (app, _state) = build_dev_app!();
+    let pet_id = api_create_pet!(&app, "MedTimeTest");
+
+    let req = test::TestRequest::post()
+        .uri("/api/v1/health/meds")
+        .set_json(serde_json::json!({
+            "pet_id": pet_id,
+            "name": "Daily pill",
+            "med_type": "pill",
+            "color": "#6366f1"
+        }))
+        .to_request();
+    let resp = test::call_service(&app, req).await;
+    assert_eq!(resp.status(), 201);
+    let med: serde_json::Value = test::read_body_json(resp).await;
+    let med_id = med["id"].as_str().unwrap();
+
+    let req = test::TestRequest::post()
+        .uri("/api/v1/health/meds/assignments")
+        .set_json(serde_json::json!({
+            "medication_id": med_id,
+            "tablet_strength_mg": 5.0,
+            "pill_shape": "round",
+            "dose_fraction": "whole",
+            "frequency": { "morning": 1, "midday": 0, "evening": 0, "every": 1, "unit": "days" },
+            "date_from": "2026-08-01"
+        }))
+        .to_request();
+    let resp = test::call_service(&app, req).await;
+    assert_eq!(resp.status(), 201);
+    let assign: serde_json::Value = test::read_body_json(resp).await;
+    let assign_id = assign["id"].as_str().unwrap();
+
+    let occurred_at = "2026-08-10T07:45:00";
+    let req = test::TestRequest::post()
+        .uri("/api/v1/health/meds/intake")
+        .set_json(serde_json::json!({
+            "pet_id": pet_id,
+            "medication_id": med_id,
+            "assignment_id": assign_id,
+            "taken": true,
+            "occurred_at": occurred_at,
+            "local_date": "2026-08-10"
+        }))
+        .to_request();
+    let resp = test::call_service(&app, req).await;
+    assert_eq!(resp.status(), 201);
+    let intake: serde_json::Value = test::read_body_json(resp).await;
+    assert_eq!(intake["occurred_at"].as_str(), Some(occurred_at));
+    assert_eq!(intake["local_date"].as_str(), Some("2026-08-10"));
+    assert_eq!(intake["taken"].as_bool(), Some(true));
+}
