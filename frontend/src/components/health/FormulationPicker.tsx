@@ -1,3 +1,4 @@
+import type { ReactNode } from 'react';
 import type { DoseFraction, PillShape } from '../../api/medications';
 import {
   DOSE_FRACTIONS,
@@ -23,6 +24,7 @@ interface FormulationPickerProps {
   formulationLocked?: boolean;
   onFormulationLockedChange?: (locked: boolean) => void;
   showDose?: boolean;
+  beforeDose?: ReactNode;
 }
 
 export function FormulationPicker({
@@ -32,6 +34,7 @@ export function FormulationPicker({
   formulationLocked = false,
   onFormulationLockedChange,
   showDose = true,
+  beforeDose,
 }: FormulationPickerProps) {
   const tabletFieldsDisabled = formulationLocked;
 
@@ -126,6 +129,7 @@ export function FormulationPicker({
           ))}
         </div>
       </div>
+      {beforeDose}
       {showDose && <div>
         <label style={{ fontSize: '0.82rem', display: 'block', marginBottom: '0.45rem' }}>Dose per administration</label>
         <div style={{ display: 'flex', gap: '0.45rem', flexWrap: 'wrap' }}>

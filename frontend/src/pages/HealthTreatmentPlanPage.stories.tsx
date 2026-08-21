@@ -59,6 +59,35 @@ export const WithPlans: Story = {
     await expect(
       canvas.getByRole('button', { name: 'Change color for Prednisolone' }),
     ).toBeInTheDocument();
+    const optional = canvas.getByLabelText('Optional medication (take as needed)');
+    const dose = canvas.getByText('Dose per administration');
+    await expect(
+      optional.compareDocumentPosition(dose) & Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBeTruthy();
+  },
+};
+
+export const LiquidFieldOrder: Story = {
+  decorators: decorator({
+    assignments: [{
+      ...mockMedAssignments[1]!,
+      optional: false,
+      liquid_dose_ml: 2.5,
+      dose_label: '2.5ml',
+    }],
+  }),
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    await userEvent.click(canvas.getByRole('button', { name: 'Revise' }));
+    const concentration = canvas.getByLabelText('Concentration (mg/ml, optional)');
+    const optional = canvas.getByLabelText('Optional medication (take as needed)');
+    const dose = canvas.getByLabelText('Dose (ml)');
+    await expect(
+      concentration.compareDocumentPosition(optional) & Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBeTruthy();
+    await expect(
+      optional.compareDocumentPosition(dose) & Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBeTruthy();
   },
 };
 

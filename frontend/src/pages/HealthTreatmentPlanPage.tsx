@@ -392,31 +392,46 @@ export default function HealthTreatmentPlanPage() {
               formulationLocked={reviseId ? formulationLocked : undefined}
               onFormulationLockedChange={reviseId ? setFormulationLocked : undefined}
               showDose={!planOptional}
+              beforeDose={(
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', width: 'fit-content' }}>
+                  <input
+                    id="plan-optional-pill"
+                    type="checkbox"
+                    checked={planOptional}
+                    onChange={(e) => setPlanOptional(e.target.checked)}
+                  />
+                  <label htmlFor="plan-optional-pill" style={{ fontSize: '0.82rem', cursor: 'pointer', userSelect: 'none' }}>
+                    Optional medication (take as needed)
+                  </label>
+                </div>
+              )}
             />
           ) : (
-            <div style={{ display: 'grid', gap: '0.65rem', ...(reviseId && formulationLocked ? { opacity: 0.55, pointerEvents: 'none' } : {}) }}>
+            <div style={{ display: 'grid', gap: '0.65rem' }}>
+              <div
+                className="form-row"
+                style={reviseId && formulationLocked ? { opacity: 0.55, pointerEvents: 'none' } : undefined}
+              >
+                <label style={{ fontSize: '0.82rem' }}>Concentration (mg/ml, optional)</label>
+                <input type="text" inputMode="decimal" value={liquidConcentration} onChange={(e) => setLiquidConcentration(e.target.value)} />
+              </div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', width: 'fit-content' }}>
+                <input
+                  id="plan-optional-liquid"
+                  type="checkbox"
+                  checked={planOptional}
+                  onChange={(e) => setPlanOptional(e.target.checked)}
+                />
+                <label htmlFor="plan-optional-liquid" style={{ fontSize: '0.82rem', cursor: 'pointer', userSelect: 'none' }}>
+                  Optional medication (take as needed)
+                </label>
+              </div>
               {!planOptional && <div className="form-row">
                 <label style={{ fontSize: '0.82rem' }}>Dose (ml)</label>
                 <input type="text" inputMode="decimal" value={liquidDoseMl} onChange={(e) => setLiquidDoseMl(e.target.value)} />
               </div>}
-              <div className="form-row">
-                <label style={{ fontSize: '0.82rem' }}>Concentration (mg/ml, optional)</label>
-                <input type="text" inputMode="decimal" value={liquidConcentration} onChange={(e) => setLiquidConcentration(e.target.value)} />
-              </div>
             </div>
           )}
-
-          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginTop: '0.65rem', width: 'fit-content' }}>
-            <input
-              id="plan-optional"
-              type="checkbox"
-              checked={planOptional}
-              onChange={(e) => setPlanOptional(e.target.checked)}
-            />
-            <label htmlFor="plan-optional" style={{ fontSize: '0.82rem', cursor: 'pointer', userSelect: 'none' }}>
-              Optional medication (take as needed)
-            </label>
-          </div>
 
           {!planOptional && <div style={{ marginTop: '0.9rem' }}>
             <MedScheduleEditor value={planFrequency} onChange={setPlanFrequency} />
