@@ -31,6 +31,7 @@ impl MedType {
 pub enum PillShape {
     Freedom,
     Oval,
+    OvalRounded,
     Square,
     Capsule,
     Pentagon,
@@ -50,6 +51,7 @@ impl PillShape {
         match s {
             "freedom" => Some(Self::Freedom),
             "oval" => Some(Self::Oval),
+            "oval_rounded" => Some(Self::OvalRounded),
             "square" => Some(Self::Square),
             "capsule" => Some(Self::Capsule),
             "pentagon" => Some(Self::Pentagon),
@@ -70,6 +72,7 @@ impl PillShape {
         match self {
             Self::Freedom => "freedom",
             Self::Oval => "oval",
+            Self::OvalRounded => "oval_rounded",
             Self::Square => "square",
             Self::Capsule => "capsule",
             Self::Pentagon => "pentagon",

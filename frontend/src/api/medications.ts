@@ -4,6 +4,7 @@ export type MedType = 'pill' | 'liquid';
 export type PillShape =
   | 'freedom'
   | 'oval'
+  | 'oval_rounded'
   | 'square'
   | 'capsule'
   | 'pentagon'
