@@ -480,7 +480,8 @@ export default function HealthTreatmentPlanPage() {
                       <ul style={{ margin: '0.35rem 0 0', paddingLeft: '1.1rem' }}>
                         {row.history.map((a) => (
                           <li key={a.id} className="muted-text">
-                            {a.dose_label} · {a.date_from}{a.date_to ? ` → ${a.date_to}` : ' → ongoing'}
+                            {a.dose_label} · {formatFrequency(a.frequency)} · {a.date_from}
+                            {a.date_to ? ` → ${a.date_to}` : ' → ongoing'}
                           </li>
                         ))}
                       </ul>
