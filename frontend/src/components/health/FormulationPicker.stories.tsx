@@ -1,5 +1,6 @@
 import type { Meta, StoryObj } from '@storybook/react-vite';
-import { FormulationPicker, defaultFormulationPickerValue } from './FormulationPicker';
+import { FormulationPicker } from './FormulationPicker';
+import { defaultFormulationPickerValue } from '../../lib/medicationDefaults';
 import { useState } from 'react';
 
 const meta = {

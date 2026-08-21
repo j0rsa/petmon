@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import type { Meta, StoryObj } from '@storybook/react-vite';
-import { MedScheduleEditor, defaultMedFrequency } from './MedScheduleEditor';
+import { MedScheduleEditor } from './MedScheduleEditor';
+import { defaultMedFrequency } from '../../lib/medicationDefaults';
 
 const meta = {
   title: 'Components/Health/MedScheduleEditor',

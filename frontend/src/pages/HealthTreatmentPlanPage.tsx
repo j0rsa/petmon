@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useMemo, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import {
   medicationsApi,
@@ -11,13 +11,9 @@ import {
 import { NoPetSelected } from '../components/NoPetSelected';
 import { MedColorSwatch } from '../components/health/MedColorSwatch';
 import { MedIcon } from '../components/health/MedIcon';
-import {
-  MedScheduleEditor,
-  defaultMedFrequency,
-} from '../components/health/MedScheduleEditor';
+import { MedScheduleEditor } from '../components/health/MedScheduleEditor';
 import {
   FormulationPicker,
-  defaultFormulationPickerValue,
   type FormulationPickerValue,
 } from '../components/health/FormulationPicker';
 import { useSelectedPet } from '../context/SelectedPetContext';
@@ -30,6 +26,10 @@ import {
   randomMedColor,
 } from '../lib/medications';
 import { parseDecimal } from '../lib/numbers';
+import {
+  defaultFormulationPickerValue,
+  defaultMedFrequency,
+} from '../lib/medicationDefaults';
 
 interface MedPlanRow {
   medication: Medication;
@@ -265,12 +265,6 @@ export default function HealthTreatmentPlanPage() {
     setReviseFrom(today);
   }
 
-  useEffect(() => {
-    if (showCreateMed) {
-      setMedColor(randomMedColor());
-    }
-  }, [showCreateMed]);
-
   return (
     <div className="page-stack">
       <section className="page-header">
@@ -279,7 +273,14 @@ export default function HealthTreatmentPlanPage() {
           <h2>Treatment plan · {selectedPet?.name ?? 'Pet'}</h2>
         </div>
         {canWrite && !showCreateMed && (
-          <button type="button" className="button" onClick={() => setShowCreateMed(true)}>
+          <button
+            type="button"
+            className="button"
+            onClick={() => {
+              setMedColor(randomMedColor());
+              setShowCreateMed(true);
+            }}
+          >
             + Register med
           </button>
         )}

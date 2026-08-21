@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useState } from 'react';
 import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { ComposedChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 import { weightApi } from '../api/weight';
@@ -112,26 +112,21 @@ export default function HealthPage() {
 
   useScrollToHash(summaryQuery.isPending);
 
-  const chartData = useMemo(() => {
-    const buckets = summaryQuery.data ?? [];
-    const trendValues = linReg(buckets.map((b) => b.avg_kg));
-    return buckets.map((b, i) => ({
-      bucket: formatBucket(b.bucket, granularity),
-      avgKg: b.avg_kg,
-      minKg: b.min_kg,
-      maxKg: b.max_kg,
-      trendKg: trendValues?.[i] ?? null,
-    }));
-  }, [summaryQuery.data, granularity]);
+  const buckets = summaryQuery.data ?? [];
+  const trendValues = linReg(buckets.map((bucket) => bucket.avg_kg));
+  const chartData = buckets.map((bucket, index) => ({
+    bucket: formatBucket(bucket.bucket, granularity),
+    avgKg: bucket.avg_kg,
+    minKg: bucket.min_kg,
+    maxKg: bucket.max_kg,
+    trendKg: trendValues?.[index] ?? null,
+  }));
 
   const hasWeightTrend = chartData.some((point) => point.trendKg != null);
 
-  const medianKg = useMemo(() => {
-    const values = (summaryQuery.data ?? [])
-      .map((b) => b.avg_kg)
-      .filter((v): v is number => v != null);
-    return medianWeight(values);
-  }, [summaryQuery.data]);
+  const medianKg = medianWeight(
+    buckets.map((bucket) => bucket.avg_kg).filter((value): value is number => value != null),
+  );
 
   if (petsLoading) return <div className="loading-state">Loading…</div>;
   if (!selectedPetId) return <NoPetSelected />;
