@@ -91,6 +91,7 @@ impl PillShape {
 pub enum DoseFraction {
     Whole,
     Half,
+    Third,
     Quarter,
     ThreeQuarter,
     Eighth,
@@ -102,6 +103,7 @@ impl DoseFraction {
         match s {
             "whole" => Some(Self::Whole),
             "half" => Some(Self::Half),
+            "third" => Some(Self::Third),
             "quarter" => Some(Self::Quarter),
             "three_quarter" => Some(Self::ThreeQuarter),
             "eighth" => Some(Self::Eighth),
@@ -114,6 +116,7 @@ impl DoseFraction {
         match self {
             Self::Whole => "whole",
             Self::Half => "half",
+            Self::Third => "third",
             Self::Quarter => "quarter",
             Self::ThreeQuarter => "three_quarter",
             Self::Eighth => "eighth",
@@ -125,6 +128,7 @@ impl DoseFraction {
         match self {
             Self::Whole => "1",
             Self::Half => "½",
+            Self::Third => "⅓",
             Self::Quarter => "¼",
             Self::ThreeQuarter => "¾",
             Self::Eighth => "⅛",
@@ -136,6 +140,7 @@ impl DoseFraction {
         match self {
             Self::Whole => 1.0,
             Self::Half => 0.5,
+            Self::Third => 1.0 / 3.0,
             Self::Quarter => 0.25,
             Self::ThreeQuarter => 0.75,
             Self::Eighth => 0.125,
@@ -492,6 +497,7 @@ mod tests {
     #[test]
     fn dose_fraction_multiplier_values() {
         assert!((DoseFraction::Half.multiplier() - 0.5).abs() < f64::EPSILON);
+        assert!((DoseFraction::Third.multiplier() - (1.0 / 3.0)).abs() < f64::EPSILON);
         assert!((DoseFraction::ThreeQuarter.multiplier() - 0.75).abs() < f64::EPSILON);
     }
 

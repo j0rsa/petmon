@@ -1,7 +1,7 @@
 import type { DoseFraction, MedType, PillShape } from '../api/medications';
 
 export const DOSE_FRACTIONS: DoseFraction[] = [
-  'whole', 'half', 'quarter', 'three_quarter', 'eighth', 'sixteenth',
+  'whole', 'half', 'third', 'quarter', 'three_quarter', 'eighth', 'sixteenth',
 ];
 
 export const PILL_SHAPES: PillShape[] = [
@@ -27,6 +27,7 @@ export function doseFractionLabel(fraction: DoseFraction): string {
   switch (fraction) {
     case 'whole': return '1';
     case 'half': return '½';
+    case 'third': return '⅓';
     case 'quarter': return '¼';
     case 'three_quarter': return '¾';
     case 'eighth': return '⅛';
@@ -66,6 +67,7 @@ export function fractionAngle(fraction: DoseFraction): number {
   switch (fraction) {
     case 'whole': return 360;
     case 'half': return 180;
+    case 'third': return 120;
     case 'quarter': return 90;
     case 'three_quarter': return 270;
     case 'eighth': return 45;

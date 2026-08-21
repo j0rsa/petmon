@@ -121,6 +121,7 @@ function fractionHeightRatio(fraction: DoseFraction): number {
   switch (fraction) {
     case 'whole': return 1;
     case 'half': return 0.5;
+    case 'third': return 1 / 3;
     case 'quarter': return 0.25;
     case 'three_quarter': return 0.75;
     case 'eighth': return 0.125;
@@ -146,6 +147,7 @@ function quadrantRect(fraction: DoseFraction): { x: number; y: number; w: number
   switch (fraction) {
     case 'whole': return { x: 0, y: 0, w: 100, h: 100 };
     case 'half': return { x: 0, y: 0, w: 100, h: 50 };
+    case 'third': return { x: 0, y: 0, w: 100, h: 100 / 3 };
     case 'quarter': return { x: 0, y: 0, w: 50, h: 50 };
     case 'three_quarter': return { x: 0, y: 0, w: 100, h: 75 };
     case 'eighth': return { x: 0, y: 0, w: 50, h: 25 };

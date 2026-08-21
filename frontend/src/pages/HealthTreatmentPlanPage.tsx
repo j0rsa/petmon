@@ -63,6 +63,7 @@ export default function HealthTreatmentPlanPage() {
 
   const [reviseId, setReviseId] = useState<string | null>(null);
   const [reviseFrom, setReviseFrom] = useState(today);
+  const [reviseMedColor, setReviseMedColor] = useState('#6366f1');
   const [formulationLocked, setFormulationLocked] = useState(true);
 
   const medsQuery = useQuery({
@@ -98,12 +99,6 @@ export default function HealthTreatmentPlanPage() {
       setShowCreateMed(false);
       invalidate();
     },
-  });
-
-  const updateColorMutation = useMutation({
-    mutationFn: ({ id, color }: { id: string; color: string }) =>
-      medicationsApi.update(id, { color }),
-    onSuccess: invalidate,
   });
 
   function buildPlanBase() {
@@ -191,8 +186,16 @@ export default function HealthTreatmentPlanPage() {
   });
 
   const reviseMutation = useMutation({
-    mutationFn: (assignmentId: string) =>
-      medicationsApi.reviseAssignment(assignmentId, buildRevisePayload()),
+    mutationFn: async (assignmentId: string) => {
+      const assignment = await medicationsApi.reviseAssignment(assignmentId, buildRevisePayload());
+      if (planMedId) {
+        const current = (medsQuery.data ?? []).find((m) => m.id === planMedId);
+        if (current && current.color !== reviseMedColor) {
+          await medicationsApi.update(planMedId, { color: reviseMedColor });
+        }
+      }
+      return assignment;
+    },
     onSuccess: () => {
       resetPlanForm();
       invalidate();
@@ -232,6 +235,7 @@ export default function HealthTreatmentPlanPage() {
     const a = row.currentAssignment!;
     setReviseId(a.id);
     setPlanMedId(row.medication.id);
+    setReviseMedColor(row.medication.color);
     setReuseFormulationId(a.formulation_id);
     setFormulationLocked(true);
     setFormulation({
@@ -276,16 +280,12 @@ export default function HealthTreatmentPlanPage() {
           <h3 style={{ marginBottom: '0.75rem' }}>Register medication</h3>
           <div className="form-row" style={{ marginBottom: '0.75rem' }}>
             <label style={{ fontSize: '0.82rem' }}>Name</label>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-              <MedColorSwatch color={medColor} onChange={setMedColor} />
-              <input
-                type="text"
-                value={medName}
-                onChange={(e) => setMedName(e.target.value)}
-                placeholder="e.g. Prednisolone"
-                style={{ flex: 1 }}
-              />
-            </div>
+            <input
+              type="text"
+              value={medName}
+              onChange={(e) => setMedName(e.target.value)}
+              placeholder="e.g. Prednisolone"
+            />
           </div>
           <div style={{ display: 'flex', gap: '0.5rem', marginBottom: '0.75rem' }}>
             {(['pill', 'liquid'] as const).map((type) => (
@@ -311,6 +311,16 @@ export default function HealthTreatmentPlanPage() {
       {(planMedId || reviseId) && canWrite && planMed && (
         <section className="panel">
           <h3 style={{ marginBottom: '0.75rem' }}>{reviseId ? 'Revise assignment' : 'New treatment plan'}</h3>
+          {reviseId && (
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.55rem', marginBottom: '0.85rem' }}>
+              <MedColorSwatch
+                color={reviseMedColor}
+                onChange={setReviseMedColor}
+                title={`Change color for ${planMed.name}`}
+              />
+              <strong>{planMed.name}</strong>
+            </div>
+          )}
           {!reviseId && (
             <div className="form-row" style={{ marginBottom: '0.75rem' }}>
               <label style={{ fontSize: '0.82rem' }}>Medication</label>
@@ -338,7 +348,7 @@ export default function HealthTreatmentPlanPage() {
 
           {planMed.med_type === 'pill' ? (
             <FormulationPicker
-              color={planMed.color}
+              color={reviseId ? reviseMedColor : planMed.color}
               value={formulation}
               onChange={setFormulation}
               formulationLocked={reviseId ? formulationLocked : undefined}
@@ -430,17 +440,7 @@ export default function HealthTreatmentPlanPage() {
                   size={44}
                 />
                 <div style={{ flex: 1 }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.45rem' }}>
-                    {canWrite && (
-                      <MedColorSwatch
-                        color={row.medication.color}
-                        onChange={(color) => updateColorMutation.mutate({ id: row.medication.id, color })}
-                        size={18}
-                        title={`Change color for ${row.medication.name}`}
-                      />
-                    )}
-                    <strong>{row.medication.name}</strong>
-                  </div>
+                  <strong>{row.medication.name}</strong>
                   {row.currentAssignment ? (
                     <p className="muted-text" style={{ fontSize: '0.82rem', margin: '0.2rem 0 0' }}>
                       {row.currentAssignment.dose_label}

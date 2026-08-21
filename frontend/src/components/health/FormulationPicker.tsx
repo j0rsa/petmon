@@ -103,14 +103,20 @@ export function FormulationPicker({
         </div>
       </div>
       <div>
-        <label style={{ fontSize: '0.82rem', display: 'block', marginBottom: '0.35rem' }}>Dose per administration</label>
-        <div style={{ display: 'flex', gap: '0.4rem', flexWrap: 'wrap' }}>
+        <label style={{ fontSize: '0.82rem', display: 'block', marginBottom: '0.45rem' }}>Dose per administration</label>
+        <div style={{ display: 'flex', gap: '0.45rem', flexWrap: 'wrap' }}>
           {DOSE_FRACTIONS.map((fraction) => (
             <button
               key={fraction}
               type="button"
               className={`button${value.doseFraction === fraction ? '' : ' button-secondary'}`}
-              style={{ padding: '0.3rem 0.65rem', fontSize: '0.78rem', minWidth: '2.5rem' }}
+              style={{
+                padding: '0.45rem 0.85rem',
+                fontSize: '1.05rem',
+                fontWeight: 600,
+                minWidth: '2.85rem',
+                lineHeight: 1.1,
+              }}
               onClick={() => onChange({ ...value, doseFraction: fraction })}
             >
               {doseFractionLabel(fraction)}

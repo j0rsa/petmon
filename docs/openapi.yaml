@@ -4093,7 +4093,7 @@ components:
 
     DoseFraction:
       type: string
-      enum: [whole, half, quarter, three_quarter, eighth, sixteenth]
+      enum: [whole, half, third, quarter, three_quarter, eighth, sixteenth]
 
     MedFrequency:
       type: object

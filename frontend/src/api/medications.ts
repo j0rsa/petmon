@@ -16,7 +16,7 @@ export type PillShape =
   | 'trapezoid'
   | 'octagon'
   | 'diamond';
-export type DoseFraction = 'whole' | 'half' | 'quarter' | 'three_quarter' | 'eighth' | 'sixteenth';
+export type DoseFraction = 'whole' | 'half' | 'third' | 'quarter' | 'three_quarter' | 'eighth' | 'sixteenth';
 
 export interface MedFrequency {
   times: string[];
