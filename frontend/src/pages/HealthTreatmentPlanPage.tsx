@@ -412,8 +412,16 @@ export default function HealthTreatmentPlanPage() {
                 className="form-row"
                 style={reviseId && formulationLocked ? { opacity: 0.55, pointerEvents: 'none' } : undefined}
               >
-                <label style={{ fontSize: '0.82rem' }}>Concentration (mg/ml, optional)</label>
-                <input type="text" inputMode="decimal" value={liquidConcentration} onChange={(e) => setLiquidConcentration(e.target.value)} />
+                <label htmlFor="liquid-concentration" style={{ fontSize: '0.82rem' }}>
+                  Concentration (mg/ml, optional)
+                </label>
+                <input
+                  id="liquid-concentration"
+                  type="text"
+                  inputMode="decimal"
+                  value={liquidConcentration}
+                  onChange={(e) => setLiquidConcentration(e.target.value)}
+                />
               </div>
               <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', width: 'fit-content' }}>
                 <input
@@ -427,8 +435,14 @@ export default function HealthTreatmentPlanPage() {
                 </label>
               </div>
               {!planOptional && <div className="form-row">
-                <label style={{ fontSize: '0.82rem' }}>Dose (ml)</label>
-                <input type="text" inputMode="decimal" value={liquidDoseMl} onChange={(e) => setLiquidDoseMl(e.target.value)} />
+                <label htmlFor="liquid-dose" style={{ fontSize: '0.82rem' }}>Dose (ml)</label>
+                <input
+                  id="liquid-dose"
+                  type="text"
+                  inputMode="decimal"
+                  value={liquidDoseMl}
+                  onChange={(e) => setLiquidDoseMl(e.target.value)}
+                />
               </div>}
             </div>
           )}
