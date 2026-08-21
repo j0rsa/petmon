@@ -423,6 +423,16 @@ export default function HealthTreatmentPlanPage() {
                   onChange={(e) => setLiquidConcentration(e.target.value)}
                 />
               </div>
+              {!planOptional && <div className="form-row">
+                <label htmlFor="liquid-dose" style={{ fontSize: '0.82rem' }}>Dose (ml)</label>
+                <input
+                  id="liquid-dose"
+                  type="text"
+                  inputMode="decimal"
+                  value={liquidDoseMl}
+                  onChange={(e) => setLiquidDoseMl(e.target.value)}
+                />
+              </div>}
               <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', width: 'fit-content' }}>
                 <input
                   id="plan-optional-liquid"
@@ -434,16 +444,6 @@ export default function HealthTreatmentPlanPage() {
                   Optional medication (take as needed)
                 </label>
               </div>
-              {!planOptional && <div className="form-row">
-                <label htmlFor="liquid-dose" style={{ fontSize: '0.82rem' }}>Dose (ml)</label>
-                <input
-                  id="liquid-dose"
-                  type="text"
-                  inputMode="decimal"
-                  value={liquidDoseMl}
-                  onChange={(e) => setLiquidDoseMl(e.target.value)}
-                />
-              </div>}
             </div>
           )}
 

@@ -83,10 +83,10 @@ export const LiquidFieldOrder: Story = {
     const optional = canvas.getByLabelText('Optional medication (take as needed)');
     const dose = canvas.getByLabelText('Dose (ml)');
     await expect(
-      concentration.compareDocumentPosition(optional) & Node.DOCUMENT_POSITION_FOLLOWING,
+      concentration.compareDocumentPosition(dose) & Node.DOCUMENT_POSITION_FOLLOWING,
     ).toBeTruthy();
     await expect(
-      optional.compareDocumentPosition(dose) & Node.DOCUMENT_POSITION_FOLLOWING,
+      dose.compareDocumentPosition(optional) & Node.DOCUMENT_POSITION_FOLLOWING,
     ).toBeTruthy();
   },
 };
