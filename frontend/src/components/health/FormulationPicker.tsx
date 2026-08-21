@@ -100,7 +100,13 @@ export function FormulationPicker({
               title={pillShapeLabel(shape)}
               className={`button${value.pillShape === shape ? '' : ' button-secondary'}`}
               style={{ padding: '0.25rem', minHeight: '2.6rem', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
-              onClick={() => onChange({ ...value, pillShape: shape })}
+              onClick={() => {
+                const fractions = supportedDoseFractions(shape);
+                const doseFraction = isDoseSupported(shape, value.doseFraction)
+                  ? value.doseFraction
+                  : (fractions.includes('half') ? 'half' : fractions[fractions.length - 1]!);
+                onChange({ ...value, pillShape: shape, doseFraction });
+              }}
             >
               <PillDoseIcon
                 color={color}

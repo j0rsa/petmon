@@ -1,23 +1,24 @@
 import type { DoseFraction, PillShape } from '../api/medications';
-import { doseFractionLabel } from './medications';
+import { doseFractionLabel, fractionAngle } from './medications';
 
 export type ScorePattern = 'vertical' | 'horizontal' | 'cross' | 'none';
+export type HalfSplit = 'left' | 'top';
 
 export interface PillShapeGeometry {
   id: PillShape;
   label: string;
   outline: string;
   scorePattern: ScorePattern;
-  /** Score lines drawn on the pill (may be empty). */
   scoreLines: string;
+  /** How a ½ dose is taken when score lines define a bisection. */
+  halfSplit: HalfSplit;
   supportedFractions: readonly DoseFraction[];
 }
 
-/**
- * Pill outlines and score patterns follow the reference chart.
- * Dose regions are derived from score lines — never proportional slices
- * unless the score grid clearly defines the piece.
- */
+/** Upright oval (taller than wide) — ½ is the top half. */
+const OVAL_UPRIGHT =
+  'M 50 14 A 20 36 0 1 1 49.9 14 A 20 36 0 1 1 50 14 Z';
+
 export const PILL_SHAPE_GEOMETRY: PillShapeGeometry[] = [
   {
     id: 'freedom',
@@ -25,15 +26,17 @@ export const PILL_SHAPE_GEOMETRY: PillShapeGeometry[] = [
     outline: 'M 20 50 C 20 32 36 28 50 50 C 64 28 80 32 80 50 C 80 68 64 72 50 50 C 36 72 20 68 20 50 Z',
     scorePattern: 'vertical',
     scoreLines: 'M 50 28 L 50 72',
-    supportedFractions: ['whole', 'half'],
+    halfSplit: 'left',
+    supportedFractions: ['whole', 'half', 'third'],
   },
   {
     id: 'oval',
     label: 'Oval',
-    outline: 'M 14 50 A 36 20 0 1 1 86 50 A 36 20 0 1 1 14 50 Z',
-    scorePattern: 'vertical',
-    scoreLines: 'M 50 30 L 50 70',
-    supportedFractions: ['whole', 'half'],
+    outline: OVAL_UPRIGHT,
+    scorePattern: 'horizontal',
+    scoreLines: 'M 14 50 L 86 50',
+    halfSplit: 'top',
+    supportedFractions: ['whole', 'half', 'third'],
   },
   {
     id: 'square',
@@ -41,7 +44,8 @@ export const PILL_SHAPE_GEOMETRY: PillShapeGeometry[] = [
     outline: 'M 28 24 H 72 A 8 8 0 0 1 80 32 V 68 A 8 8 0 0 1 72 76 H 28 A 8 8 0 0 1 20 68 V 32 A 8 8 0 0 1 28 24 Z',
     scorePattern: 'cross',
     scoreLines: 'M 50 24 L 50 76 M 20 50 L 80 50',
-    supportedFractions: ['whole', 'half', 'quarter', 'three_quarter', 'eighth', 'sixteenth'],
+    halfSplit: 'left',
+    supportedFractions: ['whole', 'half', 'third', 'quarter', 'three_quarter', 'eighth', 'sixteenth'],
   },
   {
     id: 'capsule',
@@ -49,6 +53,7 @@ export const PILL_SHAPE_GEOMETRY: PillShapeGeometry[] = [
     outline: 'M 38 22 H 62 A 18 18 0 0 1 62 78 H 38 A 18 18 0 0 1 38 22 Z',
     scorePattern: 'none',
     scoreLines: '',
+    halfSplit: 'left',
     supportedFractions: ['whole'],
   },
   {
@@ -57,7 +62,8 @@ export const PILL_SHAPE_GEOMETRY: PillShapeGeometry[] = [
     outline: 'M 50 18 L 78 38 L 68 78 L 32 78 L 22 38 Z',
     scorePattern: 'vertical',
     scoreLines: 'M 50 18 L 50 78',
-    supportedFractions: ['whole', 'half'],
+    halfSplit: 'left',
+    supportedFractions: ['whole', 'half', 'third'],
   },
   {
     id: 'tear',
@@ -65,6 +71,7 @@ export const PILL_SHAPE_GEOMETRY: PillShapeGeometry[] = [
     outline: 'M 50 18 C 68 34 72 58 50 82 C 28 58 32 34 50 18 Z',
     scorePattern: 'none',
     scoreLines: '',
+    halfSplit: 'left',
     supportedFractions: ['whole'],
   },
   {
@@ -73,7 +80,8 @@ export const PILL_SHAPE_GEOMETRY: PillShapeGeometry[] = [
     outline: 'M 22 30 H 78 A 6 6 0 0 1 84 36 V 64 A 6 6 0 0 1 78 70 H 22 A 6 6 0 0 1 16 64 V 36 A 6 6 0 0 1 22 30 Z',
     scorePattern: 'vertical',
     scoreLines: 'M 50 30 L 50 70',
-    supportedFractions: ['whole', 'half'],
+    halfSplit: 'left',
+    supportedFractions: ['whole', 'half', 'third'],
   },
   {
     id: 'hexagon',
@@ -81,7 +89,8 @@ export const PILL_SHAPE_GEOMETRY: PillShapeGeometry[] = [
     outline: 'M 50 18 L 76 34 L 76 66 L 50 82 L 24 66 L 24 34 Z',
     scorePattern: 'vertical',
     scoreLines: 'M 50 18 L 50 82',
-    supportedFractions: ['whole', 'half'],
+    halfSplit: 'left',
+    supportedFractions: ['whole', 'half', 'third'],
   },
   {
     id: 'round',
@@ -89,7 +98,8 @@ export const PILL_SHAPE_GEOMETRY: PillShapeGeometry[] = [
     outline: 'M 50 18 A 32 32 0 1 1 49.9 18 Z',
     scorePattern: 'cross',
     scoreLines: 'M 50 18 L 50 82 M 18 50 L 82 50',
-    supportedFractions: ['whole', 'half', 'quarter', 'three_quarter'],
+    halfSplit: 'left',
+    supportedFractions: ['whole', 'half', 'third', 'quarter', 'three_quarter', 'eighth', 'sixteenth'],
   },
   {
     id: 'triangle',
@@ -97,7 +107,8 @@ export const PILL_SHAPE_GEOMETRY: PillShapeGeometry[] = [
     outline: 'M 50 20 L 78 78 H 22 Z',
     scorePattern: 'vertical',
     scoreLines: 'M 50 20 L 50 78',
-    supportedFractions: ['whole', 'half'],
+    halfSplit: 'left',
+    supportedFractions: ['whole', 'half', 'third'],
   },
   {
     id: 'double_circle',
@@ -105,7 +116,8 @@ export const PILL_SHAPE_GEOMETRY: PillShapeGeometry[] = [
     outline: 'M 34 50 A 16 16 0 1 1 34 49.9 L 66 49.9 A 16 16 0 1 1 66 50 Z',
     scorePattern: 'horizontal',
     scoreLines: 'M 18 50 L 82 50',
-    supportedFractions: ['whole', 'half'],
+    halfSplit: 'top',
+    supportedFractions: ['whole', 'half', 'third', 'quarter', 'three_quarter'],
   },
   {
     id: 'trapezoid',
@@ -113,8 +125,8 @@ export const PILL_SHAPE_GEOMETRY: PillShapeGeometry[] = [
     outline: 'M 30 28 H 70 L 78 72 H 22 Z',
     scorePattern: 'vertical',
     scoreLines: 'M 50 28 L 50 72',
-    // Thirds need the triangular score pattern from the chart — undefined for now.
-    supportedFractions: ['whole', 'half'],
+    halfSplit: 'left',
+    supportedFractions: ['whole', 'half', 'third'],
   },
   {
     id: 'octagon',
@@ -122,7 +134,8 @@ export const PILL_SHAPE_GEOMETRY: PillShapeGeometry[] = [
     outline: 'M 34 18 H 66 L 82 34 V 66 L 66 82 H 34 L 18 66 V 34 Z',
     scorePattern: 'vertical',
     scoreLines: 'M 50 18 L 50 82',
-    supportedFractions: ['whole', 'half'],
+    halfSplit: 'left',
+    supportedFractions: ['whole', 'half', 'third'],
   },
   {
     id: 'diamond',
@@ -130,7 +143,8 @@ export const PILL_SHAPE_GEOMETRY: PillShapeGeometry[] = [
     outline: 'M 50 18 L 78 50 L 50 82 L 22 50 Z',
     scorePattern: 'cross',
     scoreLines: 'M 50 18 L 50 82 M 22 50 L 78 50',
-    supportedFractions: ['whole', 'half', 'quarter', 'three_quarter'],
+    halfSplit: 'left',
+    supportedFractions: ['whole', 'half', 'third', 'quarter', 'three_quarter', 'eighth', 'sixteenth'],
   },
 ];
 
@@ -147,45 +161,75 @@ export function supportedDoseFractions(shape: PillShape): DoseFraction[] {
   return [...pillShapeGeometry(shape).supportedFractions];
 }
 
-/** Rectangular dose piece before clipping to pill outline (viewBox 0 0 100 100). */
-function doseRect(fraction: DoseFraction, pattern: ScorePattern): { x: number; y: number; w: number; h: number } | null {
-  if (fraction === 'whole') {
-    return { x: 0, y: 0, w: 100, h: 100 };
-  }
+function rectPath(x: number, y: number, w: number, h: number): string {
+  return `M ${x} ${y} H ${x + w} V ${y + h} H ${x} Z`;
+}
 
-  if (pattern === 'vertical') {
-    if (fraction === 'half') return { x: 0, y: 0, w: 50, h: 100 };
-    return null;
-  }
+function proportionalTopPath(ratio: number): string {
+  return rectPath(0, 0, 100, 100 * ratio);
+}
 
-  if (pattern === 'horizontal') {
-    if (fraction === 'half') return { x: 0, y: 0, w: 100, h: 50 };
-    return null;
+function radialWedgePath(cx: number, cy: number, r: number, angleDeg: number): string {
+  if (angleDeg >= 360) {
+    return `M ${cx - r} ${cy} A ${r} ${r} 0 1 1 ${cx + r} ${cy} A ${r} ${r} 0 1 1 ${cx - r} ${cy} Z`;
   }
+  const start = -Math.PI / 2;
+  const end = start + (angleDeg * Math.PI) / 180;
+  const x1 = cx + r * Math.cos(start);
+  const y1 = cy + r * Math.sin(start);
+  const x2 = cx + r * Math.cos(end);
+  const y2 = cy + r * Math.sin(end);
+  const largeArc = angleDeg > 180 ? 1 : 0;
+  return `M ${cx} ${cy} L ${x1} ${y1} A ${r} ${r} 0 ${largeArc} 1 ${x2} ${y2} Z`;
+}
 
-  if (pattern === 'cross') {
-    switch (fraction) {
-      case 'half':
-        return { x: 0, y: 0, w: 50, h: 100 };
-      case 'quarter':
-        return { x: 0, y: 0, w: 50, h: 50 };
-      case 'three_quarter':
-        return { x: 0, y: 0, w: 100, h: 100 }; // handled as compound below
-      case 'eighth':
-        return { x: 0, y: 0, w: 50, h: 25 };
-      case 'sixteenth':
-        return { x: 0, y: 0, w: 25, h: 25 };
-      default:
-        return null;
-    }
+function crossGridPath(fraction: DoseFraction): string | null {
+  switch (fraction) {
+    case 'half':
+      return rectPath(0, 0, 50, 100);
+    case 'quarter':
+      return rectPath(0, 0, 50, 50);
+    case 'three_quarter':
+      return 'M 0 0 H 100 V 50 H 50 V 100 H 0 Z';
+    case 'eighth':
+      return rectPath(0, 0, 50, 25);
+    case 'sixteenth':
+      return rectPath(0, 0, 25, 25);
+    default:
+      return null;
   }
+}
 
-  return null;
+function halfPath(geo: PillShapeGeometry): string {
+  if (geo.halfSplit === 'top') {
+    return rectPath(0, 0, 100, 50);
+  }
+  return rectPath(0, 0, 50, 100);
+}
+
+function doubleCirclePath(fraction: DoseFraction): string | null {
+  switch (fraction) {
+    case 'half':
+      // One full lobe (top).
+      return rectPath(0, 0, 100, 50);
+    case 'quarter':
+      // Half of one lobe.
+      return rectPath(0, 0, 100, 25);
+    case 'three_quarter':
+      // Full lobe + half of the other.
+      return 'M 0 0 H 100 V 75 H 0 Z';
+    default:
+      return null;
+  }
+}
+
+function usesRadialEighth(shape: PillShape, fraction: DoseFraction): boolean {
+  return (shape === 'round' || shape === 'diamond')
+    && (fraction === 'eighth' || fraction === 'sixteenth');
 }
 
 /**
- * SVG path for the dose region clipped conceptually to the pill.
- * Returns null when the shape/fraction combination is not defined.
+ * SVG path for the dose region, clipped to the pill outline by the renderer.
  */
 export function doseRegionPath(shape: PillShape, fraction: DoseFraction): string | null {
   const geo = pillShapeGeometry(shape);
@@ -197,16 +241,27 @@ export function doseRegionPath(shape: PillShape, fraction: DoseFraction): string
     return geo.outline;
   }
 
-  if (geo.scorePattern === 'cross' && fraction === 'three_quarter') {
-    // All quadrants except bottom-right.
-    return 'M 0 0 H 100 V 50 H 50 V 100 H 0 Z';
+  if (fraction === 'third') {
+    return proportionalTopPath(1 / 3);
   }
 
-  const rect = doseRect(fraction, geo.scorePattern);
-  if (!rect) return null;
+  if (usesRadialEighth(shape, fraction)) {
+    return radialWedgePath(50, 50, 55, fractionAngle(fraction));
+  }
 
-  const { x, y, w, h } = rect;
-  return `M ${x} ${y} H ${x + w} V ${y + h} H ${x} Z`;
+  if (shape === 'double_circle') {
+    return doubleCirclePath(fraction);
+  }
+
+  if (geo.scorePattern === 'cross') {
+    return crossGridPath(fraction);
+  }
+
+  if (fraction === 'half') {
+    return halfPath(geo);
+  }
+
+  return null;
 }
 
 export function doseRegionElement(
@@ -222,5 +277,8 @@ export function pillDosePreviewHint(shape: PillShape, fraction: DoseFraction): s
   if (isDoseSupported(shape, fraction)) return null;
   if (fraction === 'whole') return null;
   const label = pillShapeGeometry(shape).label;
-  return `${doseFractionLabel(fraction)} is not defined for ${label} — specify cut pattern or choose another dose.`;
+  if (shape === 'capsule' || shape === 'tear') {
+    return `${label} is always taken whole.`;
+  }
+  return `${doseFractionLabel(fraction)} is not defined for ${label}.`;
 }
