@@ -3,6 +3,7 @@ import {
   doseRegionElement,
   isDoseSupported,
   pillShapeGeometry,
+  scoreLinesForDose,
 } from '../../lib/pillDoseCuts';
 import { doseFractionLabel } from '../../lib/medications';
 
@@ -28,6 +29,7 @@ export function PillDoseIcon({
   const stroke = 'color-mix(in srgb, var(--text-strong) 35%, transparent)';
   const supported = isDoseSupported(shape, fraction);
   const dose = doseRegionElement(shape, fraction);
+  const scoreLines = scoreLinesForDose(shape, fraction);
   const clipOutlineId = `pill-outline-${shape}-${size}`;
   const clipDoseId = `pill-dose-${shape}-${fraction}-${size}`;
 
@@ -50,8 +52,8 @@ export function PillDoseIcon({
         )}
       </g>
       <path d={geo.outline} fill="none" stroke={stroke} strokeWidth={1.4} />
-      {geo.scoreLines && (
-        <path d={geo.scoreLines} fill="none" stroke={stroke} strokeWidth={1.2} />
+      {scoreLines && (
+        <path d={scoreLines} fill="none" stroke={stroke} strokeWidth={1.2} />
       )}
     </svg>
   );

@@ -140,9 +140,9 @@ export const PILL_SHAPE_GEOMETRY: PillShapeGeometry[] = [
     id: 'trapezoid',
     label: 'Trapezoid',
     outline: 'M 30 28 H 70 L 78 72 H 22 Z',
-    scorePattern: 'horizontal',
-    scoreLines: 'M 26 50 L 74 50',
-    halfSplit: 'top',
+    scorePattern: 'vertical',
+    scoreLines: 'M 50 28 L 50 72',
+    halfSplit: 'left',
     supportedFractions: ['whole', 'half', 'third'],
   },
   {
@@ -176,6 +176,14 @@ export function isDoseSupported(shape: PillShape, fraction: DoseFraction): boole
 
 export function supportedDoseFractions(shape: PillShape): DoseFraction[] {
   return [...pillShapeGeometry(shape).supportedFractions];
+}
+
+export function scoreLinesForDose(shape: PillShape, fraction: DoseFraction): string {
+  if (shape === 'trapezoid' && fraction === 'third') {
+    // Three triangles meeting at the midpoint of the wider base.
+    return 'M 30 28 L 50 72 M 70 28 L 50 72';
+  }
+  return pillShapeGeometry(shape).scoreLines;
 }
 
 function rectPath(x: number, y: number, w: number, h: number): string {
@@ -256,6 +264,11 @@ export function doseRegionPath(shape: PillShape, fraction: DoseFraction): string
 
   if (fraction === 'whole') {
     return geo.outline;
+  }
+
+  if (shape === 'trapezoid' && fraction === 'third') {
+    // Left of the three triangular pieces.
+    return 'M 22 72 L 30 28 L 50 72 Z';
   }
 
   if (fraction === 'third') {
