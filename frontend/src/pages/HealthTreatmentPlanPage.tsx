@@ -24,6 +24,7 @@ import {
   formatFrequency,
   formulationLabel,
   randomMedColor,
+  savePlanWithMedicationColor,
 } from '../lib/medications';
 import { parseDecimal } from '../lib/numbers';
 import {
@@ -73,7 +74,7 @@ export default function HealthTreatmentPlanPage() {
 
   const [reviseId, setReviseId] = useState<string | null>(null);
   const [reviseFrom, setReviseFrom] = useState(today);
-  const [reviseMedColor, setReviseMedColor] = useState('#6366f1');
+  const [planMedColor, setPlanMedColor] = useState('#6366f1');
   const [formulationLocked, setFormulationLocked] = useState(true);
 
   const medsQuery = useQuery({
@@ -188,28 +189,37 @@ export default function HealthTreatmentPlanPage() {
   }
 
   const createPlanMutation = useMutation({
-    mutationFn: () => medicationsApi.createAssignment(buildCreatePayload()),
+    mutationFn: () => {
+      const current = (medsQuery.data ?? []).find((m) => m.id === planMedId)!;
+      return savePlanWithMedicationColor({
+        currentColor: current.color,
+        selectedColor: planMedColor,
+        saveColor: () => medicationsApi.update(current.id, { color: planMedColor }),
+        savePlan: () => medicationsApi.createAssignment(buildCreatePayload()),
+      });
+    },
     onSuccess: () => {
       resetPlanForm();
       invalidate();
     },
+    onError: () => queryClient.invalidateQueries({ queryKey: ['medications'] }),
   });
 
   const reviseMutation = useMutation({
-    mutationFn: async (assignmentId: string) => {
-      const assignment = await medicationsApi.reviseAssignment(assignmentId, buildRevisePayload());
-      if (planMedId) {
-        const current = (medsQuery.data ?? []).find((m) => m.id === planMedId);
-        if (current && current.color !== reviseMedColor) {
-          await medicationsApi.update(planMedId, { color: reviseMedColor });
-        }
-      }
-      return assignment;
+    mutationFn: (assignmentId: string) => {
+      const current = (medsQuery.data ?? []).find((m) => m.id === planMedId)!;
+      return savePlanWithMedicationColor({
+        currentColor: current.color,
+        selectedColor: planMedColor,
+        saveColor: () => medicationsApi.update(current.id, { color: planMedColor }),
+        savePlan: () => medicationsApi.reviseAssignment(assignmentId, buildRevisePayload()),
+      });
     },
     onSuccess: () => {
       resetPlanForm();
       invalidate();
     },
+    onError: () => queryClient.invalidateQueries({ queryKey: ['medications'] }),
   });
 
   const deleteMedMutation = useMutation({
@@ -218,6 +228,8 @@ export default function HealthTreatmentPlanPage() {
   });
 
   function resetPlanForm() {
+    createPlanMutation.reset();
+    reviseMutation.reset();
     setPlanMedId(null);
     setReviseId(null);
     setReuseFormulationId(null);
@@ -229,6 +241,7 @@ export default function HealthTreatmentPlanPage() {
     setPlanFrom(today);
     setPlanTo('');
     setPlanOptional(false);
+    setPlanMedColor('#6366f1');
   }
 
   const planRows = useMemo(
@@ -242,10 +255,12 @@ export default function HealthTreatmentPlanPage() {
   const planMed = (medsQuery.data ?? []).find((m) => m.id === planMedId);
 
   function startRevise(row: MedPlanRow) {
+    createPlanMutation.reset();
+    reviseMutation.reset();
     const a = row.currentAssignment!;
     setReviseId(a.id);
     setPlanMedId(row.medication.id);
-    setReviseMedColor(row.medication.color);
+    setPlanMedColor(row.medication.color);
     setReuseFormulationId(a.formulation_id);
     setFormulationLocked(true);
     setFormulation({
@@ -277,6 +292,7 @@ export default function HealthTreatmentPlanPage() {
             type="button"
             className="button"
             onClick={() => {
+              createMedMutation.reset();
               setMedColor(randomMedColor());
               setShowCreateMed(true);
             }}
@@ -314,28 +330,39 @@ export default function HealthTreatmentPlanPage() {
             <button type="button" className="button" disabled={!medName.trim() || createMedMutation.isPending} onClick={() => createMedMutation.mutate()}>
               {createMedMutation.isPending ? 'Saving…' : 'Save medication'}
             </button>
-            <button type="button" className="button button-secondary" onClick={() => setShowCreateMed(false)}>Cancel</button>
+            <button type="button" className="button button-secondary" onClick={() => { createMedMutation.reset(); setShowCreateMed(false); }}>Cancel</button>
           </div>
+          {createMedMutation.isError && (
+            <div className="error-state" role="alert" style={{ marginTop: '0.75rem' }}>
+              Medication could not be saved. Check the details and try again.
+            </div>
+          )}
         </section>
       )}
 
       {(planMedId || reviseId) && canWrite && planMed && (
         <section className="panel">
           <h3 style={{ marginBottom: '0.75rem' }}>{reviseId ? 'Revise assignment' : 'New treatment plan'}</h3>
-          {reviseId && (
-            <div style={{ display: 'flex', alignItems: 'center', gap: '0.55rem', marginBottom: '0.85rem' }}>
-              <MedColorSwatch
-                color={reviseMedColor}
-                onChange={setReviseMedColor}
-                title={`Change color for ${planMed.name}`}
-              />
-              <strong>{planMed.name}</strong>
-            </div>
-          )}
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.55rem', marginBottom: '0.85rem' }}>
+            <MedColorSwatch
+              color={planMedColor}
+              onChange={setPlanMedColor}
+              title={`Change color for ${planMed.name}`}
+            />
+            <strong>{planMed.name}</strong>
+          </div>
           {!reviseId && (
             <div className="form-row" style={{ marginBottom: '0.75rem' }}>
               <label style={{ fontSize: '0.82rem' }}>Medication</label>
-              <select value={planMedId ?? ''} onChange={(e) => setPlanMedId(e.target.value || null)}>
+              <select
+                value={planMedId ?? ''}
+                onChange={(e) => {
+                  const id = e.target.value || null;
+                  setPlanMedId(id);
+                  const medication = (medsQuery.data ?? []).find((m) => m.id === id);
+                  if (medication) setPlanMedColor(medication.color);
+                }}
+              >
                 <option value="">Select…</option>
                 {(medsQuery.data ?? []).map((m) => (
                   <option key={m.id} value={m.id}>{m.name}</option>
@@ -359,7 +386,7 @@ export default function HealthTreatmentPlanPage() {
 
           {planMed.med_type === 'pill' ? (
             <FormulationPicker
-              color={reviseId ? reviseMedColor : planMed.color}
+              color={planMedColor}
               value={formulation}
               onChange={setFormulation}
               formulationLocked={reviseId ? formulationLocked : undefined}
@@ -431,6 +458,12 @@ export default function HealthTreatmentPlanPage() {
             </button>
             <button type="button" className="button button-secondary" onClick={resetPlanForm}>Cancel</button>
           </div>
+          {(createPlanMutation.isError || reviseMutation.isError) && (
+            <div className="error-state" role="alert" style={{ marginTop: '0.75rem' }}>
+              Medication color and treatment plan could not both be saved. Any successful color
+              change remains saved; check the effective date and dose, then try the plan again.
+            </div>
+          )}
         </section>
       )}
 
@@ -497,7 +530,7 @@ export default function HealthTreatmentPlanPage() {
                 {canWrite && (
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '0.35rem' }}>
                     {!row.currentAssignment && (
-                      <button type="button" className="button" style={{ padding: '0.25rem 0.6rem', fontSize: '0.78rem' }} onClick={() => { resetPlanForm(); setPlanMedId(row.medication.id); }}>
+                      <button type="button" className="button" style={{ padding: '0.25rem 0.6rem', fontSize: '0.78rem' }} onClick={() => { resetPlanForm(); setPlanMedId(row.medication.id); setPlanMedColor(row.medication.color); }}>
                         Add plan
                       </button>
                     )}
