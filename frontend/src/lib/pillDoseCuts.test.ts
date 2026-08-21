@@ -1,5 +1,11 @@
 import { describe, expect, it } from 'vitest';
-import { doseRegionPath, isDoseSupported, pillShapeGeometry, PILL_SHAPE_GEOMETRY } from './pillDoseCuts';
+import {
+  doseRegionPath,
+  isDoseSupported,
+  pillShapeGeometry,
+  PILL_SHAPE_GEOMETRY,
+  scoreLinesForDose,
+} from './pillDoseCuts';
 
 describe('pillDoseCuts', () => {
   it('capsule and tear are whole only', () => {
@@ -16,12 +22,19 @@ describe('pillDoseCuts', () => {
     expect(tear.outline).toContain('C 82 30 90 39 90 50');
   });
 
-  it('cuts Trapezoid horizontally into top and bottom halves', () => {
+  it('cuts Trapezoid vertically into left and right halves', () => {
     const trapezoid = pillShapeGeometry('trapezoid');
-    expect(trapezoid.scorePattern).toBe('horizontal');
-    expect(trapezoid.halfSplit).toBe('top');
-    expect(trapezoid.scoreLines).toBe('M 26 50 L 74 50');
-    expect(doseRegionPath('trapezoid', 'half')).toBe('M 0 0 H 100 V 50 H 0 Z');
+    expect(trapezoid.scorePattern).toBe('vertical');
+    expect(trapezoid.halfSplit).toBe('left');
+    expect(scoreLinesForDose('trapezoid', 'half')).toBe('M 50 28 L 50 72');
+    expect(doseRegionPath('trapezoid', 'half')).toBe('M 0 0 H 50 V 100 H 0 Z');
+  });
+
+  it('cuts Trapezoid into three triangular thirds', () => {
+    expect(scoreLinesForDose('trapezoid', 'third'))
+      .toBe('M 30 28 L 50 72 M 70 28 L 50 72');
+    expect(doseRegionPath('trapezoid', 'third'))
+      .toBe('M 22 72 L 30 28 L 50 72 Z');
   });
 
   it('both horizontal Oval variants use square-like cross cuts', () => {
