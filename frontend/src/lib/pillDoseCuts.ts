@@ -15,9 +15,13 @@ export interface PillShapeGeometry {
   supportedFractions: readonly DoseFraction[];
 }
 
-/** Upright, tapered oval with pointed ends — ½ is the top half. */
+/** Horizontal almond-like oval with pointed left/right ends. */
 const POINTED_OVAL =
-  'M 50 12 C 66 25 72 38 72 50 C 72 62 66 75 50 88 C 34 75 28 62 28 50 C 28 38 34 25 50 12 Z';
+  'M 10 50 C 23 34 36 28 50 28 C 64 28 77 34 90 50 C 77 66 64 72 50 72 C 36 72 23 66 10 50 Z';
+
+/** Horizontal oblong with flat sides and strongly filleted corners. */
+const ROUNDED_OVAL =
+  'M 24 28 H 76 Q 90 28 90 42 V 58 Q 90 72 76 72 H 24 Q 10 72 10 58 V 42 Q 10 28 24 28 Z';
 
 /** Two vertically stacked lobes joined directly at a narrow waist. */
 const CONNECTED_DOUBLE_CIRCLE =
@@ -37,19 +41,19 @@ export const PILL_SHAPE_GEOMETRY: PillShapeGeometry[] = [
     id: 'oval',
     label: 'Oval · pointed',
     outline: POINTED_OVAL,
-    scorePattern: 'horizontal',
-    scoreLines: 'M 28 50 L 72 50',
-    halfSplit: 'top',
-    supportedFractions: ['whole', 'half', 'third'],
+    scorePattern: 'cross',
+    scoreLines: 'M 50 28 L 50 72 M 10 50 L 90 50',
+    halfSplit: 'left',
+    supportedFractions: ['whole', 'half', 'third', 'quarter', 'three_quarter', 'eighth', 'sixteenth'],
   },
   {
     id: 'oval_rounded',
     label: 'Oval · rounded',
-    outline: 'M 36 14 H 64 Q 78 14 78 28 V 72 Q 78 86 64 86 H 36 Q 22 86 22 72 V 28 Q 22 14 36 14 Z',
-    scorePattern: 'horizontal',
-    scoreLines: 'M 22 50 L 78 50',
-    halfSplit: 'top',
-    supportedFractions: ['whole', 'half', 'third'],
+    outline: ROUNDED_OVAL,
+    scorePattern: 'cross',
+    scoreLines: 'M 50 28 L 50 72 M 10 50 L 90 50',
+    halfSplit: 'left',
+    supportedFractions: ['whole', 'half', 'third', 'quarter', 'three_quarter', 'eighth', 'sixteenth'],
   },
   {
     id: 'square',
@@ -128,7 +132,7 @@ export const PILL_SHAPE_GEOMETRY: PillShapeGeometry[] = [
     label: 'Double circle',
     outline: CONNECTED_DOUBLE_CIRCLE,
     scorePattern: 'horizontal',
-    scoreLines: 'M 36 50 L 64 50',
+    scoreLines: 'M 36 50 L 64 50 M 50 14 L 50 86',
     halfSplit: 'top',
     supportedFractions: ['whole', 'half', 'third', 'quarter', 'three_quarter'],
   },
@@ -226,11 +230,11 @@ function doubleCirclePath(fraction: DoseFraction): string | null {
       // One full lobe (top).
       return rectPath(0, 0, 100, 50);
     case 'quarter':
-      // Half of one lobe.
-      return rectPath(0, 0, 100, 25);
+      // Half of the top lobe: horizontal split between lobes, then vertical.
+      return rectPath(0, 0, 50, 50);
     case 'three_quarter':
-      // Full lobe + half of the other.
-      return 'M 0 0 H 100 V 75 H 0 Z';
+      // Full top lobe + half of the lower lobe.
+      return 'M 0 0 H 100 V 50 H 50 V 100 H 0 Z';
     default:
       return null;
   }

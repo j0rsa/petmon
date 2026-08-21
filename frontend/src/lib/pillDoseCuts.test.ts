@@ -10,17 +10,21 @@ describe('pillDoseCuts', () => {
     }
   });
 
-  it('oval half is top half (upright)', () => {
-    expect(pillShapeGeometry('oval').halfSplit).toBe('top');
-    expect(pillShapeGeometry('oval').outline).not.toContain(' A ');
-    expect(doseRegionPath('oval', 'half')).toBe('M 0 0 H 100 V 50 H 0 Z');
+  it('both horizontal Oval variants use square-like cross cuts', () => {
+    for (const shape of ['oval', 'oval_rounded'] as const) {
+      expect(pillShapeGeometry(shape).scorePattern).toBe('cross');
+      expect(pillShapeGeometry(shape).halfSplit).toBe('left');
+      expect(isDoseSupported(shape, 'quarter')).toBe(true);
+      expect(doseRegionPath(shape, 'half')).toBe('M 0 0 H 50 V 100 H 0 Z');
+      expect(doseRegionPath(shape, 'quarter')).toBe('M 0 0 H 50 V 50 H 0 Z');
+    }
   });
 
   it('models both visual variants of the Oval category', () => {
     expect(pillShapeGeometry('oval').label).toBe('Oval · pointed');
-    expect(pillShapeGeometry('oval').outline).toContain('M 50 12');
+    expect(pillShapeGeometry('oval').outline).toContain('M 10 50');
     expect(pillShapeGeometry('oval_rounded').label).toBe('Oval · rounded');
-    expect(pillShapeGeometry('oval_rounded').outline).toContain('Q 78 14 78 28');
+    expect(pillShapeGeometry('oval_rounded').outline).toContain('M 24 28 H 76');
     expect(pillShapeGeometry('rectangle').label).toBe('Rectangle');
   });
 
@@ -43,9 +47,9 @@ describe('pillDoseCuts', () => {
   it('double circle quarter and three_quarter follow lobe rules', () => {
     const geometry = pillShapeGeometry('double_circle');
     expect(geometry.outline).not.toContain(' L 66');
-    expect(geometry.scoreLines).toBe('M 36 50 L 64 50');
-    expect(doseRegionPath('double_circle', 'quarter')).toBe('M 0 0 H 100 V 25 H 0 Z');
-    expect(doseRegionPath('double_circle', 'three_quarter')).toBe('M 0 0 H 100 V 75 H 0 Z');
+    expect(geometry.scoreLines).toBe('M 36 50 L 64 50 M 50 14 L 50 86');
+    expect(doseRegionPath('double_circle', 'quarter')).toBe('M 0 0 H 50 V 50 H 0 Z');
+    expect(doseRegionPath('double_circle', 'three_quarter')).toBe('M 0 0 H 100 V 50 H 50 V 100 H 0 Z');
   });
 
   it('every shape has a label', () => {
