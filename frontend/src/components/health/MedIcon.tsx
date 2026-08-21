@@ -1,5 +1,5 @@
 import type { MedType, DoseFraction, PillShape } from '../../api/medications';
-import { pillFractionFill, pillShapeDef } from '../../lib/pillShapes';
+import { PillDoseIcon } from './PillDoseIcon';
 
 export interface MedIconProps {
   medType: MedType;
@@ -7,6 +7,7 @@ export interface MedIconProps {
   pillShape?: PillShape | null;
   doseFraction?: DoseFraction | null;
   size?: number;
+  showShapeName?: boolean;
   className?: string;
 }
 
@@ -28,55 +29,13 @@ function LiquidIcon({ color, size }: { color: string; size: number }) {
   );
 }
 
-function PillIcon({
-  color,
-  shape,
-  fraction,
-  size,
-}: {
-  color: string;
-  shape: PillShape;
-  fraction: DoseFraction;
-  size: number;
-}) {
-  const def = pillShapeDef(shape);
-  const stroke = 'color-mix(in srgb, var(--text-strong) 35%, transparent)';
-  const clipId = `pill-clip-${shape}-${fraction}-${size}`;
-  const fill = pillFractionFill(def.fillMode, fraction);
-
-  return (
-    <svg width={size} height={size} viewBox="0 0 100 100" aria-hidden="true">
-      <defs>
-        <clipPath id={clipId}>
-          <path d={def.path} />
-        </clipPath>
-      </defs>
-      <g clipPath={`url(#${clipId})`}>
-        <path d={def.path} fill={color} opacity={0.2} />
-        {fill.element === 'path' ? (
-          <path d={fill.d} fill={color} />
-        ) : (
-          <rect
-            x={fill.rect!.x}
-            y={fill.rect!.y}
-            width={fill.rect!.w}
-            height={fill.rect!.h}
-            fill={color}
-          />
-        )}
-      </g>
-      <path d={def.path} fill="none" stroke={stroke} strokeWidth={1.4} />
-      <path d={def.scoreLines} fill="none" stroke={stroke} strokeWidth={1.2} />
-    </svg>
-  );
-}
-
 export function MedIcon({
   medType,
   color,
   pillShape,
   doseFraction,
   size = 36,
+  showShapeName = false,
   className,
 }: MedIconProps) {
   if (medType === 'liquid') {
@@ -87,12 +46,14 @@ export function MedIcon({
     );
   }
 
-  const shape = pillShape ?? 'round';
-  const fraction = doseFraction ?? 'half';
-
   return (
-    <span className={className} style={{ display: 'inline-flex', lineHeight: 0 }}>
-      <PillIcon color={color} shape={shape} fraction={fraction} size={size} />
-    </span>
+    <PillDoseIcon
+      color={color}
+      shape={pillShape ?? 'round'}
+      fraction={doseFraction ?? 'half'}
+      size={size}
+      showShapeName={showShapeName}
+      className={className}
+    />
   );
 }

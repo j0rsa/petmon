@@ -1,6 +1,7 @@
 import type { DoseFraction, PillShape } from '../../api/medications';
 import { DOSE_FRACTIONS, PILL_SHAPES, doseFractionLabel, pillShapeLabel } from '../../lib/medications';
-import { MedIcon } from './MedIcon';
+import { isDoseSupported, pillDosePreviewHint, supportedDoseFractions } from '../../lib/pillDoseCuts';
+import { PillDoseIcon } from './PillDoseIcon';
 
 export interface FormulationPickerValue {
   tabletStrengthMg: string;
@@ -26,17 +27,21 @@ export function FormulationPicker({
 }: FormulationPickerProps) {
   const tabletFieldsDisabled = formulationLocked;
 
+  const doseHint = pillDosePreviewHint(value.pillShape, value.doseFraction);
+
   return (
     <div style={{ display: 'grid', gap: '0.75rem' }}>
-      <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
-        <MedIcon
-          medType="pill"
+      <div>
+        <PillDoseIcon
           color={color}
-          pillShape={value.pillShape}
-          doseFraction={value.doseFraction}
+          shape={value.pillShape}
+          fraction={value.doseFraction}
           size={56}
+          showShapeName
         />
-        <div className="muted-text" style={{ fontSize: '0.82rem' }}>Preview</div>
+        {doseHint && (
+          <p className="muted-text" style={{ fontSize: '0.78rem', margin: '0.35rem 0 0' }}>{doseHint}</p>
+        )}
       </div>
 
       {onFormulationLockedChange && (
@@ -97,7 +102,12 @@ export function FormulationPicker({
               style={{ padding: '0.25rem', minHeight: '2.6rem', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
               onClick={() => onChange({ ...value, pillShape: shape })}
             >
-              <MedIcon medType="pill" color={color} pillShape={shape} doseFraction="half" size={32} />
+              <PillDoseIcon
+                color={color}
+                shape={shape}
+                fraction="half"
+                size={32}
+              />
             </button>
           ))}
         </div>
@@ -105,23 +115,29 @@ export function FormulationPicker({
       <div>
         <label style={{ fontSize: '0.82rem', display: 'block', marginBottom: '0.45rem' }}>Dose per administration</label>
         <div style={{ display: 'flex', gap: '0.45rem', flexWrap: 'wrap' }}>
-          {DOSE_FRACTIONS.map((fraction) => (
-            <button
-              key={fraction}
-              type="button"
-              className={`button${value.doseFraction === fraction ? '' : ' button-secondary'}`}
-              style={{
-                padding: '0.45rem 0.85rem',
-                fontSize: '1.05rem',
-                fontWeight: 600,
-                minWidth: '2.85rem',
-                lineHeight: 1.1,
-              }}
-              onClick={() => onChange({ ...value, doseFraction: fraction })}
-            >
-              {doseFractionLabel(fraction)}
-            </button>
-          ))}
+          {DOSE_FRACTIONS.map((fraction) => {
+            const supported = isDoseSupported(value.pillShape, fraction);
+            return (
+              <button
+                key={fraction}
+                type="button"
+                disabled={!supported}
+                title={supported ? undefined : pillDosePreviewHint(value.pillShape, fraction) ?? undefined}
+                className={`button${value.doseFraction === fraction ? '' : ' button-secondary'}`}
+                style={{
+                  padding: '0.45rem 0.85rem',
+                  fontSize: '1.05rem',
+                  fontWeight: 600,
+                  minWidth: '2.85rem',
+                  lineHeight: 1.1,
+                  opacity: supported ? 1 : 0.4,
+                }}
+                onClick={() => onChange({ ...value, doseFraction: fraction })}
+              >
+                {doseFractionLabel(fraction)}
+              </button>
+            );
+          })}
         </div>
       </div>
     </div>
