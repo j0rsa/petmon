@@ -29,29 +29,59 @@ impl MedType {
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "snake_case")]
 pub enum PillShape {
-    #[serde(rename = "round_1_precut")]
-    Round1Precut,
-    #[serde(rename = "round_2_precut")]
-    Round2Precut,
-    #[serde(rename = "ellipse_1_precut")]
-    Ellipse1Precut,
+    Freedom,
+    Oval,
+    Square,
+    Capsule,
+    Pentagon,
+    Tear,
+    Rectangle,
+    Hexagon,
+    Round,
+    Triangle,
+    DoubleCircle,
+    Trapezoid,
+    Octagon,
+    Diamond,
 }
 
 impl PillShape {
     pub fn parse(s: &str) -> Option<Self> {
         match s {
-            "round_1_precut" => Some(Self::Round1Precut),
-            "round_2_precut" => Some(Self::Round2Precut),
-            "ellipse_1_precut" => Some(Self::Ellipse1Precut),
+            "freedom" => Some(Self::Freedom),
+            "oval" => Some(Self::Oval),
+            "square" => Some(Self::Square),
+            "capsule" => Some(Self::Capsule),
+            "pentagon" => Some(Self::Pentagon),
+            "tear" => Some(Self::Tear),
+            "rectangle" => Some(Self::Rectangle),
+            "hexagon" => Some(Self::Hexagon),
+            "round" => Some(Self::Round),
+            "triangle" => Some(Self::Triangle),
+            "double_circle" => Some(Self::DoubleCircle),
+            "trapezoid" => Some(Self::Trapezoid),
+            "octagon" => Some(Self::Octagon),
+            "diamond" => Some(Self::Diamond),
             _ => None,
         }
     }
 
     pub fn as_str(self) -> &'static str {
         match self {
-            Self::Round1Precut => "round_1_precut",
-            Self::Round2Precut => "round_2_precut",
-            Self::Ellipse1Precut => "ellipse_1_precut",
+            Self::Freedom => "freedom",
+            Self::Oval => "oval",
+            Self::Square => "square",
+            Self::Capsule => "capsule",
+            Self::Pentagon => "pentagon",
+            Self::Tear => "tear",
+            Self::Rectangle => "rectangle",
+            Self::Hexagon => "hexagon",
+            Self::Round => "round",
+            Self::Triangle => "triangle",
+            Self::DoubleCircle => "double_circle",
+            Self::Trapezoid => "trapezoid",
+            Self::Octagon => "octagon",
+            Self::Diamond => "diamond",
         }
     }
 }
@@ -471,7 +501,7 @@ mod tests {
             id: "f".into(),
             medication_id: "m".into(),
             tablet_strength_mg: Some(5.0),
-            pill_shape: Some(PillShape::Round1Precut),
+            pill_shape: Some(PillShape::Round),
             liquid_concentration_mg_per_ml: None,
             created_at: String::new(),
         };

@@ -594,7 +594,7 @@ export const mockMedFormulations: MedFormulation[] = [
     id: 'form-1',
     medication_id: 'med-pill-1',
     tablet_strength_mg: 5,
-    pill_shape: 'round_1_precut',
+    pill_shape: 'round',
     liquid_concentration_mg_per_ml: null,
     created_at: '2026-01-01T00:00:00Z',
   },

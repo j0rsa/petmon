@@ -4089,7 +4089,7 @@ components:
 
     PillShape:
       type: string
-      enum: [round_1_precut, round_2_precut, ellipse_1_precut]
+      enum: [freedom, oval, square, capsule, pentagon, tear, rectangle, hexagon, round, triangle, double_circle, trapezoid, octagon, diamond]
 
     DoseFraction:
       type: string

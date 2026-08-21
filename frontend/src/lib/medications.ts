@@ -4,12 +4,24 @@ export const DOSE_FRACTIONS: DoseFraction[] = [
   'whole', 'half', 'quarter', 'three_quarter', 'eighth', 'sixteenth',
 ];
 
-export const PILL_SHAPES: PillShape[] = ['round_1_precut', 'round_2_precut', 'ellipse_1_precut'];
-
-export const MED_COLORS = [
-  '#6366f1', '#ec4899', '#f97316', '#eab308', '#22c55e',
-  '#06b6d4', '#8b5cf6', '#ef4444', '#64748b', '#14b8a6',
+export const PILL_SHAPES: PillShape[] = [
+  'freedom', 'oval', 'square', 'capsule', 'pentagon', 'tear', 'rectangle',
+  'hexagon', 'round', 'triangle', 'double_circle', 'trapezoid', 'octagon', 'diamond',
 ];
+
+/** 36-color palette (6×6). */
+export const MED_COLOR_PALETTE = [
+  '#6366f1', '#818cf8', '#a78bfa', '#c084fc', '#e879f9', '#f472b6',
+  '#ec4899', '#f43f5e', '#ef4444', '#f97316', '#fb923c', '#fbbf24',
+  '#eab308', '#a3e635', '#84cc16', '#22c55e', '#10b981', '#14b8a6',
+  '#06b6d4', '#0ea5e9', '#3b82f6', '#2563eb', '#1d4ed8', '#4f46e5',
+  '#7c3aed', '#9333ea', '#64748b', '#475569', '#78716c', '#a8a29e',
+  '#d6d3d1', '#fda4af', '#fdba74', '#fde047', '#86efac', '#67e8f9',
+];
+
+export function randomMedColor(): string {
+  return MED_COLOR_PALETTE[Math.floor(Math.random() * MED_COLOR_PALETTE.length)]!;
+}
 
 export function doseFractionLabel(fraction: DoseFraction): string {
   switch (fraction) {
@@ -24,9 +36,20 @@ export function doseFractionLabel(fraction: DoseFraction): string {
 
 export function pillShapeLabel(shape: PillShape): string {
   switch (shape) {
-    case 'round_1_precut': return 'Round · 1 cut';
-    case 'round_2_precut': return 'Round · 2 cuts';
-    case 'ellipse_1_precut': return 'Ellipse · 1 cut';
+    case 'freedom': return 'Freedom';
+    case 'oval': return 'Oval';
+    case 'square': return 'Square';
+    case 'capsule': return 'Capsule';
+    case 'pentagon': return 'Pentagon';
+    case 'tear': return 'Tear';
+    case 'rectangle': return 'Rectangle';
+    case 'hexagon': return 'Hexagon';
+    case 'round': return 'Round';
+    case 'triangle': return 'Triangle';
+    case 'double_circle': return 'Double circle';
+    case 'trapezoid': return 'Trapezoid';
+    case 'octagon': return 'Octagon';
+    case 'diamond': return 'Diamond';
   }
 }
 

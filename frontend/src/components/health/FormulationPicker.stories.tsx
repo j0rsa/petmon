@@ -29,7 +29,7 @@ export const OneMgWhole: Story = {
     color: '#22c55e',
     value: {
       tabletStrengthMg: '1',
-      pillShape: 'round_2_precut',
+      pillShape: 'round',
       doseFraction: 'whole',
     },
     onChange: () => {},

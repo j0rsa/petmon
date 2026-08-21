@@ -15,7 +15,10 @@ CREATE TABLE IF NOT EXISTS med_formulations (
     id TEXT PRIMARY KEY,
     medication_id TEXT NOT NULL REFERENCES medications(id) ON DELETE CASCADE,
     tablet_strength_mg REAL,
-    pill_shape TEXT CHECK (pill_shape IN ('round_1_precut', 'round_2_precut', 'ellipse_1_precut')),
+    pill_shape TEXT CHECK (pill_shape IN (
+        'freedom', 'oval', 'square', 'capsule', 'pentagon', 'tear', 'rectangle',
+        'hexagon', 'round', 'triangle', 'double_circle', 'trapezoid', 'octagon', 'diamond'
+    )),
     liquid_concentration_mg_per_ml REAL,
     created_at TEXT NOT NULL
 );
