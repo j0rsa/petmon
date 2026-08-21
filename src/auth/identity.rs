@@ -3,16 +3,19 @@ use std::collections::HashSet;
 /// Authenticated caller, injected into request extensions by the auth middleware.
 #[derive(Debug, Clone)]
 pub struct Identity {
+    /// User id: OIDC `sub`, or `"dev"` in DEV_MODE. For API tokens this is the
+    /// token's `owner_subject` (the minting user's `sub`), never the token alias.
     pub subject: String,
     pub email: Option<String>,
-    /// `name` claim from the OIDC JWT, if present.
+    /// `name` claim from the OIDC JWT, if present. For API tokens this is the
+    /// device alias (so `display_name()` still shows the device).
     pub name: Option<String>,
     pub kind: IdentityKind,
     /// Granted scopes. Empty means full access (no restriction). HashSet for O(1) lookup.
     pub scopes: HashSet<String>,
     /// Creator display name snapshot for the current API token session, if any.
     pub token_created_by: Option<String>,
-    /// OIDC subject (or `dev`) when authenticated via an API token that recorded its owner.
+    /// OIDC subject (or `dev`) recorded on the API token at mint time.
     pub owner_subject: Option<String>,
 }
 
@@ -48,20 +51,9 @@ impl Identity {
     }
 
     /// Stable key for per-user state (settings, notification reads, push ownership).
-    ///
-    /// - OIDC: JWT `sub` — same user on web and mobile shares one key.
-    /// - API token: owner's `sub` when the token was minted by an OIDC/dev session;
-    ///   legacy tokens without `owner_subject` fall back to `api_token:{id}`.
-    /// - DEV_MODE: `"dev"`.
+    /// Always the user id (`subject`): OIDC `sub` or `"dev"`.
     pub fn reader_key(&self) -> String {
-        match &self.kind {
-            IdentityKind::Dev => "dev".to_string(),
-            IdentityKind::Oidc => self.subject.clone(),
-            IdentityKind::ApiToken { token_id } => self
-                .owner_subject
-                .clone()
-                .unwrap_or_else(|| format!("api_token:{token_id}")),
-        }
+        self.subject.clone()
     }
 
     /// Returns true if this identity is permitted to use `required_scope`.
@@ -101,9 +93,9 @@ mod tests {
     }
 
     #[test]
-    fn reader_key_api_token_prefers_owner_subject() {
+    fn reader_key_api_token_uses_owner_subject_as_subject() {
         let identity = Identity {
-            subject: "My Device".into(),
+            subject: "google-oauth2|123".into(),
             email: None,
             name: Some("My Device".into()),
             kind: IdentityKind::ApiToken {
@@ -114,21 +106,11 @@ mod tests {
             owner_subject: Some("google-oauth2|123".into()),
         };
         assert_eq!(identity.reader_key(), "google-oauth2|123");
+        assert_eq!(identity.display_name(), "My Device");
     }
 
     #[test]
-    fn reader_key_api_token_falls_back_without_owner_subject() {
-        let identity = Identity {
-            subject: "legacy".into(),
-            email: None,
-            name: None,
-            kind: IdentityKind::ApiToken {
-                token_id: "tok-legacy".into(),
-            },
-            scopes: HashSet::new(),
-            token_created_by: None,
-            owner_subject: None,
-        };
-        assert_eq!(identity.reader_key(), "api_token:tok-legacy");
+    fn reader_key_dev_uses_dev() {
+        assert_eq!(Identity::dev().reader_key(), "dev");
     }
 }

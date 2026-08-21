@@ -2393,7 +2393,9 @@ components:
       properties:
         subject:
           type: string
-          description: User subject identifier
+          description: >
+            Stable user identifier — OIDC `sub`, or `dev` in DEV_MODE.
+            For API token sessions this is the token owner's `sub`, not the token alias.
         email:
           type: string
           nullable: true

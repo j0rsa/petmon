@@ -350,14 +350,15 @@ async fn sign_out_deletes_api_token() {
         format!("{:x}", hasher.finalize())
     };
     sqlx::query(
-        "INSERT INTO api_tokens (id, token_hash, alias, scopes, created_by, created_at, last_used_at, active) \
-         VALUES (?, ?, ?, ?, ?, datetime('now'), NULL, 1)",
+        "INSERT INTO api_tokens (id, token_hash, alias, scopes, created_by, owner_subject, created_at, last_used_at, active) \
+         VALUES (?, ?, ?, ?, ?, ?, datetime('now'), NULL, 1)",
     )
     .bind(&token_id)
     .bind(&hash)
     .bind("My Device")
     .bind("all")
     .bind("Alice")
+    .bind("google-oauth2|alice")
     .execute(&pool)
     .await
     .unwrap();
@@ -389,6 +390,7 @@ async fn sign_out_deletes_api_token() {
     );
     let me: serde_json::Value = test::read_body_json(resp).await;
     assert_eq!(me["kind"].as_str(), Some("api_token"));
+    assert_eq!(me["subject"].as_str(), Some("google-oauth2|alice"));
     assert_eq!(me["display_name"].as_str(), Some("My Device"));
     assert_eq!(me["token_created_by"].as_str(), Some("Alice"));
 
@@ -421,6 +423,38 @@ async fn sign_out_deletes_api_token() {
         resp.status(),
         401,
         "deleted token must no longer authenticate"
+    );
+}
+
+#[actix_web::test]
+async fn api_token_without_owner_subject_is_unauthorized() {
+    let pool = setup_pool().await;
+    let raw = "pm_api_no_owner_000000000000000000000000000000000000000000000000000";
+    let hash = sha256_hex(raw);
+    sqlx::query(
+        "INSERT INTO api_tokens (id, token_hash, alias, scopes, created_at, last_used_at, active) \
+         VALUES (?, ?, 'orphan', 'all', datetime('now'), NULL, 1)",
+    )
+    .bind(uuid::Uuid::new_v4().to_string())
+    .bind(&hash)
+    .execute(&pool)
+    .await
+    .unwrap();
+
+    let state = web::Data::new(AppState::new(pool, false, None, None));
+    let app = build_app!(state);
+    let resp = test::call_service(
+        &app,
+        test::TestRequest::get()
+            .uri("/api/v1/auth/me")
+            .insert_header(("Authorization", format!("Bearer {raw}")))
+            .to_request(),
+    )
+    .await;
+    assert_eq!(
+        resp.status(),
+        401,
+        "API tokens without owner_subject must not authenticate"
     );
 }
 
@@ -1915,6 +1949,209 @@ async fn user_settings_display_returns_json_not_spa() {
 }
 
 #[actix_web::test]
+async fn user_settings_are_shared_across_api_tokens_for_the_same_owner() {
+    let pool = setup_pool().await;
+    let owner = "google-oauth2|alice";
+    let raw_a = "pm_api_settings_a_000000000000000000000000000000000000000000000";
+    let raw_b = "pm_api_settings_b_000000000000000000000000000000000000000000000";
+    seed_token_for_owner(&pool, raw_a, "all", owner).await;
+    seed_token_for_owner(&pool, raw_b, "all", owner).await;
+    let state = web::Data::new(AppState::new(pool.clone(), false, None, None));
+    let app = build_app!(state);
+
+    let post_resp = test::call_service(
+        &app,
+        test::TestRequest::post()
+            .uri("/api/v1/me/settings/display")
+            .insert_header(("Authorization", format!("Bearer {raw_a}")))
+            .set_json(serde_json::json!({ "time_format": "h12" }))
+            .to_request(),
+    )
+    .await;
+    assert_eq!(post_resp.status(), 200);
+
+    let get_resp = test::call_service(
+        &app,
+        test::TestRequest::get()
+            .uri("/api/v1/me/settings/display")
+            .insert_header(("Authorization", format!("Bearer {raw_b}")))
+            .to_request(),
+    )
+    .await;
+    assert_eq!(get_resp.status(), 200);
+    let body: serde_json::Value = test::read_body_json(get_resp).await;
+    assert_eq!(body["time_format"].as_str(), Some("h12"));
+
+    let keys: Vec<String> = sqlx::query_scalar("SELECT DISTINCT reader_key FROM user_settings")
+        .fetch_all(&pool)
+        .await
+        .unwrap();
+    assert_eq!(keys, vec![owner.to_string()]);
+}
+
+#[actix_web::test]
+async fn push_subscribe_stores_owner_subject_as_reader_key() {
+    let pool = setup_pool().await;
+    let owner = "google-oauth2|alice";
+    let raw = "pm_api_push_owner_0000000000000000000000000000000000000000000000";
+    seed_token_for_owner(&pool, raw, "all", owner).await;
+    let state = web::Data::new(AppState::new(pool.clone(), false, None, None));
+    let app = build_app!(state);
+
+    let resp = test::call_service(
+        &app,
+        test::TestRequest::post()
+            .uri("/api/v1/push/subscribe")
+            .insert_header(("Authorization", format!("Bearer {raw}")))
+            .set_json(serde_json::json!({
+                "endpoint": "https://push.example.test/device/owned",
+                "keys": { "p256dh": "k", "auth": "a" }
+            }))
+            .to_request(),
+    )
+    .await;
+    assert_eq!(resp.status(), 204);
+
+    let reader_key: String =
+        sqlx::query_scalar("SELECT reader_key FROM push_subscriptions WHERE endpoint = ?")
+            .bind("https://push.example.test/device/owned")
+            .fetch_one(&pool)
+            .await
+            .unwrap();
+    assert_eq!(reader_key, owner);
+}
+
+#[tokio::test]
+async fn migration_016_remaps_api_token_reader_keys_then_deletes_leftovers() {
+    let pool = setup_pool().await;
+    let owned_id = "tok-owned";
+    let orphan_id = "tok-orphan";
+    sqlx::query(
+        "INSERT INTO api_tokens (id, token_hash, alias, scopes, owner_subject, created_at, last_used_at, active) \
+         VALUES (?, 'h1', 'owned', 'all', 'google-oauth2|alice', datetime('now'), NULL, 1)",
+    )
+    .bind(owned_id)
+    .execute(&pool)
+    .await
+    .unwrap();
+    sqlx::query(
+        "INSERT INTO api_tokens (id, token_hash, alias, scopes, created_at, last_used_at, active) \
+         VALUES (?, 'h2', 'orphan', 'all', datetime('now'), NULL, 1)",
+    )
+    .bind(orphan_id)
+    .execute(&pool)
+    .await
+    .unwrap();
+
+    sqlx::query(
+        "INSERT INTO user_settings (reader_key, key, value_json, updated_at) \
+         VALUES (?, 'display', '{\"time_format\":\"h12\"}', '2026-01-02T00:00:00Z')",
+    )
+    .bind(format!("api_token:{owned_id}"))
+    .execute(&pool)
+    .await
+    .unwrap();
+    sqlx::query(
+        "INSERT INTO user_settings (reader_key, key, value_json, updated_at) \
+         VALUES ('google-oauth2|alice', 'display', '{\"time_format\":\"h24\"}', '2026-01-01T00:00:00Z')",
+    )
+    .execute(&pool)
+    .await
+    .unwrap();
+    sqlx::query(
+        "INSERT INTO user_settings (reader_key, key, value_json, updated_at) \
+         VALUES (?, 'display', '{}', '2026-01-01T00:00:00Z')",
+    )
+    .bind(format!("api_token:{orphan_id}"))
+    .execute(&pool)
+    .await
+    .unwrap();
+
+    sqlx::query(
+        "INSERT INTO notifications (id, kind, title, link_path, created_at) \
+         VALUES ('n1', 'info', 't', '/x', datetime('now'))",
+    )
+    .execute(&pool)
+    .await
+    .unwrap();
+    sqlx::query(
+        "INSERT INTO notification_reads (notification_id, reader_key, read_at) \
+         VALUES ('n1', ?, '2026-01-02T00:00:00Z')",
+    )
+    .bind(format!("api_token:{owned_id}"))
+    .execute(&pool)
+    .await
+    .unwrap();
+
+    sqlx::query(
+        "INSERT INTO push_subscriptions (id, endpoint, p256dh, auth, reader_key, created_at) \
+         VALUES ('p1', 'https://push.example.test/owned', 'k', 'a', ?, datetime('now'))",
+    )
+    .bind(format!("api_token:{owned_id}"))
+    .execute(&pool)
+    .await
+    .unwrap();
+    sqlx::query(
+        "INSERT INTO push_subscriptions (id, endpoint, p256dh, auth, reader_key, created_at) \
+         VALUES ('p2', 'https://push.example.test/orphan', 'k', 'a', ?, datetime('now'))",
+    )
+    .bind(format!("api_token:{orphan_id}"))
+    .execute(&pool)
+    .await
+    .unwrap();
+
+    sqlx::raw_sql(include_str!(
+        "../migrations/016_reader_key_to_owner_subject.sql"
+    ))
+    .execute(&pool)
+    .await
+    .unwrap();
+
+    let display: String = sqlx::query_scalar(
+        "SELECT value_json FROM user_settings WHERE reader_key = 'google-oauth2|alice' AND key = 'display'",
+    )
+    .fetch_one(&pool)
+    .await
+    .unwrap();
+    assert!(
+        display.contains("h12"),
+        "newer token-keyed row must win: {display}"
+    );
+
+    let leftover: i64 = sqlx::query_scalar(
+        "SELECT COUNT(*) FROM user_settings WHERE reader_key LIKE 'api_token:%'",
+    )
+    .fetch_one(&pool)
+    .await
+    .unwrap();
+    assert_eq!(leftover, 0);
+
+    let read_key: String = sqlx::query_scalar(
+        "SELECT reader_key FROM notification_reads WHERE notification_id = 'n1'",
+    )
+    .fetch_one(&pool)
+    .await
+    .unwrap();
+    assert_eq!(read_key, "google-oauth2|alice");
+
+    let push_owned: String = sqlx::query_scalar(
+        "SELECT reader_key FROM push_subscriptions WHERE endpoint = 'https://push.example.test/owned'",
+    )
+    .fetch_one(&pool)
+    .await
+    .unwrap();
+    assert_eq!(push_owned, "google-oauth2|alice");
+
+    let orphan_push: i64 = sqlx::query_scalar(
+        "SELECT COUNT(*) FROM push_subscriptions WHERE endpoint = 'https://push.example.test/orphan'",
+    )
+    .fetch_one(&pool)
+    .await
+    .unwrap();
+    assert_eq!(orphan_push, 0);
+}
+
+#[actix_web::test]
 async fn settings_display_route_removed() {
     let pool = setup_pool().await;
     let state = web::Data::new(AppState::new(pool, true, None, None));
@@ -2397,6 +2634,29 @@ async fn api_token_created_with_default_all_scope() {
 }
 
 #[actix_web::test]
+async fn api_token_create_persists_owner_subject() {
+    let (app, state) = build_dev_app!();
+    let resp = test::call_service(
+        &app,
+        test::TestRequest::post()
+            .uri("/api/v1/api-tokens")
+            .set_json(serde_json::json!({ "alias": "owned" }))
+            .to_request(),
+    )
+    .await;
+    assert_eq!(resp.status(), 201);
+    let body: serde_json::Value = test::read_body_json(resp).await;
+    let id = body["id"].as_str().unwrap();
+    let owner: Option<String> =
+        sqlx::query_scalar("SELECT owner_subject FROM api_tokens WHERE id = ?")
+            .bind(id)
+            .fetch_one(&state.pool)
+            .await
+            .unwrap();
+    assert_eq!(owner.as_deref(), Some("dev"));
+}
+
+#[actix_web::test]
 async fn api_token_created_with_explicit_scopes() {
     let (app, _state) = build_dev_app!();
     let req = test::TestRequest::post()
@@ -2507,20 +2767,26 @@ fn sha256_hex(raw: &str) -> String {
     format!("{:x}", hasher.finalize())
 }
 
-/// Seeds a token with the given raw value and scopes, returns the raw token string.
-async fn seed_token(pool: &SqlitePool, raw: &str, scopes: &str) {
+/// Seeds a token with the given raw value, scopes, and owner subject.
+async fn seed_token_for_owner(pool: &SqlitePool, raw: &str, scopes: &str, owner_subject: &str) {
     let hash = sha256_hex(raw);
     sqlx::query(
-        "INSERT INTO api_tokens (id, token_hash, alias, scopes, created_at, last_used_at, active) \
-         VALUES (?, ?, ?, ?, datetime('now'), NULL, 1)",
+        "INSERT INTO api_tokens (id, token_hash, alias, scopes, owner_subject, created_at, last_used_at, active) \
+         VALUES (?, ?, ?, ?, ?, datetime('now'), NULL, 1)",
     )
     .bind(uuid::Uuid::new_v4().to_string())
     .bind(&hash)
     .bind(raw)
     .bind(scopes)
+    .bind(owner_subject)
     .execute(pool)
     .await
     .unwrap();
+}
+
+/// Seeds a token owned by `test-owner`.
+async fn seed_token(pool: &SqlitePool, raw: &str, scopes: &str) {
+    seed_token_for_owner(pool, raw, scopes, "test-owner").await;
 }
 
 /// GET /pets with an api_read token → 200
