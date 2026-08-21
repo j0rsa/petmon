@@ -1879,6 +1879,30 @@ async fn demo_mode_off_leaves_empty_database() {
 }
 
 #[actix_web::test]
+async fn user_settings_developer_mode_roundtrip() {
+    let pool = setup_pool().await;
+    let state = web::Data::new(AppState::new(pool, true, None, None));
+    let app = build_app!(state);
+
+    let get_req = test::TestRequest::get()
+        .uri("/api/v1/me/settings/developer_mode")
+        .to_request();
+    let get_resp = test::call_service(&app, get_req).await;
+    assert_eq!(get_resp.status(), 200);
+    let initial: serde_json::Value = test::read_body_json(get_resp).await;
+    assert_eq!(initial["enabled"], false);
+
+    let post_req = test::TestRequest::post()
+        .uri("/api/v1/me/settings/developer_mode")
+        .set_json(serde_json::json!({ "enabled": true }))
+        .to_request();
+    let post_resp = test::call_service(&app, post_req).await;
+    assert_eq!(post_resp.status(), 200);
+    let updated: serde_json::Value = test::read_body_json(post_resp).await;
+    assert_eq!(updated["enabled"], true);
+}
+
+#[actix_web::test]
 async fn user_settings_display_roundtrip() {
     let pool = setup_pool().await;
     let state = web::Data::new(AppState::new(pool, true, None, None));
@@ -3070,13 +3094,24 @@ async fn medication_system_formulations_and_intake_by_reference() {
             "pet_id": pet_id,
             "name": "Prednisolone",
             "med_type": "pill",
-            "color": "#6366f1"
+            "color": "#6366f1",
+            "emoji": "🦠"
         }))
         .to_request();
     let resp = test::call_service(&app, req).await;
     assert_eq!(resp.status(), 201);
     let med: serde_json::Value = test::read_body_json(resp).await;
     let med_id = med["id"].as_str().unwrap().to_string();
+    assert_eq!(med["emoji"].as_str(), Some("🦠"));
+
+    let req = test::TestRequest::patch()
+        .uri(&format!("/api/v1/health/meds/{med_id}"))
+        .set_json(serde_json::json!({ "emoji": "" }))
+        .to_request();
+    let resp = test::call_service(&app, req).await;
+    assert_eq!(resp.status(), 200);
+    let med: serde_json::Value = test::read_body_json(resp).await;
+    assert!(med["emoji"].is_null());
 
     let req = test::TestRequest::post()
         .uri("/api/v1/health/meds/assignments")
@@ -3268,4 +3303,59 @@ async fn medication_system_formulations_and_intake_by_reference() {
         .to_request();
     let resp = test::call_service(&app, req).await;
     assert_eq!(resp.status(), 204);
+}
+
+#[actix_web::test]
+async fn med_intake_explicit_occurred_at_is_preserved() {
+    let (app, _state) = build_dev_app!();
+    let pet_id = api_create_pet!(&app, "MedTimeTest");
+
+    let req = test::TestRequest::post()
+        .uri("/api/v1/health/meds")
+        .set_json(serde_json::json!({
+            "pet_id": pet_id,
+            "name": "Daily pill",
+            "med_type": "pill",
+            "color": "#6366f1"
+        }))
+        .to_request();
+    let resp = test::call_service(&app, req).await;
+    assert_eq!(resp.status(), 201);
+    let med: serde_json::Value = test::read_body_json(resp).await;
+    let med_id = med["id"].as_str().unwrap();
+
+    let req = test::TestRequest::post()
+        .uri("/api/v1/health/meds/assignments")
+        .set_json(serde_json::json!({
+            "medication_id": med_id,
+            "tablet_strength_mg": 5.0,
+            "pill_shape": "round",
+            "dose_fraction": "whole",
+            "frequency": { "morning": 1, "midday": 0, "evening": 0, "every": 1, "unit": "days" },
+            "date_from": "2026-08-01"
+        }))
+        .to_request();
+    let resp = test::call_service(&app, req).await;
+    assert_eq!(resp.status(), 201);
+    let assign: serde_json::Value = test::read_body_json(resp).await;
+    let assign_id = assign["id"].as_str().unwrap();
+
+    let occurred_at = "2026-08-10T07:45:00";
+    let req = test::TestRequest::post()
+        .uri("/api/v1/health/meds/intake")
+        .set_json(serde_json::json!({
+            "pet_id": pet_id,
+            "medication_id": med_id,
+            "assignment_id": assign_id,
+            "taken": true,
+            "occurred_at": occurred_at,
+            "local_date": "2026-08-10"
+        }))
+        .to_request();
+    let resp = test::call_service(&app, req).await;
+    assert_eq!(resp.status(), 201);
+    let intake: serde_json::Value = test::read_body_json(resp).await;
+    assert_eq!(intake["occurred_at"].as_str(), Some(occurred_at));
+    assert_eq!(intake["local_date"].as_str(), Some("2026-08-10"));
+    assert_eq!(intake["taken"].as_bool(), Some(true));
 }

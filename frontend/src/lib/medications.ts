@@ -33,19 +33,23 @@ export function randomMedColor(): string {
   return MED_COLOR_PALETTE[Math.floor(Math.random() * MED_COLOR_PALETTE.length)]!;
 }
 
-export async function savePlanWithMedicationColor<T>({
+export async function savePlanWithMedicationPresentation<T>({
   currentColor,
   selectedColor,
-  saveColor,
+  currentEmoji,
+  selectedEmoji,
+  savePresentation,
   savePlan,
 }: {
   currentColor: string;
   selectedColor: string;
-  saveColor: () => Promise<unknown>;
+  currentEmoji: string | null;
+  selectedEmoji: string;
+  savePresentation: () => Promise<unknown>;
   savePlan: () => Promise<T>;
 }): Promise<T> {
-  if (currentColor !== selectedColor) {
-    await saveColor();
+  if (currentColor !== selectedColor || currentEmoji !== (selectedEmoji.trim() || null)) {
+    await savePresentation();
   }
   return savePlan();
 }

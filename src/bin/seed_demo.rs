@@ -21,6 +21,7 @@ async fn main() -> anyhow::Result<()> {
     println!("  Nutrition records: {}", summary.nutrition_records);
     println!("  Day notes:         {}", summary.day_notes);
     println!("  Schedules:         {}", summary.schedules);
+    println!("  Medications:       {}", summary.medications);
     println!();
     println!("Demo pet IDs (match frontend Storybook fixtures):");
     println!("  Mittens: {}", petmon::demo_seed::MITTENS_ID);

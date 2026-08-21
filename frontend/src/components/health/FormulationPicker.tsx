@@ -41,7 +41,7 @@ export function FormulationPicker({
   const doseHint = pillDosePreviewHint(value.pillShape, value.doseFraction);
 
   return (
-    <div style={{ display: 'grid', gap: '0.75rem' }}>
+    <div className="formulation-picker" style={{ display: 'grid', gap: '0.75rem' }}>
       <div>
         <PillDoseIcon
           color={color}
@@ -97,12 +97,7 @@ export function FormulationPicker({
       <div style={tabletFieldsDisabled ? { opacity: 0.55, pointerEvents: 'none' } : undefined}>
         <label style={{ fontSize: '0.82rem', display: 'block', marginBottom: '0.35rem' }}>Shape</label>
         <div
-          style={{
-            display: 'grid',
-            gridTemplateColumns: 'repeat(auto-fill, minmax(3.2rem, 1fr))',
-            gap: '0.35rem',
-            maxWidth: '28rem',
-          }}
+          className="formulation-picker__shapes"
         >
           {PILL_SHAPES.map((shape) => (
             <button
@@ -132,7 +127,7 @@ export function FormulationPicker({
       {beforeDose}
       {showDose && <div>
         <label style={{ fontSize: '0.82rem', display: 'block', marginBottom: '0.45rem' }}>Dose per administration</label>
-        <div style={{ display: 'flex', gap: '0.45rem', flexWrap: 'wrap' }}>
+        <div className="formulation-picker__doses">
           {DOSE_FRACTIONS.map((fraction) => {
             const supported = isDoseSupported(value.pillShape, fraction);
             return (
@@ -143,10 +138,9 @@ export function FormulationPicker({
                 title={supported ? undefined : pillDosePreviewHint(value.pillShape, fraction) ?? undefined}
                 className={`button${value.doseFraction === fraction ? '' : ' button-secondary'}`}
                 style={{
-                  padding: '0.45rem 0.85rem',
+                  padding: '0.45rem 0.35rem',
                   fontSize: '0.95rem',
                   fontWeight: 400,
-                  width: '3.5rem',
                   lineHeight: 1.1,
                   fontVariantNumeric: 'tabular-nums',
                   opacity: supported ? 1 : 0.4,

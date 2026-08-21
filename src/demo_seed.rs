@@ -4,6 +4,10 @@ use sqlx::SqlitePool;
 use uuid::Uuid;
 
 use crate::domain::elimination::{CreateEliminationRecord, EliminationEventType};
+use crate::domain::medication::{
+    CreateMedAssignment, CreateMedIntakeRecord, CreateMedication, DoseFraction, MedFrequency,
+    MedFrequencyUnit, MedType, PillShape,
+};
 use crate::domain::nutrition_record::{CreateNutritionRecord, NutritionRecord};
 use crate::domain::nutrition_schedule::CreateNutritionSchedule;
 use crate::domain::pet::Pet;
@@ -12,7 +16,8 @@ use crate::domain::species::PetSpecies;
 use crate::domain::weight::CreateWeightRecord;
 use crate::error::AppResult;
 use crate::repo::{
-    day_notes, elimination_records, nutrition_records, nutrition_schedules, pets, weight_records,
+    day_notes, elimination_records, med_assignments, med_intake_records, medications,
+    nutrition_records, nutrition_schedules, pets, weight_records,
 };
 
 pub const MITTENS_ID: &str = "550e8400-e29b-41d4-a716-446655440000";
@@ -30,6 +35,7 @@ pub struct SeedSummary {
     pub weight_records: usize,
     pub day_notes: usize,
     pub schedules: usize,
+    pub medications: usize,
 }
 
 pub async fn run(pool: &SqlitePool, fresh: bool) -> AppResult<SeedSummary> {
@@ -43,6 +49,7 @@ pub async fn run(pool: &SqlitePool, fresh: bool) -> AppResult<SeedSummary> {
     let weight_count = seed_weight_records(pool, &demo_pets).await?;
     let note_count = seed_day_notes(pool, &demo_pets).await?;
     let schedule_count = seed_schedules(pool, &demo_pets).await?;
+    let medication_count = seed_medications(pool, &demo_pets).await?;
 
     Ok(SeedSummary {
         pets: demo_pets.len(),
@@ -51,6 +58,7 @@ pub async fn run(pool: &SqlitePool, fresh: bool) -> AppResult<SeedSummary> {
         weight_records: weight_count,
         day_notes: note_count,
         schedules: schedule_count,
+        medications: medication_count,
     })
 }
 
@@ -79,6 +87,16 @@ async fn clear_all(pool: &SqlitePool) -> AppResult<()> {
     sqlx::query("DELETE FROM nutrition_schedules")
         .execute(pool)
         .await?;
+    sqlx::query("DELETE FROM med_intake_records")
+        .execute(pool)
+        .await?;
+    sqlx::query("DELETE FROM med_assignments")
+        .execute(pool)
+        .await?;
+    sqlx::query("DELETE FROM med_formulations")
+        .execute(pool)
+        .await?;
+    sqlx::query("DELETE FROM medications").execute(pool).await?;
     sqlx::query("DELETE FROM pets").execute(pool).await?;
     Ok(())
 }
@@ -147,8 +165,10 @@ async fn seed_pets(pool: &SqlitePool) -> AppResult<Vec<Pet>> {
             color: color.map(str::to_string),
             weight_kg,
             feeding_notes: feeding_notes.map(str::to_string),
-            telegram_chat_id: None,
-            telegram_thread_id: None,
+            telegram_nutrition_chat_id: None,
+            telegram_nutrition_thread_id: None,
+            telegram_meds_chat_id: None,
+            telegram_meds_thread_id: None,
             elimination_auto_categorize_by_duration: false,
             created_at: now.clone(),
             updated_at: now.clone(),
@@ -771,6 +791,110 @@ async fn seed_schedules(pool: &SqlitePool, demo_pets: &[Pet]) -> AppResult<usize
     Ok(count)
 }
 
+async fn seed_medications(pool: &SqlitePool, demo_pets: &[Pet]) -> AppResult<usize> {
+    let rex = demo_pets
+        .iter()
+        .find(|pet| pet.id.to_string() == REX_ID)
+        .expect("rex seeded");
+    let today = Utc::now().date_naive();
+    let date_from = (today - Duration::days(DEMO_DAYS))
+        .format("%Y-%m-%d")
+        .to_string();
+    let local_date = today.format("%Y-%m-%d").to_string();
+
+    let carprofen = medications::create(
+        pool,
+        CreateMedication {
+            pet_id: rex.id.to_string(),
+            name: "Carprofen".to_string(),
+            med_type: MedType::Pill,
+            color: Some("#f97316".to_string()),
+            emoji: Some("🦴".to_string()),
+        },
+    )
+    .await?;
+
+    let carprofen_assign = med_assignments::create(
+        pool,
+        CreateMedAssignment {
+            medication_id: carprofen.id.clone(),
+            formulation_id: None,
+            tablet_strength_mg: Some(25.0),
+            pill_shape: Some(PillShape::OvalRounded),
+            liquid_concentration_mg_per_ml: None,
+            dose_fraction: Some(DoseFraction::Half),
+            liquid_dose_ml: None,
+            frequency: Some(MedFrequency {
+                morning: 1,
+                midday: 0,
+                evening: 1,
+                every: 1,
+                unit: MedFrequencyUnit::Days,
+            }),
+            date_from: date_from.clone(),
+            date_to: None,
+            optional: Some(false),
+        },
+    )
+    .await?;
+
+    let probiotic = medications::create(
+        pool,
+        CreateMedication {
+            pet_id: rex.id.to_string(),
+            name: "Probiotic paste".to_string(),
+            med_type: MedType::Liquid,
+            color: Some("#22c55e".to_string()),
+            emoji: Some("💧".to_string()),
+        },
+    )
+    .await?;
+
+    med_assignments::create(
+        pool,
+        CreateMedAssignment {
+            medication_id: probiotic.id,
+            formulation_id: None,
+            tablet_strength_mg: None,
+            pill_shape: None,
+            liquid_concentration_mg_per_ml: Some(100.0),
+            dose_fraction: None,
+            liquid_dose_ml: None,
+            frequency: Some(MedFrequency {
+                morning: 1,
+                midday: 0,
+                evening: 0,
+                every: 1,
+                unit: MedFrequencyUnit::Days,
+            }),
+            date_from,
+            date_to: None,
+            optional: Some(true),
+        },
+    )
+    .await?;
+
+    med_intake_records::create(
+        pool,
+        CreateMedIntakeRecord {
+            pet_id: rex.id.to_string(),
+            medication_id: carprofen.id,
+            assignment_id: Some(carprofen_assign.id),
+            dose_fraction_override: None,
+            liquid_dose_ml_override: None,
+            taken: Some(true),
+            occurred_at: Some(format!("{local_date}T07:30:00")),
+            local_date: Some(local_date),
+            note: None,
+            source_type: Some("manual".to_string()),
+        },
+        chrono_tz::UTC,
+    )
+    .await?;
+
+    Ok(2)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -799,9 +923,21 @@ mod tests {
         assert!(summary.weight_records > 0);
         assert_eq!(summary.day_notes, 4);
         assert_eq!(summary.schedules, 3);
+        assert_eq!(summary.medications, 2);
 
         let pets = pets::list_pets(&pool).await.expect("pets");
         assert_eq!(pets.len(), 4);
         assert!(pets.iter().any(|pet| pet.name == "Mittens"));
+
+        let rex_id = Uuid::parse_str(REX_ID).unwrap();
+        let rex_meds = medications::list_by_pet(&pool, rex_id)
+            .await
+            .expect("rex meds");
+        assert_eq!(rex_meds.len(), 2);
+        let today = Utc::now().date_naive().format("%Y-%m-%d").to_string();
+        let daily = crate::services::medication_service::daily_assignments(&pool, rex_id, &today)
+            .await
+            .expect("rex daily meds");
+        assert_eq!(daily.len(), 2);
     }
 }

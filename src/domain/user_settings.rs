@@ -5,6 +5,7 @@ use super::settings::{DateFormat, TimeFormat, WeekStart};
 pub const DISPLAY_KEY: &str = "display";
 pub const NUTRITION_CALENDAR_KEY: &str = "nutrition_calendar";
 pub const CUMULATIVE_FLUID_CHART_KEY: &str = "cumulative_fluid_chart";
+pub const DEVELOPER_MODE_KEY: &str = "developer_mode";
 
 /// Per-user display preferences (global UI formatting, page toggles).
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -185,9 +186,29 @@ fn default_false() -> bool {
     false
 }
 
+/// Per-user developer tooling (curl snippets, etc.).
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+pub struct DeveloperModeSettings {
+    #[serde(default)]
+    pub enabled: bool,
+}
+
+#[derive(Debug, Deserialize)]
+pub struct UpdateDeveloperModeSettings {
+    pub enabled: Option<bool>,
+}
+
+impl UpdateDeveloperModeSettings {
+    pub fn apply(self, existing: DeveloperModeSettings) -> DeveloperModeSettings {
+        DeveloperModeSettings {
+            enabled: self.enabled.unwrap_or(existing.enabled),
+        }
+    }
+}
+
 pub fn is_known_user_settings_key(key: &str) -> bool {
     matches!(
         key,
-        DISPLAY_KEY | NUTRITION_CALENDAR_KEY | CUMULATIVE_FLUID_CHART_KEY
+        DISPLAY_KEY | NUTRITION_CALENDAR_KEY | CUMULATIVE_FLUID_CHART_KEY | DEVELOPER_MODE_KEY
     )
 }

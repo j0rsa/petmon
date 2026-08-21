@@ -22,6 +22,7 @@ import {
   mockNotifications,
   mockNutritionCalendarSettings,
   mockCumulativeFluidChartSettings,
+  mockDeveloperModeSettings,
   mockNutritionRecords,
   mockNutritionSchedules,
   mockOidcConfigured,
@@ -51,6 +52,7 @@ function seedUserSettings(client: QueryClient) {
   client.setQueryData(['user-settings', 'display'], mockDisplaySettings);
   client.setQueryData(['user-settings', 'nutrition_calendar'], mockNutritionCalendarSettings);
   client.setQueryData(['user-settings', 'cumulative_fluid_chart'], mockCumulativeFluidChartSettings);
+  client.setQueryData(['user-settings', 'developer_mode'], mockDeveloperModeSettings);
 }
 
 /** Seeds the minimum query data needed for Layout (me, pets, app-info, display settings). */

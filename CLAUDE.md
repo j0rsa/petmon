@@ -9,7 +9,7 @@
 | **Instance** | `app_settings` | Shared by all users on this deployment | OIDC config, Telegram bot token, VAPID keys |
 | **User** | `user_settings` keyed by `reader_key` | Per authenticated identity | Display format, widget prefs, (future) per-user integrations |
 
-User settings API: `GET/POST /api/v1/me/settings/{key}` where `key` is e.g. `display`, `nutrition_calendar`, `cumulative_fluid_chart`.
+User settings API: `GET/POST /api/v1/me/settings/{key}` where `key` is e.g. `display`, `nutrition_calendar`, `cumulative_fluid_chart`, `developer_mode`.
 
 `reader_key` is always the user id (`Identity.subject`):
 - **OIDC:** JWT `sub` — same settings on web, mobile, and API-token sessions.
@@ -29,6 +29,17 @@ Push subscriptions remain per browser endpoint; notification read state and push
 1. **Storybook** — update existing stories or add new ones for the changed component/page; ensure mock fixtures cover the new states.
 2. **Tests** — update Vitest unit tests if any exist for the changed module.
 3. **CLAUDE.md** — if the change establishes a new UI convention or naming pattern, add it here.
+
+### Locale-aware decimal inputs (iOS / EU keyboards)
+
+Mobile decimal fields often show a comma (`,`) instead of a dot (`.`). **Never use `type="number"` for free-form decimal entry** — iOS rejects or mishandles comma input.
+
+**Pattern (weight, liquid ml, schedule amounts, etc.):**
+- `type="text"` + `inputMode="decimal"`
+- Parse with `parseDecimal()` from `frontend/src/lib/numbers.ts` (normalises `,` → `.`)
+- Validate with `Number.isFinite(parseDecimal(value)) && parseDecimal(value) > 0` (or `!isNaN(...)` where zero is allowed)
+
+**Do not** use `Number.parseFloat` directly on raw input strings.
 
 ### Touching anything
 - **Cargo version** — bump `version` in `Cargo.toml` following semver. **Always bump on every change, no exceptions:**

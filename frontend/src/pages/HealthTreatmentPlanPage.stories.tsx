@@ -59,6 +59,7 @@ export const WithPlans: Story = {
     await expect(
       canvas.getByRole('button', { name: 'Change color for Prednisolone' }),
     ).toBeInTheDocument();
+    await expect(canvas.getByLabelText('Telegram emoji for Prednisolone')).toBeInTheDocument();
     const optional = canvas.getByLabelText('Optional medication (take as needed)');
     const dose = canvas.getByText('Dose per administration');
     await expect(

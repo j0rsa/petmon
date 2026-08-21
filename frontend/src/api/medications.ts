@@ -33,6 +33,7 @@ export interface Medication {
   name: string;
   med_type: MedType;
   color: string;
+  emoji: string | null;
   created_at: string;
   updated_at: string;
 }
@@ -94,11 +95,13 @@ export interface CreateMedication {
   name: string;
   med_type: MedType;
   color?: string;
+  emoji?: string;
 }
 
 export interface UpdateMedication {
   name?: string;
   color?: string;
+  emoji?: string;
 }
 
 export interface CreateMedAssignment {

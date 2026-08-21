@@ -618,6 +618,7 @@ paths:
               - display
               - nutrition_calendar
               - cumulative_fluid_chart
+              - developer_mode
       responses:
         '200':
           description: User settings
@@ -628,6 +629,7 @@ paths:
                   - $ref: '#/components/schemas/UserDisplaySettings'
                   - $ref: '#/components/schemas/NutritionCalendarSettings'
                   - $ref: '#/components/schemas/CumulativeFluidChartSettings'
+                  - $ref: '#/components/schemas/DeveloperModeSettings'
         '404':
           $ref: '#/components/responses/NotFound'
         '403':
@@ -651,6 +653,7 @@ paths:
               - display
               - nutrition_calendar
               - cumulative_fluid_chart
+              - developer_mode
       requestBody:
         required: true
         content:
@@ -660,6 +663,7 @@ paths:
                 - $ref: '#/components/schemas/UpdateUserDisplaySettings'
                 - $ref: '#/components/schemas/UpdateNutritionCalendarSettings'
                 - $ref: '#/components/schemas/UpdateCumulativeFluidChartSettings'
+                - $ref: '#/components/schemas/UpdateDeveloperModeSettings'
       responses:
         '200':
           description: User settings updated
@@ -670,6 +674,7 @@ paths:
                   - $ref: '#/components/schemas/UserDisplaySettings'
                   - $ref: '#/components/schemas/NutritionCalendarSettings'
                   - $ref: '#/components/schemas/CumulativeFluidChartSettings'
+                  - $ref: '#/components/schemas/DeveloperModeSettings'
         '400':
           $ref: '#/components/responses/BadRequest'
         '404':
@@ -2480,14 +2485,22 @@ components:
           type: string
           nullable: true
           description: Feeding instructions and notes
-        telegram_chat_id:
+        telegram_nutrition_chat_id:
           type: string
           nullable: true
-          description: Telegram chat ID for notifications
-        telegram_thread_id:
+          description: Telegram chat ID for nutrition record notifications
+        telegram_nutrition_thread_id:
           type: string
           nullable: true
-          description: Telegram thread ID for topic replies
+          description: Telegram thread ID for nutrition record topic replies
+        telegram_meds_chat_id:
+          type: string
+          nullable: true
+          description: Telegram chat ID for medication intake notifications
+        telegram_meds_thread_id:
+          type: string
+          nullable: true
+          description: Telegram thread ID for medication intake topic replies
         elimination_auto_categorize_by_duration:
           type: boolean
           description: When enabled, general elimination records with duration are auto-tagged as wee or poop based on this pet's historical duration buckets
@@ -2534,10 +2547,16 @@ components:
         feeding_notes:
           type: string
           nullable: true
-        telegram_chat_id:
+        telegram_nutrition_chat_id:
           type: string
           nullable: true
-        telegram_thread_id:
+        telegram_nutrition_thread_id:
+          type: string
+          nullable: true
+        telegram_meds_chat_id:
+          type: string
+          nullable: true
+        telegram_meds_thread_id:
           type: string
           nullable: true
         elimination_auto_categorize_by_duration:
@@ -2572,10 +2591,16 @@ components:
         feeding_notes:
           type: string
           nullable: true
-        telegram_chat_id:
+        telegram_nutrition_chat_id:
           type: string
           nullable: true
-        telegram_thread_id:
+        telegram_nutrition_thread_id:
+          type: string
+          nullable: true
+        telegram_meds_chat_id:
+          type: string
+          nullable: true
+        telegram_meds_thread_id:
           type: string
           nullable: true
         elimination_auto_categorize_by_duration:
@@ -3005,6 +3030,10 @@ components:
           type: string
           nullable: true
           description: Optional day note
+      required:
+        - local_date
+        - records
+        - totals_by_category
 
     NutritionStatus:
       type: object
@@ -3109,10 +3138,6 @@ components:
         - daily_min_ml
         - daily_max_ml
         - delta_ml
-      required:
-        - local_date
-        - records
-        - totals_by_category
 
     FluidCurvePoint:
       type: object
@@ -3231,6 +3256,22 @@ components:
         date_format:
           $ref: '#/components/schemas/DateFormat'
         show_water_card:
+          type: boolean
+          nullable: true
+
+    DeveloperModeSettings:
+      type: object
+      properties:
+        enabled:
+          type: boolean
+          description: Show developer tooling such as copyable API curl snippets
+      required:
+        - enabled
+
+    UpdateDeveloperModeSettings:
+      type: object
+      properties:
+        enabled:
           type: boolean
           nullable: true
 
@@ -4129,6 +4170,10 @@ components:
         name: { type: string }
         med_type: { $ref: '#/components/schemas/MedType' }
         color: { type: string }
+        emoji:
+          type: string
+          nullable: true
+          description: Optional emoji used in medication Telegram messages
         created_at: { type: string, format: date-time }
         updated_at: { type: string, format: date-time }
       required: [id, pet_id, name, med_type, color, created_at, updated_at]
@@ -4140,6 +4185,9 @@ components:
         name: { type: string }
         med_type: { $ref: '#/components/schemas/MedType' }
         color: { type: string }
+        emoji:
+          type: string
+          description: Optional emoji used in medication Telegram messages
       required: [pet_id, name, med_type]
 
     UpdateMedication:
@@ -4147,6 +4195,9 @@ components:
       properties:
         name: { type: string }
         color: { type: string }
+        emoji:
+          type: string
+          description: An empty string clears the custom emoji and uses the default pill emoji
 
     MedFormulation:
       type: object
@@ -4259,9 +4310,16 @@ components:
         liquid_dose_ml_override:
           type: number
           description: Required when taking an optional/as-needed liquid
-        taken: { type: boolean }
-        occurred_at: { type: string }
-        local_date: { type: string, format: date }
+        taken:
+          type: boolean
+          description: Whether the dose was taken (true) or skipped (false). Defaults to true.
+        occurred_at:
+          type: string
+          description: Naive local datetime when the dose was taken (YYYY-MM-DDTHH:MM:SS). Defaults to now in the server timezone.
+        local_date:
+          type: string
+          format: date
+          description: Calendar day the intake counts toward (assignment due/active checks). Defaults to the date portion of occurred_at.
         note: { type: string }
         source_type: { type: string }
       required: [pet_id, medication_id]

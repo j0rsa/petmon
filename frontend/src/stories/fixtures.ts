@@ -3,7 +3,7 @@ import type { BestFluidDay, Category, NutritionDaySummary, NutritionRangeSummary
 import type { DayNutritionHighlight, DayEliminationHighlight } from '../types/pillars';
 import type { AppInfo } from '../api/info';
 import type { ApiTokenCreated, ApiTokenPublic, OidcConfigPublic, TelegramConfigPublic } from '../api/settings';
-import { DEFAULT_CUMULATIVE_FLUID_CHART_SETTINGS, DEFAULT_NUTRITION_CALENDAR_SETTINGS, DEFAULT_USER_DISPLAY_SETTINGS, type UserDisplaySettings } from '../api/userSettings';
+import { DEFAULT_CUMULATIVE_FLUID_CHART_SETTINGS, DEFAULT_DEVELOPER_MODE_SETTINGS, DEFAULT_NUTRITION_CALENDAR_SETTINGS, DEFAULT_USER_DISPLAY_SETTINGS, type DeveloperModeSettings, type UserDisplaySettings } from '../api/userSettings';
 import type { EliminationRecord, EliminationDailySummary, EliminationRangeSummary, EliminationDurationProfile, EliminationClassifierStatus } from '../api/elimination';
 import type { NotificationItem } from '../api/notifications';
 import type { WeightRecord, WeightSummaryBucket } from '../api/weight';
@@ -239,6 +239,7 @@ export const mockDisplaySettings: UserDisplaySettings = DEFAULT_USER_DISPLAY_SET
 
 export const mockNutritionCalendarSettings = DEFAULT_NUTRITION_CALENDAR_SETTINGS;
 export const mockCumulativeFluidChartSettings = DEFAULT_CUMULATIVE_FLUID_CHART_SETTINGS;
+export const mockDeveloperModeSettings: DeveloperModeSettings = DEFAULT_DEVELOPER_MODE_SETTINGS;
 
 // ── Settings fixtures ─────────────────────────────────────────────────────────
 
@@ -575,6 +576,7 @@ export const mockMedications: Medication[] = [
     name: 'Prednisolone',
     med_type: 'pill',
     color: '#6366f1',
+    emoji: '💊',
     created_at: '2026-01-01T00:00:00Z',
     updated_at: '2026-01-01T00:00:00Z',
   },
@@ -584,6 +586,7 @@ export const mockMedications: Medication[] = [
     name: 'Metronidazole',
     med_type: 'liquid',
     color: '#f97316',
+    emoji: '💧',
     created_at: '2026-01-01T00:00:00Z',
     updated_at: '2026-01-01T00:00:00Z',
   },

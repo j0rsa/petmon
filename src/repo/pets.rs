@@ -4,7 +4,7 @@ use chrono::Utc;
 use sqlx::SqlitePool;
 use uuid::Uuid;
 
-const PET_COLUMNS: &str = "id, name, species, status, breed, birth_date, blood_type, color, weight_kg, feeding_notes, telegram_chat_id, telegram_thread_id, elimination_auto_categorize_by_duration, created_at, updated_at";
+const PET_COLUMNS: &str = "id, name, species, status, breed, birth_date, blood_type, color, weight_kg, feeding_notes, telegram_nutrition_chat_id, telegram_nutrition_thread_id, telegram_meds_chat_id, telegram_meds_thread_id, elimination_auto_categorize_by_duration, created_at, updated_at";
 
 pub async fn list_pets(pool: &SqlitePool) -> AppResult<Vec<Pet>> {
     let query = format!("SELECT {PET_COLUMNS} FROM pets ORDER BY name");
@@ -24,7 +24,7 @@ pub async fn get_pet(pool: &SqlitePool, id: Uuid) -> AppResult<Pet> {
 
 pub async fn create_pet(pool: &SqlitePool, pet: Pet) -> AppResult<Pet> {
     sqlx::query(
-        "INSERT INTO pets (id, name, species, status, breed, birth_date, blood_type, color, weight_kg, feeding_notes, telegram_chat_id, telegram_thread_id, elimination_auto_categorize_by_duration, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+        "INSERT INTO pets (id, name, species, status, breed, birth_date, blood_type, color, weight_kg, feeding_notes, telegram_nutrition_chat_id, telegram_nutrition_thread_id, telegram_meds_chat_id, telegram_meds_thread_id, elimination_auto_categorize_by_duration, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
     )
     .bind(pet.id)
     .bind(&pet.name)
@@ -36,8 +36,10 @@ pub async fn create_pet(pool: &SqlitePool, pet: Pet) -> AppResult<Pet> {
     .bind(&pet.color)
     .bind(pet.weight_kg)
     .bind(&pet.feeding_notes)
-    .bind(&pet.telegram_chat_id)
-    .bind(&pet.telegram_thread_id)
+    .bind(&pet.telegram_nutrition_chat_id)
+    .bind(&pet.telegram_nutrition_thread_id)
+    .bind(&pet.telegram_meds_chat_id)
+    .bind(&pet.telegram_meds_thread_id)
     .bind(pet.elimination_auto_categorize_by_duration)
     .bind(&pet.created_at)
     .bind(&pet.updated_at)
@@ -73,18 +75,24 @@ pub async fn update_pet(pool: &SqlitePool, id: Uuid, req: UpdatePet) -> AppResul
     if req.feeding_notes.is_some() {
         pet.feeding_notes = req.feeding_notes;
     }
-    if req.telegram_chat_id.is_some() {
-        pet.telegram_chat_id = req.telegram_chat_id;
+    if let Some(value) = req.telegram_nutrition_chat_id {
+        pet.telegram_nutrition_chat_id = value;
     }
-    if req.telegram_thread_id.is_some() {
-        pet.telegram_thread_id = req.telegram_thread_id;
+    if let Some(value) = req.telegram_nutrition_thread_id {
+        pet.telegram_nutrition_thread_id = value;
+    }
+    if let Some(value) = req.telegram_meds_chat_id {
+        pet.telegram_meds_chat_id = value;
+    }
+    if let Some(value) = req.telegram_meds_thread_id {
+        pet.telegram_meds_thread_id = value;
     }
     if let Some(enabled) = req.elimination_auto_categorize_by_duration {
         pet.elimination_auto_categorize_by_duration = enabled;
     }
     pet.updated_at = now;
     sqlx::query(
-        "UPDATE pets SET name=?, species=?, status=?, breed=?, birth_date=?, blood_type=?, color=?, weight_kg=?, feeding_notes=?, telegram_chat_id=?, telegram_thread_id=?, elimination_auto_categorize_by_duration=?, updated_at=? WHERE id=?",
+        "UPDATE pets SET name=?, species=?, status=?, breed=?, birth_date=?, blood_type=?, color=?, weight_kg=?, feeding_notes=?, telegram_nutrition_chat_id=?, telegram_nutrition_thread_id=?, telegram_meds_chat_id=?, telegram_meds_thread_id=?, elimination_auto_categorize_by_duration=?, updated_at=? WHERE id=?",
     )
     .bind(&pet.name)
     .bind(pet.species)
@@ -95,8 +103,10 @@ pub async fn update_pet(pool: &SqlitePool, id: Uuid, req: UpdatePet) -> AppResul
     .bind(&pet.color)
     .bind(pet.weight_kg)
     .bind(&pet.feeding_notes)
-    .bind(&pet.telegram_chat_id)
-    .bind(&pet.telegram_thread_id)
+    .bind(&pet.telegram_nutrition_chat_id)
+    .bind(&pet.telegram_nutrition_thread_id)
+    .bind(&pet.telegram_meds_chat_id)
+    .bind(&pet.telegram_meds_thread_id)
     .bind(pet.elimination_auto_categorize_by_duration)
     .bind(&pet.updated_at)
     .bind(id)
