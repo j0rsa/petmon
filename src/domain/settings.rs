@@ -190,7 +190,7 @@ pub struct ApiToken {
     pub active: bool,
     pub scopes: String,
     pub created_by: Option<String>,
-    /// OIDC `sub` (or `dev`) of the user who minted this token — drives per-user settings sync.
+    /// OIDC `sub` (or `dev`) of the user who minted this token — the per-user id for settings, reads, and push.
     pub owner_subject: Option<String>,
     pub created_at: String,
     pub last_used_at: Option<String>,
