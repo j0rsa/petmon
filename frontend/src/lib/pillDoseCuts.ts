@@ -15,13 +15,13 @@ export interface PillShapeGeometry {
   supportedFractions: readonly DoseFraction[];
 }
 
-/** Horizontal almond-like oval with pointed left/right ends. */
+/** Reference #3: horizontal ellipse with softly tapered left/right ends. */
 const POINTED_OVAL =
-  'M 10 50 C 23 34 36 28 50 28 C 64 28 77 34 90 50 C 77 66 64 72 50 72 C 36 72 23 66 10 50 Z';
+  'M 10 50 C 17 33 31 26 50 26 C 69 26 83 33 90 50 C 83 67 69 74 50 74 C 31 74 17 67 10 50 Z';
 
-/** Horizontal oblong with flat sides and strongly filleted corners. */
+/** Reference #1: horizontal caplet with flat sides and fully rounded ends. */
 const ROUNDED_OVAL =
-  'M 24 28 H 76 Q 90 28 90 42 V 58 Q 90 72 76 72 H 24 Q 10 72 10 58 V 42 Q 10 28 24 28 Z';
+  'M 30 28 H 70 C 82 28 90 38 90 50 C 90 62 82 72 70 72 H 30 C 18 72 10 62 10 50 C 10 38 18 28 30 28 Z';
 
 /** Two vertically stacked lobes joined directly at a narrow waist. */
 const CONNECTED_DOUBLE_CIRCLE =

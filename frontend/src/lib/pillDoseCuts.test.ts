@@ -24,7 +24,7 @@ describe('pillDoseCuts', () => {
     expect(pillShapeGeometry('oval').label).toBe('Oval · pointed');
     expect(pillShapeGeometry('oval').outline).toContain('M 10 50');
     expect(pillShapeGeometry('oval_rounded').label).toBe('Oval · rounded');
-    expect(pillShapeGeometry('oval_rounded').outline).toContain('M 24 28 H 76');
+    expect(pillShapeGeometry('oval_rounded').outline).toContain('M 30 28 H 70');
     expect(pillShapeGeometry('rectangle').label).toBe('Rectangle');
   });
 
