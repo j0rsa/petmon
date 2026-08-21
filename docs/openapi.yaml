@@ -4187,12 +4187,20 @@ components:
         tablet_strength_mg: { type: number }
         pill_shape: { $ref: '#/components/schemas/PillShape' }
         liquid_concentration_mg_per_ml: { type: number }
-        dose_fraction: { $ref: '#/components/schemas/DoseFraction' }
-        liquid_dose_ml: { type: number }
-        frequency: { $ref: '#/components/schemas/MedFrequency' }
+        dose_fraction:
+          allOf: [{ $ref: '#/components/schemas/DoseFraction' }]
+          description: Required for scheduled pills; omitted for optional/as-needed assignments
+        liquid_dose_ml:
+          type: number
+          description: Required for scheduled liquids; omitted for optional/as-needed assignments
+        frequency:
+          allOf: [{ $ref: '#/components/schemas/MedFrequency' }]
+          description: Required for scheduled assignments; ignored for optional/as-needed assignments
         date_from: { type: string, format: date }
         date_to: { type: string, format: date, nullable: true }
-        optional: { type: boolean }
+        optional:
+          type: boolean
+          description: As-needed medication; dosage is provided for each intake and no schedule is required
       required: [medication_id, date_from]
 
     ReviseMedAssignment:
@@ -4202,12 +4210,20 @@ components:
         tablet_strength_mg: { type: number }
         pill_shape: { $ref: '#/components/schemas/PillShape' }
         liquid_concentration_mg_per_ml: { type: number }
-        dose_fraction: { $ref: '#/components/schemas/DoseFraction' }
-        liquid_dose_ml: { type: number }
-        frequency: { $ref: '#/components/schemas/MedFrequency' }
+        dose_fraction:
+          allOf: [{ $ref: '#/components/schemas/DoseFraction' }]
+          description: Required for scheduled pills; omitted for optional/as-needed assignments
+        liquid_dose_ml:
+          type: number
+          description: Required for scheduled liquids; omitted for optional/as-needed assignments
+        frequency:
+          allOf: [{ $ref: '#/components/schemas/MedFrequency' }]
+          description: Required for scheduled assignments; ignored for optional/as-needed assignments
         effective_from: { type: string, format: date }
         date_to: { type: string, format: date, nullable: true }
-        optional: { type: boolean }
+        optional:
+          type: boolean
+          description: As-needed medication; dosage is provided for each intake and no schedule is required
       required: [effective_from]
 
     MedIntakeRecord:
@@ -4237,8 +4253,12 @@ components:
         pet_id: { type: string, format: uuid }
         medication_id: { type: string }
         assignment_id: { type: string }
-        dose_fraction_override: { $ref: '#/components/schemas/DoseFraction' }
-        liquid_dose_ml_override: { type: number }
+        dose_fraction_override:
+          allOf: [{ $ref: '#/components/schemas/DoseFraction' }]
+          description: Required when taking an optional/as-needed pill
+        liquid_dose_ml_override:
+          type: number
+          description: Required when taking an optional/as-needed liquid
         taken: { type: boolean }
         occurred_at: { type: string }
         local_date: { type: string, format: date }

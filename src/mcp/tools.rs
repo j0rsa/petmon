@@ -647,7 +647,7 @@ fn tool_list() -> Value {
             },
             {
                 "name": "health.meds.assignments.create",
-                "description": "Create a treatment assignment: formulation (tablet strength + shape, or liquid concentration) plus dose fraction/volume and schedule.",
+                "description": "Create a treatment assignment. For optional/as-needed medication, omit dose and frequency; actual dosage is required on each intake.",
                 "inputSchema": {
                     "type": "object",
                     "required": ["medication_id", "date_from"],
@@ -678,7 +678,7 @@ fn tool_list() -> Value {
             },
             {
                 "name": "health.meds.assignments.revise",
-                "description": "Revise assignment (new dose fraction, new formulation, or schedule). Ends previous assignment one day before effective_from.",
+                "description": "Revise assignment (dose, formulation, schedule, or optional/as-needed status). Ends the previous assignment one day before effective_from.",
                 "inputSchema": {
                     "type": "object",
                     "required": ["id", "effective_from"],
@@ -736,7 +736,7 @@ fn tool_list() -> Value {
             },
             {
                 "name": "health.meds.intake.create",
-                "description": "Log medication intake by referencing the active assignment. Use dose_fraction_override only when the given amount differed from the plan.",
+                "description": "Log medication intake by assignment. Optional/as-needed pills require dose_fraction_override; optional/as-needed liquids require liquid_dose_ml_override.",
                 "inputSchema": {
                     "type": "object",
                     "required": ["pet_id", "medication_id"],

@@ -113,7 +113,7 @@ export default function HealthTreatmentPlanPage() {
 
   function buildPlanBase() {
     return {
-      frequency: planFrequency,
+      ...(planOptional ? {} : { frequency: planFrequency }),
       date_to: planTo.trim() || null,
       optional: planOptional,
     };
@@ -129,7 +129,7 @@ export default function HealthTreatmentPlanPage() {
     if (selectedMed?.med_type === 'liquid') {
       return {
         ...base,
-        liquid_dose_ml: parseDecimal(liquidDoseMl),
+        liquid_dose_ml: planOptional ? undefined : parseDecimal(liquidDoseMl),
         liquid_concentration_mg_per_ml: liquidConcentration.trim()
           ? parseDecimal(liquidConcentration)
           : undefined,
@@ -142,14 +142,14 @@ export default function HealthTreatmentPlanPage() {
       return {
         ...base,
         formulation_id: reuseFormulationId,
-        dose_fraction: formulation.doseFraction,
+        dose_fraction: planOptional ? undefined : formulation.doseFraction,
       };
     }
     return {
       ...base,
       tablet_strength_mg: strength,
       pill_shape: formulation.pillShape,
-      dose_fraction: formulation.doseFraction,
+      dose_fraction: planOptional ? undefined : formulation.doseFraction,
     };
   }
 
@@ -163,7 +163,7 @@ export default function HealthTreatmentPlanPage() {
     if (selectedMed?.med_type === 'liquid') {
       return {
         ...base,
-        liquid_dose_ml: parseDecimal(liquidDoseMl),
+        liquid_dose_ml: planOptional ? undefined : parseDecimal(liquidDoseMl),
         liquid_concentration_mg_per_ml: liquidConcentration.trim()
           ? parseDecimal(liquidConcentration)
           : undefined,
@@ -176,14 +176,14 @@ export default function HealthTreatmentPlanPage() {
       return {
         ...base,
         formulation_id: reuseFormulationId,
-        dose_fraction: formulation.doseFraction,
+        dose_fraction: planOptional ? undefined : formulation.doseFraction,
       };
     }
     return {
       ...base,
       tablet_strength_mg: strength,
       pill_shape: formulation.pillShape,
-      dose_fraction: formulation.doseFraction,
+      dose_fraction: planOptional ? undefined : formulation.doseFraction,
     };
   }
 
@@ -364,13 +364,14 @@ export default function HealthTreatmentPlanPage() {
               onChange={setFormulation}
               formulationLocked={reviseId ? formulationLocked : undefined}
               onFormulationLockedChange={reviseId ? setFormulationLocked : undefined}
+              showDose={!planOptional}
             />
           ) : (
             <div style={{ display: 'grid', gap: '0.65rem', ...(reviseId && formulationLocked ? { opacity: 0.55, pointerEvents: 'none' } : {}) }}>
-              <div className="form-row">
+              {!planOptional && <div className="form-row">
                 <label style={{ fontSize: '0.82rem' }}>Dose (ml)</label>
                 <input type="text" inputMode="decimal" value={liquidDoseMl} onChange={(e) => setLiquidDoseMl(e.target.value)} />
-              </div>
+              </div>}
               <div className="form-row">
                 <label style={{ fontSize: '0.82rem' }}>Concentration (mg/ml, optional)</label>
                 <input type="text" inputMode="decimal" value={liquidConcentration} onChange={(e) => setLiquidConcentration(e.target.value)} />
@@ -378,9 +379,21 @@ export default function HealthTreatmentPlanPage() {
             </div>
           )}
 
-          <div style={{ marginTop: '0.9rem' }}>
-            <MedScheduleEditor value={planFrequency} onChange={setPlanFrequency} />
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginTop: '0.65rem', width: 'fit-content' }}>
+            <input
+              id="plan-optional"
+              type="checkbox"
+              checked={planOptional}
+              onChange={(e) => setPlanOptional(e.target.checked)}
+            />
+            <label htmlFor="plan-optional" style={{ fontSize: '0.82rem', cursor: 'pointer', userSelect: 'none' }}>
+              Optional medication (take as needed)
+            </label>
           </div>
+
+          {!planOptional && <div style={{ marginTop: '0.9rem' }}>
+            <MedScheduleEditor value={planFrequency} onChange={setPlanFrequency} />
+          </div>}
 
           <div style={{ display: 'grid', gap: '0.65rem', gridTemplateColumns: 'repeat(auto-fit, minmax(10rem, 1fr))', marginTop: '0.75rem' }}>
             {!reviseId ? (
@@ -399,24 +412,13 @@ export default function HealthTreatmentPlanPage() {
               <input type="date" value={planTo} onChange={(e) => setPlanTo(e.target.value)} />
             </div>
           </div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginTop: '0.65rem', width: 'fit-content' }}>
-            <input
-              id="plan-optional"
-              type="checkbox"
-              checked={planOptional}
-              onChange={(e) => setPlanOptional(e.target.checked)}
-            />
-            <label htmlFor="plan-optional" style={{ fontSize: '0.82rem', cursor: 'pointer', userSelect: 'none' }}>
-              Optional medication
-            </label>
-          </div>
           <div style={{ display: 'flex', gap: '0.5rem', marginTop: '0.85rem' }}>
             <button
               type="button"
               className="button"
               disabled={
                 !planMedId
-                || expectedDoseCount(planFrequency) === 0
+                || (!planOptional && expectedDoseCount(planFrequency) === 0)
                 || createPlanMutation.isPending
                 || reviseMutation.isPending
               }
@@ -465,8 +467,9 @@ export default function HealthTreatmentPlanPage() {
                         row.currentAssignment.formulation.tablet_strength_mg,
                         row.currentAssignment.formulation.pill_shape,
                       )}
-                      {' · '}
-                      {formatFrequency(row.currentAssignment.frequency)}
+                      {!row.currentAssignment.optional && (
+                        <> · {formatFrequency(row.currentAssignment.frequency)}</>
+                      )}
                       {' · '}
                       {row.currentAssignment.date_from}
                       {row.currentAssignment.date_to ? ` → ${row.currentAssignment.date_to}` : ' → ongoing'}
@@ -481,7 +484,9 @@ export default function HealthTreatmentPlanPage() {
                       <ul style={{ margin: '0.35rem 0 0', paddingLeft: '1.1rem' }}>
                         {row.history.map((a) => (
                           <li key={a.id} className="muted-text">
-                            {a.dose_label} · {formatFrequency(a.frequency)} · {a.date_from}
+                            {a.dose_label}
+                            {!a.optional && <> · {formatFrequency(a.frequency)}</>}
+                            {' · '}{a.date_from}
                             {a.date_to ? ` → ${a.date_to}` : ' → ongoing'}
                           </li>
                         ))}

@@ -110,7 +110,7 @@ pub async fn daily_assignments(
         if let Some(assignment) =
             med_assignments::active_for_medication_on(pool, &medication.id, date).await?
         {
-            if !assignment_due_on(&assignment, date) {
+            if !assignment.optional && !assignment_due_on(&assignment, date) {
                 continue;
             }
             let med_intakes: Vec<MedIntakeRecord> = intakes

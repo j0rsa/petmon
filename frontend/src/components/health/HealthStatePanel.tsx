@@ -1,4 +1,4 @@
-import { useState, type ReactNode } from 'react';
+import { useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { healthStateApi, type CreateHealthStateRecord, type HealthStateRecord } from '../../api/healthState';
 import type { HealthStateLevel } from '../../lib/healthState';
@@ -28,10 +28,9 @@ function nowLocalDateTimeString(): string {
 
 export interface HealthStatePanelProps {
   petId: string;
-  afterPrimary?: ReactNode;
 }
 
-export function HealthStatePanel({ petId, afterPrimary }: HealthStatePanelProps) {
+export function HealthStatePanel({ petId }: HealthStatePanelProps) {
   const queryClient = useQueryClient();
   const { canWrite } = usePermissions();
   const formatDate = useFormatDate();
@@ -183,8 +182,6 @@ export function HealthStatePanel({ petId, afterPrimary }: HealthStatePanelProps)
           latest && <HealthStatePicker value={latest.level} onChange={() => {}} disabled />
         )}
       </section>
-
-      {afterPrimary}
 
       <section className="panel">
         <div className="section-heading">
