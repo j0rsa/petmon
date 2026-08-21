@@ -12,7 +12,15 @@ describe('pillDoseCuts', () => {
 
   it('oval half is top half (upright)', () => {
     expect(pillShapeGeometry('oval').halfSplit).toBe('top');
+    expect(pillShapeGeometry('oval').outline).not.toContain(' A ');
     expect(doseRegionPath('oval', 'half')).toBe('M 0 0 H 100 V 50 H 0 Z');
+  });
+
+  it('keeps pointed oval and rounded rectangle as distinct shapes', () => {
+    expect(pillShapeGeometry('oval').label).toBe('Oval');
+    expect(pillShapeGeometry('oval').outline).toContain('M 50 12');
+    expect(pillShapeGeometry('rectangle').label).toBe('Rounded rectangle');
+    expect(pillShapeGeometry('rectangle').outline).toContain('Q 82 18 82 28');
   });
 
   it('third uses proportional top fill', () => {
@@ -32,6 +40,9 @@ describe('pillDoseCuts', () => {
   });
 
   it('double circle quarter and three_quarter follow lobe rules', () => {
+    const geometry = pillShapeGeometry('double_circle');
+    expect(geometry.outline).not.toContain(' L 66');
+    expect(geometry.scoreLines).toBe('M 36 50 L 64 50');
     expect(doseRegionPath('double_circle', 'quarter')).toBe('M 0 0 H 100 V 25 H 0 Z');
     expect(doseRegionPath('double_circle', 'three_quarter')).toBe('M 0 0 H 100 V 75 H 0 Z');
   });
