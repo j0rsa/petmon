@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import {
   medicationsApi,
@@ -8,6 +8,7 @@ import {
   type ReviseMedAssignment,
 } from '../api/medications';
 import { NoPetSelected } from '../components/NoPetSelected';
+import { MedColorSwatch } from '../components/health/MedColorSwatch';
 import { MedIcon } from '../components/health/MedIcon';
 import {
   FormulationPicker,
@@ -17,7 +18,7 @@ import {
 import { useSelectedPet } from '../context/SelectedPetContext';
 import { usePermissions } from '../context/usePermissions';
 import { localToday } from '../lib/dates';
-import { formatFrequency, formulationLabel } from '../lib/medications';
+import { formatFrequency, formulationLabel, randomMedColor } from '../lib/medications';
 import { parseDecimal } from '../lib/numbers';
 
 interface MedPlanRow {
@@ -48,7 +49,7 @@ export default function HealthTreatmentPlanPage() {
   const [showCreateMed, setShowCreateMed] = useState(false);
   const [medName, setMedName] = useState('');
   const [medType, setMedType] = useState<'pill' | 'liquid'>('pill');
-  const [medColor, setMedColor] = useState('#6366f1');
+  const [medColor, setMedColor] = useState(() => randomMedColor());
 
   const [planMedId, setPlanMedId] = useState<string | null>(null);
   const [formulation, setFormulation] = useState<FormulationPickerValue>(defaultFormulationPickerValue);
@@ -62,7 +63,7 @@ export default function HealthTreatmentPlanPage() {
 
   const [reviseId, setReviseId] = useState<string | null>(null);
   const [reviseFrom, setReviseFrom] = useState(today);
-  const [newFormulationOnRevise, setNewFormulationOnRevise] = useState(false);
+  const [formulationLocked, setFormulationLocked] = useState(true);
 
   const medsQuery = useQuery({
     queryKey: ['medications', selectedPetId],
@@ -93,10 +94,16 @@ export default function HealthTreatmentPlanPage() {
     onSuccess: () => {
       setMedName('');
       setMedType('pill');
-      setMedColor('#6366f1');
+      setMedColor(randomMedColor());
       setShowCreateMed(false);
       invalidate();
     },
+  });
+
+  const updateColorMutation = useMutation({
+    mutationFn: ({ id, color }: { id: string; color: string }) =>
+      medicationsApi.update(id, { color }),
+    onSuccess: invalidate,
   });
 
   function buildPlanBase() {
@@ -155,12 +162,12 @@ export default function HealthTreatmentPlanPage() {
         liquid_concentration_mg_per_ml: liquidConcentration.trim()
           ? parseDecimal(liquidConcentration)
           : undefined,
-        ...(reuseFormulationId && !newFormulationOnRevise ? { formulation_id: reuseFormulationId } : {}),
+        ...(reuseFormulationId && formulationLocked ? { formulation_id: reuseFormulationId } : {}),
       };
     }
 
     const strength = parseDecimal(formulation.tabletStrengthMg);
-    if (reuseFormulationId && !newFormulationOnRevise) {
+    if (reuseFormulationId && formulationLocked) {
       return {
         ...base,
         formulation_id: reuseFormulationId,
@@ -201,7 +208,7 @@ export default function HealthTreatmentPlanPage() {
     setPlanMedId(null);
     setReviseId(null);
     setReuseFormulationId(null);
-    setNewFormulationOnRevise(false);
+    setFormulationLocked(true);
     setFormulation(defaultFormulationPickerValue);
     setLiquidDoseMl('2.5');
     setLiquidConcentration('');
@@ -226,10 +233,10 @@ export default function HealthTreatmentPlanPage() {
     setReviseId(a.id);
     setPlanMedId(row.medication.id);
     setReuseFormulationId(a.formulation_id);
-    setNewFormulationOnRevise(false);
+    setFormulationLocked(true);
     setFormulation({
       tabletStrengthMg: String(a.formulation.tablet_strength_mg ?? '5'),
-      pillShape: a.formulation.pill_shape ?? 'round_1_precut',
+      pillShape: a.formulation.pill_shape ?? 'round',
       doseFraction: a.dose_fraction ?? 'half',
     });
     setLiquidDoseMl(String(a.liquid_dose_ml ?? '2.5'));
@@ -243,6 +250,12 @@ export default function HealthTreatmentPlanPage() {
     setPlanTo(a.date_to ?? '');
     setReviseFrom(today);
   }
+
+  useEffect(() => {
+    if (showCreateMed) {
+      setMedColor(randomMedColor());
+    }
+  }, [showCreateMed]);
 
   return (
     <div className="page-stack">
@@ -263,7 +276,16 @@ export default function HealthTreatmentPlanPage() {
           <h3 style={{ marginBottom: '0.75rem' }}>Register medication</h3>
           <div className="form-row" style={{ marginBottom: '0.75rem' }}>
             <label style={{ fontSize: '0.82rem' }}>Name</label>
-            <input type="text" value={medName} onChange={(e) => setMedName(e.target.value)} placeholder="e.g. Prednisolone" />
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+              <MedColorSwatch color={medColor} onChange={setMedColor} />
+              <input
+                type="text"
+                value={medName}
+                onChange={(e) => setMedName(e.target.value)}
+                placeholder="e.g. Prednisolone"
+                style={{ flex: 1 }}
+              />
+            </div>
           </div>
           <div style={{ display: 'flex', gap: '0.5rem', marginBottom: '0.75rem' }}>
             {(['pill', 'liquid'] as const).map((type) => (
@@ -276,10 +298,6 @@ export default function HealthTreatmentPlanPage() {
                 {type === 'pill' ? 'Pill' : 'Liquid'}
               </button>
             ))}
-          </div>
-          <div className="form-row">
-            <label style={{ fontSize: '0.82rem' }}>Accent color</label>
-            <input type="color" value={medColor} onChange={(e) => setMedColor(e.target.value)} />
           </div>
           <div style={{ display: 'flex', gap: '0.5rem', marginTop: '1rem' }}>
             <button type="button" className="button" disabled={!medName.trim() || createMedMutation.isPending} onClick={() => createMedMutation.mutate()}>
@@ -305,21 +323,29 @@ export default function HealthTreatmentPlanPage() {
             </div>
           )}
 
-          {reviseId && (
-            <label style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', marginBottom: '0.75rem', fontSize: '0.82rem' }}>
-              <input
-                type="checkbox"
-                checked={newFormulationOnRevise}
-                onChange={(e) => setNewFormulationOnRevise(e.target.checked)}
-              />
-              Change tablet strength or pill shape (e.g. 5mg → 1mg)
-            </label>
+          {reviseId && planMed.med_type === 'liquid' && formulationLocked && (
+            <p className="muted-text" style={{ fontSize: '0.82rem', margin: '0 0 0.75rem' }}>
+              Keeping the same bottle concentration.{' '}
+              <button
+                type="button"
+                style={{ fontSize: 'inherit', background: 'none', border: 'none', color: 'var(--accent)', cursor: 'pointer', padding: 0, textDecoration: 'underline' }}
+                onClick={() => setFormulationLocked(false)}
+              >
+                Change concentration
+              </button>
+            </p>
           )}
 
           {planMed.med_type === 'pill' ? (
-            <FormulationPicker color={planMed.color} value={formulation} onChange={setFormulation} />
+            <FormulationPicker
+              color={planMed.color}
+              value={formulation}
+              onChange={setFormulation}
+              formulationLocked={reviseId ? formulationLocked : undefined}
+              onFormulationLockedChange={reviseId ? setFormulationLocked : undefined}
+            />
           ) : (
-            <div style={{ display: 'grid', gap: '0.65rem' }}>
+            <div style={{ display: 'grid', gap: '0.65rem', ...(reviseId && formulationLocked ? { opacity: 0.55, pointerEvents: 'none' } : {}) }}>
               <div className="form-row">
                 <label style={{ fontSize: '0.82rem' }}>Dose (ml)</label>
                 <input type="text" inputMode="decimal" value={liquidDoseMl} onChange={(e) => setLiquidDoseMl(e.target.value)} />
@@ -352,10 +378,17 @@ export default function HealthTreatmentPlanPage() {
               <input type="date" value={planTo} onChange={(e) => setPlanTo(e.target.value)} />
             </div>
           </div>
-          <label style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', marginTop: '0.65rem', fontSize: '0.82rem' }}>
-            <input type="checkbox" checked={planOptional} onChange={(e) => setPlanOptional(e.target.checked)} />
-            Optional medication
-          </label>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginTop: '0.65rem', width: 'fit-content' }}>
+            <input
+              id="plan-optional"
+              type="checkbox"
+              checked={planOptional}
+              onChange={(e) => setPlanOptional(e.target.checked)}
+            />
+            <label htmlFor="plan-optional" style={{ fontSize: '0.82rem', cursor: 'pointer', userSelect: 'none' }}>
+              Optional medication
+            </label>
+          </div>
           <div style={{ display: 'flex', gap: '0.5rem', marginTop: '0.85rem' }}>
             <button
               type="button"
@@ -397,7 +430,17 @@ export default function HealthTreatmentPlanPage() {
                   size={44}
                 />
                 <div style={{ flex: 1 }}>
-                  <strong>{row.medication.name}</strong>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.45rem' }}>
+                    {canWrite && (
+                      <MedColorSwatch
+                        color={row.medication.color}
+                        onChange={(color) => updateColorMutation.mutate({ id: row.medication.id, color })}
+                        size={18}
+                        title={`Change color for ${row.medication.name}`}
+                      />
+                    )}
+                    <strong>{row.medication.name}</strong>
+                  </div>
                   {row.currentAssignment ? (
                     <p className="muted-text" style={{ fontSize: '0.82rem', margin: '0.2rem 0 0' }}>
                       {row.currentAssignment.dose_label}

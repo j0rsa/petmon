@@ -1,7 +1,21 @@
 import { api } from './client';
 
 export type MedType = 'pill' | 'liquid';
-export type PillShape = 'round_1_precut' | 'round_2_precut' | 'ellipse_1_precut';
+export type PillShape =
+  | 'freedom'
+  | 'oval'
+  | 'square'
+  | 'capsule'
+  | 'pentagon'
+  | 'tear'
+  | 'rectangle'
+  | 'hexagon'
+  | 'round'
+  | 'triangle'
+  | 'double_circle'
+  | 'trapezoid'
+  | 'octagon'
+  | 'diamond';
 export type DoseFraction = 'whole' | 'half' | 'quarter' | 'three_quarter' | 'eighth' | 'sixteenth';
 
 export interface MedFrequency {

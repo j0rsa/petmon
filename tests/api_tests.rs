@@ -3083,7 +3083,7 @@ async fn medication_system_formulations_and_intake_by_reference() {
         .set_json(serde_json::json!({
             "medication_id": med_id,
             "tablet_strength_mg": 5.0,
-            "pill_shape": "round_1_precut",
+            "pill_shape": "round",
             "dose_fraction": "half",
             "frequency": { "times": ["08:00"] },
             "date_from": "2026-03-01"
@@ -3117,7 +3117,7 @@ async fn medication_system_formulations_and_intake_by_reference() {
         ))
         .set_json(serde_json::json!({
             "tablet_strength_mg": 1.0,
-            "pill_shape": "round_2_precut",
+            "pill_shape": "round",
             "dose_fraction": "whole",
             "effective_from": "2026-03-15"
         }))
