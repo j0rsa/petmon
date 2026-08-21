@@ -20,7 +20,11 @@ export type PillShape =
 export type DoseFraction = 'whole' | 'half' | 'third' | 'quarter' | 'three_quarter' | 'eighth' | 'sixteenth';
 
 export interface MedFrequency {
-  times: string[];
+  morning: number;
+  midday: number;
+  evening: number;
+  every: number;
+  unit: 'days' | 'weeks';
 }
 
 export interface Medication {

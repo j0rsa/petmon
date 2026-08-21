@@ -1,6 +1,6 @@
 use crate::domain::medication::{
-    CreateMedIntakeRecord, DoseFraction, MedIntakeCore, MedIntakeRecord, MedIntakeRecordFilters,
-    hydrate_intake,
+    hydrate_intake, CreateMedIntakeRecord, DoseFraction, MedIntakeCore, MedIntakeRecord,
+    MedIntakeRecordFilters,
 };
 use crate::error::{AppError, AppResult};
 use chrono::Utc;
@@ -188,7 +188,15 @@ pub async fn create(
         })?
     };
 
-    if req.dose_fraction_override.is_some() && medication.med_type != crate::domain::medication::MedType::Pill {
+    if !crate::domain::medication::assignment_due_on(&assignment, &local_date) {
+        return Err(AppError::BadRequest(
+            "assignment is not due on the given date".into(),
+        ));
+    }
+
+    if req.dose_fraction_override.is_some()
+        && medication.med_type != crate::domain::medication::MedType::Pill
+    {
         return Err(AppError::BadRequest(
             "dose_fraction_override applies to pill medications only".into(),
         ));
@@ -236,7 +244,9 @@ pub async fn delete(pool: &SqlitePool, id: &str) -> AppResult<()> {
         .execute(pool)
         .await?;
     if result.rows_affected() == 0 {
-        return Err(AppError::NotFound(format!("Med intake record {id} not found")));
+        return Err(AppError::NotFound(format!(
+            "Med intake record {id} not found"
+        )));
     }
     Ok(())
 }

@@ -1,7 +1,7 @@
 use crate::domain::medication::{
-    day_before, CreateMedAssignment, CreateMedFormulation, DoseFraction,
+    day_before, hydrate_assignment, CreateMedAssignment, CreateMedFormulation, DoseFraction,
     MedAssignment, MedAssignmentCore, MedAssignmentFilters, MedFrequency, MedType,
-    ReviseMedAssignment, hydrate_assignment,
+    ReviseMedAssignment,
 };
 use crate::error::{AppError, AppResult};
 use chrono::Utc;
@@ -98,6 +98,12 @@ fn validate_dose(
         }
     }
     Ok(())
+}
+
+fn validate_frequency(frequency: &MedFrequency) -> AppResult<()> {
+    frequency
+        .validate()
+        .map_err(|message| AppError::BadRequest(message.to_string()))
 }
 
 async fn resolve_formulation_id(
@@ -217,11 +223,9 @@ pub async fn active_for_medication_on(
 #[tracing::instrument(skip(pool, req))]
 pub async fn create(pool: &SqlitePool, req: CreateMedAssignment) -> AppResult<MedAssignment> {
     let medication = crate::repo::medications::get(pool, &req.medication_id).await?;
-    validate_dose(
-        medication.med_type,
-        req.dose_fraction,
-        req.liquid_dose_ml,
-    )?;
+    validate_dose(medication.med_type, req.dose_fraction, req.liquid_dose_ml)?;
+    let frequency = req.frequency.clone().unwrap_or_default();
+    validate_frequency(&frequency)?;
 
     let formulation_id = resolve_formulation_id(
         pool,
@@ -236,7 +240,6 @@ pub async fn create(pool: &SqlitePool, req: CreateMedAssignment) -> AppResult<Me
 
     let now = Utc::now().to_rfc3339();
     let id = Uuid::new_v4().to_string();
-    let frequency = req.frequency.unwrap_or(MedFrequency { times: vec![] });
     let optional = req.optional.unwrap_or(false);
 
     sqlx::query(

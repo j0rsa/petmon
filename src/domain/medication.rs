@@ -152,23 +152,90 @@ impl DoseFraction {
     }
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "snake_case")]
+pub enum MedFrequencyUnit {
+    Days,
+    Weeks,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub struct MedFrequency {
     #[serde(default)]
-    pub times: Vec<String>,
+    pub morning: u8,
+    #[serde(default)]
+    pub midday: u8,
+    #[serde(default)]
+    pub evening: u8,
+    #[serde(default = "default_frequency_every")]
+    pub every: u32,
+    #[serde(default = "default_frequency_unit")]
+    pub unit: MedFrequencyUnit,
+}
+
+const fn default_frequency_every() -> u32 {
+    1
+}
+
+const fn default_frequency_unit() -> MedFrequencyUnit {
+    MedFrequencyUnit::Days
+}
+
+impl Default for MedFrequency {
+    fn default() -> Self {
+        Self {
+            morning: 1,
+            midday: 0,
+            evening: 0,
+            every: 1,
+            unit: MedFrequencyUnit::Days,
+        }
+    }
 }
 
 impl MedFrequency {
     pub fn default_json() -> String {
-        r#"{"times":[]}"#.to_string()
+        serde_json::to_string(&Self::default()).expect("default medication frequency serializes")
     }
 
     pub fn from_json(raw: &str) -> Self {
-        serde_json::from_str(raw).unwrap_or(Self { times: vec![] })
+        serde_json::from_str(raw).unwrap_or_default()
     }
 
     pub fn to_json(&self) -> String {
         serde_json::to_string(self).unwrap_or_else(|_| Self::default_json())
+    }
+
+    pub fn expected_doses(&self) -> u32 {
+        u32::from(self.morning) + u32::from(self.midday) + u32::from(self.evening)
+    }
+
+    pub fn validate(&self) -> Result<(), &'static str> {
+        if self.expected_doses() == 0 {
+            return Err("at least one morning, midday, or evening dose is required");
+        }
+        if self.every == 0 {
+            return Err("frequency every must be at least 1");
+        }
+        Ok(())
+    }
+
+    pub fn due_on(&self, date_from: &str, date: &str) -> bool {
+        let Ok(anchor) = NaiveDate::parse_from_str(date_from, "%Y-%m-%d") else {
+            return false;
+        };
+        let Ok(target) = NaiveDate::parse_from_str(date, "%Y-%m-%d") else {
+            return false;
+        };
+        let elapsed_days = (target - anchor).num_days();
+        if elapsed_days < 0 {
+            return false;
+        }
+        let interval_days = match self.unit {
+            MedFrequencyUnit::Days => i64::from(self.every),
+            MedFrequencyUnit::Weeks => i64::from(self.every) * 7,
+        };
+        elapsed_days % interval_days == 0
     }
 }
 
@@ -338,6 +405,11 @@ pub fn assignment_active_on(assignment: &MedAssignment, date: &str) -> bool {
     }
 }
 
+pub fn assignment_due_on(assignment: &MedAssignment, date: &str) -> bool {
+    assignment_active_on(assignment, date)
+        && assignment.frequency.due_on(&assignment.date_from, date)
+}
+
 pub fn compute_effective_dose_mg(
     formulation: &MedFormulation,
     dose_fraction: Option<DoseFraction>,
@@ -346,10 +418,9 @@ pub fn compute_effective_dose_mg(
     if let (Some(strength), Some(fraction)) = (formulation.tablet_strength_mg, dose_fraction) {
         return Some(strength * fraction.multiplier());
     }
-    if let (Some(concentration), Some(ml)) = (
-        formulation.liquid_concentration_mg_per_ml,
-        liquid_dose_ml,
-    ) {
+    if let (Some(concentration), Some(ml)) =
+        (formulation.liquid_concentration_mg_per_ml, liquid_dose_ml)
+    {
         return Some(concentration * ml);
     }
     None
@@ -445,11 +516,8 @@ pub fn hydrate_intake(
 ) -> MedIntakeRecord {
     let effective_fraction = intake.dose_fraction_override.or(assignment.dose_fraction);
     let effective_ml = intake.liquid_dose_ml_override.or(assignment.liquid_dose_ml);
-    let effective_dose_mg = compute_effective_dose_mg(
-        &assignment.formulation,
-        effective_fraction,
-        effective_ml,
-    );
+    let effective_dose_mg =
+        compute_effective_dose_mg(&assignment.formulation, effective_fraction, effective_ml);
     let dose_label = build_dose_label(
         med_type,
         &assignment.formulation,
@@ -514,9 +582,49 @@ mod tests {
             liquid_concentration_mg_per_ml: None,
             created_at: String::new(),
         };
-        assert!((compute_effective_dose_mg(&formulation, Some(DoseFraction::Half), None).unwrap()
-            - 2.5)
-            .abs()
-            < f64::EPSILON);
+        assert!(
+            (compute_effective_dose_mg(&formulation, Some(DoseFraction::Half), None).unwrap()
+                - 2.5)
+                .abs()
+                < f64::EPSILON
+        );
+    }
+
+    #[test]
+    fn frequency_every_three_days_uses_assignment_start_as_anchor() {
+        let frequency = MedFrequency {
+            morning: 0,
+            midday: 0,
+            evening: 1,
+            every: 3,
+            unit: MedFrequencyUnit::Days,
+        };
+        assert!(frequency.due_on("2026-03-01", "2026-03-01"));
+        assert!(!frequency.due_on("2026-03-01", "2026-03-02"));
+        assert!(frequency.due_on("2026-03-01", "2026-03-04"));
+    }
+
+    #[test]
+    fn frequency_every_two_weeks_uses_fourteen_day_interval() {
+        let frequency = MedFrequency {
+            morning: 1,
+            midday: 0,
+            evening: 0,
+            every: 2,
+            unit: MedFrequencyUnit::Weeks,
+        };
+        assert!(!frequency.due_on("2026-03-01", "2026-03-08"));
+        assert!(frequency.due_on("2026-03-01", "2026-03-15"));
+    }
+
+    #[test]
+    fn frequency_requires_dose_and_positive_interval() {
+        let mut frequency = MedFrequency::default();
+        assert!(frequency.validate().is_ok());
+        frequency.morning = 0;
+        assert!(frequency.validate().is_err());
+        frequency.evening = 1;
+        frequency.every = 0;
+        assert!(frequency.validate().is_err());
     }
 }

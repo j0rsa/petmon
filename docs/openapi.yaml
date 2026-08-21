@@ -1619,7 +1619,7 @@ paths:
   /health/meds/assignments/daily:
     get:
       tags: [Medications]
-      summary: Daily active medication assignments with intake records
+      summary: Medication assignments due on a date with intake records
       x-required-scope: api_read
       parameters:
         - name: pet_id
@@ -4100,10 +4100,26 @@ components:
     MedFrequency:
       type: object
       properties:
-        times:
-          type: array
-          items: { type: string }
-      required: [times]
+        morning:
+          type: integer
+          minimum: 0
+          description: Number of doses in the morning on each due day
+        midday:
+          type: integer
+          minimum: 0
+          description: Number of doses around midday on each due day
+        evening:
+          type: integer
+          minimum: 0
+          description: Number of doses in the evening on each due day
+        every:
+          type: integer
+          minimum: 1
+          description: Cadence interval anchored to the assignment start date
+        unit:
+          type: string
+          enum: [days, weeks]
+      required: [morning, midday, evening, every, unit]
 
     Medication:
       type: object

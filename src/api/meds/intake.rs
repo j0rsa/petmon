@@ -21,12 +21,8 @@ pub async fn create_intake(
     state: web::Data<AppState>,
     body: web::Json<CreateMedIntakeRecord>,
 ) -> AppResult<HttpResponse> {
-    let record = medication_service::create_intake(
-        &state.pool,
-        body.into_inner(),
-        state.timezone,
-    )
-    .await?;
+    let record =
+        medication_service::create_intake(&state.pool, body.into_inner(), state.timezone).await?;
     Ok(HttpResponse::Created().json(record))
 }
 

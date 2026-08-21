@@ -4,12 +4,17 @@ import {
   medicationsApi,
   type CreateMedAssignment,
   type MedAssignment,
+  type MedFrequency,
   type Medication,
   type ReviseMedAssignment,
 } from '../api/medications';
 import { NoPetSelected } from '../components/NoPetSelected';
 import { MedColorSwatch } from '../components/health/MedColorSwatch';
 import { MedIcon } from '../components/health/MedIcon';
+import {
+  MedScheduleEditor,
+  defaultMedFrequency,
+} from '../components/health/MedScheduleEditor';
 import {
   FormulationPicker,
   defaultFormulationPickerValue,
@@ -18,7 +23,12 @@ import {
 import { useSelectedPet } from '../context/SelectedPetContext';
 import { usePermissions } from '../context/usePermissions';
 import { localToday } from '../lib/dates';
-import { formatFrequency, formulationLabel, randomMedColor } from '../lib/medications';
+import {
+  expectedDoseCount,
+  formatFrequency,
+  formulationLabel,
+  randomMedColor,
+} from '../lib/medications';
 import { parseDecimal } from '../lib/numbers';
 
 interface MedPlanRow {
@@ -56,7 +66,7 @@ export default function HealthTreatmentPlanPage() {
   const [reuseFormulationId, setReuseFormulationId] = useState<string | null>(null);
   const [liquidDoseMl, setLiquidDoseMl] = useState('2.5');
   const [liquidConcentration, setLiquidConcentration] = useState('');
-  const [planTimes, setPlanTimes] = useState('08:00, 20:00');
+  const [planFrequency, setPlanFrequency] = useState<MedFrequency>(defaultMedFrequency);
   const [planFrom, setPlanFrom] = useState(today);
   const [planTo, setPlanTo] = useState('');
   const [planOptional, setPlanOptional] = useState(false);
@@ -103,7 +113,7 @@ export default function HealthTreatmentPlanPage() {
 
   function buildPlanBase() {
     return {
-      frequency: { times: planTimes.split(',').map((t) => t.trim()).filter(Boolean) },
+      frequency: planFrequency,
       date_to: planTo.trim() || null,
       optional: planOptional,
     };
@@ -215,7 +225,7 @@ export default function HealthTreatmentPlanPage() {
     setFormulation(defaultFormulationPickerValue);
     setLiquidDoseMl('2.5');
     setLiquidConcentration('');
-    setPlanTimes('08:00, 20:00');
+    setPlanFrequency(defaultMedFrequency);
     setPlanFrom(today);
     setPlanTo('');
     setPlanOptional(false);
@@ -249,7 +259,7 @@ export default function HealthTreatmentPlanPage() {
         ? String(a.formulation.liquid_concentration_mg_per_ml)
         : '',
     );
-    setPlanTimes(a.frequency.times.join(', '));
+    setPlanFrequency(a.frequency);
     setPlanOptional(a.optional);
     setPlanTo(a.date_to ?? '');
     setReviseFrom(today);
@@ -367,11 +377,11 @@ export default function HealthTreatmentPlanPage() {
             </div>
           )}
 
+          <div style={{ marginTop: '0.9rem' }}>
+            <MedScheduleEditor value={planFrequency} onChange={setPlanFrequency} />
+          </div>
+
           <div style={{ display: 'grid', gap: '0.65rem', gridTemplateColumns: 'repeat(auto-fit, minmax(10rem, 1fr))', marginTop: '0.75rem' }}>
-            <div className="form-row">
-              <label style={{ fontSize: '0.82rem' }}>Times (comma-separated)</label>
-              <input type="text" value={planTimes} onChange={(e) => setPlanTimes(e.target.value)} />
-            </div>
             {!reviseId ? (
               <div className="form-row">
                 <label style={{ fontSize: '0.82rem' }}>From</label>
@@ -403,7 +413,12 @@ export default function HealthTreatmentPlanPage() {
             <button
               type="button"
               className="button"
-              disabled={!planMedId || createPlanMutation.isPending || reviseMutation.isPending}
+              disabled={
+                !planMedId
+                || expectedDoseCount(planFrequency) === 0
+                || createPlanMutation.isPending
+                || reviseMutation.isPending
+              }
               onClick={() => {
                 if (reviseId) reviseMutation.mutate(reviseId);
                 else createPlanMutation.mutate();
@@ -450,7 +465,7 @@ export default function HealthTreatmentPlanPage() {
                         row.currentAssignment.formulation.pill_shape,
                       )}
                       {' · '}
-                      {formatFrequency(row.currentAssignment.frequency.times)}
+                      {formatFrequency(row.currentAssignment.frequency)}
                       {' · '}
                       {row.currentAssignment.date_from}
                       {row.currentAssignment.date_to ? ` → ${row.currentAssignment.date_to}` : ' → ongoing'}
