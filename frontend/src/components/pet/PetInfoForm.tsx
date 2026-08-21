@@ -12,8 +12,10 @@ export interface PetInfoFormState {
   color: string;
   blood_type: string;
   feeding_notes: string;
-  telegram_chat_id: string;
-  telegram_thread_id: string;
+  telegram_nutrition_chat_id: string;
+  telegram_nutrition_thread_id: string;
+  telegram_meds_chat_id: string;
+  telegram_meds_thread_id: string;
   elimination_auto_categorize_by_duration: boolean;
 }
 
@@ -40,8 +42,10 @@ export function petToFormState(pet: {
   color?: string;
   blood_type?: string;
   feeding_notes?: string;
-  telegram_chat_id?: string;
-  telegram_thread_id?: string;
+  telegram_nutrition_chat_id?: string;
+  telegram_nutrition_thread_id?: string;
+  telegram_meds_chat_id?: string;
+  telegram_meds_thread_id?: string;
   elimination_auto_categorize_by_duration?: boolean;
 }): PetInfoFormState {
   return {
@@ -53,8 +57,10 @@ export function petToFormState(pet: {
     color: pet.color ?? '',
     blood_type: pet.blood_type ?? '',
     feeding_notes: pet.feeding_notes ?? '',
-    telegram_chat_id: pet.telegram_chat_id ?? '',
-    telegram_thread_id: pet.telegram_thread_id ?? '',
+    telegram_nutrition_chat_id: pet.telegram_nutrition_chat_id ?? '',
+    telegram_nutrition_thread_id: pet.telegram_nutrition_thread_id ?? '',
+    telegram_meds_chat_id: pet.telegram_meds_chat_id ?? '',
+    telegram_meds_thread_id: pet.telegram_meds_thread_id ?? '',
     elimination_auto_categorize_by_duration: pet.elimination_auto_categorize_by_duration ?? false,
   };
 }
@@ -70,8 +76,10 @@ export function formStateToPayload(form: PetInfoFormState) {
     color: form.color.trim() || undefined,
     blood_type: form.blood_type.trim() || undefined,
     feeding_notes: form.feeding_notes.trim() || undefined,
-    telegram_chat_id: form.telegram_chat_id.trim() || undefined,
-    telegram_thread_id: form.telegram_thread_id.trim() || undefined,
+    telegram_nutrition_chat_id: form.telegram_nutrition_chat_id.trim() || null,
+    telegram_nutrition_thread_id: form.telegram_nutrition_thread_id.trim() || null,
+    telegram_meds_chat_id: form.telegram_meds_chat_id.trim() || null,
+    telegram_meds_thread_id: form.telegram_meds_thread_id.trim() || null,
     elimination_auto_categorize_by_duration: form.elimination_auto_categorize_by_duration,
   };
 }
@@ -173,7 +181,7 @@ export function PetInfoForm({
           <textarea id="pet-info-notes" rows={4} value={form.feeding_notes} onChange={(event) => setForm((current) => ({ ...current, feeding_notes: event.target.value }))} />
         </div>
         <div className="form-row form-row-full">
-          <span className="eyebrow">Telegram notifications</span>
+          <span className="eyebrow">Nutrition Telegram notifications</span>
           <p className="muted-text" style={{ fontSize: '0.82rem', marginTop: '0.15rem' }}>
             Records for this pet will be forwarded to the chat below. The bot token is configured globally in Settings.
             Use a group chat ID (negative number, e.g. <code>-100123456789</code>) and optionally a thread/topic ID to route messages to a specific topic within a supergroup.
@@ -181,11 +189,38 @@ export function PetInfoForm({
         </div>
         <div className="form-row">
           <label htmlFor="pet-info-tg-chat">Chat ID</label>
-          <input id="pet-info-tg-chat" placeholder="-100123456789" value={form.telegram_chat_id} onChange={(event) => setForm((current) => ({ ...current, telegram_chat_id: event.target.value }))} />
+          <input id="pet-info-tg-chat" placeholder="-100123456789" value={form.telegram_nutrition_chat_id} onChange={(event) => setForm((current) => ({ ...current, telegram_nutrition_chat_id: event.target.value }))} />
         </div>
         <div className="form-row">
           <label htmlFor="pet-info-tg-thread">Thread ID <span style={{ fontWeight: 400, color: 'var(--text-subtle)' }}>(optional)</span></label>
-          <input id="pet-info-tg-thread" placeholder="e.g. 42" value={form.telegram_thread_id} onChange={(event) => setForm((current) => ({ ...current, telegram_thread_id: event.target.value }))} />
+          <input id="pet-info-tg-thread" placeholder="e.g. 42" value={form.telegram_nutrition_thread_id} onChange={(event) => setForm((current) => ({ ...current, telegram_nutrition_thread_id: event.target.value }))} />
+        </div>
+        <div className="form-row form-row-full">
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', flexWrap: 'wrap' }}>
+            <span className="eyebrow">Medication Telegram notifications</span>
+            <button
+              className="button button-secondary button-compact"
+              type="button"
+              onClick={() => setForm((current) => ({
+                ...current,
+                telegram_meds_chat_id: current.telegram_nutrition_chat_id,
+                telegram_meds_thread_id: current.telegram_nutrition_thread_id,
+              }))}
+            >
+              Copy from Nutrition
+            </button>
+          </div>
+          <p className="muted-text" style={{ fontSize: '0.82rem', marginTop: '0.15rem' }}>
+            Medication records are sent only to this destination when configured.
+          </p>
+        </div>
+        <div className="form-row">
+          <label htmlFor="pet-info-tg-meds-chat">Chat ID</label>
+          <input id="pet-info-tg-meds-chat" placeholder="-100123456789" value={form.telegram_meds_chat_id} onChange={(event) => setForm((current) => ({ ...current, telegram_meds_chat_id: event.target.value }))} />
+        </div>
+        <div className="form-row">
+          <label htmlFor="pet-info-tg-meds-thread">Thread ID <span style={{ fontWeight: 400, color: 'var(--text-subtle)' }}>(optional)</span></label>
+          <input id="pet-info-tg-meds-thread" placeholder="e.g. 42" value={form.telegram_meds_thread_id} onChange={(event) => setForm((current) => ({ ...current, telegram_meds_thread_id: event.target.value }))} />
         </div>
         <div className="form-row form-row-full">
           <span className="eyebrow">Toileting auto-tag</span>

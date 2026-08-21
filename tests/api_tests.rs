@@ -3094,13 +3094,24 @@ async fn medication_system_formulations_and_intake_by_reference() {
             "pet_id": pet_id,
             "name": "Prednisolone",
             "med_type": "pill",
-            "color": "#6366f1"
+            "color": "#6366f1",
+            "emoji": "🦠"
         }))
         .to_request();
     let resp = test::call_service(&app, req).await;
     assert_eq!(resp.status(), 201);
     let med: serde_json::Value = test::read_body_json(resp).await;
     let med_id = med["id"].as_str().unwrap().to_string();
+    assert_eq!(med["emoji"].as_str(), Some("🦠"));
+
+    let req = test::TestRequest::patch()
+        .uri(&format!("/api/v1/health/meds/{med_id}"))
+        .set_json(serde_json::json!({ "emoji": "" }))
+        .to_request();
+    let resp = test::call_service(&app, req).await;
+    assert_eq!(resp.status(), 200);
+    let med: serde_json::Value = test::read_body_json(resp).await;
+    assert!(med["emoji"].is_null());
 
     let req = test::TestRequest::post()
         .uri("/api/v1/health/meds/assignments")

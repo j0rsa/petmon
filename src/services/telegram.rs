@@ -1,8 +1,9 @@
 use sqlx::SqlitePool;
 
+use crate::domain::medication::MedIntakeRecord;
 use crate::domain::nutrition_record::NutritionRecord;
 use crate::domain::pet::Pet;
-use crate::domain::settings::TelegramConfig;
+use crate::domain::settings::{DateFormat, TelegramConfig};
 use crate::repo::{nutrition_records, pets, settings};
 
 /// Format a nutrition record as a Telegram log line.
@@ -17,6 +18,153 @@ fn format_record_line(record: &NutritionRecord) -> String {
         Some(note) if !note.trim().is_empty() => format!("{base} — {note}"),
         _ => base,
     }
+}
+
+/// Fire-and-forget: send a medication intake to the configured medication chat.
+#[tracing::instrument(skip(pool, record), fields(record_id = %record.id))]
+pub async fn notify_medication_intake(
+    pool: &SqlitePool,
+    record: &MedIntakeRecord,
+    delayed: bool,
+    date_format: DateFormat,
+) {
+    let Some(ctx) = load_medication_telegram_context(pool, record).await else {
+        return;
+    };
+    let medication = match crate::repo::medications::get(pool, &record.medication_id).await {
+        Ok(medication) => medication,
+        Err(e) => {
+            tracing::warn!(error = %e, record_id = %record.id, "failed to load medication for telegram notification");
+            return;
+        }
+    };
+    let mut payload = serde_json::json!({
+        "chat_id": ctx.chat_id,
+        "text": format_medication_intake_line(
+            &medication.name,
+            medication.emoji.as_deref(),
+            &record.dose_label,
+            &record.occurred_at,
+            delayed,
+            date_format,
+        ),
+    });
+    apply_thread_id(&mut payload, &ctx.thread_id);
+
+    match post_telegram(&ctx.bot_token, "sendMessage", &payload).await {
+        Ok(body) => {
+            if let Some(message_id) = body.pointer("/result/message_id").and_then(|v| v.as_i64()) {
+                if let Err(e) = crate::repo::med_intake_records::set_telegram_message_id(
+                    pool, &record.id, message_id,
+                )
+                .await
+                {
+                    tracing::warn!(error = %e, record_id = %record.id, "failed to store medication telegram message id");
+                }
+            }
+            tracing::info!(pet = %ctx.pet_name, record_id = %record.id, "medication telegram notification sent");
+        }
+        Err(err) => {
+            tracing::warn!(%err, pet = %ctx.pet_name, record_id = %record.id, "medication telegram sendMessage failed");
+        }
+    }
+}
+
+/// Fire-and-forget: delete the Telegram message for a removed medication intake.
+#[tracing::instrument(skip(pool, record), fields(record_id = %record.id))]
+pub async fn notify_medication_intake_delete(pool: &SqlitePool, record: &MedIntakeRecord) {
+    let Some(message_id) = record.telegram_message_id else {
+        tracing::debug!(record_id = %record.id, "no telegram_message_id, skipping medication delete notification");
+        return;
+    };
+    let Some(ctx) = load_medication_telegram_context(pool, record).await else {
+        return;
+    };
+    let payload = serde_json::json!({
+        "chat_id": ctx.chat_id,
+        "message_id": message_id,
+    });
+    match post_telegram(&ctx.bot_token, "deleteMessage", &payload).await {
+        Ok(_) => {
+            tracing::info!(pet = %ctx.pet_name, record_id = %record.id, "medication telegram message deleted");
+        }
+        Err(err) => {
+            tracing::warn!(%err, pet = %ctx.pet_name, record_id = %record.id, "medication telegram deleteMessage failed");
+        }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{format_intake_timestamp, format_medication_intake_line, DateFormat};
+
+    #[test]
+    fn format_intake_timestamp_trims_seconds() {
+        assert_eq!(
+            format_intake_timestamp("2026-08-21T21:53:00", DateFormat::Dmy),
+            "21.08.2026 21:53"
+        );
+    }
+
+    #[test]
+    fn format_medication_intake_distinguishes_immediate_and_delayed_records() {
+        assert_eq!(
+            format_medication_intake_line(
+                "Amoxicillin",
+                Some("🦠"),
+                "½ × 50mg = 25.00mg",
+                "",
+                false,
+                DateFormat::Dmy,
+            ),
+            "#pills 💊 🦠 Amoxicillin ½ × 50mg = 25.00mg"
+        );
+        assert_eq!(
+            format_medication_intake_line(
+                "Amoxicillin",
+                None,
+                "½ × 50mg = 25.00mg",
+                "2026-08-21T21:53:00",
+                true,
+                DateFormat::MmmDdYyyy,
+            ),
+            "#pills 💊 💊 Amoxicillin ½ × 50mg = 25.00mg — Aug 21, 2026 21:53"
+        );
+    }
+}
+
+fn format_medication_intake_line(
+    medication_name: &str,
+    medication_emoji: Option<&str>,
+    dose_label: &str,
+    occurred_at: &str,
+    delayed: bool,
+    date_format: DateFormat,
+) -> String {
+    let emoji = medication_emoji
+        .filter(|emoji| !emoji.trim().is_empty())
+        .unwrap_or("💊");
+    let line = format!("#pills 💊 {emoji} {medication_name} {dose_label}");
+    if delayed {
+        format!(
+            "{line} — {}",
+            format_intake_timestamp(occurred_at, date_format)
+        )
+    } else {
+        line
+    }
+}
+
+fn format_intake_timestamp(occurred_at: &str, date_format: DateFormat) -> String {
+    let Ok(timestamp) = chrono::NaiveDateTime::parse_from_str(occurred_at, "%Y-%m-%dT%H:%M:%S")
+    else {
+        return occurred_at.to_string();
+    };
+    let date = match date_format {
+        DateFormat::Dmy => timestamp.format("%d.%m.%Y").to_string(),
+        DateFormat::MmmDdYyyy => timestamp.format("%b %-d, %Y").to_string(),
+    };
+    format!("{} {}", date, timestamp.format("%H:%M"))
 }
 
 struct TelegramContext {
@@ -59,10 +207,10 @@ async fn load_telegram_context(
         }
     };
 
-    let chat_id = match pet.telegram_chat_id {
+    let chat_id = match pet.telegram_nutrition_chat_id {
         Some(ref c) if !c.trim().is_empty() => c.trim().to_owned(),
         _ => {
-            tracing::info!(pet = %pet.name, "no telegram_chat_id set for pet, skipping notification");
+            tracing::info!(pet = %pet.name, "no telegram_nutrition_chat_id set for pet, skipping notification");
             return None;
         }
     };
@@ -70,7 +218,51 @@ async fn load_telegram_context(
     Some(TelegramContext {
         bot_token,
         chat_id,
-        thread_id: pet.telegram_thread_id,
+        thread_id: pet.telegram_nutrition_thread_id,
+        pet_name: pet.name,
+    })
+}
+
+async fn load_medication_telegram_context(
+    pool: &SqlitePool,
+    record: &MedIntakeRecord,
+) -> Option<TelegramContext> {
+    let cfg: TelegramConfig = match settings::get(pool, "telegram").await {
+        Ok(c) => c,
+        Err(e) => {
+            tracing::warn!(error = %e, "failed to load telegram config");
+            return None;
+        }
+    };
+    if !cfg.enabled {
+        tracing::debug!("telegram disabled, skipping notification");
+        return None;
+    }
+    let bot_token = match cfg.bot_token {
+        Some(t) if !t.trim().is_empty() => t.trim().to_owned(),
+        _ => {
+            tracing::warn!("telegram enabled but bot_token not set, skipping notification");
+            return None;
+        }
+    };
+    let pet: Pet = match pets::get_pet(pool, record.pet_id).await {
+        Ok(p) => p,
+        Err(e) => {
+            tracing::warn!(error = %e, "failed to load pet for medication telegram notification");
+            return None;
+        }
+    };
+    let chat_id = match pet.telegram_meds_chat_id {
+        Some(ref c) if !c.trim().is_empty() => c.trim().to_owned(),
+        _ => {
+            tracing::info!(pet = %pet.name, "no telegram_meds_chat_id set for pet, skipping notification");
+            return None;
+        }
+    };
+    Some(TelegramContext {
+        bot_token,
+        chat_id,
+        thread_id: pet.telegram_meds_thread_id,
         pet_name: pet.name,
     })
 }

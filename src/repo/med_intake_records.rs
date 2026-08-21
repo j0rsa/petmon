@@ -21,7 +21,27 @@ struct MedIntakeRow {
     taken: i64,
     note: Option<String>,
     source_type: String,
+    telegram_message_id: Option<i64>,
     created_at: String,
+}
+
+pub async fn set_telegram_message_id(
+    pool: &SqlitePool,
+    id: &str,
+    message_id: i64,
+) -> AppResult<()> {
+    let rows = sqlx::query("UPDATE med_intake_records SET telegram_message_id=? WHERE id=?")
+        .bind(message_id)
+        .bind(id)
+        .execute(pool)
+        .await?
+        .rows_affected();
+    if rows == 0 {
+        return Err(AppError::NotFound(format!(
+            "Med intake record {id} not found"
+        )));
+    }
+    Ok(())
 }
 
 fn parse_dose_fraction(raw: Option<String>) -> AppResult<Option<DoseFraction>> {
@@ -46,6 +66,7 @@ fn row_to_core(row: MedIntakeRow) -> AppResult<MedIntakeCore> {
         taken: row.taken != 0,
         note: row.note,
         source_type: row.source_type,
+        telegram_message_id: row.telegram_message_id,
         created_at: row.created_at,
     })
 }
@@ -72,7 +93,7 @@ pub async fn list(
     let order_desc = !has_date_range;
 
     let mut query = String::from(
-        "SELECT id, pet_id, medication_id, assignment_id, dose_fraction_override, liquid_dose_ml_override, occurred_at, local_date, taken, note, source_type, created_at
+        "SELECT id, pet_id, medication_id, assignment_id, dose_fraction_override, liquid_dose_ml_override, occurred_at, local_date, taken, note, source_type, telegram_message_id, created_at
          FROM med_intake_records WHERE 1=1",
     );
     if filters.pet_id.is_some() {
@@ -126,7 +147,7 @@ pub async fn list(
 #[tracing::instrument(skip(pool))]
 pub async fn get(pool: &SqlitePool, id: &str) -> AppResult<MedIntakeRecord> {
     let row = sqlx::query_as::<_, MedIntakeRow>(
-        "SELECT id, pet_id, medication_id, assignment_id, dose_fraction_override, liquid_dose_ml_override, occurred_at, local_date, taken, note, source_type, created_at
+        "SELECT id, pet_id, medication_id, assignment_id, dose_fraction_override, liquid_dose_ml_override, occurred_at, local_date, taken, note, source_type, telegram_message_id, created_at
          FROM med_intake_records WHERE id = ?",
     )
     .bind(id)
@@ -237,8 +258,8 @@ pub async fn create(
 
     sqlx::query(
         "INSERT INTO med_intake_records
-         (id, pet_id, medication_id, assignment_id, dose_fraction_override, liquid_dose_ml_override, occurred_at, local_date, taken, note, source_type, created_at)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+         (id, pet_id, medication_id, assignment_id, dose_fraction_override, liquid_dose_ml_override, occurred_at, local_date, taken, note, source_type, telegram_message_id, created_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NULL, ?)",
     )
     .bind(&id)
     .bind(pet_id)

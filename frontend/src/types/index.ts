@@ -27,8 +27,10 @@ export interface Pet {
   blood_type?: string;
   color?: string;
   feeding_notes?: string;
-  telegram_chat_id?: string;
-  telegram_thread_id?: string;
+  telegram_nutrition_chat_id?: string;
+  telegram_nutrition_thread_id?: string;
+  telegram_meds_chat_id?: string;
+  telegram_meds_thread_id?: string;
   elimination_auto_categorize_by_duration?: boolean;
   created_at: string;
   updated_at: string;

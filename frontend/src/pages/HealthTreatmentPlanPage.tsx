@@ -24,7 +24,7 @@ import {
   formatFrequency,
   formulationLabel,
   randomMedColor,
-  savePlanWithMedicationColor,
+  savePlanWithMedicationPresentation,
 } from '../lib/medications';
 import { parseDecimal } from '../lib/numbers';
 import {
@@ -75,6 +75,7 @@ export default function HealthTreatmentPlanPage() {
   const [reviseId, setReviseId] = useState<string | null>(null);
   const [reviseFrom, setReviseFrom] = useState(today);
   const [planMedColor, setPlanMedColor] = useState('#6366f1');
+  const [planMedEmoji, setPlanMedEmoji] = useState('');
   const [formulationLocked, setFormulationLocked] = useState(true);
 
   const medsQuery = useQuery({
@@ -191,10 +192,15 @@ export default function HealthTreatmentPlanPage() {
   const createPlanMutation = useMutation({
     mutationFn: () => {
       const current = (medsQuery.data ?? []).find((m) => m.id === planMedId)!;
-      return savePlanWithMedicationColor({
+      return savePlanWithMedicationPresentation({
         currentColor: current.color,
         selectedColor: planMedColor,
-        saveColor: () => medicationsApi.update(current.id, { color: planMedColor }),
+        currentEmoji: current.emoji,
+        selectedEmoji: planMedEmoji,
+        savePresentation: () => medicationsApi.update(current.id, {
+          color: planMedColor,
+          emoji: planMedEmoji,
+        }),
         savePlan: () => medicationsApi.createAssignment(buildCreatePayload()),
       });
     },
@@ -208,10 +214,15 @@ export default function HealthTreatmentPlanPage() {
   const reviseMutation = useMutation({
     mutationFn: (assignmentId: string) => {
       const current = (medsQuery.data ?? []).find((m) => m.id === planMedId)!;
-      return savePlanWithMedicationColor({
+      return savePlanWithMedicationPresentation({
         currentColor: current.color,
         selectedColor: planMedColor,
-        saveColor: () => medicationsApi.update(current.id, { color: planMedColor }),
+        currentEmoji: current.emoji,
+        selectedEmoji: planMedEmoji,
+        savePresentation: () => medicationsApi.update(current.id, {
+          color: planMedColor,
+          emoji: planMedEmoji,
+        }),
         savePlan: () => medicationsApi.reviseAssignment(assignmentId, buildRevisePayload()),
       });
     },
@@ -242,6 +253,7 @@ export default function HealthTreatmentPlanPage() {
     setPlanTo('');
     setPlanOptional(false);
     setPlanMedColor('#6366f1');
+    setPlanMedEmoji('');
   }
 
   const planRows = useMemo(
@@ -261,6 +273,7 @@ export default function HealthTreatmentPlanPage() {
     setReviseId(a.id);
     setPlanMedId(row.medication.id);
     setPlanMedColor(row.medication.color);
+    setPlanMedEmoji(row.medication.emoji ?? '');
     setReuseFormulationId(a.formulation_id);
     setFormulationLocked(true);
     setFormulation({
@@ -349,6 +362,17 @@ export default function HealthTreatmentPlanPage() {
               onChange={setPlanMedColor}
               title={`Change color for ${planMed.name}`}
             />
+            <label style={{ display: 'flex', alignItems: 'center', gap: '0.35rem', fontSize: '0.82rem' }}>
+              Emoji
+              <input
+                aria-label={`Telegram emoji for ${planMed.name}`}
+                type="text"
+                value={planMedEmoji}
+                onChange={(e) => setPlanMedEmoji(e.target.value)}
+                placeholder="💊"
+                style={{ width: '4rem', textAlign: 'center' }}
+              />
+            </label>
             <strong>{planMed.name}</strong>
           </div>
           {!reviseId && (
@@ -360,7 +384,10 @@ export default function HealthTreatmentPlanPage() {
                   const id = e.target.value || null;
                   setPlanMedId(id);
                   const medication = (medsQuery.data ?? []).find((m) => m.id === id);
-                  if (medication) setPlanMedColor(medication.color);
+                  if (medication) {
+                    setPlanMedColor(medication.color);
+                    setPlanMedEmoji(medication.emoji ?? '');
+                  }
                 }}
               >
                 <option value="">Select…</option>
@@ -489,8 +516,9 @@ export default function HealthTreatmentPlanPage() {
           </div>
           {(createPlanMutation.isError || reviseMutation.isError) && (
             <div className="error-state" role="alert" style={{ marginTop: '0.75rem' }}>
-              Medication color and treatment plan could not both be saved. Any successful color
-              change remains saved; check the effective date and dose, then try the plan again.
+              Medication presentation and treatment plan could not both be saved. Any successful
+              color or emoji change remains saved; check the effective date and dose, then try the
+              plan again.
             </div>
           )}
         </section>
@@ -559,7 +587,7 @@ export default function HealthTreatmentPlanPage() {
                 {canWrite && (
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '0.35rem' }}>
                     {!row.currentAssignment && (
-                      <button type="button" className="button" style={{ padding: '0.25rem 0.6rem', fontSize: '0.78rem' }} onClick={() => { resetPlanForm(); setPlanMedId(row.medication.id); setPlanMedColor(row.medication.color); }}>
+                      <button type="button" className="button" style={{ padding: '0.25rem 0.6rem', fontSize: '0.78rem' }} onClick={() => { resetPlanForm(); setPlanMedId(row.medication.id); setPlanMedColor(row.medication.color); setPlanMedEmoji(row.medication.emoji ?? ''); }}>
                         Add plan
                       </button>
                     )}

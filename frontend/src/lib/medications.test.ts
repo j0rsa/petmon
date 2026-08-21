@@ -7,7 +7,7 @@ import {
   expectedDoseCount,
   formatFrequency,
   hasActiveAssignmentOn,
-  savePlanWithMedicationColor,
+  savePlanWithMedicationPresentation,
 } from './medications';
 
 describe('medication dose buttons', () => {
@@ -70,70 +70,78 @@ describe('medication dose buttons', () => {
   });
 });
 
-describe('treatment plan medication color saving', () => {
-  it('persists a changed medication color before saving the plan', async () => {
+describe('treatment plan medication presentation saving', () => {
+  it('persists changed medication color and emoji before saving the plan', async () => {
     const calls: string[] = [];
-    const saveColor = vi.fn(async () => { calls.push('color'); });
+    const savePresentation = vi.fn(async () => { calls.push('presentation'); });
     const savePlan = vi.fn(async () => {
       calls.push('plan');
       return 'assignment';
     });
 
-    await expect(savePlanWithMedicationColor({
+    await expect(savePlanWithMedicationPresentation({
       currentColor: '#f97316',
-      selectedColor: '#1d4ed8',
-      saveColor,
+      selectedColor: '#f97316',
+      currentEmoji: null,
+      selectedEmoji: '💧',
+      savePresentation,
       savePlan,
     })).resolves.toBe('assignment');
 
-    expect(calls).toEqual(['color', 'plan']);
+    expect(calls).toEqual(['presentation', 'plan']);
   });
 
-  it('keeps the color persisted when assignment validation fails', async () => {
-    const saveColor = vi.fn(async () => undefined);
+  it('keeps the presentation persisted when assignment validation fails', async () => {
+    const savePresentation = vi.fn(async () => undefined);
     const savePlan = vi.fn(async () => {
       throw new Error('invalid effective date');
     });
 
-    await expect(savePlanWithMedicationColor({
+    await expect(savePlanWithMedicationPresentation({
       currentColor: '#f97316',
       selectedColor: '#1d4ed8',
-      saveColor,
+      currentEmoji: null,
+      selectedEmoji: '🦠',
+      savePresentation,
       savePlan,
     })).rejects.toThrow('invalid effective date');
 
-    expect(saveColor).toHaveBeenCalledOnce();
+    expect(savePresentation).toHaveBeenCalledOnce();
     expect(savePlan).toHaveBeenCalledOnce();
   });
 
-  it('does not create a plan when saving its changed color fails', async () => {
-    const saveColor = vi.fn(async () => {
-      throw new Error('color update failed');
+  it('does not create a plan when saving its changed presentation fails', async () => {
+    const savePresentation = vi.fn(async () => {
+      throw new Error('presentation update failed');
     });
     const savePlan = vi.fn(async () => 'assignment');
 
-    await expect(savePlanWithMedicationColor({
+    await expect(savePlanWithMedicationPresentation({
       currentColor: '#f97316',
       selectedColor: '#1d4ed8',
-      saveColor,
+      currentEmoji: null,
+      selectedEmoji: '🦠',
+      savePresentation,
       savePlan,
-    })).rejects.toThrow('color update failed');
+    })).rejects.toThrow('presentation update failed');
 
     expect(savePlan).not.toHaveBeenCalled();
   });
 
-  it('skips an unchanged color update', async () => {
-    const saveColor = vi.fn(async () => undefined);
+  it('skips an unchanged presentation update', async () => {
+    const savePresentation = vi.fn(async () => undefined);
     const savePlan = vi.fn(async () => 'assignment');
 
-    await savePlanWithMedicationColor({
+    await savePlanWithMedicationPresentation({
       currentColor: '#6366f1',
       selectedColor: '#6366f1',
-      saveColor,
+      currentEmoji: null,
+      selectedEmoji: '',
+      savePresentation,
       savePlan,
     });
 
-    expect(saveColor).not.toHaveBeenCalled();
+    expect(savePresentation).not.toHaveBeenCalled();
     expect(savePlan).toHaveBeenCalledOnce();
   });
 });

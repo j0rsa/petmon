@@ -22,18 +22,20 @@ describe('buildMedIntakePayload', () => {
     });
   });
 
-  it('includes liquid override for optional liquid meds', () => {
+  it('includes the supplied liquid override for optional liquid meds', () => {
     const item = mockDailyMedAssignments[1];
-    const payload = buildMedIntakePayload(mockPetId, item, timing);
+    const payload = buildMedIntakePayload(mockPetId, item, timing, {
+      liquid_dose_ml_override: 1.25,
+    });
 
-    expect(payload.liquid_dose_ml_override).toBe(0.6);
+    expect(payload.liquid_dose_ml_override).toBe(1.25);
   });
 });
 
 describe('buildMedIntakeCurl', () => {
   it('builds a no-auth curl command with the intake payload', () => {
     const item = mockDailyMedAssignments[0];
-    const curl = buildMedIntakeCurl(mockPetId, item, timing, 'http://localhost:8080');
+    const curl = buildMedIntakeCurl(mockPetId, item, timing, {}, 'http://localhost:8080');
 
     expect(curl).toContain("curl -X POST 'http://localhost:8080/api/v1/health/meds/intake'");
     expect(curl).toContain("-H 'Content-Type: application/json'");

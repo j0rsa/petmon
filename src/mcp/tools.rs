@@ -84,8 +84,8 @@ fn tool_list() -> Value {
                         "blood_type":      { "type": "string" },
                         "color":           { "type": "string" },
                         "feeding_notes":   { "type": "string" },
-                        "telegram_chat_id":   { "type": "string" },
-                        "telegram_thread_id": { "type": "string" }
+                        "telegram_nutrition_chat_id":   { "type": "string" },
+                        "telegram_nutrition_thread_id": { "type": "string" }
                     }
                 }
             },
@@ -105,8 +105,8 @@ fn tool_list() -> Value {
                         "blood_type":      { "type": "string" },
                         "color":           { "type": "string" },
                         "feeding_notes":   { "type": "string" },
-                        "telegram_chat_id":   { "type": "string" },
-                        "telegram_thread_id": { "type": "string" }
+                        "telegram_nutrition_chat_id":   { "type": "string" },
+                        "telegram_nutrition_thread_id": { "type": "string" }
                     }
                 }
             },
@@ -1308,7 +1308,13 @@ pub async fn dispatch(
         "health.meds.intake.create" => {
             let req: CreateMedIntakeRecord =
                 serde_json::from_value(params).map_err(|e| AppError::BadRequest(e.to_string()))?;
-            let record = medication_service::create_intake(pool, req, timezone).await?;
+            let record = medication_service::create_intake(
+                pool,
+                req,
+                timezone,
+                crate::domain::settings::DateFormat::default(),
+            )
+            .await?;
             Ok(json!(record))
         }
         "health.meds.intake.delete" => {

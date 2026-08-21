@@ -2485,14 +2485,22 @@ components:
           type: string
           nullable: true
           description: Feeding instructions and notes
-        telegram_chat_id:
+        telegram_nutrition_chat_id:
           type: string
           nullable: true
-          description: Telegram chat ID for notifications
-        telegram_thread_id:
+          description: Telegram chat ID for nutrition record notifications
+        telegram_nutrition_thread_id:
           type: string
           nullable: true
-          description: Telegram thread ID for topic replies
+          description: Telegram thread ID for nutrition record topic replies
+        telegram_meds_chat_id:
+          type: string
+          nullable: true
+          description: Telegram chat ID for medication intake notifications
+        telegram_meds_thread_id:
+          type: string
+          nullable: true
+          description: Telegram thread ID for medication intake topic replies
         elimination_auto_categorize_by_duration:
           type: boolean
           description: When enabled, general elimination records with duration are auto-tagged as wee or poop based on this pet's historical duration buckets
@@ -2539,10 +2547,16 @@ components:
         feeding_notes:
           type: string
           nullable: true
-        telegram_chat_id:
+        telegram_nutrition_chat_id:
           type: string
           nullable: true
-        telegram_thread_id:
+        telegram_nutrition_thread_id:
+          type: string
+          nullable: true
+        telegram_meds_chat_id:
+          type: string
+          nullable: true
+        telegram_meds_thread_id:
           type: string
           nullable: true
         elimination_auto_categorize_by_duration:
@@ -2577,10 +2591,16 @@ components:
         feeding_notes:
           type: string
           nullable: true
-        telegram_chat_id:
+        telegram_nutrition_chat_id:
           type: string
           nullable: true
-        telegram_thread_id:
+        telegram_nutrition_thread_id:
+          type: string
+          nullable: true
+        telegram_meds_chat_id:
+          type: string
+          nullable: true
+        telegram_meds_thread_id:
           type: string
           nullable: true
         elimination_auto_categorize_by_duration:
@@ -4150,6 +4170,10 @@ components:
         name: { type: string }
         med_type: { $ref: '#/components/schemas/MedType' }
         color: { type: string }
+        emoji:
+          type: string
+          nullable: true
+          description: Optional emoji used in medication Telegram messages
         created_at: { type: string, format: date-time }
         updated_at: { type: string, format: date-time }
       required: [id, pet_id, name, med_type, color, created_at, updated_at]
@@ -4161,6 +4185,9 @@ components:
         name: { type: string }
         med_type: { $ref: '#/components/schemas/MedType' }
         color: { type: string }
+        emoji:
+          type: string
+          description: Optional emoji used in medication Telegram messages
       required: [pet_id, name, med_type]
 
     UpdateMedication:
@@ -4168,6 +4195,9 @@ components:
       properties:
         name: { type: string }
         color: { type: string }
+        emoji:
+          type: string
+          description: An empty string clears the custom emoji and uses the default pill emoji
 
     MedFormulation:
       type: object

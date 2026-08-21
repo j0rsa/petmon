@@ -19,7 +19,7 @@ import {
 import { buildMedIntakeCurl } from '../../lib/medIntakeCurl';
 import { parseDecimal } from '../../lib/numbers';
 import { isDoseSupported } from '../../lib/pillDoseCuts';
-import { isoFromDateAndTime, nowTimeString } from '../../lib/time';
+import { isoFromDateAndTime, nowLocalDateTime, nowTimeString } from '../../lib/time';
 import { usePermissions } from '../../context/usePermissions';
 import { useFormatTime } from '../../context/useDisplaySettings';
 import { useUserSettings } from '../../api/userSettings';
@@ -49,8 +49,9 @@ function DailyMedRow({
   const { medication, assignment } = item;
   const expected = expectedDoseCount(assignment.frequency);
   const status = intakeStatus(item.intakes, expected);
-  const [showIntakePrompt, setShowIntakePrompt] = useState(false);
+  const [intakeMode, setIntakeMode] = useState<'record' | 'now' | null>(null);
   const [intakeDate, setIntakeDate] = useState(panelDate);
+  const [intakeLocalDate, setIntakeLocalDate] = useState(panelDate);
   const [intakeTime, setIntakeTime] = useState(nowTimeString);
   const [doseFraction, setDoseFraction] = useState<DoseFraction>('whole');
   const [liquidDoseMl, setLiquidDoseMl] = useState('');
@@ -67,51 +68,69 @@ function DailyMedRow({
   });
 
   function resetIntakePrompt() {
-    setShowIntakePrompt(false);
+    setIntakeMode(null);
     setIntakeDate(panelDate);
+    setIntakeLocalDate(panelDate);
     setIntakeTime(nowTimeString());
     setLiquidDoseMl('');
   }
 
   function intakeTiming() {
+    if (intakeMode === 'now') {
+      return nowLocalDateTime();
+    }
     return {
-      local_date: intakeDate,
+      local_date: intakeLocalDate,
       occurred_at: isoFromDateAndTime(intakeDate, intakeTime),
     };
   }
 
-  function logIntake(overrides: Partial<CreateMedIntakeRecord> = {}) {
+  function logIntake(
+    timing: { local_date: string; occurred_at: string },
+    overrides: Partial<CreateMedIntakeRecord> = {},
+  ) {
     logMutation.mutate({
       pet_id: petId,
       medication_id: medication.id,
       assignment_id: assignment.id,
       taken: true,
-      ...intakeTiming(),
+      ...timing,
       ...overrides,
     }, {
       onSuccess: resetIntakePrompt,
     });
   }
 
-  function handleTake() {
+  function handleAddRecord() {
     setIntakeDate(panelDate);
+    setIntakeLocalDate(panelDate);
     setIntakeTime(nowTimeString());
-    setShowIntakePrompt(true);
+    setIntakeMode('record');
+  }
+
+  function handleTakeNow() {
+    if (assignment.optional) {
+      setLiquidDoseMl('');
+      setIntakeMode('now');
+      return;
+    }
+    logIntake(nowLocalDateTime());
   }
 
   function confirmIntake() {
+    const timing = intakeTiming();
     if (assignment.optional) {
       if (medication.med_type === 'pill') {
-        logIntake({ dose_fraction_override: doseFraction });
+        logIntake(timing, { dose_fraction_override: doseFraction });
         return;
       }
       const ml = parseDecimal(liquidDoseMl);
       if (Number.isFinite(ml) && ml > 0) {
-        logIntake({ liquid_dose_ml_override: ml });
+        logIntake(timing, { liquid_dose_ml_override: ml });
       }
       return;
     }
-    logIntake();
+    logIntake(timing);
   }
 
   const lastIntake = [...item.intakes]
@@ -123,12 +142,19 @@ function DailyMedRow({
   const canConfirmIntake = !assignment.optional
     || medication.med_type === 'pill'
     || liquidDoseValid;
+  const optionalOverrides = assignment.optional
+    ? medication.med_type === 'pill'
+      ? { dose_fraction_override: doseFraction }
+      : liquidDoseValid
+        ? { liquid_dose_ml_override: parseDecimal(liquidDoseMl) }
+        : { liquid_dose_ml_override: 0.6 }
+    : undefined;
 
   function handleCopyCurl() {
-    const timing = showIntakePrompt
+    const timing = intakeMode
       ? intakeTiming()
-      : { local_date: panelDate, occurred_at: isoFromDateAndTime(panelDate, nowTimeString()) };
-    const curl = buildMedIntakeCurl(petId, item, timing);
+      : nowLocalDateTime();
+    const curl = buildMedIntakeCurl(petId, item, timing, optionalOverrides);
     navigator.clipboard.writeText(curl).then(() => {
       setCurlCopied(true);
       setTimeout(() => setCurlCopied(false), 2000);
@@ -197,23 +223,36 @@ function DailyMedRow({
               type="button"
               className="button button-secondary"
               style={{ padding: '0.25rem 0.45rem', fontSize: '0.78rem', lineHeight: 0 }}
-              title={curlCopied ? 'Copied curl command' : 'Copy curl command for this intake'}
-              aria-label={curlCopied ? 'Copied curl command' : 'Copy curl command for this intake'}
+              title={curlCopied ? 'Copied curl command' : assignment.optional ? 'Copy curl command with example dosage' : 'Copy curl command for this intake'}
+              aria-label={curlCopied ? 'Copied curl command' : assignment.optional ? 'Copy curl command with example dosage' : 'Copy curl command for this intake'}
               onClick={handleCopyCurl}
             >
               <Code size={15} aria-hidden="true" />
             </button>
           )}
-          {canWrite && showTake && (
-            <button
-              type="button"
-              className="button"
-              style={{ padding: '0.25rem 0.65rem', fontSize: '0.78rem' }}
-              disabled={logMutation.isPending}
-              onClick={handleTake}
-            >
-              Take
-            </button>
+          {canWrite && (
+            <>
+              <button
+                type="button"
+                className="button button-secondary"
+                style={{ padding: '0.25rem 0.65rem', fontSize: '0.78rem' }}
+                disabled={logMutation.isPending}
+                onClick={handleAddRecord}
+              >
+                Add record
+              </button>
+              {showTake && (
+                <button
+                  type="button"
+                  className="button"
+                  style={{ padding: '0.25rem 0.65rem', fontSize: '0.78rem' }}
+                  disabled={logMutation.isPending}
+                  onClick={handleTakeNow}
+                >
+                  Take now
+                </button>
+              )}
+            </>
           )}
           {canWrite && lastIntake && (
             <button
@@ -228,39 +267,53 @@ function DailyMedRow({
           )}
         </div>
       )}
-      {showIntakePrompt && (
+      {intakeMode && (
         <div
           style={{
             flexBasis: '100%',
-            marginLeft: '3.25rem',
+            marginLeft: 0,
             padding: '0.65rem',
             borderRadius: 8,
             background: 'var(--surface-muted)',
           }}
         >
           <strong style={{ display: 'block', fontSize: '0.82rem', marginBottom: '0.45rem' }}>
-            Log intake
+            {intakeMode === 'record' ? 'Add medication record' : 'Record medication taken now'}
           </strong>
-          <div style={{ display: 'flex', gap: '0.75rem', flexWrap: 'wrap', marginBottom: '0.55rem' }}>
-            <div className="form-row" style={{ flex: '0 0 auto' }}>
-              <label style={{ fontSize: '0.78rem' }}>Date</label>
-              <input
-                type="date"
-                value={intakeDate}
-                onChange={(event) => setIntakeDate(event.target.value)}
-                style={{ width: '10.5rem' }}
-              />
+          {intakeMode === 'record' && (
+            <div style={{ display: 'flex', gap: '0.75rem', flexWrap: 'wrap', marginBottom: '0.55rem' }}>
+              <div className="form-row" style={{ flex: '0 0 auto' }}>
+                <label style={{ fontSize: '0.78rem' }}>Taken date</label>
+                <input
+                  type="date"
+                  value={intakeDate}
+                  onChange={(event) => {
+                    setIntakeDate(event.target.value);
+                    setIntakeLocalDate(event.target.value);
+                  }}
+                  style={{ width: '10.5rem' }}
+                />
+              </div>
+              <div className="form-row" style={{ flex: '0 0 auto' }}>
+                <label style={{ fontSize: '0.78rem' }}>Time</label>
+                <TimeInput
+                  variant="form"
+                  aria-label="Intake time"
+                  value={intakeTime}
+                  onChange={setIntakeTime}
+                />
+              </div>
+              <div className="form-row" style={{ flex: '0 0 auto', marginLeft: '0.5rem' }}>
+                <label style={{ fontSize: '0.78rem' }}>Credit date</label>
+                <input
+                  type="date"
+                  value={intakeLocalDate}
+                  onChange={(event) => setIntakeLocalDate(event.target.value)}
+                  style={{ width: '10.5rem' }}
+                />
+              </div>
             </div>
-            <div className="form-row" style={{ flex: '0 0 auto' }}>
-              <label style={{ fontSize: '0.78rem' }}>Time</label>
-              <TimeInput
-                variant="form"
-                aria-label="Intake time"
-                value={intakeTime}
-                onChange={setIntakeTime}
-              />
-            </div>
-          </div>
+          )}
           {assignment.optional && (
             <>
               <strong style={{ display: 'block', fontSize: '0.82rem', marginBottom: '0.45rem' }}>

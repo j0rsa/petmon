@@ -246,6 +246,7 @@ pub struct Medication {
     pub name: String,
     pub med_type: MedType,
     pub color: String,
+    pub emoji: Option<String>,
     pub created_at: String,
     pub updated_at: String,
 }
@@ -256,12 +257,14 @@ pub struct CreateMedication {
     pub name: String,
     pub med_type: MedType,
     pub color: Option<String>,
+    pub emoji: Option<String>,
 }
 
 #[derive(Debug, Deserialize)]
 pub struct UpdateMedication {
     pub name: Option<String>,
     pub color: Option<String>,
+    pub emoji: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -348,6 +351,8 @@ pub struct MedIntakeRecord {
     pub taken: bool,
     pub note: Option<String>,
     pub source_type: String,
+    #[serde(skip_serializing)]
+    pub telegram_message_id: Option<i64>,
     pub created_at: String,
 }
 
@@ -548,6 +553,7 @@ pub fn hydrate_intake(
         taken: intake.taken,
         note: intake.note,
         source_type: intake.source_type,
+        telegram_message_id: intake.telegram_message_id,
         created_at: intake.created_at,
     }
 }
@@ -565,6 +571,7 @@ pub struct MedIntakeCore {
     pub taken: bool,
     pub note: Option<String>,
     pub source_type: String,
+    pub telegram_message_id: Option<i64>,
     pub created_at: String,
 }
 

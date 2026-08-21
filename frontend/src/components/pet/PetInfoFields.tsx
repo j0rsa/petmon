@@ -14,6 +14,10 @@ interface PetInfoFieldsProps {
 }
 
 export function PetInfoFields({ pet }: PetInfoFieldsProps) {
+  const telegramChats = [...new Set([
+    pet.telegram_nutrition_chat_id?.trim(),
+    pet.telegram_meds_chat_id?.trim(),
+  ].filter((chat): chat is string => Boolean(chat)))];
   const rows = [
     { label: 'Species', value: PET_SPECIES_LABELS[pet.species] },
     { label: 'Breed', value: pet.breed?.trim() || '—' },
@@ -37,16 +41,10 @@ export function PetInfoFields({ pet }: PetInfoFieldsProps) {
           <dd>{pet.feeding_notes}</dd>
         </div>
       )}
-      {pet.telegram_chat_id?.trim() && (
+      {telegramChats.length > 0 && (
         <div className="pet-info-row">
-          <dt>Telegram chat</dt>
-          <dd style={{ fontFamily: 'monospace', fontSize: '0.88rem' }}>{pet.telegram_chat_id}</dd>
-        </div>
-      )}
-      {pet.telegram_thread_id?.trim() && (
-        <div className="pet-info-row">
-          <dt>Telegram thread</dt>
-          <dd style={{ fontFamily: 'monospace', fontSize: '0.88rem' }}>{pet.telegram_thread_id}</dd>
+          <dt>Telegram chats</dt>
+          <dd style={{ fontFamily: 'monospace', fontSize: '0.88rem' }}>{telegramChats.join(', ')}</dd>
         </div>
       )}
       <div className="pet-info-row pet-info-row-full">

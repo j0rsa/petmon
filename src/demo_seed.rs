@@ -165,8 +165,10 @@ async fn seed_pets(pool: &SqlitePool) -> AppResult<Vec<Pet>> {
             color: color.map(str::to_string),
             weight_kg,
             feeding_notes: feeding_notes.map(str::to_string),
-            telegram_chat_id: None,
-            telegram_thread_id: None,
+            telegram_nutrition_chat_id: None,
+            telegram_nutrition_thread_id: None,
+            telegram_meds_chat_id: None,
+            telegram_meds_thread_id: None,
             elimination_auto_categorize_by_duration: false,
             created_at: now.clone(),
             updated_at: now.clone(),
@@ -807,6 +809,7 @@ async fn seed_medications(pool: &SqlitePool, demo_pets: &[Pet]) -> AppResult<usi
             name: "Carprofen".to_string(),
             med_type: MedType::Pill,
             color: Some("#f97316".to_string()),
+            emoji: Some("🦴".to_string()),
         },
     )
     .await?;
@@ -842,6 +845,7 @@ async fn seed_medications(pool: &SqlitePool, demo_pets: &[Pet]) -> AppResult<usi
             name: "Probiotic paste".to_string(),
             med_type: MedType::Liquid,
             color: Some("#22c55e".to_string()),
+            emoji: Some("💧".to_string()),
         },
     )
     .await?;
