@@ -1,7 +1,12 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { medicationsApi, type CreateMedIntakeRecord, type DailyMedAssignment } from '../../api/medications';
 import { localToday } from '../../lib/dates';
-import { formatFrequency, intakeStatus, intakeStatusLabel } from '../../lib/medications';
+import {
+  expectedDoseCount,
+  formatFrequency,
+  intakeStatus,
+  intakeStatusLabel,
+} from '../../lib/medications';
 import { usePermissions } from '../../context/usePermissions';
 import { useFormatTime } from '../../context/useDisplaySettings';
 import { MedIcon } from './MedIcon';
@@ -23,7 +28,7 @@ function DailyMedRow({
 }) {
   const formatTime = useFormatTime();
   const { medication, assignment } = item;
-  const expected = Math.max(1, assignment.frequency.times.length);
+  const expected = expectedDoseCount(assignment.frequency);
   const status = intakeStatus(item.intakes, expected);
 
   const logMutation = useMutation({
@@ -84,7 +89,7 @@ function DailyMedRow({
           </span>
         </div>
         <p className="muted-text" style={{ fontSize: '0.8rem', margin: '0.15rem 0 0' }}>
-          {assignment.dose_label} · {formatFrequency(assignment.frequency.times)}
+          {assignment.dose_label} · {formatFrequency(assignment.frequency)}
         </p>
         {item.intakes.length > 0 && (
           <p className="muted-text" style={{ fontSize: '0.75rem', margin: '0.2rem 0 0' }}>
@@ -149,7 +154,7 @@ export function MedIntakePanel({ petId }: MedIntakePanelProps) {
         <div className="loading-state">Loading…</div>
       ) : items.length === 0 ? (
         <p className="muted-text" style={{ fontSize: '0.88rem' }}>
-          No active medications for today. Add a treatment plan on the Treatment plan tab.
+          No medications are due today.
         </p>
       ) : (
         <div>

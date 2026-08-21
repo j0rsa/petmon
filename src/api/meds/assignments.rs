@@ -1,7 +1,5 @@
 use crate::auth::AppState;
-use crate::domain::medication::{
-    CreateMedAssignment, MedAssignmentFilters, ReviseMedAssignment,
-};
+use crate::domain::medication::{CreateMedAssignment, MedAssignmentFilters, ReviseMedAssignment};
 use crate::error::{AppError, AppResult};
 use crate::services::medication_service;
 use actix_web::{get, post, web, HttpResponse};
@@ -14,8 +12,7 @@ pub async fn list_assignments(
     state: web::Data<AppState>,
     query: web::Query<MedAssignmentFilters>,
 ) -> AppResult<HttpResponse> {
-    let assignments =
-        medication_service::list_assignments(&state.pool, query.into_inner()).await?;
+    let assignments = medication_service::list_assignments(&state.pool, query.into_inner()).await?;
     Ok(HttpResponse::Ok().json(assignments))
 }
 
@@ -43,8 +40,7 @@ pub async fn create_assignment(
     state: web::Data<AppState>,
     body: web::Json<CreateMedAssignment>,
 ) -> AppResult<HttpResponse> {
-    let assignment =
-        medication_service::create_assignment(&state.pool, body.into_inner()).await?;
+    let assignment = medication_service::create_assignment(&state.pool, body.into_inner()).await?;
     Ok(HttpResponse::Created().json(assignment))
 }
 

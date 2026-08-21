@@ -1,7 +1,7 @@
 use crate::domain::medication::{
-    CreateMedAssignment, CreateMedication, CreateMedIntakeRecord, DailyMedAssignment,
-    MedAssignment, MedAssignmentFilters, MedIntakeRecord, MedIntakeRecordFilters, Medication,
-    ReviseMedAssignment, UpdateMedication,
+    assignment_due_on, CreateMedAssignment, CreateMedIntakeRecord, CreateMedication,
+    DailyMedAssignment, MedAssignment, MedAssignmentFilters, MedIntakeRecord,
+    MedIntakeRecordFilters, Medication, ReviseMedAssignment, UpdateMedication,
 };
 use crate::error::{AppError, AppResult};
 use crate::repo::{med_assignments, med_intake_records, medications, pets};
@@ -110,6 +110,9 @@ pub async fn daily_assignments(
         if let Some(assignment) =
             med_assignments::active_for_medication_on(pool, &medication.id, date).await?
         {
+            if !assignment_due_on(&assignment, date) {
+                continue;
+            }
             let med_intakes: Vec<MedIntakeRecord> = intakes
                 .iter()
                 .filter(|r| r.medication_id == medication.id)

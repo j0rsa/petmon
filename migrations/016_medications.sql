@@ -33,7 +33,7 @@ CREATE TABLE IF NOT EXISTS med_assignments (
     formulation_id TEXT NOT NULL REFERENCES med_formulations(id) ON DELETE RESTRICT,
     dose_fraction TEXT CHECK (dose_fraction IN ('whole', 'half', 'third', 'quarter', 'three_quarter', 'eighth', 'sixteenth')),
     liquid_dose_ml REAL,
-    frequency_json TEXT NOT NULL DEFAULT '{"times":[]}',
+    frequency_json TEXT NOT NULL DEFAULT '{"morning":1,"midday":0,"evening":0,"every":1,"unit":"days"}',
     date_from TEXT NOT NULL,
     date_to TEXT,
     optional INTEGER NOT NULL DEFAULT 0,

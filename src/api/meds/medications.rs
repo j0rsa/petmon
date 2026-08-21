@@ -50,8 +50,7 @@ pub async fn update_medication(
     id: web::Path<String>,
     body: web::Json<UpdateMedication>,
 ) -> AppResult<HttpResponse> {
-    let med =
-        medication_service::update_medication(&state.pool, &id, body.into_inner()).await?;
+    let med = medication_service::update_medication(&state.pool, &id, body.into_inner()).await?;
     Ok(HttpResponse::Ok().json(med))
 }
 

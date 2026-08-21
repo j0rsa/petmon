@@ -2,6 +2,7 @@ import { useMemo, useState } from 'react';
 import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { ComposedChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 import { weightApi } from '../api/weight';
+import { medicationsApi } from '../api/medications';
 import { parseDecimal } from '../lib/numbers';
 import type { CreateWeightRecord, WeightGranularity } from '../api/weight';
 import { NoPetSelected } from '../components/NoPetSelected';
@@ -13,6 +14,7 @@ import { usePermissions } from '../context/usePermissions';
 import { useFormatDate, useFormatTime } from '../context/useDisplaySettings';
 import { useScrollToHash } from '../hooks/useScrollToHash';
 import { linReg } from '../lib/linReg';
+import { hasActiveAssignmentOn } from '../lib/medications';
 
 type PeriodLabel = '30d' | '90d' | '1y' | 'all';
 
@@ -77,6 +79,12 @@ export default function HealthPage() {
     enabled: Boolean(selectedPetId),
   });
 
+  const assignmentsQuery = useQuery({
+    queryKey: ['med-assignments', selectedPetId],
+    queryFn: () => medicationsApi.listAssignments({ pet_id: selectedPetId! }),
+    enabled: Boolean(selectedPetId),
+  });
+
   const [weightInput, setWeightInput] = useState('');
   const [noteInput, setNoteInput] = useState('');
   const [measuredAt, setMeasuredAt] = useState(() => nowLocalDateTimeString());
@@ -130,6 +138,7 @@ export default function HealthPage() {
 
   const records = (weightsQuery.data ?? []).filter((r) => r.local_date && r.weight_kg != null);
   const latest = records[0];
+  const hasActiveTreatmentPlan = hasActiveAssignmentOn(assignmentsQuery.data ?? [], today);
 
   function formatRecordWhen(measuredAt: string, localDate: string): string {
     return `${formatDate(localDate, 'short')} ${formatTime(measuredAt)}`;
@@ -160,9 +169,12 @@ export default function HealthPage() {
         )}
       </section>
 
-      <HealthStatePanel petId={selectedPetId} />
-
-      <MedIntakePanel petId={selectedPetId} />
+      <HealthStatePanel
+        petId={selectedPetId}
+        afterPrimary={
+          hasActiveTreatmentPlan ? <MedIntakePanel petId={selectedPetId} /> : null
+        }
+      />
 
       {/* Weight chart */}
       <section className="panel" id="weight">

@@ -2819,7 +2819,13 @@ async fn medication_system_formulations_and_intake_by_reference() {
             "tablet_strength_mg": 5.0,
             "pill_shape": "oval_rounded",
             "dose_fraction": "half",
-            "frequency": { "times": ["08:00"] },
+            "frequency": {
+                "morning": 0,
+                "midday": 0,
+                "evening": 1,
+                "every": 3,
+                "unit": "days"
+            },
             "date_from": "2026-03-01"
         }))
         .to_request();
@@ -2832,7 +2838,9 @@ async fn medication_system_formulations_and_intake_by_reference() {
     assert_eq!(assign1["formulation"]["pill_shape"], "oval_rounded");
 
     let req = test::TestRequest::post()
-        .uri(&format!("/api/v1/health/meds/assignments/{assign1_id}/revise"))
+        .uri(&format!(
+            "/api/v1/health/meds/assignments/{assign1_id}/revise"
+        ))
         .set_json(serde_json::json!({
             "formulation_id": form1_id,
             "dose_fraction": "quarter",
@@ -2882,7 +2890,42 @@ async fn medication_system_formulations_and_intake_by_reference() {
     assert!(intake.get("dosage").is_none());
 
     let req = test::TestRequest::get()
-        .uri(&format!("/api/v1/health/meds/assignments?medication_id={med_id}"))
+        .uri(&format!(
+            "/api/v1/health/meds/assignments/daily?pet_id={pet_id}&date=2026-03-16"
+        ))
+        .to_request();
+    let resp = test::call_service(&app, req).await;
+    assert_eq!(resp.status(), 200);
+    let not_due: serde_json::Value = test::read_body_json(resp).await;
+    assert_eq!(not_due.as_array().unwrap().len(), 0);
+
+    let req = test::TestRequest::get()
+        .uri(&format!(
+            "/api/v1/health/meds/assignments/daily?pet_id={pet_id}&date=2026-03-18"
+        ))
+        .to_request();
+    let resp = test::call_service(&app, req).await;
+    assert_eq!(resp.status(), 200);
+    let due: serde_json::Value = test::read_body_json(resp).await;
+    assert_eq!(due.as_array().unwrap().len(), 1);
+
+    let req = test::TestRequest::post()
+        .uri("/api/v1/health/meds/intake")
+        .set_json(serde_json::json!({
+            "pet_id": pet_id,
+            "medication_id": med_id,
+            "assignment_id": assign3_id,
+            "taken": true,
+            "local_date": "2026-03-16"
+        }))
+        .to_request();
+    let resp = test::call_service(&app, req).await;
+    assert_eq!(resp.status(), 400);
+
+    let req = test::TestRequest::get()
+        .uri(&format!(
+            "/api/v1/health/meds/assignments?medication_id={med_id}"
+        ))
         .to_request();
     let resp = test::call_service(&app, req).await;
     let history: serde_json::Value = test::read_body_json(resp).await;

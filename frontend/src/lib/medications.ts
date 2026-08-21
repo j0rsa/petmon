@@ -1,4 +1,10 @@
-import type { DoseFraction, MedType, PillShape } from '../api/medications';
+import type {
+  DoseFraction,
+  MedAssignment,
+  MedFrequency,
+  MedType,
+  PillShape,
+} from '../api/medications';
 
 export const DOSE_FRACTIONS: DoseFraction[] = [
   'whole', 'three_quarter', 'half', 'third', 'quarter', 'eighth', 'sixteenth',
@@ -63,9 +69,28 @@ export function medTypeLabel(type: MedType): string {
   return type === 'pill' ? 'Pill' : 'Liquid';
 }
 
-export function formatFrequency(times: string[]): string {
-  if (times.length === 0) return 'As scheduled';
-  return times.join(', ');
+export function expectedDoseCount(frequency: MedFrequency): number {
+  return frequency.morning + frequency.midday + frequency.evening;
+}
+
+export function formatFrequency(frequency: MedFrequency): string {
+  const parts = [
+    frequency.morning > 0 ? `Morning ×${frequency.morning}` : null,
+    frequency.midday > 0 ? `Midday ×${frequency.midday}` : null,
+    frequency.evening > 0 ? `Evening ×${frequency.evening}` : null,
+  ].filter((part): part is string => part != null);
+  const unit = frequency.every === 1
+    ? frequency.unit === 'days' ? 'day' : 'week'
+    : frequency.unit;
+  return `${parts.join(' · ')} · Every ${frequency.every} ${unit}`;
+}
+
+export function hasActiveAssignmentOn(assignments: MedAssignment[], date: string): boolean {
+  return assignments.some(
+    (assignment) =>
+      assignment.date_from <= date
+      && (assignment.date_to == null || assignment.date_to >= date),
+  );
 }
 
 export function fractionAngle(fraction: DoseFraction): number {

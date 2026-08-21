@@ -3,7 +3,7 @@ use crate::domain::elimination::{
 };
 use crate::domain::health_state::{CreateHealthStateRecord, HealthStateRecordFilters};
 use crate::domain::medication::{
-    CreateMedAssignment, CreateMedication, CreateMedIntakeRecord, MedAssignmentFilters,
+    CreateMedAssignment, CreateMedIntakeRecord, CreateMedication, MedAssignmentFilters,
     MedIntakeRecordFilters, ReviseMedAssignment, UpdateMedication,
 };
 use crate::domain::nutrition_record::BatchCreateNutritionRecords;
@@ -659,7 +659,17 @@ fn tool_list() -> Value {
                         "liquid_concentration_mg_per_ml": { "type": "number" },
                         "dose_fraction": { "type": "string", "enum": ["whole", "half", "third", "quarter", "three_quarter", "eighth", "sixteenth"] },
                         "liquid_dose_ml": { "type": "number" },
-                        "frequency": { "type": "object", "properties": { "times": { "type": "array", "items": { "type": "string" } } } },
+                        "frequency": {
+                            "type": "object",
+                            "required": ["morning", "midday", "evening", "every", "unit"],
+                            "properties": {
+                                "morning": { "type": "integer", "minimum": 0, "description": "Dose count in the morning" },
+                                "midday": { "type": "integer", "minimum": 0, "description": "Dose count around midday" },
+                                "evening": { "type": "integer", "minimum": 0, "description": "Dose count in the evening" },
+                                "every": { "type": "integer", "minimum": 1 },
+                                "unit": { "type": "string", "enum": ["days", "weeks"] }
+                            }
+                        },
                         "date_from": { "type": "string", "format": "date" },
                         "date_to": { "type": "string", "format": "date" },
                         "optional": { "type": "boolean" }
@@ -680,7 +690,17 @@ fn tool_list() -> Value {
                         "liquid_concentration_mg_per_ml": { "type": "number" },
                         "dose_fraction": { "type": "string", "enum": ["whole", "half", "third", "quarter", "three_quarter", "eighth", "sixteenth"] },
                         "liquid_dose_ml": { "type": "number" },
-                        "frequency": { "type": "object", "properties": { "times": { "type": "array", "items": { "type": "string" } } } },
+                        "frequency": {
+                            "type": "object",
+                            "required": ["morning", "midday", "evening", "every", "unit"],
+                            "properties": {
+                                "morning": { "type": "integer", "minimum": 0, "description": "Dose count in the morning" },
+                                "midday": { "type": "integer", "minimum": 0, "description": "Dose count around midday" },
+                                "evening": { "type": "integer", "minimum": 0, "description": "Dose count in the evening" },
+                                "every": { "type": "integer", "minimum": 1 },
+                                "unit": { "type": "string", "enum": ["days", "weeks"] }
+                            }
+                        },
                         "effective_from": { "type": "string", "format": "date" },
                         "date_to": { "type": "string", "format": "date" },
                         "optional": { "type": "boolean" }
@@ -689,7 +709,7 @@ fn tool_list() -> Value {
             },
             {
                 "name": "health.meds.assignments.daily",
-                "description": "Get today's active medication assignments with intake records for a pet.",
+                "description": "Get medication assignments due on a date, filtered by their every-N-days/weeks cadence, with intake records.",
                 "inputSchema": {
                     "type": "object",
                     "required": ["pet_id", "date"],
