@@ -139,7 +139,7 @@ export function FormulationPicker({
                 style={{
                   padding: '0.45rem 0.85rem',
                   fontSize: '0.95rem',
-                  fontWeight: EMPHASIZED_DOSE_FRACTIONS.has(fraction) ? 700 : 400,
+                  fontWeight: 400,
                   width: '3.5rem',
                   lineHeight: 1.1,
                   fontVariantNumeric: 'tabular-nums',
@@ -147,7 +147,11 @@ export function FormulationPicker({
                 }}
                 onClick={() => onChange({ ...value, doseFraction: fraction })}
               >
-                {doseFractionLabel(fraction)}
+                {EMPHASIZED_DOSE_FRACTIONS.has(fraction) ? (
+                  <strong style={{ fontWeight: 800 }}>{doseFractionLabel(fraction)}</strong>
+                ) : (
+                  <span style={{ fontWeight: 400 }}>{doseFractionLabel(fraction)}</span>
+                )}
               </button>
             );
           })}
