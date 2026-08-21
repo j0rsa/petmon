@@ -5,7 +5,7 @@ export const DOSE_FRACTIONS: DoseFraction[] = [
 ];
 
 export const PILL_SHAPES: PillShape[] = [
-  'freedom', 'oval', 'square', 'capsule', 'pentagon', 'tear', 'rectangle',
+  'freedom', 'oval', 'oval_rounded', 'square', 'capsule', 'pentagon', 'tear', 'rectangle',
   'hexagon', 'round', 'triangle', 'double_circle', 'trapezoid', 'octagon', 'diamond',
 ];
 
@@ -38,12 +38,13 @@ export function doseFractionLabel(fraction: DoseFraction): string {
 export function pillShapeLabel(shape: PillShape): string {
   switch (shape) {
     case 'freedom': return 'Freedom';
-    case 'oval': return 'Oval';
+    case 'oval': return 'Oval · pointed';
+    case 'oval_rounded': return 'Oval · rounded';
     case 'square': return 'Square';
     case 'capsule': return 'Capsule';
     case 'pentagon': return 'Pentagon';
     case 'tear': return 'Tear';
-    case 'rectangle': return 'Rounded rectangle';
+    case 'rectangle': return 'Rectangle';
     case 'hexagon': return 'Hexagon';
     case 'round': return 'Round';
     case 'triangle': return 'Triangle';

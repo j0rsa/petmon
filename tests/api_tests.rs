@@ -2817,7 +2817,7 @@ async fn medication_system_formulations_and_intake_by_reference() {
         .set_json(serde_json::json!({
             "medication_id": med_id,
             "tablet_strength_mg": 5.0,
-            "pill_shape": "round",
+            "pill_shape": "oval_rounded",
             "dose_fraction": "half",
             "frequency": { "times": ["08:00"] },
             "date_from": "2026-03-01"
@@ -2829,6 +2829,7 @@ async fn medication_system_formulations_and_intake_by_reference() {
     let assign1_id = assign1["id"].as_str().unwrap().to_string();
     let form1_id = assign1["formulation_id"].as_str().unwrap().to_string();
     assert_eq!(assign1["effective_dose_mg"].as_f64().unwrap(), 2.5);
+    assert_eq!(assign1["formulation"]["pill_shape"], "oval_rounded");
 
     let req = test::TestRequest::post()
         .uri(&format!("/api/v1/health/meds/assignments/{assign1_id}/revise"))

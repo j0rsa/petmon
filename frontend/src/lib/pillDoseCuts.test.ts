@@ -16,11 +16,12 @@ describe('pillDoseCuts', () => {
     expect(doseRegionPath('oval', 'half')).toBe('M 0 0 H 100 V 50 H 0 Z');
   });
 
-  it('keeps pointed oval and rounded rectangle as distinct shapes', () => {
-    expect(pillShapeGeometry('oval').label).toBe('Oval');
+  it('models both visual variants of the Oval category', () => {
+    expect(pillShapeGeometry('oval').label).toBe('Oval · pointed');
     expect(pillShapeGeometry('oval').outline).toContain('M 50 12');
-    expect(pillShapeGeometry('rectangle').label).toBe('Rounded rectangle');
-    expect(pillShapeGeometry('rectangle').outline).toContain('Q 82 18 82 28');
+    expect(pillShapeGeometry('oval_rounded').label).toBe('Oval · rounded');
+    expect(pillShapeGeometry('oval_rounded').outline).toContain('Q 78 14 78 28');
+    expect(pillShapeGeometry('rectangle').label).toBe('Rectangle');
   });
 
   it('third uses proportional top fill', () => {
