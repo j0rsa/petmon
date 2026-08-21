@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { Code } from 'lucide-react';
 import {
   medicationsApi,
   type CreateMedIntakeRecord,
@@ -15,9 +16,11 @@ import {
   intakeStatus,
   intakeStatusLabel,
 } from '../../lib/medications';
+import { buildMedIntakeCurl } from '../../lib/medIntakeCurl';
 import { isDoseSupported } from '../../lib/pillDoseCuts';
 import { usePermissions } from '../../context/usePermissions';
 import { useFormatTime } from '../../context/useDisplaySettings';
+import { useUserSettings } from '../../api/userSettings';
 import { MedIcon } from './MedIcon';
 
 export interface MedIntakePanelProps {
@@ -28,11 +31,15 @@ function DailyMedRow({
   item,
   petId,
   canWrite,
+  developerMode,
+  localDate,
   onLogged,
 }: {
   item: DailyMedAssignment;
   petId: string;
   canWrite: boolean;
+  developerMode: boolean;
+  localDate: string;
   onLogged: () => void;
 }) {
   const formatTime = useFormatTime();
@@ -42,6 +49,7 @@ function DailyMedRow({
   const [showDosePrompt, setShowDosePrompt] = useState(false);
   const [doseFraction, setDoseFraction] = useState<DoseFraction>('whole');
   const [liquidDoseMl, setLiquidDoseMl] = useState('');
+  const [curlCopied, setCurlCopied] = useState(false);
 
   const logMutation = useMutation({
     mutationFn: (payload: CreateMedIntakeRecord) => medicationsApi.createIntake(payload),
@@ -92,6 +100,17 @@ function DailyMedRow({
 
   const iconFraction = assignment.optional ? 'whole' : assignment.dose_fraction;
   const iconShape = assignment.formulation.pill_shape;
+
+  function handleCopyCurl() {
+    const curl = buildMedIntakeCurl(petId, item, localDate);
+    navigator.clipboard.writeText(curl).then(() => {
+      setCurlCopied(true);
+      setTimeout(() => setCurlCopied(false), 2000);
+    });
+  }
+
+  const showTake = assignment.optional || status !== 'done';
+  const showActions = canWrite || developerMode;
 
   return (
     <div
@@ -145,9 +164,9 @@ function DailyMedRow({
           </p>
         )}
       </div>
-      {canWrite && (
-        <div style={{ display: 'flex', gap: '0.35rem' }}>
-          {(assignment.optional || status !== 'done') && (
+      {showActions && (
+        <div style={{ display: 'flex', gap: '0.35rem', alignItems: 'center' }}>
+          {canWrite && showTake && (
             <button
               type="button"
               className="button"
@@ -158,7 +177,19 @@ function DailyMedRow({
               Take
             </button>
           )}
-          {lastIntake && (
+          {developerMode && (
+            <button
+              type="button"
+              className="button button-secondary"
+              style={{ padding: '0.25rem 0.45rem', fontSize: '0.78rem', lineHeight: 0 }}
+              title={curlCopied ? 'Copied curl command' : 'Copy curl command for this intake'}
+              aria-label={curlCopied ? 'Copied curl command' : 'Copy curl command for this intake'}
+              onClick={handleCopyCurl}
+            >
+              <Code size={15} aria-hidden="true" />
+            </button>
+          )}
+          {canWrite && lastIntake && (
             <button
               type="button"
               className="button button-secondary"
@@ -248,6 +279,7 @@ export function MedIntakePanel({ petId }: MedIntakePanelProps) {
   const queryClient = useQueryClient();
   const { canWrite } = usePermissions();
   const today = localToday();
+  const { settings: developerSettings } = useUserSettings('developer_mode');
 
   const dailyQuery = useQuery({
     queryKey: ['med-daily', petId, today],
@@ -285,6 +317,8 @@ export function MedIntakePanel({ petId }: MedIntakePanelProps) {
               item={item}
               petId={petId}
               canWrite={canWrite}
+              developerMode={developerSettings.enabled}
+              localDate={today}
               onLogged={invalidate}
             />
           ))}

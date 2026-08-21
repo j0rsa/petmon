@@ -3,7 +3,7 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { MemoryRouter } from 'react-router-dom';
 import { MedIntakePanel } from './MedIntakePanel';
 import { SelectedPetProvider } from '../../context/SelectedPetContext';
-import { mockDailyMedAssignments, mockPetId, mockPets } from '../../stories/fixtures';
+import { mockDailyMedAssignments, mockDeveloperModeSettings, mockPetId, mockPets } from '../../stories/fixtures';
 import { localToday } from '../../lib/dates';
 
 const meta = {
@@ -16,11 +16,15 @@ const meta = {
 export default meta;
 type Story = StoryObj<typeof meta>;
 
-function withMedData(empty = false): Story['decorators'] {
+function withMedData(empty = false, developerMode = false): Story['decorators'] {
   return [
     (Story) => {
       const client = new QueryClient();
       client.setQueryData(['pets'], mockPets);
+      client.setQueryData(['user-settings', 'developer_mode'], {
+        ...mockDeveloperModeSettings,
+        enabled: developerMode,
+      });
       client.setQueryData(
         ['med-daily', mockPetId, localToday()],
         empty ? [] : mockDailyMedAssignments,
@@ -41,6 +45,11 @@ function withMedData(empty = false): Story['decorators'] {
 export const WithDailyMeds: Story = {
   args: { petId: mockPetId },
   decorators: withMedData(false),
+};
+
+export const WithDeveloperMode: Story = {
+  args: { petId: mockPetId },
+  decorators: withMedData(false, true),
 };
 
 export const Empty: Story = {

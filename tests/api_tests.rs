@@ -1879,6 +1879,30 @@ async fn demo_mode_off_leaves_empty_database() {
 }
 
 #[actix_web::test]
+async fn user_settings_developer_mode_roundtrip() {
+    let pool = setup_pool().await;
+    let state = web::Data::new(AppState::new(pool, true, None, None));
+    let app = build_app!(state);
+
+    let get_req = test::TestRequest::get()
+        .uri("/api/v1/me/settings/developer_mode")
+        .to_request();
+    let get_resp = test::call_service(&app, get_req).await;
+    assert_eq!(get_resp.status(), 200);
+    let initial: serde_json::Value = test::read_body_json(get_resp).await;
+    assert_eq!(initial["enabled"], false);
+
+    let post_req = test::TestRequest::post()
+        .uri("/api/v1/me/settings/developer_mode")
+        .set_json(serde_json::json!({ "enabled": true }))
+        .to_request();
+    let post_resp = test::call_service(&app, post_req).await;
+    assert_eq!(post_resp.status(), 200);
+    let updated: serde_json::Value = test::read_body_json(post_resp).await;
+    assert_eq!(updated["enabled"], true);
+}
+
+#[actix_web::test]
 async fn user_settings_display_roundtrip() {
     let pool = setup_pool().await;
     let state = web::Data::new(AppState::new(pool, true, None, None));

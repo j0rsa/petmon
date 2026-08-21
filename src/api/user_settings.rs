@@ -5,9 +5,10 @@ use serde_json::Value;
 use crate::auth::identity::Identity;
 use crate::auth::AppState;
 use crate::domain::user_settings::{
-    is_known_user_settings_key, CumulativeFluidChartSettings, NutritionCalendarSettings,
-    UpdateCumulativeFluidChartSettings, UpdateNutritionCalendarSettings, UpdateUserDisplaySettings,
-    UserDisplaySettings, CUMULATIVE_FLUID_CHART_KEY, DISPLAY_KEY, NUTRITION_CALENDAR_KEY,
+    is_known_user_settings_key, CumulativeFluidChartSettings, DeveloperModeSettings,
+    NutritionCalendarSettings, UpdateCumulativeFluidChartSettings, UpdateDeveloperModeSettings,
+    UpdateNutritionCalendarSettings, UpdateUserDisplaySettings, UserDisplaySettings,
+    CUMULATIVE_FLUID_CHART_KEY, DEVELOPER_MODE_KEY, DISPLAY_KEY, NUTRITION_CALENDAR_KEY,
 };
 use crate::error::{AppError, AppResult};
 use crate::repo::user_settings;
@@ -47,6 +48,11 @@ pub async fn get_user_settings(
         }
         CUMULATIVE_FLUID_CHART_KEY => {
             let settings: CumulativeFluidChartSettings =
+                user_settings::get(&state.pool, &reader_key, &key).await?;
+            serde_json::to_value(settings).map_err(|e| AppError::Internal(e.to_string()))?
+        }
+        DEVELOPER_MODE_KEY => {
+            let settings: DeveloperModeSettings =
                 user_settings::get(&state.pool, &reader_key, &key).await?;
             serde_json::to_value(settings).map_err(|e| AppError::Internal(e.to_string()))?
         }
@@ -99,6 +105,17 @@ pub async fn update_user_settings(
             let update: UpdateCumulativeFluidChartSettings =
                 serde_json::from_value(body.into_inner()).map_err(|e| {
                     AppError::BadRequest(format!("invalid cumulative fluid chart settings: {e}"))
+                })?;
+            let merged = update.apply(existing);
+            user_settings::upsert(&state.pool, &reader_key, &key, &merged).await?;
+            serde_json::to_value(merged).map_err(|e| AppError::Internal(e.to_string()))?
+        }
+        DEVELOPER_MODE_KEY => {
+            let existing: DeveloperModeSettings =
+                user_settings::get(&state.pool, &reader_key, &key).await?;
+            let update: UpdateDeveloperModeSettings = serde_json::from_value(body.into_inner())
+                .map_err(|e| {
+                    AppError::BadRequest(format!("invalid developer mode settings: {e}"))
                 })?;
             let merged = update.apply(existing);
             user_settings::upsert(&state.pool, &reader_key, &key, &merged).await?;

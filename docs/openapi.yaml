@@ -618,6 +618,7 @@ paths:
               - display
               - nutrition_calendar
               - cumulative_fluid_chart
+              - developer_mode
       responses:
         '200':
           description: User settings
@@ -628,6 +629,7 @@ paths:
                   - $ref: '#/components/schemas/UserDisplaySettings'
                   - $ref: '#/components/schemas/NutritionCalendarSettings'
                   - $ref: '#/components/schemas/CumulativeFluidChartSettings'
+                  - $ref: '#/components/schemas/DeveloperModeSettings'
         '404':
           $ref: '#/components/responses/NotFound'
         '403':
@@ -651,6 +653,7 @@ paths:
               - display
               - nutrition_calendar
               - cumulative_fluid_chart
+              - developer_mode
       requestBody:
         required: true
         content:
@@ -660,6 +663,7 @@ paths:
                 - $ref: '#/components/schemas/UpdateUserDisplaySettings'
                 - $ref: '#/components/schemas/UpdateNutritionCalendarSettings'
                 - $ref: '#/components/schemas/UpdateCumulativeFluidChartSettings'
+                - $ref: '#/components/schemas/UpdateDeveloperModeSettings'
       responses:
         '200':
           description: User settings updated
@@ -670,6 +674,7 @@ paths:
                   - $ref: '#/components/schemas/UserDisplaySettings'
                   - $ref: '#/components/schemas/NutritionCalendarSettings'
                   - $ref: '#/components/schemas/CumulativeFluidChartSettings'
+                  - $ref: '#/components/schemas/DeveloperModeSettings'
         '400':
           $ref: '#/components/responses/BadRequest'
         '404':
@@ -3231,6 +3236,22 @@ components:
         date_format:
           $ref: '#/components/schemas/DateFormat'
         show_water_card:
+          type: boolean
+          nullable: true
+
+    DeveloperModeSettings:
+      type: object
+      properties:
+        enabled:
+          type: boolean
+          description: Show developer tooling such as copyable API curl snippets
+      required:
+        - enabled
+
+    UpdateDeveloperModeSettings:
+      type: object
+      properties:
+        enabled:
           type: boolean
           nullable: true
 

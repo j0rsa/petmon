@@ -14,6 +14,7 @@ export default function SettingsPage() {
   return (
     <div className="page-stack">
       <DisplaySection />
+      <DeveloperModeSection />
       <PushNotificationsSection />
       <AppCacheSection />
       <OidcSection />
@@ -96,6 +97,46 @@ function DisplaySection() {
       {error && (
         <div className="error-state">
           {error instanceof Error ? error.message : 'Failed to save display settings.'}
+        </div>
+      )}
+    </section>
+  );
+}
+
+function DeveloperModeSection() {
+  const { settings: current, update, isLoading, error, isSaving } = useUserSettings('developer_mode');
+
+  if (isLoading) return <div className="loading-state">Loading developer settings…</div>;
+
+  return (
+    <section className="panel">
+      <div className="section-heading">
+        <div>
+          <p className="eyebrow">Preferences</p>
+          <h3>Developer mode</h3>
+        </div>
+      </div>
+
+      <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
+        <div className="display-option-row">
+          <span className="display-option-label">API snippets</span>
+          <div className="display-option-choices">
+            <label className="checkbox-row" style={{ paddingTop: 0 }}>
+              <input
+                type="checkbox"
+                checked={current.enabled}
+                onChange={(e) => update({ enabled: e.target.checked })}
+                disabled={isSaving}
+              />
+              Show copyable curl commands next to medication Take buttons
+            </label>
+          </div>
+        </div>
+      </div>
+
+      {error && (
+        <div className="error-state">
+          {error instanceof Error ? error.message : 'Failed to save developer settings.'}
         </div>
       )}
     </section>

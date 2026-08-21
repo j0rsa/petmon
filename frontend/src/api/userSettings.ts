@@ -1,7 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { api } from './client';
 
-export type UserSettingsKey = 'display' | 'nutrition_calendar' | 'cumulative_fluid_chart';
+export type UserSettingsKey = 'display' | 'nutrition_calendar' | 'cumulative_fluid_chart' | 'developer_mode';
 
 /** @deprecated Use UserSettingsKey */
 export type WidgetSettingsKey = Exclude<UserSettingsKey, 'display'>;
@@ -38,10 +38,16 @@ export interface CumulativeFluidChartSettings {
   show_now_bar: boolean;
 }
 
+/** Per-user developer tooling (curl snippets, etc.). */
+export interface DeveloperModeSettings {
+  enabled: boolean;
+}
+
 export type UserSettingsMap = {
   display: UserDisplaySettings;
   nutrition_calendar: NutritionCalendarSettings;
   cumulative_fluid_chart: CumulativeFluidChartSettings;
+  developer_mode: DeveloperModeSettings;
 };
 
 export const DEFAULT_USER_DISPLAY_SETTINGS: UserDisplaySettings = {
@@ -71,10 +77,15 @@ export const DEFAULT_CUMULATIVE_FLUID_CHART_SETTINGS: CumulativeFluidChartSettin
   show_now_bar: true,
 };
 
+export const DEFAULT_DEVELOPER_MODE_SETTINGS: DeveloperModeSettings = {
+  enabled: false,
+};
+
 export const USER_SETTINGS_DEFAULTS: UserSettingsMap = {
   display: DEFAULT_USER_DISPLAY_SETTINGS,
   nutrition_calendar: DEFAULT_NUTRITION_CALENDAR_SETTINGS,
   cumulative_fluid_chart: DEFAULT_CUMULATIVE_FLUID_CHART_SETTINGS,
+  developer_mode: DEFAULT_DEVELOPER_MODE_SETTINGS,
 };
 
 export const userSettingsApi = {
