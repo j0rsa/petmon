@@ -1666,6 +1666,58 @@ paths:
             application/json:
               schema: { $ref: '#/components/schemas/MedAssignment' }
 
+  /health/meds/assignments/{id}/end:
+    post:
+      tags: [Medications]
+      summary: Pause an assignment by setting its end date
+      description: >
+        Sets `date_to` so the assignment is no longer active after `ended_on`.
+        Defaults to yesterday in the server timezone (not due today).
+      x-required-scope: api_write
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/EndMedAssignment' }
+      responses:
+        '200':
+          description: Assignment ended
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/MedAssignment' }
+        '400':
+          $ref: '#/components/responses/BadRequest'
+
+  /health/meds/assignments/{id}:
+    delete:
+      tags: [Medications]
+      summary: Delete an assignment
+      description: >
+        Fails with 400 if the assignment has intake records, unless `cascade=true`
+        is passed to delete those records as well.
+      x-required-scope: api_write
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string }
+        - name: cascade
+          in: query
+          schema: { type: boolean, default: false }
+          description: When true, also delete intake records logged against this assignment
+      responses:
+        '204':
+          description: Assignment deleted
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
   /health/meds/formulations:
     get:
       tags: [Medications]
@@ -1684,6 +1736,117 @@ paths:
               schema:
                 type: array
                 items: { $ref: '#/components/schemas/MedFormulation' }
+
+  /health/meds/bundles:
+    get:
+      tags: [Medications]
+      summary: List medication bundles for a pet
+      x-required-scope: api_read
+      parameters:
+        - name: pet_id
+          in: query
+          required: true
+          schema: { type: string, format: uuid }
+      responses:
+        '200':
+          description: Bundles with two or more members each
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: '#/components/schemas/MedBundle' }
+    post:
+      tags: [Medications]
+      summary: Create a bundle of two or more scheduled assignments
+      description: >
+        Members are stored by medication identity so they survive assignment
+        pause/revise. Optional/as-needed assignments are rejected. Name defaults
+        to the medication names joined with ` + `.
+      x-required-scope: api_write
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/CreateMedBundle' }
+      responses:
+        '201':
+          description: Bundle created
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/MedBundle' }
+        '400':
+          $ref: '#/components/responses/BadRequest'
+
+  /health/meds/bundles/{id}:
+    patch:
+      tags: [Medications]
+      summary: Rename a medication bundle
+      x-required-scope: api_write
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/UpdateMedBundle' }
+      responses:
+        '200':
+          description: Updated bundle
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/MedBundle' }
+        '404':
+          $ref: '#/components/responses/NotFound'
+    delete:
+      tags: [Medications]
+      summary: Delete a medication bundle
+      x-required-scope: api_write
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string }
+      responses:
+        '204':
+          description: Bundle deleted
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /health/meds/bundles/{id}/intake:
+    post:
+      tags: [Medications]
+      summary: Log intake for every medication in a bundle
+      description: >
+        Creates one intake record per member using each medication's active assignment.
+        Omit `occurred_at` and `local_date` for a real-time Take now (one Telegram
+        message, one `#pills` line per member, no timestamp). Providing either date
+        field marks a delayed Add record.
+      x-required-scope: api_write
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/CreateMedBundleIntake' }
+      responses:
+        '201':
+          description: Intakes logged for every bundle member
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: '#/components/schemas/MedIntakeRecord' }
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '404':
+          $ref: '#/components/responses/NotFound'
 
   /health/meds/intake:
     get:
@@ -4277,6 +4440,14 @@ components:
           description: As-needed medication; dosage is provided for each intake and no schedule is required
       required: [effective_from]
 
+    EndMedAssignment:
+      type: object
+      properties:
+        ended_on:
+          type: string
+          format: date
+          description: Last active date. Defaults to yesterday in the server timezone.
+
     MedIntakeRecord:
       type: object
       properties:
@@ -4315,11 +4486,18 @@ components:
           description: Whether the dose was taken (true) or skipped (false). Defaults to true.
         occurred_at:
           type: string
-          description: Naive local datetime when the dose was taken (YYYY-MM-DDTHH:MM:SS). Defaults to now in the server timezone.
+          description: >
+            Naive local datetime when the dose was taken (YYYY-MM-DDTHH:MM:SS).
+            Defaults to now in the server timezone. Omit together with local_date
+            for a real-time Telegram line (no timestamp). Providing this or local_date
+            marks a delayed entry and appends a formatted timestamp.
         local_date:
           type: string
           format: date
-          description: Calendar day the intake counts toward (assignment due/active checks). Defaults to the date portion of occurred_at.
+          description: >
+            Calendar day the intake counts toward (assignment due/active checks).
+            Defaults to the date portion of occurred_at. Providing this or occurred_at
+            marks a delayed Telegram entry.
         note: { type: string }
         source_type: { type: string }
       required: [pet_id, medication_id]
@@ -4332,6 +4510,62 @@ components:
         intakes:
           type: array
           items: { $ref: '#/components/schemas/MedIntakeRecord' }
+
+    MedBundleItem:
+      type: object
+      properties:
+        medication_id: { type: string }
+        medication: { $ref: '#/components/schemas/Medication' }
+      required: [medication_id, medication]
+
+    MedBundle:
+      type: object
+      properties:
+        id: { type: string }
+        pet_id: { type: string, format: uuid }
+        name: { type: string }
+        items:
+          type: array
+          minItems: 2
+          items: { $ref: '#/components/schemas/MedBundleItem' }
+        created_at: { type: string, format: date-time }
+        updated_at: { type: string, format: date-time }
+      required: [id, pet_id, name, items, created_at, updated_at]
+
+    CreateMedBundle:
+      type: object
+      properties:
+        pet_id: { type: string, format: uuid }
+        name:
+          type: string
+          description: Optional display name. Defaults to the medication names joined with ` + `.
+        assignment_ids:
+          type: array
+          minItems: 2
+          items: { type: string }
+          description: Two or more scheduled (non-optional) assignment IDs for different medications
+      required: [pet_id, assignment_ids]
+
+    UpdateMedBundle:
+      type: object
+      properties:
+        name: { type: string }
+      required: [name]
+
+    CreateMedBundleIntake:
+      type: object
+      properties:
+        occurred_at:
+          type: string
+          description: >
+            Naive local datetime when the doses were taken (YYYY-MM-DDTHH:MM:SS).
+            Omit together with local_date for a real-time Telegram message (no timestamp).
+        local_date:
+          type: string
+          format: date
+          description: Calendar day the intakes count toward
+        note: { type: string }
+        source_type: { type: string }
       required: [medication, assignment, intakes]
 
     WeightSummaryBucket:

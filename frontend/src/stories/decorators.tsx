@@ -39,6 +39,7 @@ import {
   mockHealthStateRecords,
   mockDailyMedAssignments,
   mockMedAssignments,
+  mockMedBundles,
 } from './fixtures';
 
 /** Single router wrapper — use `parameters.route` per story to set the active path. */
@@ -434,6 +435,7 @@ export function withHealthPage({ petId = mockPetId, loading = false, empty = fal
       client.setQueryDefaults(['health-state-chart', petId], { queryFn: pending });
       client.setQueryDefaults(['med-daily', petId], { queryFn: pending });
       client.setQueryDefaults(['med-assignments', petId], { queryFn: pending });
+      client.setQueryDefaults(['med-bundles', petId], { queryFn: pending });
     } else {
       client.setQueryData(
         ['weight-records', petId],
@@ -474,6 +476,10 @@ export function withHealthPage({ petId = mockPetId, loading = false, empty = fal
       client.setQueryData(
         ['med-assignments', petId],
         empty ? [] : mockMedAssignments.map((assignment) => ({ ...assignment, pet_id: petId })),
+      );
+      client.setQueryData(
+        ['med-bundles', petId],
+        empty ? [] : mockMedBundles.map((bundle) => ({ ...bundle, pet_id: petId })),
       );
     }
 

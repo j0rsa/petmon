@@ -334,6 +334,11 @@ pub struct ReviseMedAssignment {
     pub optional: Option<bool>,
 }
 
+#[derive(Debug, Deserialize, Default)]
+pub struct EndMedAssignment {
+    pub ended_on: Option<String>,
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct MedIntakeRecord {
     pub id: String,
@@ -573,6 +578,42 @@ pub struct MedIntakeCore {
     pub source_type: String,
     pub telegram_message_id: Option<i64>,
     pub created_at: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct MedBundleItem {
+    pub medication_id: String,
+    pub medication: Medication,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct MedBundle {
+    pub id: String,
+    pub pet_id: Uuid,
+    pub name: String,
+    pub items: Vec<MedBundleItem>,
+    pub created_at: String,
+    pub updated_at: String,
+}
+
+#[derive(Debug, Deserialize)]
+pub struct CreateMedBundle {
+    pub pet_id: String,
+    pub name: Option<String>,
+    pub assignment_ids: Vec<String>,
+}
+
+#[derive(Debug, Deserialize)]
+pub struct UpdateMedBundle {
+    pub name: Option<String>,
+}
+
+#[derive(Debug, Deserialize, Default)]
+pub struct CreateMedBundleIntake {
+    pub occurred_at: Option<String>,
+    pub local_date: Option<String>,
+    pub note: Option<String>,
+    pub source_type: Option<String>,
 }
 
 #[cfg(test)]

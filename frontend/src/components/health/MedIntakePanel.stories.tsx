@@ -1,10 +1,12 @@
 import type { Meta, StoryObj } from '@storybook/react-vite';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { MemoryRouter } from 'react-router-dom';
+import { expect, userEvent, within } from 'storybook/test';
 import { MedIntakePanel } from './MedIntakePanel';
 import { SelectedPetProvider } from '../../context/SelectedPetContext';
-import { mockDailyMedAssignments, mockDeveloperModeSettings, mockPetId, mockPets } from '../../stories/fixtures';
+import { mockDailyMedAssignments, mockBundleDailyAssignments, mockDeveloperModeSettings, mockMedBundles, mockPetId, mockPets } from '../../stories/fixtures';
 import { localToday } from '../../lib/dates';
+import { asNarrowStory } from '../../stories/viewport';
 
 const meta = {
   title: 'Components/Health/MedIntakePanel',
@@ -16,10 +18,29 @@ const meta = {
 export default meta;
 type Story = StoryObj<typeof meta>;
 
-function withMedData(empty = false, developerMode = false): Story['decorators'] {
+function withMedData({
+  empty = false,
+  developerMode = false,
+  daily = mockDailyMedAssignments,
+  bundles = [],
+}: {
+  empty?: boolean;
+  developerMode?: boolean;
+  daily?: typeof mockDailyMedAssignments;
+  bundles?: typeof mockMedBundles;
+} = {}): Story['decorators'] {
   return [
     (Story) => {
-      const client = new QueryClient();
+      const client = new QueryClient({
+        defaultOptions: {
+          queries: {
+            retry: false,
+            staleTime: Infinity,
+            refetchOnMount: false,
+            refetchOnWindowFocus: false,
+          },
+        },
+      });
       client.setQueryData(['pets'], mockPets);
       client.setQueryData(['user-settings', 'developer_mode'], {
         ...mockDeveloperModeSettings,
@@ -27,8 +48,9 @@ function withMedData(empty = false, developerMode = false): Story['decorators'] 
       });
       client.setQueryData(
         ['med-daily', mockPetId, localToday()],
-        empty ? [] : mockDailyMedAssignments,
+        empty ? [] : daily,
       );
+      client.setQueryData(['med-bundles', mockPetId], empty ? [] : bundles);
       return (
         <MemoryRouter>
           <QueryClientProvider client={client}>
@@ -44,15 +66,88 @@ function withMedData(empty = false, developerMode = false): Story['decorators'] 
 
 export const WithDailyMeds: Story = {
   args: { petId: mockPetId },
-  decorators: withMedData(false),
+  decorators: withMedData(),
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    await expect(canvas.getByRole('heading', { name: 'Meds' })).toBeInTheDocument();
+    await expect(canvas.queryByRole('heading', { name: 'Bundles' })).not.toBeInTheDocument();
+    await userEvent.click(canvas.getAllByRole('button', { name: 'Add record' })[0]!);
+    await expect(canvas.getByText('Add medication record')).toBeInTheDocument();
+    await expect(canvas.getByText('Taken date')).toBeInTheDocument();
+    await userEvent.click(canvas.getByRole('button', { name: 'Cancel' }));
+    await userEvent.click(canvas.getAllByRole('button', { name: 'Take now' })[1]!);
+    await expect(canvas.getByText('Record medication taken now')).toBeInTheDocument();
+    await expect(canvas.queryByText('Taken date')).not.toBeInTheDocument();
+  },
 };
 
 export const WithDeveloperMode: Story = {
   args: { petId: mockPetId },
-  decorators: withMedData(false, true),
+  decorators: withMedData({ developerMode: true }),
+};
+
+export const WithBundle: Story = {
+  args: { petId: mockPetId },
+  decorators: withMedData({
+    daily: mockBundleDailyAssignments,
+    bundles: mockMedBundles,
+  }),
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    await expect(canvas.getByText('Prednisolone + Gabapentin')).toBeInTheDocument();
+    await expect(canvas.getByRole('heading', { name: 'Bundles' })).toBeInTheDocument();
+    await expect(canvas.getByRole('heading', { name: 'Meds' })).toBeInTheDocument();
+    await userEvent.click(canvas.getByRole('button', { name: 'Add record for Prednisolone + Gabapentin' }));
+    await expect(canvas.getByText('Add medication record')).toBeInTheDocument();
+    await expect(canvas.getByText('Taken date')).toBeInTheDocument();
+    await userEvent.click(canvas.getByRole('button', { name: 'Cancel' }));
+    await expect(canvas.getByRole('button', { name: 'Take Prednisolone + Gabapentin now' })).toBeInTheDocument();
+    await expect(canvas.queryByRole('button', { name: 'Undo Prednisolone + Gabapentin' })).not.toBeInTheDocument();
+  },
+};
+
+export const WithBundleTaken: Story = {
+  args: { petId: mockPetId },
+  decorators: withMedData({
+    daily: mockBundleDailyAssignments.map((item, index) => ({
+      ...item,
+      intakes: [{
+        id: `bundle-intake-${index}`,
+        pet_id: mockPetId,
+        medication_id: item.medication.id,
+        assignment_id: item.assignment.id,
+        assignment: item.assignment,
+        dose_fraction_override: null,
+        liquid_dose_ml_override: null,
+        effective_dose_fraction: item.assignment.dose_fraction,
+        effective_dose_mg: item.assignment.effective_dose_mg,
+        dose_label: item.assignment.dose_label,
+        occurred_at: `${localToday()}T08:00:00`,
+        local_date: localToday(),
+        taken: true,
+        note: null,
+        source_type: 'manual',
+        created_at: `${localToday()}T08:00:00`,
+      }],
+    })),
+    bundles: mockMedBundles,
+  }),
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    await expect(canvas.getByRole('button', { name: 'Add record for Prednisolone + Gabapentin' })).toBeInTheDocument();
+    await expect(canvas.queryByRole('button', { name: 'Take Prednisolone + Gabapentin now' })).not.toBeInTheDocument();
+    await expect(canvas.getByRole('button', { name: 'Undo Prednisolone + Gabapentin' })).toBeInTheDocument();
+    await expect(canvas.getByRole('heading', { name: 'Bundles' })).toBeInTheDocument();
+    await expect(canvas.getByRole('heading', { name: 'Meds' })).toBeInTheDocument();
+  },
 };
 
 export const Empty: Story = {
   args: { petId: mockPetId },
-  decorators: withMedData(true),
+  decorators: withMedData({ empty: true }),
 };
+
+export const WithDailyMedsNarrow = asNarrowStory(WithDailyMeds);
+export const WithBundleNarrow = asNarrowStory(WithBundle);
+export const WithBundleTakenNarrow = asNarrowStory(WithBundleTaken);
+export const EmptyNarrow = asNarrowStory(Empty);
