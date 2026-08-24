@@ -4,7 +4,9 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { BottomNav } from './BottomNav';
 import { withMemoryRouter } from '../stories/decorators';
 import { mockNotifications, mockPets, mockPetId, mockAppInfo } from '../stories/fixtures';
+import { asNarrowStory } from '../stories/viewport';
 import { SelectedPetProvider } from '../context/SelectedPetContext';
+import { SELECTED_PET_STORAGE_KEY } from '../lib/selectedPetStorage';
 
 function bottomNavClient(unreadCount: number, notifications = mockNotifications) {
   const client = new QueryClient({
@@ -41,7 +43,7 @@ const withNoPets: Decorator = (Story) => {
   client.setQueryData(['notifications-unread-count'], { count: 0 });
   client.setQueryData(['app-info'], mockAppInfo);
 
-  localStorage.removeItem('pm_selected_pet_id');
+  localStorage.removeItem(SELECTED_PET_STORAGE_KEY);
 
   return (
     <QueryClientProvider client={client}>
@@ -122,3 +124,19 @@ export const AllPillarTabs: Story = {
     await expect(canvas.queryByRole('link', { name: 'Settings' })).not.toBeInTheDocument();
   },
 };
+
+export const SwitchPetPersists: Story = {
+  name: 'Switch pet persists',
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    await userEvent.click(canvas.getByRole('button', { name: /^Mittens/i }));
+    await waitFor(() => {
+      expect(canvas.getByRole('dialog', { name: 'Pet, notifications, and settings' })).toBeInTheDocument();
+    });
+    await userEvent.click(canvas.getByRole('button', { name: /dog placeholder Rex/i }));
+    expect(localStorage.getItem(SELECTED_PET_STORAGE_KEY)).toBe(mockPets[1].id);
+    await expect(canvas.getByRole('button', { name: /^Rex/i })).toBeInTheDocument();
+  },
+};
+
+export const SwitchPetPersistsNarrow = asNarrowStory(SwitchPetPersists);

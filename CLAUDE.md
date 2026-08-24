@@ -18,6 +18,8 @@ User settings API: `GET/POST /api/v1/me/settings/{key}` where `key` is e.g. `dis
 
 Push subscriptions remain per browser endpoint; notification read state and push ownership follow `reader_key`.
 
+**Selected pet** is browser-local (`localStorage` key `petmon-selected-pet-id`), not a user setting. Restore it after refresh. While the pets query is pending, `data` is `undefined` — do not treat the `data ?? []` empty array as “no pets”, or the stored id is wiped and the UI falls back to the first pet.
+
 ---
 1. **Tests** — update or add integration tests in `tests/api_tests.rs` covering the changed behaviour.
 2. **API spec** — reflect any new/changed/removed endpoints or fields in `docs/openapi.yaml`.

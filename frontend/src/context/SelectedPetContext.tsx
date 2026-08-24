@@ -1,17 +1,8 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { petsApi } from '../api/pets';
+import { readStoredPetId, resolveSelectedPetId, writeStoredPetId } from '../lib/selectedPetStorage';
 import type { Pet } from '../types';
-
-const STORAGE_KEY = 'petmon-selected-pet-id';
-
-function readStoredPetId() {
-  try {
-    return localStorage.getItem(STORAGE_KEY);
-  } catch {
-    return null;
-  }
-}
 
 interface SelectedPetContextValue {
   pets: Pet[];
@@ -37,26 +28,19 @@ export function SelectedPetProvider({ children, initialPetId }: SelectedPetProvi
 
   const setSelectedPetId = useCallback((id: string) => {
     setSelectedPetIdState(id);
-    try {
-      localStorage.setItem(STORAGE_KEY, id);
-    } catch {
-      // ignore storage errors
-    }
+    writeStoredPetId(id);
   }, []);
 
   useEffect(() => {
-    if (pets.length === 0) {
+    const next = resolveSelectedPetId(petsQuery.data, selectedPetId);
+    if (next === selectedPetId) return;
+    if (next === null) {
       // eslint-disable-next-line react-hooks/set-state-in-effect
       setSelectedPetIdState(null);
       return;
     }
-
-    if (selectedPetId && pets.some((pet) => pet.id === selectedPetId)) {
-      return;
-    }
-
-    setSelectedPetId(pets[0].id);
-  }, [pets, selectedPetId, setSelectedPetId]);
+    setSelectedPetId(next);
+  }, [petsQuery.data, selectedPetId, setSelectedPetId]);
 
   const selectedPet = useMemo(() => pets.find((pet) => pet.id === selectedPetId) ?? null, [pets, selectedPetId]);
 
