@@ -88,8 +88,8 @@ export function asNarrowStory<TArgs>(story: StoryObj<TArgs>): StoryObj<TArgs> {
       },
     },
     decorators: [...decoratorList(story), withNarrowFrame],
-    play: async (context) => {
-      if (play) await play(context);
+    play: async (context: { canvasElement: HTMLElement }) => {
+      if (play) await (play as (ctx: { canvasElement: HTMLElement }) => unknown)(context);
       assertFitsNarrowViewport(context.canvasElement);
     },
   };
