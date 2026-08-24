@@ -51,6 +51,10 @@ function withMedData({
         empty ? [] : daily,
       );
       client.setQueryData(['med-bundles', mockPetId], empty ? [] : bundles);
+      client.setQueryData(['app-info'], {
+        med_intake_shortcut_icloud_url: 'https://www.icloud.com/shortcuts/abc123def4',
+        med_intake_automate_community_url: 'https://llamalab.com/automate/community/flows/12345',
+      });
       return (
         <MemoryRouter>
           <QueryClientProvider client={client}>
@@ -71,6 +75,7 @@ export const WithDailyMeds: Story = {
     const canvas = within(canvasElement);
     await expect(canvas.getByRole('heading', { name: 'Meds' })).toBeInTheDocument();
     await expect(canvas.getByRole('link', { name: 'Apple Shortcut' })).toBeInTheDocument();
+    await expect(canvas.getByRole('link', { name: 'AutoMate flow' })).toBeInTheDocument();
     await expect(canvas.queryByRole('heading', { name: 'Bundles' })).not.toBeInTheDocument();
     await userEvent.click(canvas.getAllByRole('button', { name: 'Add record' })[0]!);
     await expect(canvas.getByText('Add medication record')).toBeInTheDocument();

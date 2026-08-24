@@ -668,6 +668,7 @@ async fn app_info_reports_demo_mode() {
         chrono_tz::UTC,
         true,
         None,
+        None,
     ));
     let app = build_full_app!(state);
 
@@ -689,6 +690,7 @@ async fn app_info_includes_med_intake_shortcut_icloud_url() {
         chrono_tz::UTC,
         false,
         Some("https://www.icloud.com/shortcuts/abc123def4".into()),
+        None,
     ));
     let app = build_full_app!(state);
 
@@ -700,6 +702,32 @@ async fn app_info_includes_med_intake_shortcut_icloud_url() {
         body.get("med_intake_shortcut_icloud_url")
             .and_then(|v| v.as_str()),
         Some("https://www.icloud.com/shortcuts/abc123def4")
+    );
+}
+
+#[actix_web::test]
+async fn app_info_includes_med_intake_automate_community_url() {
+    let pool = setup_pool().await;
+    let state = web::Data::new(AppState::new_with_tz(
+        pool,
+        false,
+        None,
+        None,
+        chrono_tz::UTC,
+        false,
+        None,
+        Some("https://llamalab.com/automate/community/flows/12345".into()),
+    ));
+    let app = build_full_app!(state);
+
+    let req = test::TestRequest::get().uri("/api/v1/info").to_request();
+    let resp = test::call_service(&app, req).await;
+    assert_eq!(resp.status(), 200);
+    let body: serde_json::Value = test::read_body_json(resp).await;
+    assert_eq!(
+        body.get("med_intake_automate_community_url")
+            .and_then(|v| v.as_str()),
+        Some("https://llamalab.com/automate/community/flows/12345")
     );
 }
 
@@ -792,6 +820,7 @@ async fn nutrition_record_default_occurred_at_uses_configured_timezone() {
         None,
         "Asia/Tokyo".parse().unwrap(),
         false,
+        None,
         None,
     ));
     let app = build_app!(state);
@@ -3873,22 +3902,55 @@ async fn shortcuts_med_intake_menu_take_and_download() {
     let resp = test::call_service(&app, req).await;
     assert_eq!(resp.status(), 201);
 
+    let req = test::TestRequest::post()
+        .uri("/api/v1/health/meds")
+        .set_json(serde_json::json!({
+            "pet_id": pet_id,
+            "name": "Shortcut PRN",
+            "med_type": "pill",
+            "color": "#22c55e"
+        }))
+        .to_request();
+    let resp = test::call_service(&app, req).await;
+    assert_eq!(resp.status(), 201);
+    let prn_med: serde_json::Value = test::read_body_json(resp).await;
+    let prn_med_id = prn_med["id"].as_str().unwrap();
+
+    let req = test::TestRequest::post()
+        .uri("/api/v1/health/meds/assignments")
+        .set_json(serde_json::json!({
+            "medication_id": prn_med_id,
+            "tablet_strength_mg": 2.5,
+            "pill_shape": "round",
+            "frequency": { "morning": 0, "midday": 0, "evening": 0, "every": 1, "unit": "days" },
+            "date_from": "2026-03-01",
+            "optional": true
+        }))
+        .to_request();
+    let resp = test::call_service(&app, req).await;
+    assert_eq!(resp.status(), 201);
+
     let req = test::TestRequest::get()
         .uri(&format!(
-            "/api/v1/shortcuts/med-intake/menu?pet_id={pet_id}&date=2026-03-15"
+            "/api/v1/shortcuts/meds/intake/menu?pet_id={pet_id}&date=2026-03-15"
         ))
         .to_request();
     let resp = test::call_service(&app, req).await;
     assert_eq!(resp.status(), 200);
     let menu: serde_json::Value = test::read_body_json(resp).await;
     let choices = menu["choices"].as_array().unwrap();
-    assert_eq!(choices.len(), 1);
-    let choice = choices[0].as_str().unwrap();
-    assert!(choice.starts_with("Shortcut Pill · "));
-    let token = choice.split('|').nth(1).unwrap();
+    assert_eq!(choices.len(), 2);
+    let lines = menu["lines"].as_array().unwrap();
+    assert_eq!(lines.len(), 2);
+
+    let scheduled = choices
+        .iter()
+        .find(|c| c["kind"].as_str() == Some("scheduled"))
+        .unwrap();
+    let token = scheduled["token"].as_str().unwrap();
 
     let req = test::TestRequest::post()
-        .uri(&format!("/api/v1/shortcuts/med-intake/take/{token}"))
+        .uri(&format!("/api/v1/shortcuts/meds/intake/take/{token}"))
         .to_request();
     let resp = test::call_service(&app, req).await;
     assert_eq!(resp.status(), 201);
@@ -3896,11 +3958,38 @@ async fn shortcuts_med_intake_menu_take_and_download() {
     assert_eq!(intake["medication_id"].as_str(), Some(med_id));
     assert_eq!(intake["source_type"].as_str(), Some("shortcut"));
 
+    let optional = choices
+        .iter()
+        .find(|c| c["kind"].as_str() == Some("optional_pill"))
+        .unwrap();
+    let prn_token = optional["token"].as_str().unwrap();
+    assert!(optional["fractions"].as_array().unwrap().len() >= 4);
+
+    let req = test::TestRequest::post()
+        .uri(&format!(
+            "/api/v1/shortcuts/meds/intake/take/{prn_token}?dose_fraction=half"
+        ))
+        .to_request();
+    let resp = test::call_service(&app, req).await;
+    assert_eq!(resp.status(), 201);
+    let prn_intake: serde_json::Value = test::read_body_json(resp).await;
+    assert_eq!(prn_intake["medication_id"].as_str(), Some(prn_med_id));
+    assert_eq!(prn_intake["dose_fraction_override"].as_str(), Some("half"));
+
     let req = test::TestRequest::get()
-        .uri("/api/v1/shortcuts/med-intake.shortcut")
+        .uri("/api/v1/shortcuts/meds/intake.shortcut")
         .to_request();
     let resp = test::call_service(&app, req).await;
     assert_eq!(resp.status(), 200);
     let body = test::read_body(resp).await;
     assert!(body.len() > 1_000);
+
+    let req = test::TestRequest::get()
+        .uri("/api/v1/shortcuts/meds/intake.flo")
+        .to_request();
+    let resp = test::call_service(&app, req).await;
+    assert_eq!(resp.status(), 200);
+    let flo = test::read_body(resp).await;
+    assert!(flo.starts_with(b"LAFl"));
+    assert!(flo.len() > 200);
 }

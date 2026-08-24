@@ -19,6 +19,8 @@ pub struct AppState {
     pub demo_mode: bool,
     /// iCloud share link for the med-intake shortcut (iPhone import). From env or publish.json.
     pub med_intake_shortcut_icloud_url: Option<String>,
+    /// Automate Community link for the med-intake flow (Android import). From env or publish.json.
+    pub med_intake_automate_community_url: Option<String>,
 }
 
 impl AppState {
@@ -36,9 +38,11 @@ impl AppState {
             chrono_tz::UTC,
             false,
             None,
+            None,
         )
     }
 
+    #[allow(clippy::too_many_arguments)]
     pub fn new_with_tz(
         pool: SqlitePool,
         dev_mode: bool,
@@ -47,6 +51,7 @@ impl AppState {
         timezone: Tz,
         demo_mode: bool,
         med_intake_shortcut_icloud_url: Option<String>,
+        med_intake_automate_community_url: Option<String>,
     ) -> Self {
         AppState {
             pool,
@@ -56,6 +61,7 @@ impl AppState {
             timezone,
             demo_mode,
             med_intake_shortcut_icloud_url,
+            med_intake_automate_community_url,
         }
     }
 }

@@ -67,6 +67,8 @@ async fn main() -> anyhow::Result<()> {
 
     let med_intake_shortcut_icloud_url =
         services::shortcut_publish::resolve_med_intake_icloud_url();
+    let med_intake_automate_community_url =
+        services::shortcut_publish::resolve_med_intake_automate_community_url();
 
     let state = web::Data::new(auth::AppState::new_with_tz(
         pool,
@@ -76,6 +78,7 @@ async fn main() -> anyhow::Result<()> {
         timezone,
         config.demo_mode,
         med_intake_shortcut_icloud_url,
+        med_intake_automate_community_url,
     ));
     let bind_addr = format!("{}:{}", config.host, config.port);
 

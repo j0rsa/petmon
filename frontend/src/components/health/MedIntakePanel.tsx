@@ -25,6 +25,7 @@ import { buildMedIntakeCurl } from '../../lib/medIntakeCurl';
 import { parseDecimal } from '../../lib/numbers';
 import { isDoseSupported } from '../../lib/pillDoseCuts';
 import { medIntakeShortcutLinkProps } from '../../lib/medIntakeShortcut';
+import { medIntakeAutomateLinkProps, isAndroid } from '../../lib/medIntakeAutomate';
 import { isoFromDateAndTime, nowTimeString } from '../../lib/time';
 import { infoApi } from '../../api/info';
 import { usePermissions } from '../../context/usePermissions';
@@ -621,18 +622,36 @@ export function MedIntakePanel({ petId }: MedIntakePanelProps) {
           <h3>Today&apos;s meds</h3>
         </div>
         {!loading && !empty && (
-          <a
-            {...medIntakeShortcutLinkProps(undefined, appInfoQuery.data?.med_intake_shortcut_icloud_url)}
-            className="shortcuts-import-link"
-            aria-label="Apple Shortcut"
-            title={
-              appInfoQuery.data?.med_intake_shortcut_icloud_url
-                ? 'Import the Petmon Take Meds shortcut from iCloud (configure URL, pet id, and API key on first run)'
-                : 'Download the Petmon Take Meds shortcut (iPhone needs an iCloud link — see docs/apple-shortcut-med-intake.md)'
-            }
-          >
-            <img src="/icons/shortcuts.png" alt="" width={22} height={22} className="shortcuts-import-link__icon" />
-          </a>
+          <div className="med-intake-import-links">
+            {(!isAndroid() || typeof navigator === 'undefined') && (
+              <a
+                {...medIntakeShortcutLinkProps(undefined, appInfoQuery.data?.med_intake_shortcut_icloud_url)}
+                className="shortcuts-import-link"
+                aria-label="Apple Shortcut"
+                title={
+                  appInfoQuery.data?.med_intake_shortcut_icloud_url
+                    ? 'Import the Petmon Take Meds shortcut from iCloud (configure URL, pet id, and API key on first run)'
+                    : 'Download the Petmon Take Meds shortcut (iPhone needs an iCloud link — see docs/apple-shortcut-med-intake.md)'
+                }
+              >
+                <img src="/icons/shortcuts.png" alt="" width={22} height={22} className="shortcuts-import-link__icon" />
+              </a>
+            )}
+            {(isAndroid() || typeof navigator === 'undefined') && (
+              <a
+                {...medIntakeAutomateLinkProps(undefined, appInfoQuery.data?.med_intake_automate_community_url)}
+                className="shortcuts-import-link"
+                aria-label="AutoMate flow"
+                title={
+                  appInfoQuery.data?.med_intake_automate_community_url
+                    ? 'Open the Petmon Take Meds flow on Automate Community (configure URL, pet id, and API key on first run)'
+                    : 'Download the Petmon Take Meds AutoMate flow (see docs/automate-med-intake.md)'
+                }
+              >
+                <img src="/icons/automate.png" alt="" width={22} height={22} className="shortcuts-import-link__icon" />
+              </a>
+            )}
+          </div>
         )}
       </div>
 

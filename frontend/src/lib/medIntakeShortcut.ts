@@ -1,5 +1,6 @@
 const SHORTCUT_NAME = 'Petmon Take Meds';
-const SHORTCUT_PATH = '/api/v1/shortcuts/med-intake.shortcut';
+const SHORTCUT_FILENAME = 'Petmon Take Meds.shortcut';
+const SHORTCUT_PATH = '/api/v1/shortcuts/meds/intake.shortcut';
 
 function isAppleMobile(): boolean {
   return typeof navigator !== 'undefined'
@@ -35,7 +36,7 @@ export function medIntakeShortcutLinkProps(
   const usesIcloud = Boolean(icloudUrl?.trim());
   return {
     href,
-    download: appleMobile || usesIcloud ? undefined : 'petmon-med-intake.shortcut',
+    download: appleMobile || usesIcloud ? undefined : SHORTCUT_FILENAME,
   } as const;
 }
 

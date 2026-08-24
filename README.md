@@ -28,7 +28,7 @@ Log litter box visits and potty breaks with event type (wee, poop, vomit, genera
 ### Health
 Weight history per pet — log measurements, view a 30-day trend chart on the pet profile, and manage the full history at `/health`. Overview shows the latest weight with a ▲/▼/● indicator vs the 30-day average.
 
-**Medications** on `/health` include today's meds, treatment plan, and an **Apple Shortcut** link for iPhone logging. The shortcut calls dedicated adapter endpoints under `/api/v1/shortcuts/` (opaque take tokens, multi-select menu). Full design: [`docs/apple-shortcut-med-intake.md`](docs/apple-shortcut-med-intake.md).
+**Medications** on `/health` include today's meds, treatment plan, and quick-import links for **Apple Shortcuts** (iPhone) and **AutoMate** (Android). Both call adapter endpoints under `/api/v1/shortcuts/` (opaque take tokens, multi-select menu). Docs: [`docs/apple-shortcut-med-intake.md`](docs/apple-shortcut-med-intake.md), [`docs/automate-med-intake.md`](docs/automate-med-intake.md).
 
 ## Pages
 
@@ -93,16 +93,17 @@ DELETE           /api/v1/api-tokens/:id
 DELETE           /api/v1/api-tokens/:id/permanent
 
 GET              /api/v1/health                  # health check (unauthenticated)
-GET              /api/v1/info                    # version + git SHA + optional shortcut iCloud URL
+GET              /api/v1/info                    # version + git SHA + optional shortcut/AutoMate URLs
 
-GET              /api/v1/shortcuts/med-intake/menu           # Apple Shortcut menu (api_read)
-POST             /api/v1/shortcuts/med-intake/take/{token}   # Apple Shortcut take (api_write)
-GET              /api/v1/shortcuts/med-intake.shortcut       # signed shortcut file (public)
+GET              /api/v1/shortcuts/meds/intake/menu           # med intake menu (api_read)
+POST             /api/v1/shortcuts/meds/intake/take/{token}   # med intake take (api_write)
+GET              /api/v1/shortcuts/meds/intake.shortcut       # Apple Shortcut file (public)
+GET              /api/v1/shortcuts/meds/intake.flo            # AutoMate flow file (public)
 
 POST             /mcp                            # JSON-RPC 2.0
 ```
 
-Full schema at `/api/docs` (Swagger UI) or `/api/docs/openapi.yaml`. Apple Shortcut med intake (build, publish, token format): [`docs/apple-shortcut-med-intake.md`](docs/apple-shortcut-med-intake.md).
+Full schema at `/api/docs` (Swagger UI) or `/api/docs/openapi.yaml`. Med intake adapters: [`docs/apple-shortcut-med-intake.md`](docs/apple-shortcut-med-intake.md), [`docs/automate-med-intake.md`](docs/automate-med-intake.md).
 
 ## MCP
 
@@ -224,6 +225,7 @@ petmon supports two auth methods:
 | `DEV_MODE` | `false` | Skip all auth (local dev only) |
 | `DEMO_MODE` | `false` | On first startup with an empty database (no pets), load demo seed automatically |
 | `MED_INTAKE_SHORTCUT_ICLOUD_URL` | *(unset)* | iCloud share link for med-intake shortcut; overrides `assets/shortcuts/publish.json` |
+| `MED_INTAKE_AUTOMATE_COMMUNITY_URL` | *(unset)* | Automate Community link for med-intake flow; overrides `assets/shortcuts/publish.json` |
 | `IMPORT_MAX_BYTES` | `1048576` | Max JSON request body size |
 | `STATIC_DIR` | *(unset)* | Serve frontend from this directory instead of embedded assets |
 | `OIDC_ISSUER_URL` | *(unset)* | Merged over DB config at startup |

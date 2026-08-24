@@ -2635,6 +2635,13 @@ pre {
   opacity: 0.92;
 }
 
+.med-intake-import-links {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  flex-shrink: 0;
+}
+
 .med-intake-row {
   display: flex;
   flex-wrap: wrap;

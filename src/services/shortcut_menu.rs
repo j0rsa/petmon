@@ -4,7 +4,7 @@ use chrono::{Duration, Utc};
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
-use crate::domain::medication::DailyMedAssignment;
+use crate::domain::medication::{DailyMedAssignment, DoseFraction, MedType};
 use crate::error::{AppError, AppResult};
 use crate::services::medication_service;
 use sqlx::SqlitePool;
@@ -17,7 +17,51 @@ pub struct TakeTokenPayload {
     exp: i64,
 }
 
+#[derive(Debug, Clone, Copy, Serialize, PartialEq, Eq)]
+#[serde(rename_all = "snake_case")]
+pub enum MenuChoiceKind {
+    Scheduled,
+    OptionalPill,
+    OptionalLiquid,
+}
+
+impl MenuChoiceKind {
+    fn as_line_str(self) -> &'static str {
+        match self {
+            Self::Scheduled => "scheduled",
+            Self::OptionalPill => "optional_pill",
+            Self::OptionalLiquid => "optional_liquid",
+        }
+    }
+}
+
+#[derive(Debug, Serialize)]
+pub struct MedIntakeMenuChoice {
+    pub label: String,
+    pub token: String,
+    pub kind: MenuChoiceKind,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub fractions: Option<Vec<&'static str>>,
+}
+
+#[derive(Debug, Serialize)]
+pub struct MedIntakeMenuResponse {
+    pub choices: Vec<MedIntakeMenuChoice>,
+    /// Pipe-encoded lines for Apple Shortcuts: `label|token|kind|fractions_csv`.
+    pub lines: Vec<String>,
+}
+
 const TOKEN_TTL: Duration = Duration::hours(24);
+
+const ALL_DOSE_FRACTIONS: [DoseFraction; 7] = [
+    DoseFraction::Whole,
+    DoseFraction::ThreeQuarter,
+    DoseFraction::Half,
+    DoseFraction::Third,
+    DoseFraction::Quarter,
+    DoseFraction::Eighth,
+    DoseFraction::Sixteenth,
+];
 
 fn encode_take_token(pet_id: Uuid, medication_id: &str, assignment_id: &str) -> AppResult<String> {
     let payload = TakeTokenPayload {
@@ -57,29 +101,84 @@ fn menu_label(item: &DailyMedAssignment) -> String {
     format!("{} · {}", item.medication.name, item.assignment.dose_label)
 }
 
-/// Pipe-delimited choices for Apple Shortcuts: `label|take_token`.
-/// Excludes optional meds and bundle members.
-pub async fn med_intake_menu_choices(
+fn encode_line(
+    label: &str,
+    token: &str,
+    kind: MenuChoiceKind,
+    fractions_csv: Option<&str>,
+) -> String {
+    match fractions_csv {
+        Some(csv) => format!("{label}|{token}|{}|{csv}", kind.as_line_str()),
+        None => format!("{label}|{token}|{}", kind.as_line_str()),
+    }
+}
+
+fn choice_kind(item: &DailyMedAssignment) -> MenuChoiceKind {
+    if item.assignment.optional {
+        match item.medication.med_type {
+            MedType::Pill => MenuChoiceKind::OptionalPill,
+            MedType::Liquid => MenuChoiceKind::OptionalLiquid,
+        }
+    } else {
+        MenuChoiceKind::Scheduled
+    }
+}
+
+fn pill_fractions() -> Vec<&'static str> {
+    ALL_DOSE_FRACTIONS.iter().map(|f| f.as_str()).collect()
+}
+
+/// Menu for Apple Shortcuts. Includes scheduled and optional meds; excludes bundle members.
+pub async fn med_intake_menu(
     pool: &SqlitePool,
     pet_id: Uuid,
     date: &str,
-) -> AppResult<Vec<String>> {
+) -> AppResult<MedIntakeMenuResponse> {
     let daily = medication_service::daily_assignments(pool, pet_id, date).await?;
     let bundled = bundled_medication_ids(pool, pet_id).await?;
 
     let mut choices = Vec::new();
     for item in daily {
-        if item.assignment.optional {
-            continue;
-        }
         if bundled.contains(&item.medication.id) {
             continue;
         }
+        if !item.assignment.optional
+            && !crate::domain::medication::assignment_due_on(&item.assignment, date)
+        {
+            continue;
+        }
+
+        let label = menu_label(&item);
         let token = encode_take_token(pet_id, &item.medication.id, &item.assignment.id)?;
-        choices.push(format!("{}|{}", menu_label(&item), token));
+        let kind = choice_kind(&item);
+        let fractions = if kind == MenuChoiceKind::OptionalPill {
+            Some(pill_fractions())
+        } else {
+            None
+        };
+        choices.push(MedIntakeMenuChoice {
+            label,
+            token,
+            kind,
+            fractions,
+        });
     }
-    choices.sort();
-    Ok(choices)
+
+    choices.sort_by(|a, b| a.label.cmp(&b.label));
+    let lines = choices
+        .iter()
+        .map(|choice| {
+            let fractions_csv = choice.fractions.as_ref().map(|values| values.join(","));
+            encode_line(
+                &choice.label,
+                &choice.token,
+                choice.kind,
+                fractions_csv.as_deref(),
+            )
+        })
+        .collect();
+
+    Ok(MedIntakeMenuResponse { choices, lines })
 }
 
 #[cfg(test)]
@@ -94,5 +193,19 @@ mod tests {
         assert_eq!(decoded.pet_id, pet_id.to_string());
         assert_eq!(decoded.medication_id, "med-1");
         assert_eq!(decoded.assignment_id, "assign-1");
+    }
+
+    #[test]
+    fn encode_line_includes_kind_and_fractions() {
+        let line = encode_line(
+            "Gabapentin · As needed",
+            "tok123",
+            MenuChoiceKind::OptionalPill,
+            Some("whole,half"),
+        );
+        assert_eq!(
+            line,
+            "Gabapentin · As needed|tok123|optional_pill|whole,half"
+        );
     }
 }

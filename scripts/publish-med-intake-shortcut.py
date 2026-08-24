@@ -11,25 +11,28 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 BUILD = ROOT / "scripts" / "build-med-intake-shortcut.py"
-SIGNED = ROOT / "assets" / "shortcuts" / "petmon-med-intake.shortcut"
+SHORTCUT_NAME = "Petmon Take Meds"
+SIGNED = ROOT / "assets" / "shortcuts" / f"{SHORTCUT_NAME}.shortcut"
 PUBLISH = ROOT / "assets" / "shortcuts" / "publish.json"
 ICLOUD_PREFIX = "https://www.icloud.com/shortcuts/"
 
 
+def save_publish_config(icloud_url: str) -> None:
+    cfg = load_publish_config()
+    cfg["icloud_url"] = icloud_url
+    PUBLISH.write_text(json.dumps(cfg, indent=2) + "\n", encoding="utf-8")
+
+
 def load_publish_config() -> dict[str, str]:
     if not PUBLISH.exists():
-        return {"icloud_url": ""}
+        return {"icloud_url": "", "automate_community_url": ""}
     data = json.loads(PUBLISH.read_text(encoding="utf-8"))
     if not isinstance(data, dict):
         raise ValueError(f"{PUBLISH} must be a JSON object")
-    return {"icloud_url": str(data.get("icloud_url", "")).strip()}
-
-
-def save_publish_config(icloud_url: str) -> None:
-    PUBLISH.write_text(
-        json.dumps({"icloud_url": icloud_url}, indent=2) + "\n",
-        encoding="utf-8",
-    )
+    return {
+        "icloud_url": str(data.get("icloud_url", "")).strip(),
+        "automate_community_url": str(data.get("automate_community_url", "")).strip(),
+    }
 
 
 def validate_icloud_url(url: str) -> str:
@@ -55,15 +58,45 @@ def print_instructions(current_url: str) -> None:
     print("  1. Shortcuts should open with “Petmon Take Meds”.")
     print("  2. Tap Share → Share Link (or Get Link). Allow untrusted shortcuts if prompted.")
     print("  3. Copy the iCloud URL (https://www.icloud.com/shortcuts/…).")
-    print("  4. Save it:")
-    print(f"       python3 {Path(__file__).name} --set-url '<paste url>'")
-    print("     or set deployment env MED_INTAKE_SHORTCUT_ICLOUD_URL (overrides publish.json).")
     if current_url:
         print()
         print(f"Current publish.json icloud_url: {current_url}")
     else:
         print()
         print("publish.json icloud_url is empty — iPhone import uses the self-hosted .shortcut until you set this.")
+
+
+def prompt_icloud_url() -> str:
+    while True:
+        try:
+            raw = input("\nPaste iCloud shortcut URL: ").strip()
+        except (EOFError, KeyboardInterrupt):
+            print("\nCancelled — publish.json unchanged.")
+            raise SystemExit(1) from None
+        if not raw:
+            print("URL required. Paste the https://www.icloud.com/shortcuts/… link.")
+            continue
+        try:
+            return validate_icloud_url(raw)
+        except ValueError as err:
+            print(err)
+
+
+def interactive_publish() -> int:
+    if sys.platform != "darwin":
+        print("Interactive shortcut publish requires macOS (sign + Shortcuts app).", file=sys.stderr)
+        return 1
+
+    build_shortcut()
+    cfg = load_publish_config()
+    print_instructions(cfg.get("icloud_url", ""))
+    open_for_sharing()
+    url = prompt_icloud_url()
+    save_publish_config(url)
+    print(f"\nUpdated {PUBLISH}")
+    print(f"  icloud_url: {url}")
+    print("Commit publish.json and redeploy so /api/v1/info serves the new link.")
+    return 0
 
 
 def main() -> int:
@@ -78,7 +111,15 @@ def main() -> int:
         action="store_true",
         help="Only update publish.json or print instructions",
     )
+    parser.add_argument(
+        "--await-url",
+        action="store_true",
+        help="Build, sign, open Shortcuts, prompt for iCloud URL, update publish.json",
+    )
     args = parser.parse_args()
+
+    if args.await_url:
+        return interactive_publish()
 
     if args.set_url:
         url = validate_icloud_url(args.set_url)

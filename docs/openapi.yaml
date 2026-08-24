@@ -1910,13 +1910,14 @@ paths:
         '204':
           description: Intake record deleted
 
-  /shortcuts/med-intake/menu:
+  /shortcuts/meds/intake/menu:
     get:
       tags: [Shortcuts]
       summary: Med intake menu for Apple Shortcuts
       description: |
-        Returns pipe-delimited choices (`label|take_token`) for scheduled daily meds.
-        Excludes optional meds and bundle members. Tokens expire after 24 hours.
+        Returns structured menu choices plus `lines` pipe-encoded for Shortcuts
+        (`label|token|kind|fractions_csv`). Includes scheduled and optional meds;
+        excludes bundle members. Tokens expire after 24 hours.
       x-required-scope: api_read
       parameters:
         - name: pet_id
@@ -1929,29 +1930,48 @@ paths:
           schema: { type: string, format: date }
       responses:
         '200':
-          description: Shortcut menu choices
+          description: Shortcut menu
           content:
             application/json:
               schema:
-                type: object
-                required: [choices]
-                properties:
-                  choices:
-                    type: array
-                    items: { type: string }
-                    description: Each entry is `display label|take_token`.
+                $ref: '#/components/schemas/MedIntakeShortcutMenu'
 
-  /shortcuts/med-intake/take/{token}:
+  /shortcuts/meds/intake/take/{token}:
     post:
       tags: [Shortcuts]
       summary: Take a med via shortcut token
-      description: Records a take-now intake for the med encoded in the opaque token from the menu endpoint.
+      description: |
+        Records a take-now intake for the med encoded in the opaque token from the menu
+        endpoint. Optional meds require `dose_fraction` / `liquid_dose_ml` query params or
+        JSON body overrides.
       x-required-scope: api_write
       parameters:
         - name: token
           in: path
           required: true
           schema: { type: string }
+        - name: dose_fraction
+          in: query
+          required: false
+          schema: { $ref: '#/components/schemas/DoseFraction' }
+        - name: liquid_dose_ml
+          in: query
+          required: false
+          schema: { type: number, format: double }
+        - name: source
+          in: query
+          required: false
+          schema: { type: string, example: automate }
+          description: Intake source label stored on the record (default `shortcut`).
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                dose_fraction_override: { $ref: '#/components/schemas/DoseFraction' }
+                liquid_dose_ml_override: { type: number, format: double }
       responses:
         '201':
           description: Intake recorded
@@ -1959,7 +1979,7 @@ paths:
             application/json:
               schema: { $ref: '#/components/schemas/MedIntakeRecord' }
 
-  /shortcuts/med-intake.shortcut:
+  /shortcuts/meds/intake.shortcut:
     get:
       tags: [Shortcuts]
       summary: Download Apple Shortcut for med intake
@@ -1968,6 +1988,21 @@ paths:
       responses:
         '200':
           description: Signed `.shortcut` file
+          content:
+            application/octet-stream:
+              schema:
+                type: string
+                format: binary
+
+  /shortcuts/meds/intake.flo:
+    get:
+      tags: [Shortcuts]
+      summary: Download AutoMate flow for med intake
+      description: AutoMate `.flo` file (same for all users). Configure server URL, pet id, and API key on first run. See docs/automate-med-intake.md.
+      security: []
+      responses:
+        '200':
+          description: AutoMate `.flo` file
           content:
             application/octet-stream:
               schema:
@@ -2583,6 +2618,10 @@ components:
           type: string
           description: iCloud share link for the med-intake Apple Shortcut (iPhone import). Omitted when unset.
           example: "https://www.icloud.com/shortcuts/abc123def4"
+        med_intake_automate_community_url:
+          type: string
+          description: Automate Community link for the med-intake flow (Android import). Omitted when unset.
+          example: "https://llamalab.com/automate/community/flows/12345"
     ErrorResponse:
       type: object
       properties:
@@ -4515,6 +4554,32 @@ components:
           type: string
           format: date
           description: Last active date. Defaults to yesterday in the server timezone.
+
+    MedIntakeShortcutMenu:
+      type: object
+      required: [choices, lines]
+      properties:
+        choices:
+          type: array
+          items: { $ref: '#/components/schemas/MedIntakeShortcutMenuChoice' }
+        lines:
+          type: array
+          items: { type: string }
+          description: Pipe-encoded rows for Apple Shortcuts (`label|token|kind|fractions_csv`).
+
+    MedIntakeShortcutMenuChoice:
+      type: object
+      required: [label, token, kind]
+      properties:
+        label: { type: string }
+        token: { type: string }
+        kind:
+          type: string
+          enum: [scheduled, optional_pill, optional_liquid]
+        fractions:
+          type: array
+          items: { $ref: '#/components/schemas/DoseFraction' }
+          description: Present for optional pills; allowed dose fractions for the picker.
 
     MedIntakeRecord:
       type: object

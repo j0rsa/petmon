@@ -11,10 +11,14 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 OUT_DIR = ROOT / "assets" / "shortcuts"
-UNSIGNED = OUT_DIR / "petmon-med-intake.unsigned.plist"
-BINARY = OUT_DIR / "petmon-med-intake.unsigned.shortcut"
-SIGNED = OUT_DIR / "petmon-med-intake.shortcut"
+SHORTCUT_NAME = "Petmon Take Meds"
+UNSIGNED = OUT_DIR / f"{SHORTCUT_NAME}.unsigned.plist"
+BINARY = OUT_DIR / f"{SHORTCUT_NAME}.unsigned.shortcut"
+SIGNED = OUT_DIR / f"{SHORTCUT_NAME}.shortcut"
 PLACEHOLDER = "\ufffc"
+
+MENU_PATH = "/api/v1/shortcuts/meds/intake/menu"
+TAKE_PATH = "/api/v1/shortcuts/meds/intake/take/"
 
 
 def wf_text(value: str) -> dict:
@@ -40,6 +44,75 @@ def wf_token_string(template: str, outputs: list[tuple[str, str]]) -> dict:
     return {
         "Value": {"string": template, "attachmentsByRange": attachments},
         "WFSerializationType": "WFTextTokenString",
+    }
+
+
+def wf_output_ref(output_uuid: str, output_name: str) -> dict:
+    return {
+        "Value": {
+            "OutputUUID": output_uuid,
+            "OutputName": output_name,
+            "Type": "ActionOutput",
+        },
+        "WFSerializationType": "WFTextTokenAttachment",
+    }
+
+
+def wf_conditional(
+    group: str,
+    repeat_group: str,
+    mode: int,
+    *,
+    compare_to: str | None = None,
+    input_ref: dict | None = None,
+) -> dict:
+    params: dict = {
+        "UUID": group,
+        "GroupingIdentifier": repeat_group,
+        "WFControlFlowMode": mode,
+    }
+    if mode == 0:
+        params["WFCondition"] = 4
+        params["WFConditionalActionString"] = compare_to or ""
+        params["WFInput"] = input_ref or {}
+    return {
+        "WFWorkflowActionIdentifier": "is.workflow.actions.conditional",
+        "WFWorkflowActionParameters": params,
+    }
+
+
+def post_take_action(
+    *,
+    repeat_group: str,
+    action_uuid: str,
+    uid_server: str,
+    uid_api_key: str,
+    url_value: dict,
+) -> dict:
+    auth_template = f"Bearer {PLACEHOLDER}"
+    return {
+        "WFWorkflowActionIdentifier": "is.workflow.actions.downloadurl",
+        "WFWorkflowActionParameters": {
+            "UUID": action_uuid,
+            "GroupingIdentifier": repeat_group,
+            "WFURL": url_value,
+            "WFHTTPMethod": "POST",
+            "WFHTTPHeaders": {
+                "Value": {
+                    "WFDictionaryFieldValueItems": [
+                        {
+                            "WFItemType": 0,
+                            "WFKey": wf_text("Authorization"),
+                            "WFValue": wf_token_string(
+                                auth_template,
+                                [(uid_api_key, "API Key")],
+                            ),
+                        }
+                    ]
+                },
+                "WFSerializationType": "WFDictionaryFieldValue",
+            },
+        },
     }
 
 
@@ -86,14 +159,27 @@ def build_workflow() -> dict:
         },
     ]
 
-    menu_url_template = f"{PLACEHOLDER}/api/v1/shortcuts/med-intake/menu?pet_id={PLACEHOLDER}&date={PLACEHOLDER}"
-    take_url_template = f"{PLACEHOLDER}/api/v1/shortcuts/med-intake/take/{PLACEHOLDER}"
+    menu_url_template = f"{PLACEHOLDER}{MENU_PATH}?pet_id={PLACEHOLDER}&date={PLACEHOLDER}"
+    take_url_template = f"{PLACEHOLDER}{TAKE_PATH}{PLACEHOLDER}"
+    take_pill_url_template = f"{PLACEHOLDER}{TAKE_PATH}{PLACEHOLDER}?dose_fraction={PLACEHOLDER}"
+    take_liquid_url_template = f"{PLACEHOLDER}{TAKE_PATH}{PLACEHOLDER}?liquid_dose_ml={PLACEHOLDER}"
     auth_template = f"Bearer {PLACEHOLDER}"
 
     repeat_uuid = str(uuid.uuid4()).upper()
     split_uuid = str(uuid.uuid4()).upper()
     token_uuid = str(uuid.uuid4()).upper()
-    post_uuid = str(uuid.uuid4()).upper()
+    kind_uuid = str(uuid.uuid4()).upper()
+    fractions_csv_uuid = str(uuid.uuid4()).upper()
+    split_fractions_uuid = str(uuid.uuid4()).upper()
+    picked_fraction_uuid = str(uuid.uuid4()).upper()
+    ml_amount_uuid = str(uuid.uuid4()).upper()
+    if_kind_uuid = str(uuid.uuid4()).upper()
+    if_liquid_uuid = str(uuid.uuid4()).upper()
+    post_scheduled_uuid = str(uuid.uuid4()).upper()
+    post_pill_uuid = str(uuid.uuid4()).upper()
+    post_liquid_uuid = str(uuid.uuid4()).upper()
+
+    kind_ref = wf_output_ref(kind_uuid, "Kind")
 
     actions: list[dict] = [
         {
@@ -168,7 +254,7 @@ def build_workflow() -> dict:
         {
             "WFWorkflowActionIdentifier": "is.workflow.actions.getvalueforkey",
             "WFWorkflowActionParameters": {
-                "WFDictionaryKey": "choices",
+                "WFDictionaryKey": "lines",
             },
         },
         {
@@ -199,40 +285,118 @@ def build_workflow() -> dict:
             "WFWorkflowActionParameters": {
                 "UUID": token_uuid,
                 "GroupingIdentifier": repeat_uuid,
+                "CustomOutputName": "Token",
                 "WFItemIndex": 2,
                 "WFItemSpecifier": "Item At Index",
             },
         },
         {
-            "WFWorkflowActionIdentifier": "is.workflow.actions.downloadurl",
+            "WFWorkflowActionIdentifier": "is.workflow.actions.getitemfromlist",
             "WFWorkflowActionParameters": {
-                "UUID": post_uuid,
+                "UUID": kind_uuid,
                 "GroupingIdentifier": repeat_uuid,
-                "WFURL": wf_token_string(
-                    take_url_template,
-                    [
-                        (uid_server, "Server URL"),
-                        (token_uuid, "Item from List"),
-                    ],
-                ),
-                "WFHTTPMethod": "POST",
-                "WFHTTPHeaders": {
-                    "Value": {
-                        "WFDictionaryFieldValueItems": [
-                            {
-                                "WFItemType": 0,
-                                "WFKey": wf_text("Authorization"),
-                                "WFValue": wf_token_string(
-                                    auth_template,
-                                    [(uid_api_key, "API Key")],
-                                ),
-                            }
-                        ]
-                    },
-                    "WFSerializationType": "WFDictionaryFieldValue",
-                },
+                "CustomOutputName": "Kind",
+                "WFItemIndex": 3,
+                "WFItemSpecifier": "Item At Index",
             },
         },
+        wf_conditional(
+            if_kind_uuid,
+            repeat_uuid,
+            0,
+            compare_to="optional_pill",
+            input_ref=kind_ref,
+        ),
+        {
+            "WFWorkflowActionIdentifier": "is.workflow.actions.getitemfromlist",
+            "WFWorkflowActionParameters": {
+                "UUID": fractions_csv_uuid,
+                "GroupingIdentifier": repeat_uuid,
+                "CustomOutputName": "Fractions CSV",
+                "WFItemIndex": 4,
+                "WFItemSpecifier": "Item At Index",
+            },
+        },
+        {
+            "WFWorkflowActionIdentifier": "is.workflow.actions.text.split",
+            "WFWorkflowActionParameters": {
+                "UUID": split_fractions_uuid,
+                "GroupingIdentifier": repeat_uuid,
+                "WFTextSeparator": "Custom",
+                "WFTextCustomSeparator": ",",
+            },
+        },
+        {
+            "WFWorkflowActionIdentifier": "is.workflow.actions.choosefromlist",
+            "WFWorkflowActionParameters": {
+                "UUID": picked_fraction_uuid,
+                "GroupingIdentifier": repeat_uuid,
+                "CustomOutputName": "Dose fraction",
+                "WFChooseFromListActionPrompt": "Dose fraction",
+            },
+        },
+        post_take_action(
+            repeat_group=repeat_uuid,
+            action_uuid=post_pill_uuid,
+            uid_server=uid_server,
+            uid_api_key=uid_api_key,
+            url_value=wf_token_string(
+                take_pill_url_template,
+                [
+                    (uid_server, "Server URL"),
+                    (token_uuid, "Token"),
+                    (picked_fraction_uuid, "Dose fraction"),
+                ],
+            ),
+        ),
+        wf_conditional(if_kind_uuid, repeat_uuid, 1),
+        wf_conditional(
+            if_liquid_uuid,
+            repeat_uuid,
+            0,
+            compare_to="optional_liquid",
+            input_ref=kind_ref,
+        ),
+        {
+            "WFWorkflowActionIdentifier": "is.workflow.actions.ask",
+            "WFWorkflowActionParameters": {
+                "UUID": ml_amount_uuid,
+                "GroupingIdentifier": repeat_uuid,
+                "CustomOutputName": "Liquid ml",
+                "WFAskActionPrompt": "Liquid dose (ml)",
+                "WFInputType": "Number",
+            },
+        },
+        post_take_action(
+            repeat_group=repeat_uuid,
+            action_uuid=post_liquid_uuid,
+            uid_server=uid_server,
+            uid_api_key=uid_api_key,
+            url_value=wf_token_string(
+                take_liquid_url_template,
+                [
+                    (uid_server, "Server URL"),
+                    (token_uuid, "Token"),
+                    (ml_amount_uuid, "Liquid ml"),
+                ],
+            ),
+        ),
+        wf_conditional(if_liquid_uuid, repeat_uuid, 1),
+        post_take_action(
+            repeat_group=repeat_uuid,
+            action_uuid=post_scheduled_uuid,
+            uid_server=uid_server,
+            uid_api_key=uid_api_key,
+            url_value=wf_token_string(
+                take_url_template,
+                [
+                    (uid_server, "Server URL"),
+                    (token_uuid, "Token"),
+                ],
+            ),
+        ),
+        wf_conditional(if_liquid_uuid, repeat_uuid, 2),
+        wf_conditional(if_kind_uuid, repeat_uuid, 2),
         {
             "WFWorkflowActionIdentifier": "is.workflow.actions.showresult",
             "WFWorkflowActionParameters": {
@@ -247,7 +411,7 @@ def build_workflow() -> dict:
         "WFWorkflowClientRelease": "2.2",
         "WFWorkflowMinimumClientVersion": 900,
         "WFWorkflowMinimumClientVersionString": "900",
-        "WFWorkflowName": "Petmon Take Meds",
+        "WFWorkflowName": SHORTCUT_NAME,
         "WFWorkflowImportQuestions": import_questions,
         "WFWorkflowIcon": {
             "WFWorkflowIconStartColor": 463140863,
