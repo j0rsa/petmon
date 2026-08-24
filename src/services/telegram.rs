@@ -3,7 +3,8 @@ use sqlx::SqlitePool;
 use crate::domain::medication::MedIntakeRecord;
 use crate::domain::nutrition_record::NutritionRecord;
 use crate::domain::pet::Pet;
-use crate::domain::settings::{DateFormat, TelegramConfig};
+use crate::domain::settings::{DateFormat, TelegramConfig, TimeFormat};
+use crate::domain::user_settings::UserDisplaySettings;
 use crate::repo::{nutrition_records, pets, settings};
 
 /// Format a nutrition record as a Telegram log line.
@@ -26,7 +27,7 @@ pub async fn notify_medication_intake(
     pool: &SqlitePool,
     record: &MedIntakeRecord,
     delayed: bool,
-    date_format: DateFormat,
+    display_settings: UserDisplaySettings,
 ) {
     let Some(ctx) = load_medication_telegram_context(pool, record).await else {
         return;
@@ -46,7 +47,8 @@ pub async fn notify_medication_intake(
             &record.dose_label,
             &record.occurred_at,
             delayed,
-            date_format,
+            display_settings.date_format,
+            display_settings.time_format,
         ),
     });
     apply_thread_id(&mut payload, &ctx.thread_id);
@@ -70,7 +72,54 @@ pub async fn notify_medication_intake(
     }
 }
 
-/// Fire-and-forget: delete the Telegram message for a removed medication intake.
+/// Fire-and-forget: send one Telegram message covering every intake in a bundle.
+#[tracing::instrument(skip(pool, records), fields(count = records.len()))]
+pub async fn notify_medication_bundle_intake(
+    pool: &SqlitePool,
+    records: &[MedIntakeRecord],
+    delayed: bool,
+    display_settings: UserDisplaySettings,
+) {
+    let Some(first) = records.first() else {
+        return;
+    };
+    let Some(ctx) = load_medication_telegram_context(pool, first).await else {
+        return;
+    };
+    let Some(text) =
+        format_records_as_medication_text(pool, records, delayed, &display_settings).await
+    else {
+        return;
+    };
+    let mut payload = serde_json::json!({
+        "chat_id": ctx.chat_id,
+        "text": text,
+    });
+    apply_thread_id(&mut payload, &ctx.thread_id);
+
+    match post_telegram(&ctx.bot_token, "sendMessage", &payload).await {
+        Ok(body) => {
+            if let Some(message_id) = body.pointer("/result/message_id").and_then(|v| v.as_i64()) {
+                for record in records {
+                    if let Err(e) = crate::repo::med_intake_records::set_telegram_message_id(
+                        pool, &record.id, message_id,
+                    )
+                    .await
+                    {
+                        tracing::warn!(error = %e, record_id = %record.id, "failed to store medication telegram message id");
+                    }
+                }
+            }
+            tracing::info!(pet = %ctx.pet_name, count = records.len(), "medication bundle telegram notification sent");
+        }
+        Err(err) => {
+            tracing::warn!(%err, pet = %ctx.pet_name, "medication bundle telegram sendMessage failed");
+        }
+    }
+}
+
+/// Fire-and-forget: delete or edit the Telegram message for a removed medication intake.
+/// Bundle intakes share one message — remaining lines are edited in place.
 #[tracing::instrument(skip(pool, record), fields(record_id = %record.id))]
 pub async fn notify_medication_intake_delete(pool: &SqlitePool, record: &MedIntakeRecord) {
     let Some(message_id) = record.telegram_message_id else {
@@ -80,57 +129,80 @@ pub async fn notify_medication_intake_delete(pool: &SqlitePool, record: &MedInta
     let Some(ctx) = load_medication_telegram_context(pool, record).await else {
         return;
     };
-    let payload = serde_json::json!({
+    let remaining = match crate::repo::med_intake_records::list_by_telegram_message_id(
+        pool, message_id,
+    )
+    .await
+    {
+        Ok(records) => records,
+        Err(e) => {
+            tracing::warn!(error = %e, message_id, "failed to load remaining medication telegram records");
+            return;
+        }
+    };
+    if remaining.is_empty() {
+        let payload = serde_json::json!({
+            "chat_id": ctx.chat_id,
+            "message_id": message_id,
+        });
+        match post_telegram(&ctx.bot_token, "deleteMessage", &payload).await {
+            Ok(_) => {
+                tracing::info!(pet = %ctx.pet_name, record_id = %record.id, "medication telegram message deleted");
+            }
+            Err(err) => {
+                tracing::warn!(%err, pet = %ctx.pet_name, record_id = %record.id, "medication telegram deleteMessage failed");
+            }
+        }
+        return;
+    }
+    let Some(text) =
+        format_records_as_medication_text(pool, &remaining, false, &UserDisplaySettings::default())
+            .await
+    else {
+        return;
+    };
+    let mut payload = serde_json::json!({
         "chat_id": ctx.chat_id,
         "message_id": message_id,
+        "text": text,
     });
-    match post_telegram(&ctx.bot_token, "deleteMessage", &payload).await {
+    apply_thread_id(&mut payload, &ctx.thread_id);
+    match post_telegram(&ctx.bot_token, "editMessageText", &payload).await {
         Ok(_) => {
-            tracing::info!(pet = %ctx.pet_name, record_id = %record.id, "medication telegram message deleted");
+            tracing::info!(pet = %ctx.pet_name, record_id = %record.id, remaining = remaining.len(), "medication telegram message edited after partial undo");
         }
         Err(err) => {
-            tracing::warn!(%err, pet = %ctx.pet_name, record_id = %record.id, "medication telegram deleteMessage failed");
+            tracing::warn!(%err, pet = %ctx.pet_name, record_id = %record.id, "medication telegram editMessageText failed");
         }
     }
 }
 
-#[cfg(test)]
-mod tests {
-    use super::{format_intake_timestamp, format_medication_intake_line, DateFormat};
-
-    #[test]
-    fn format_intake_timestamp_trims_seconds() {
-        assert_eq!(
-            format_intake_timestamp("2026-08-21T21:53:00", DateFormat::Dmy),
-            "21.08.2026 21:53"
-        );
+async fn format_records_as_medication_text(
+    pool: &SqlitePool,
+    records: &[MedIntakeRecord],
+    delayed: bool,
+    display_settings: &UserDisplaySettings,
+) -> Option<String> {
+    let mut lines = Vec::with_capacity(records.len());
+    for record in records {
+        let medication = match crate::repo::medications::get(pool, &record.medication_id).await {
+            Ok(medication) => medication,
+            Err(e) => {
+                tracing::warn!(error = %e, record_id = %record.id, "failed to load medication for telegram notification");
+                return None;
+            }
+        };
+        lines.push(format_medication_intake_line(
+            &medication.name,
+            medication.emoji.as_deref(),
+            &record.dose_label,
+            &record.occurred_at,
+            delayed,
+            display_settings.date_format.clone(),
+            display_settings.time_format.clone(),
+        ));
     }
-
-    #[test]
-    fn format_medication_intake_distinguishes_immediate_and_delayed_records() {
-        assert_eq!(
-            format_medication_intake_line(
-                "Amoxicillin",
-                Some("🦠"),
-                "½ × 50mg = 25.00mg",
-                "",
-                false,
-                DateFormat::Dmy,
-            ),
-            "#pills 💊 🦠 Amoxicillin ½ × 50mg = 25.00mg"
-        );
-        assert_eq!(
-            format_medication_intake_line(
-                "Amoxicillin",
-                None,
-                "½ × 50mg = 25.00mg",
-                "2026-08-21T21:53:00",
-                true,
-                DateFormat::MmmDdYyyy,
-            ),
-            "#pills 💊 💊 Amoxicillin ½ × 50mg = 25.00mg — Aug 21, 2026 21:53"
-        );
-    }
+    Some(lines.join("\n"))
 }
 
 fn format_medication_intake_line(
@@ -140,22 +212,27 @@ fn format_medication_intake_line(
     occurred_at: &str,
     delayed: bool,
     date_format: DateFormat,
+    time_format: TimeFormat,
 ) -> String {
     let emoji = medication_emoji
         .filter(|emoji| !emoji.trim().is_empty())
         .unwrap_or("💊");
-    let line = format!("#pills 💊 {emoji} {medication_name} {dose_label}");
+    let line = format!("#pills {medication_name} {dose_label} {emoji}");
     if delayed {
         format!(
-            "{line} — {}",
-            format_intake_timestamp(occurred_at, date_format)
+            "{line} - {}",
+            format_intake_timestamp(occurred_at, date_format, time_format)
         )
     } else {
         line
     }
 }
 
-fn format_intake_timestamp(occurred_at: &str, date_format: DateFormat) -> String {
+fn format_intake_timestamp(
+    occurred_at: &str,
+    date_format: DateFormat,
+    time_format: TimeFormat,
+) -> String {
     let Ok(timestamp) = chrono::NaiveDateTime::parse_from_str(occurred_at, "%Y-%m-%dT%H:%M:%S")
     else {
         return occurred_at.to_string();
@@ -164,7 +241,20 @@ fn format_intake_timestamp(occurred_at: &str, date_format: DateFormat) -> String
         DateFormat::Dmy => timestamp.format("%d.%m.%Y").to_string(),
         DateFormat::MmmDdYyyy => timestamp.format("%b %-d, %Y").to_string(),
     };
-    format!("{} {}", date, timestamp.format("%H:%M"))
+    let time = match time_format {
+        TimeFormat::H24 => timestamp.format("%H:%M").to_string(),
+        TimeFormat::H12 => {
+            use chrono::Timelike;
+            let hour = timestamp.hour();
+            let suffix = if hour >= 12 { "pm" } else { "am" };
+            let h12 = match hour % 12 {
+                0 => 12,
+                h => h,
+            };
+            format!("{h12}:{:02} {suffix}", timestamp.minute())
+        }
+    };
+    format!("{date} {time}")
 }
 
 struct TelegramContext {
@@ -401,5 +491,84 @@ pub async fn notify_record_delete(pool: &SqlitePool, record: &NutritionRecord) {
         Err(err) => {
             tracing::warn!(%err, pet = %ctx.pet_name, record_id = %record.id, "telegram deleteMessage failed");
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{format_intake_timestamp, format_medication_intake_line, DateFormat, TimeFormat};
+
+    #[test]
+    fn format_intake_timestamp_trims_seconds() {
+        assert_eq!(
+            format_intake_timestamp("2026-08-21T21:53:00", DateFormat::Dmy, TimeFormat::H24),
+            "21.08.2026 21:53"
+        );
+    }
+
+    #[test]
+    fn format_intake_timestamp_uses_12h_when_configured() {
+        assert_eq!(
+            format_intake_timestamp(
+                "2026-08-21T21:53:00",
+                DateFormat::MmmDdYyyy,
+                TimeFormat::H12,
+            ),
+            "Aug 21, 2026 9:53 pm"
+        );
+    }
+
+    #[test]
+    fn format_medication_intake_distinguishes_immediate_and_delayed_records() {
+        assert_eq!(
+            format_medication_intake_line(
+                "Amoxicillin",
+                Some("🦠"),
+                "½ × 50mg = 25.00mg",
+                "",
+                false,
+                DateFormat::Dmy,
+                TimeFormat::H24,
+            ),
+            "#pills Amoxicillin ½ × 50mg = 25.00mg 🦠"
+        );
+        assert_eq!(
+            format_medication_intake_line(
+                "Amoxicillin",
+                None,
+                "½ × 50mg = 25.00mg",
+                "2026-08-21T21:53:00",
+                true,
+                DateFormat::MmmDdYyyy,
+                TimeFormat::H24,
+            ),
+            "#pills Amoxicillin ½ × 50mg = 25.00mg 💊 - Aug 21, 2026 21:53"
+        );
+    }
+
+    #[test]
+    fn format_medication_bundle_joins_one_line_per_med() {
+        let first = format_medication_intake_line(
+            "Prednisolone",
+            Some("💊"),
+            "½ × 5mg = 2.50mg",
+            "2026-08-24T08:00:00",
+            false,
+            DateFormat::Dmy,
+            TimeFormat::H24,
+        );
+        let second = format_medication_intake_line(
+            "Gabapentin",
+            Some("🌙"),
+            "1 × 50mg = 50.00mg",
+            "2026-08-24T08:00:00",
+            false,
+            DateFormat::Dmy,
+            TimeFormat::H24,
+        );
+        assert_eq!(
+            format!("{first}\n{second}"),
+            "#pills Prednisolone ½ × 5mg = 2.50mg 💊\n#pills Gabapentin 1 × 50mg = 50.00mg 🌙"
+        );
     }
 }

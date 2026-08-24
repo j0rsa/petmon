@@ -11,6 +11,7 @@ import type { HealthStateRecord } from '../api/healthState';
 import type {
   DailyMedAssignment,
   MedAssignment,
+  MedBundle,
   MedFormulation,
   Medication,
 } from '../api/medications';
@@ -590,6 +591,16 @@ export const mockMedications: Medication[] = [
     created_at: '2026-01-01T00:00:00Z',
     updated_at: '2026-01-01T00:00:00Z',
   },
+  {
+    id: 'med-pill-2',
+    pet_id: mockPetId,
+    name: 'Gabapentin',
+    med_type: 'pill',
+    color: '#22c55e',
+    emoji: '🌙',
+    created_at: '2026-01-01T00:00:00Z',
+    updated_at: '2026-01-01T00:00:00Z',
+  },
 ];
 
 export const mockMedFormulations: MedFormulation[] = [
@@ -608,6 +619,14 @@ export const mockMedFormulations: MedFormulation[] = [
     pill_shape: null,
     liquid_concentration_mg_per_ml: 10,
     created_at: '2026-01-08T00:00:00Z',
+  },
+  {
+    id: 'form-3',
+    medication_id: 'med-pill-2',
+    tablet_strength_mg: 50,
+    pill_shape: 'capsule',
+    liquid_concentration_mg_per_ml: null,
+    created_at: '2026-01-01T00:00:00Z',
   },
 ];
 
@@ -646,29 +665,78 @@ export const mockMedAssignments: MedAssignment[] = [
     created_at: '2026-01-08T00:00:00Z',
     updated_at: '2026-01-08T00:00:00Z',
   },
+  {
+    id: 'assign-3',
+    medication_id: 'med-pill-2',
+    pet_id: mockPetId,
+    formulation_id: 'form-3',
+    formulation: mockMedFormulations[2]!,
+    dose_fraction: 'whole',
+    liquid_dose_ml: null,
+    effective_dose_mg: 50,
+    dose_label: '1 × 50mg = 50.00mg',
+    frequency: { morning: 1, midday: 0, evening: 0, every: 1, unit: 'days' },
+    date_from: shiftDate(todayStr, -10),
+    date_to: null,
+    optional: false,
+    created_at: '2026-01-10T00:00:00Z',
+    updated_at: '2026-01-10T00:00:00Z',
+  },
 ];
 
-export const mockDailyMedAssignments: DailyMedAssignment[] = mockMedications.map((medication, i) => ({
-  medication,
-  assignment: mockMedAssignments[i],
-  intakes: i === 0
-    ? [{
-        id: 'intake-1',
-        pet_id: mockPetId,
-        medication_id: medication.id,
-        assignment_id: mockMedAssignments[i].id,
-        assignment: mockMedAssignments[i],
-        dose_fraction_override: null,
-        liquid_dose_ml_override: null,
-        effective_dose_fraction: 'half',
-        effective_dose_mg: 2.5,
-        dose_label: mockMedAssignments[i].dose_label,
-        occurred_at: `${todayStr}T08:05:00`,
-        local_date: todayStr,
-        taken: true,
-        note: null,
-        source_type: 'manual',
-        created_at: `${todayStr}T08:05:00`,
-      }]
-    : [],
-}));
+export const mockDailyMedAssignments: DailyMedAssignment[] = [
+  {
+    medication: mockMedications[0]!,
+    assignment: mockMedAssignments[0]!,
+    intakes: [{
+      id: 'intake-1',
+      pet_id: mockPetId,
+      medication_id: mockMedications[0]!.id,
+      assignment_id: mockMedAssignments[0]!.id,
+      assignment: mockMedAssignments[0]!,
+      dose_fraction_override: null,
+      liquid_dose_ml_override: null,
+      effective_dose_fraction: 'half',
+      effective_dose_mg: 2.5,
+      dose_label: mockMedAssignments[0]!.dose_label,
+      occurred_at: `${todayStr}T08:05:00`,
+      local_date: todayStr,
+      taken: true,
+      note: null,
+      source_type: 'manual',
+      created_at: `${todayStr}T08:05:00`,
+    }],
+  },
+  {
+    medication: mockMedications[1]!,
+    assignment: mockMedAssignments[1]!,
+    intakes: [],
+  },
+];
+
+export const mockBundleDailyAssignments: DailyMedAssignment[] = [
+  {
+    medication: mockMedications[0]!,
+    assignment: mockMedAssignments[0]!,
+    intakes: [],
+  },
+  {
+    medication: mockMedications[2]!,
+    assignment: mockMedAssignments[2]!,
+    intakes: [],
+  },
+];
+
+export const mockMedBundles: MedBundle[] = [
+  {
+    id: 'bundle-1',
+    pet_id: mockPetId,
+    name: 'Prednisolone + Gabapentin',
+    items: [
+      { medication_id: 'med-pill-1', medication: mockMedications[0]! },
+      { medication_id: 'med-pill-2', medication: mockMedications[2]! },
+    ],
+    created_at: '2026-01-12T00:00:00Z',
+    updated_at: '2026-01-12T00:00:00Z',
+  },
+];

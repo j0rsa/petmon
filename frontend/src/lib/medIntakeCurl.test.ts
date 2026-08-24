@@ -30,6 +30,14 @@ describe('buildMedIntakePayload', () => {
 
     expect(payload.liquid_dose_ml_override).toBe(1.25);
   });
+
+  it('omits timestamps for real-time take-now payloads', () => {
+    const item = mockDailyMedAssignments[0];
+    const payload = buildMedIntakePayload(mockPetId, item);
+
+    expect(payload.local_date).toBeUndefined();
+    expect(payload.occurred_at).toBeUndefined();
+  });
 });
 
 describe('buildMedIntakeCurl', () => {

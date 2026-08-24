@@ -1,10 +1,15 @@
+import { ApiError } from '../api/client';
 import type {
+  DailyMedAssignment,
   DoseFraction,
   MedAssignment,
+  MedBundle,
   MedFrequency,
+  MedIntakeRecord,
   MedType,
   PillShape,
 } from '../api/medications';
+import { daysInclusive, shiftDate } from './dates';
 
 export const DOSE_FRACTIONS: DoseFraction[] = [
   'whole', 'three_quarter', 'half', 'third', 'quarter', 'eighth', 'sixteenth',
@@ -33,25 +38,145 @@ export function randomMedColor(): string {
   return MED_COLOR_PALETTE[Math.floor(Math.random() * MED_COLOR_PALETTE.length)]!;
 }
 
-export async function savePlanWithMedicationPresentation<T>({
-  currentColor,
-  selectedColor,
-  currentEmoji,
-  selectedEmoji,
-  savePresentation,
-  savePlan,
-}: {
-  currentColor: string;
-  selectedColor: string;
-  currentEmoji: string | null;
-  selectedEmoji: string;
-  savePresentation: () => Promise<unknown>;
-  savePlan: () => Promise<T>;
-}): Promise<T> {
-  if (currentColor !== selectedColor || currentEmoji !== (selectedEmoji.trim() || null)) {
-    await savePresentation();
+export function assignmentStatus(
+  assignment: MedAssignment,
+  date: string,
+): 'upcoming' | 'active' | 'ended' {
+  if (assignment.date_from > date) return 'upcoming';
+  if (assignment.date_to != null && assignment.date_to < date) return 'ended';
+  return 'active';
+}
+
+export function assignmentStatusLabel(status: ReturnType<typeof assignmentStatus>): string {
+  switch (status) {
+    case 'upcoming': return 'Upcoming';
+    case 'active': return 'Active';
+    case 'ended': return 'Ended';
   }
-  return savePlan();
+}
+
+export interface AssignmentGroup {
+  medicationId: string;
+  current: MedAssignment;
+  past: MedAssignment[];
+}
+
+function assignmentStatusRank(status: ReturnType<typeof assignmentStatus>): number {
+  switch (status) {
+    case 'active': return 0;
+    case 'upcoming': return 1;
+    case 'ended': return 2;
+  }
+}
+
+export function compareAssignments(a: MedAssignment, b: MedAssignment): number {
+  const byFrom = b.date_from.localeCompare(a.date_from);
+  if (byFrom !== 0) return byFrom;
+  return b.created_at.localeCompare(a.created_at);
+}
+
+/** One group per medication: latest/current course first, older courses in `past`. */
+export function groupAssignmentsByMedication(
+  assignments: MedAssignment[],
+  date: string,
+): AssignmentGroup[] {
+  const byMed = new Map<string, MedAssignment[]>();
+  for (const assignment of assignments) {
+    const list = byMed.get(assignment.medication_id) ?? [];
+    list.push(assignment);
+    byMed.set(assignment.medication_id, list);
+  }
+
+  const groups: AssignmentGroup[] = [];
+  for (const [medicationId, list] of byMed) {
+    const sorted = [...list].sort((a, b) => {
+      const rank = assignmentStatusRank(assignmentStatus(a, date))
+        - assignmentStatusRank(assignmentStatus(b, date));
+      if (rank !== 0) return rank;
+      return compareAssignments(a, b);
+    });
+    const [current, ...past] = sorted;
+    if (current == null) continue;
+    groups.push({ medicationId, current, past });
+  }
+
+  return groups.sort((a, b) => {
+    const rank = assignmentStatusRank(assignmentStatus(a.current, date))
+      - assignmentStatusRank(assignmentStatus(b.current, date));
+    if (rank !== 0) return rank;
+    return compareAssignments(a.current, b.current);
+  });
+}
+
+export function assignmentHistoryLabel(count: number): string {
+  return count === 1 ? '1 earlier assignment' : `${count} earlier assignments`;
+}
+
+export interface ConsecutiveCourse {
+  from: string;
+  to: string;
+  days: number;
+  ongoing: boolean;
+}
+
+/** True when `later` starts on or before the day after `earlier` ended — no pause between them. */
+export function assignmentsChainWithoutPause(earlier: MedAssignment, later: MedAssignment): boolean {
+  if (earlier.date_to == null) return false;
+  return later.date_from <= shiftDate(earlier.date_to, 1);
+}
+
+/**
+ * Uninterrupted stretch ending at `current`: walk earlier assignments until a pause (calendar gap).
+ * Active courses count through `today`; ended courses count through `current.date_to`.
+ */
+export function consecutiveCourse(
+  current: MedAssignment,
+  past: MedAssignment[],
+  today: string,
+): ConsecutiveCourse | null {
+  if (current.date_from > today) return null;
+  let start = current;
+  const older = [...past]
+    .filter((assignment) => {
+      const byFrom = assignment.date_from.localeCompare(current.date_from);
+      if (byFrom !== 0) return byFrom < 0;
+      return assignment.created_at.localeCompare(current.created_at) < 0;
+    })
+    .sort((a, b) => {
+      const byFrom = b.date_from.localeCompare(a.date_from);
+      if (byFrom !== 0) return byFrom;
+      return b.created_at.localeCompare(a.created_at);
+    });
+  for (const previous of older) {
+    if (!assignmentsChainWithoutPause(previous, start)) break;
+    start = previous;
+  }
+  const ongoing = current.date_to == null || current.date_to >= today;
+  const to = ongoing ? today : current.date_to!;
+  if (start.date_from > to) return null;
+  return {
+    from: start.date_from,
+    to,
+    days: daysInclusive(start.date_from, to),
+    ongoing,
+  };
+}
+
+export function consecutiveCourseLabel(
+  course: ConsecutiveCourse,
+  formatDate: (date: string, style?: 'long' | 'short') => string,
+): string {
+  const count = course.days === 1 ? '1 day' : `${course.days} days`;
+  const from = formatDate(course.from, 'short');
+  if (course.ongoing) return `${count} · since ${from}`;
+  return `${count} · ${from} → ${formatDate(course.to, 'short')}`;
+}
+
+export function assignmentDeleteErrorMessage(error: unknown): string {
+  if (error instanceof ApiError && error.status === 400) {
+    return 'This assignment has logged doses, so it can’t be deleted. Pause it to stop the schedule, or undo those doses first.';
+  }
+  return 'Assignment could not be deleted.';
 }
 
 export function doseFractionLabel(fraction: DoseFraction): string {
@@ -106,6 +231,11 @@ export function formatFrequency(frequency: MedFrequency): string {
   return `${parts.join(' · ')} · Every ${frequency.every} ${unit}`;
 }
 
+export function assignmentScheduleLabel(assignment: MedAssignment): string {
+  if (assignment.optional) return 'Optional';
+  return formatFrequency(assignment.frequency);
+}
+
 export function hasActiveAssignmentOn(assignments: MedAssignment[], date: string): boolean {
   return assignments.some(
     (assignment) =>
@@ -143,6 +273,68 @@ export function intakeStatusLabel(status: ReturnType<typeof intakeStatus>): stri
     case 'skipped': return 'Skipped';
     case 'pending': return 'Pending';
   }
+}
+
+/** Current courses that can be bundled: scheduled (not optional) and not ended. */
+export function bundleableAssignments(assignments: MedAssignment[], date: string): MedAssignment[] {
+  return groupAssignmentsByMedication(assignments, date)
+    .map((group) => group.current)
+    .filter((assignment) => !assignment.optional && assignmentStatus(assignment, date) !== 'ended');
+}
+
+/** Scheduled courses that are not already a member of any bundle. */
+export function unbundledAssignments(
+  assignments: MedAssignment[],
+  bundles: MedBundle[],
+  date: string,
+): MedAssignment[] {
+  const bundled = new Set(
+    bundles.flatMap((bundle) => bundle.items.map((item) => item.medication_id)),
+  );
+  return bundleableAssignments(assignments, date)
+    .filter((assignment) => !bundled.has(assignment.medication_id));
+}
+
+export function defaultBundleName(names: string[]): string {
+  return names.filter((name) => name.trim().length > 0).join(' + ');
+}
+
+/** Every member must be due today as a scheduled (non-optional) daily row. */
+export function bundleDailyMembers(
+  bundle: MedBundle,
+  daily: DailyMedAssignment[],
+): DailyMedAssignment[] | null {
+  const members: DailyMedAssignment[] = [];
+  for (const item of bundle.items) {
+    const dailyItem = daily.find((entry) => entry.medication.id === item.medication_id);
+    if (dailyItem == null || dailyItem.assignment.optional) return null;
+    members.push(dailyItem);
+  }
+  return members.length === bundle.items.length ? members : null;
+}
+
+export function bundleCanTakeNow(members: DailyMedAssignment[]): boolean {
+  return members.every(
+    (item) => intakeStatus(item.intakes, expectedDoseCount(item.assignment.frequency)) !== 'done',
+  );
+}
+
+/** Latest shared take across bundle members (same `occurred_at`), one record per member. */
+export function lastBundleIntakes(members: DailyMedAssignment[]): MedIntakeRecord[] {
+  const latest = members
+    .flatMap((item) => item.intakes)
+    .sort((a, b) => {
+      const byOccurred = b.occurred_at.localeCompare(a.occurred_at);
+      if (byOccurred !== 0) return byOccurred;
+      return b.created_at.localeCompare(a.created_at);
+    })[0];
+  if (latest == null) return [];
+  return members.flatMap((item) => {
+    const match = [...item.intakes]
+      .filter((intake) => intake.occurred_at === latest.occurred_at)
+      .sort((a, b) => b.created_at.localeCompare(a.created_at))[0];
+    return match == null ? [] : [match];
+  });
 }
 
 export function formulationLabel(strengthMg: number | null | undefined, shape: PillShape | null | undefined): string {

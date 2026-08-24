@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { shiftDate } from './dates';
+import { daysInclusive, shiftDate } from './dates';
 
 describe('shiftDate', () => {
   it('moves forward and backward by whole local calendar days', () => {
@@ -18,5 +18,16 @@ describe('shiftDate', () => {
   it('shifts end-of-month dates by exactly one local calendar day', () => {
     expect(shiftDate('2026-07-31', -1)).toBe('2026-07-30');
     expect(shiftDate('2026-07-31', 1)).toBe('2026-08-01');
+  });
+});
+
+describe('daysInclusive', () => {
+  it('counts the start day', () => {
+    expect(daysInclusive('2026-08-24', '2026-08-24')).toBe(1);
+    expect(daysInclusive('2026-08-01', '2026-08-04')).toBe(4);
+  });
+
+  it('crosses month boundaries', () => {
+    expect(daysInclusive('2026-07-31', '2026-08-01')).toBe(2);
   });
 });

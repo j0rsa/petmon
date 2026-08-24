@@ -5,51 +5,33 @@ import {
   type CreateMedAssignment,
   type MedAssignment,
   type MedFrequency,
-  type Medication,
   type ReviseMedAssignment,
+  type UpdateMedication,
 } from '../api/medications';
 import { NoPetSelected } from '../components/NoPetSelected';
+import { AssignmentCreateCard } from '../components/health/AssignmentCreateCard';
+import { AssignmentGroupCard } from '../components/health/AssignmentGroupCard';
+import { BundleCard } from '../components/health/BundleCard';
+import { BundleCreateCard } from '../components/health/BundleCreateCard';
+import { KnownMedicationCard } from '../components/health/KnownMedicationCard';
 import { MedColorSwatch } from '../components/health/MedColorSwatch';
-import { MedIcon } from '../components/health/MedIcon';
-import { MedScheduleEditor } from '../components/health/MedScheduleEditor';
-import {
-  FormulationPicker,
-  type FormulationPickerValue,
-} from '../components/health/FormulationPicker';
+import { type FormulationPickerValue } from '../components/health/FormulationPicker';
 import { useSelectedPet } from '../context/SelectedPetContext';
 import { usePermissions } from '../context/usePermissions';
-import { localToday } from '../lib/dates';
+import { localToday, shiftDate } from '../lib/dates';
 import {
-  expectedDoseCount,
-  formatFrequency,
-  formulationLabel,
+  assignmentDeleteErrorMessage,
+  assignmentStatus,
+  bundleableAssignments,
+  groupAssignmentsByMedication,
   randomMedColor,
-  savePlanWithMedicationPresentation,
+  unbundledAssignments,
 } from '../lib/medications';
 import { parseDecimal } from '../lib/numbers';
 import {
   defaultFormulationPickerValue,
   defaultMedFrequency,
 } from '../lib/medicationDefaults';
-
-interface MedPlanRow {
-  medication: Medication;
-  currentAssignment: MedAssignment | null;
-  history: MedAssignment[];
-}
-
-function buildPlanRows(meds: Medication[], assignments: MedAssignment[], today: string): MedPlanRow[] {
-  return meds.map((medication) => {
-    const history = assignments
-      .filter((a) => a.medication_id === medication.id)
-      .sort((a, b) => b.date_from.localeCompare(a.date_from));
-    const currentAssignment =
-      history.find(
-        (a) => a.date_from <= today && (a.date_to == null || a.date_to >= today),
-      ) ?? null;
-    return { medication, currentAssignment, history };
-  });
-}
 
 export default function HealthTreatmentPlanPage() {
   const queryClient = useQueryClient();
@@ -61,6 +43,7 @@ export default function HealthTreatmentPlanPage() {
   const [medName, setMedName] = useState('');
   const [medType, setMedType] = useState<'pill' | 'liquid'>('pill');
   const [medColor, setMedColor] = useState(() => randomMedColor());
+  const [medEmoji, setMedEmoji] = useState('');
 
   const [planMedId, setPlanMedId] = useState<string | null>(null);
   const [formulation, setFormulation] = useState<FormulationPickerValue>(defaultFormulationPickerValue);
@@ -74,9 +57,10 @@ export default function HealthTreatmentPlanPage() {
 
   const [reviseId, setReviseId] = useState<string | null>(null);
   const [reviseFrom, setReviseFrom] = useState(today);
-  const [planMedColor, setPlanMedColor] = useState('#6366f1');
-  const [planMedEmoji, setPlanMedEmoji] = useState('');
   const [formulationLocked, setFormulationLocked] = useState(true);
+  const [planOpen, setPlanOpen] = useState(false);
+  const [editingMedId, setEditingMedId] = useState<string | null>(null);
+  const [showCreateBundle, setShowCreateBundle] = useState(false);
 
   const medsQuery = useQuery({
     queryKey: ['medications', selectedPetId],
@@ -90,9 +74,16 @@ export default function HealthTreatmentPlanPage() {
     enabled: Boolean(selectedPetId),
   });
 
+  const bundlesQuery = useQuery({
+    queryKey: ['med-bundles', selectedPetId],
+    queryFn: () => medicationsApi.listBundles(selectedPetId!),
+    enabled: Boolean(selectedPetId),
+  });
+
   const invalidate = () => {
     queryClient.invalidateQueries({ queryKey: ['medications'] });
     queryClient.invalidateQueries({ queryKey: ['med-assignments'] });
+    queryClient.invalidateQueries({ queryKey: ['med-bundles'] });
     queryClient.invalidateQueries({ queryKey: ['med-daily'] });
   };
 
@@ -103,12 +94,23 @@ export default function HealthTreatmentPlanPage() {
         name: medName.trim(),
         med_type: medType,
         color: medColor,
+        emoji: medEmoji.trim() || undefined,
       }),
     onSuccess: () => {
       setMedName('');
       setMedType('pill');
       setMedColor(randomMedColor());
+      setMedEmoji('');
       setShowCreateMed(false);
+      invalidate();
+    },
+  });
+
+  const updateMedMutation = useMutation({
+    mutationFn: ({ id, patch }: { id: string; patch: UpdateMedication }) =>
+      medicationsApi.update(id, patch),
+    onSuccess: () => {
+      setEditingMedId(null);
       invalidate();
     },
   });
@@ -190,53 +192,60 @@ export default function HealthTreatmentPlanPage() {
   }
 
   const createPlanMutation = useMutation({
-    mutationFn: () => {
-      const current = (medsQuery.data ?? []).find((m) => m.id === planMedId)!;
-      return savePlanWithMedicationPresentation({
-        currentColor: current.color,
-        selectedColor: planMedColor,
-        currentEmoji: current.emoji,
-        selectedEmoji: planMedEmoji,
-        savePresentation: () => medicationsApi.update(current.id, {
-          color: planMedColor,
-          emoji: planMedEmoji,
-        }),
-        savePlan: () => medicationsApi.createAssignment(buildCreatePayload()),
-      });
-    },
+    mutationFn: () => medicationsApi.createAssignment(buildCreatePayload()),
     onSuccess: () => {
       resetPlanForm();
       invalidate();
     },
-    onError: () => queryClient.invalidateQueries({ queryKey: ['medications'] }),
   });
 
   const reviseMutation = useMutation({
-    mutationFn: (assignmentId: string) => {
-      const current = (medsQuery.data ?? []).find((m) => m.id === planMedId)!;
-      return savePlanWithMedicationPresentation({
-        currentColor: current.color,
-        selectedColor: planMedColor,
-        currentEmoji: current.emoji,
-        selectedEmoji: planMedEmoji,
-        savePresentation: () => medicationsApi.update(current.id, {
-          color: planMedColor,
-          emoji: planMedEmoji,
-        }),
-        savePlan: () => medicationsApi.reviseAssignment(assignmentId, buildRevisePayload()),
-      });
-    },
+    mutationFn: (assignmentId: string) =>
+      medicationsApi.reviseAssignment(assignmentId, buildRevisePayload()),
     onSuccess: () => {
       resetPlanForm();
       invalidate();
     },
-    onError: () => queryClient.invalidateQueries({ queryKey: ['medications'] }),
+  });
+
+  const endMutation = useMutation({
+    mutationFn: ({ id, ended_on }: { id: string; ended_on: string }) =>
+      medicationsApi.endAssignment(id, { ended_on }),
+    onSuccess: invalidate,
+  });
+
+  const deleteAssignmentMutation = useMutation({
+    mutationFn: (id: string) => medicationsApi.deleteAssignment(id),
+    onSuccess: invalidate,
   });
 
   const deleteMedMutation = useMutation({
     mutationFn: (id: string) => medicationsApi.delete(id),
     onSuccess: invalidate,
   });
+
+  const createBundleMutation = useMutation({
+    mutationFn: ({ assignmentIds, name }: { assignmentIds: string[]; name: string }) =>
+      medicationsApi.createBundle({
+        pet_id: selectedPetId!,
+        name: name.trim() || undefined,
+        assignment_ids: assignmentIds,
+      }),
+    onSuccess: () => {
+      resetBundleForm();
+      invalidate();
+    },
+  });
+
+  const deleteBundleMutation = useMutation({
+    mutationFn: (id: string) => medicationsApi.deleteBundle(id),
+    onSuccess: invalidate,
+  });
+
+  function resetBundleForm() {
+    createBundleMutation.reset();
+    setShowCreateBundle(false);
+  }
 
   function resetPlanForm() {
     createPlanMutation.reset();
@@ -252,45 +261,88 @@ export default function HealthTreatmentPlanPage() {
     setPlanFrom(today);
     setPlanTo('');
     setPlanOptional(false);
-    setPlanMedColor('#6366f1');
-    setPlanMedEmoji('');
+    setPlanOpen(false);
+    setShowCreateBundle(false);
   }
 
-  const planRows = useMemo(
-    () => buildPlanRows(medsQuery.data ?? [], assignmentsQuery.data ?? [], today),
-    [medsQuery.data, assignmentsQuery.data, today],
+  const medications = useMemo(() => medsQuery.data ?? [], [medsQuery.data]);
+  const assignments = useMemo(() => assignmentsQuery.data ?? [], [assignmentsQuery.data]);
+  const bundles = useMemo(() => bundlesQuery.data ?? [], [bundlesQuery.data]);
+  const assignmentGroups = useMemo(
+    () => groupAssignmentsByMedication(assignments, today),
+    [assignments, today],
   );
+  const bundleChoices = useMemo(
+    () => unbundledAssignments(assignments, bundles, today),
+    [assignments, bundles, today],
+  );
+  const medById = useMemo(
+    () => new Map(medications.map((medication) => [medication.id, medication])),
+    [medications],
+  );
+  const activeMedicationIds = useMemo(() => {
+    const ids = new Set<string>();
+    for (const assignment of assignments) {
+      if (assignmentStatus(assignment, today) === 'active') {
+        ids.add(assignment.medication_id);
+      }
+    }
+    return ids;
+  }, [assignments, today]);
 
   if (petsLoading) return <div className="loading-state">Loading…</div>;
   if (!selectedPetId) return <NoPetSelected />;
 
-  const planMed = (medsQuery.data ?? []).find((m) => m.id === planMedId);
+  function startNewAssignment(medicationId?: string) {
+    resetBundleForm();
+    resetPlanForm();
+    setPlanMedId(medicationId ?? null);
+    setPlanOpen(true);
+  }
 
-  function startRevise(row: MedPlanRow) {
-    createPlanMutation.reset();
-    reviseMutation.reset();
-    const a = row.currentAssignment!;
-    setReviseId(a.id);
-    setPlanMedId(row.medication.id);
-    setPlanMedColor(row.medication.color);
-    setPlanMedEmoji(row.medication.emoji ?? '');
-    setReuseFormulationId(a.formulation_id);
+  function startNewBundle() {
+    resetPlanForm();
+    createBundleMutation.reset();
+    setShowCreateBundle(true);
+  }
+
+  function startRevise(assignment: MedAssignment) {
+    const medication = medById.get(assignment.medication_id);
+    if (!medication) return;
+    resetPlanForm();
+    setReviseId(assignment.id);
+    setPlanMedId(medication.id);
+    setPlanOpen(true);
+    setReuseFormulationId(assignment.formulation_id);
     setFormulationLocked(true);
     setFormulation({
-      tabletStrengthMg: String(a.formulation.tablet_strength_mg ?? '5'),
-      pillShape: a.formulation.pill_shape ?? 'round',
-      doseFraction: a.dose_fraction ?? 'half',
+      tabletStrengthMg: String(assignment.formulation.tablet_strength_mg ?? '5'),
+      pillShape: assignment.formulation.pill_shape ?? 'round',
+      doseFraction: assignment.dose_fraction ?? 'half',
     });
-    setLiquidDoseMl(String(a.liquid_dose_ml ?? '2.5'));
+    setLiquidDoseMl(String(assignment.liquid_dose_ml ?? '2.5'));
     setLiquidConcentration(
-      a.formulation.liquid_concentration_mg_per_ml != null
-        ? String(a.formulation.liquid_concentration_mg_per_ml)
+      assignment.formulation.liquid_concentration_mg_per_ml != null
+        ? String(assignment.formulation.liquid_concentration_mg_per_ml)
         : '',
     );
-    setPlanFrequency(a.frequency);
-    setPlanOptional(a.optional);
-    setPlanTo(a.date_to ?? '');
+    setPlanFrequency(assignment.frequency);
+    setPlanOptional(assignment.optional);
+    setPlanTo(assignment.date_to ?? '');
     setReviseFrom(today);
+  }
+
+  function handlePause(assignment: MedAssignment) {
+    const endedOn = shiftDate(today, -1);
+    if (assignment.date_from > endedOn) {
+      window.alert(
+        'This assignment starts today or later, so it cannot be paused. Delete it instead if it was created by mistake.',
+      );
+      return;
+    }
+    if (window.confirm('Pause this assignment so it is no longer due from today?')) {
+      endMutation.mutate({ id: assignment.id, ended_on: endedOn });
+    }
   }
 
   return (
@@ -307,6 +359,7 @@ export default function HealthTreatmentPlanPage() {
             onClick={() => {
               createMedMutation.reset();
               setMedColor(randomMedColor());
+              setMedEmoji('');
               setShowCreateMed(true);
             }}
           >
@@ -339,6 +392,23 @@ export default function HealthTreatmentPlanPage() {
               </button>
             ))}
           </div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', marginBottom: '0.75rem', flexWrap: 'wrap' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
+              <span style={{ fontSize: '0.82rem' }}>Color</span>
+              <MedColorSwatch color={medColor} onChange={setMedColor} title="Choose medication color" />
+            </div>
+            <label style={{ display: 'flex', alignItems: 'center', gap: '0.35rem', fontSize: '0.82rem' }}>
+              Emoji
+              <input
+                aria-label="Telegram emoji"
+                type="text"
+                value={medEmoji}
+                onChange={(e) => setMedEmoji(e.target.value)}
+                placeholder="💊"
+                style={{ width: '4rem', textAlign: 'center' }}
+              />
+            </label>
+          </div>
           <div style={{ display: 'flex', gap: '0.5rem', marginTop: '1rem' }}>
             <button type="button" className="button" disabled={!medName.trim() || createMedMutation.isPending} onClick={() => createMedMutation.mutate()}>
               {createMedMutation.isPending ? 'Saving…' : 'Save medication'}
@@ -353,263 +423,207 @@ export default function HealthTreatmentPlanPage() {
         </section>
       )}
 
-      {(planMedId || reviseId) && canWrite && planMed && (
-        <section className="panel">
-          <h3 style={{ marginBottom: '0.75rem' }}>{reviseId ? 'Revise assignment' : 'New treatment plan'}</h3>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '0.55rem', marginBottom: '0.85rem' }}>
-            <MedColorSwatch
-              color={planMedColor}
-              onChange={setPlanMedColor}
-              title={`Change color for ${planMed.name}`}
-            />
-            <label style={{ display: 'flex', alignItems: 'center', gap: '0.35rem', fontSize: '0.82rem' }}>
-              Emoji
-              <input
-                aria-label={`Telegram emoji for ${planMed.name}`}
-                type="text"
-                value={planMedEmoji}
-                onChange={(e) => setPlanMedEmoji(e.target.value)}
-                placeholder="💊"
-                style={{ width: '4rem', textAlign: 'center' }}
-              />
-            </label>
-            <strong>{planMed.name}</strong>
-          </div>
-          {!reviseId && (
-            <div className="form-row" style={{ marginBottom: '0.75rem' }}>
-              <label style={{ fontSize: '0.82rem' }}>Medication</label>
-              <select
-                value={planMedId ?? ''}
-                onChange={(e) => {
-                  const id = e.target.value || null;
-                  setPlanMedId(id);
-                  const medication = (medsQuery.data ?? []).find((m) => m.id === id);
-                  if (medication) {
-                    setPlanMedColor(medication.color);
-                    setPlanMedEmoji(medication.emoji ?? '');
-                  }
-                }}
-              >
-                <option value="">Select…</option>
-                {(medsQuery.data ?? []).map((m) => (
-                  <option key={m.id} value={m.id}>{m.name}</option>
-                ))}
-              </select>
-            </div>
-          )}
-
-          {reviseId && planMed.med_type === 'liquid' && formulationLocked && (
-            <p className="muted-text" style={{ fontSize: '0.82rem', margin: '0 0 0.75rem' }}>
-              Keeping the same bottle concentration.{' '}
-              <button
-                type="button"
-                style={{ fontSize: 'inherit', background: 'none', border: 'none', color: 'var(--accent)', cursor: 'pointer', padding: 0, textDecoration: 'underline' }}
-                onClick={() => setFormulationLocked(false)}
-              >
-                Change concentration
-              </button>
-            </p>
-          )}
-
-          {planMed.med_type === 'pill' ? (
-            <FormulationPicker
-              color={planMedColor}
-              value={formulation}
-              onChange={setFormulation}
-              formulationLocked={reviseId ? formulationLocked : undefined}
-              onFormulationLockedChange={reviseId ? setFormulationLocked : undefined}
-              showDose={!planOptional}
-              beforeDose={(
-                <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', width: 'fit-content' }}>
-                  <input
-                    id="plan-optional-pill"
-                    type="checkbox"
-                    checked={planOptional}
-                    onChange={(e) => setPlanOptional(e.target.checked)}
-                  />
-                  <label htmlFor="plan-optional-pill" style={{ fontSize: '0.82rem', cursor: 'pointer', userSelect: 'none' }}>
-                    Optional medication (take as needed)
-                  </label>
-                </div>
-              )}
-            />
-          ) : (
-            <div style={{ display: 'grid', gap: '0.65rem' }}>
-              <div
-                className="form-row"
-                style={reviseId && formulationLocked ? { opacity: 0.55, pointerEvents: 'none' } : undefined}
-              >
-                <label htmlFor="liquid-concentration" style={{ fontSize: '0.82rem' }}>
-                  Concentration (mg/ml, optional)
-                </label>
-                <input
-                  id="liquid-concentration"
-                  type="text"
-                  inputMode="decimal"
-                  value={liquidConcentration}
-                  onChange={(e) => setLiquidConcentration(e.target.value)}
-                />
-              </div>
-              {!planOptional && <div className="form-row">
-                <label htmlFor="liquid-dose" style={{ fontSize: '0.82rem' }}>Dose (ml)</label>
-                <input
-                  id="liquid-dose"
-                  type="text"
-                  inputMode="decimal"
-                  value={liquidDoseMl}
-                  onChange={(e) => setLiquidDoseMl(e.target.value)}
-                />
-              </div>}
-              <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', width: 'fit-content' }}>
-                <input
-                  id="plan-optional-liquid"
-                  type="checkbox"
-                  checked={planOptional}
-                  onChange={(e) => setPlanOptional(e.target.checked)}
-                />
-                <label htmlFor="plan-optional-liquid" style={{ fontSize: '0.82rem', cursor: 'pointer', userSelect: 'none' }}>
-                  Optional medication (take as needed)
-                </label>
-              </div>
-            </div>
-          )}
-
-          {!planOptional && <div style={{ marginTop: '0.9rem' }}>
-            <MedScheduleEditor value={planFrequency} onChange={setPlanFrequency} />
-          </div>}
-
-          <div style={{ display: 'grid', gap: '0.65rem', gridTemplateColumns: 'repeat(auto-fit, minmax(10rem, 1fr))', marginTop: '0.75rem' }}>
-            {!reviseId ? (
-              <div className="form-row">
-                <label style={{ fontSize: '0.82rem' }}>From</label>
-                <input type="date" value={planFrom} onChange={(e) => setPlanFrom(e.target.value)} />
-              </div>
-            ) : (
-              <div className="form-row">
-                <label style={{ fontSize: '0.82rem' }}>Effective from</label>
-                <input type="date" value={reviseFrom} onChange={(e) => setReviseFrom(e.target.value)} />
-              </div>
-            )}
-            <div className="form-row">
-              <label style={{ fontSize: '0.82rem' }}>Until (optional)</label>
-              <input type="date" value={planTo} onChange={(e) => setPlanTo(e.target.value)} />
-            </div>
-          </div>
-          <div style={{ display: 'flex', gap: '0.5rem', marginTop: '0.85rem' }}>
-            <button
-              type="button"
-              className="button"
-              disabled={
-                !planMedId
-                || (!planOptional && expectedDoseCount(planFrequency) === 0)
-                || createPlanMutation.isPending
-                || reviseMutation.isPending
-              }
-              onClick={() => {
-                if (reviseId) reviseMutation.mutate(reviseId);
-                else createPlanMutation.mutate();
-              }}
-            >
-              {reviseId ? 'Save revision' : 'Create plan'}
-            </button>
-            <button type="button" className="button button-secondary" onClick={resetPlanForm}>Cancel</button>
-          </div>
-          {(createPlanMutation.isError || reviseMutation.isError) && (
-            <div className="error-state" role="alert" style={{ marginTop: '0.75rem' }}>
-              Medication presentation and treatment plan could not both be saved. Any successful
-              color or emoji change remains saved; check the effective date and dose, then try the
-              plan again.
-            </div>
-          )}
-        </section>
-      )}
-
       <section className="panel">
         <div className="section-heading">
           <div>
-            <p className="eyebrow">Active plans</p>
-            <h3>Medications</h3>
+            <p className="eyebrow">Library</p>
+            <h3>Known medications</h3>
           </div>
         </div>
 
         {medsQuery.isPending ? (
           <div className="loading-state">Loading…</div>
-        ) : planRows.length === 0 ? (
+        ) : medications.length === 0 ? (
           <p className="muted-text" style={{ fontSize: '0.88rem' }}>No medications registered yet.</p>
         ) : (
-          planRows.map((row) => (
-            <div key={row.medication.id} style={{ padding: '0.75rem 0', borderBottom: '1px solid var(--border-subtle)' }}>
-              <div style={{ display: 'flex', gap: '0.75rem', alignItems: 'flex-start' }}>
-                <MedIcon
-                  medType={row.medication.med_type}
-                  color={row.medication.color}
-                  pillShape={row.currentAssignment?.formulation.pill_shape}
-                  doseFraction={row.currentAssignment?.dose_fraction}
-                  size={44}
+          <div className="plan-entity-list">
+            {medications.map((medication) => (
+              <KnownMedicationCard
+                key={medication.id}
+                medication={medication}
+                canWrite={canWrite}
+                canAssign={!activeMedicationIds.has(medication.id)}
+                editing={editingMedId === medication.id}
+                saving={updateMedMutation.isPending && editingMedId === medication.id}
+                deleting={deleteMedMutation.isPending}
+                onEdit={() => {
+                  updateMedMutation.reset();
+                  setEditingMedId(medication.id);
+                }}
+                onCancelEdit={() => {
+                  updateMedMutation.reset();
+                  setEditingMedId(null);
+                }}
+                onSave={(patch) => updateMedMutation.mutate({ id: medication.id, patch })}
+                onAssign={() => startNewAssignment(medication.id)}
+                onDelete={() => {
+                  if (window.confirm(`Delete ${medication.name}?`)) {
+                    deleteMedMutation.mutate(medication.id);
+                  }
+                }}
+              />
+            ))}
+          </div>
+        )}
+        {updateMedMutation.isError && (
+          <div className="error-state" role="alert">
+            Medication could not be saved. Check the details and try again.
+          </div>
+        )}
+      </section>
+
+      <section className="panel">
+        <div className="section-heading">
+          <div>
+            <p className="eyebrow">Schedule</p>
+            <h3>Assignments</h3>
+          </div>
+          {canWrite && medications.length > 0 && !planOpen && !reviseId && (
+            <button type="button" className="button" onClick={() => startNewAssignment()}>
+              + New assignment
+            </button>
+          )}
+        </div>
+
+        {assignmentsQuery.isPending ? (
+          <div className="loading-state">Loading…</div>
+        ) : (
+          <div className="plan-entity-list">
+            {(planOpen || reviseId) && canWrite && (
+              <AssignmentCreateCard
+                revising={Boolean(reviseId)}
+                medications={medications}
+                planMedId={planMedId}
+                onPlanMedIdChange={setPlanMedId}
+                formulation={formulation}
+                onFormulationChange={setFormulation}
+                formulationLocked={formulationLocked}
+                onFormulationLockedChange={setFormulationLocked}
+                planOptional={planOptional}
+                onPlanOptionalChange={setPlanOptional}
+                liquidDoseMl={liquidDoseMl}
+                onLiquidDoseMlChange={setLiquidDoseMl}
+                liquidConcentration={liquidConcentration}
+                onLiquidConcentrationChange={setLiquidConcentration}
+                planFrequency={planFrequency}
+                onPlanFrequencyChange={setPlanFrequency}
+                planFrom={planFrom}
+                onPlanFromChange={setPlanFrom}
+                reviseFrom={reviseFrom}
+                onReviseFromChange={setReviseFrom}
+                planTo={planTo}
+                onPlanToChange={setPlanTo}
+                saving={createPlanMutation.isPending || reviseMutation.isPending}
+                error={createPlanMutation.isError || reviseMutation.isError}
+                onSave={() => {
+                  if (reviseId) reviseMutation.mutate(reviseId);
+                  else createPlanMutation.mutate();
+                }}
+                onCancel={resetPlanForm}
+              />
+            )}
+            {assignmentGroups.length === 0 && !planOpen && !reviseId ? (
+              <p className="muted-text" style={{ fontSize: '0.88rem' }}>
+                No assignments yet.
+              </p>
+            ) : (
+              assignmentGroups.map((group) => (
+                <AssignmentGroupCard
+                  key={group.medicationId}
+                  medication={medById.get(group.medicationId)}
+                  current={group.current}
+                  past={group.past}
+                  today={today}
+                  canWrite={canWrite}
+                  canAssign={!activeMedicationIds.has(group.medicationId)}
+                  deleting={deleteAssignmentMutation.isPending}
+                  pausing={endMutation.isPending}
+                  onRevise={startRevise}
+                  onPause={handlePause}
+                  onAssign={() => startNewAssignment(group.medicationId)}
+                  onDelete={(assignment) => {
+                    const medication = medById.get(assignment.medication_id);
+                    if (window.confirm(`Delete this ${medication?.name ?? 'medication'} assignment?`)) {
+                      deleteAssignmentMutation.mutate(assignment.id);
+                    }
+                  }}
                 />
-                <div style={{ flex: 1 }}>
-                  <strong>{row.medication.name}</strong>
-                  {row.currentAssignment ? (
-                    <p className="muted-text" style={{ fontSize: '0.82rem', margin: '0.2rem 0 0' }}>
-                      {row.currentAssignment.dose_label}
-                      {' · '}
-                      {formulationLabel(
-                        row.currentAssignment.formulation.tablet_strength_mg,
-                        row.currentAssignment.formulation.pill_shape,
-                      )}
-                      {!row.currentAssignment.optional && (
-                        <> · {formatFrequency(row.currentAssignment.frequency)}</>
-                      )}
-                      {' · '}
-                      {row.currentAssignment.date_from}
-                      {row.currentAssignment.date_to ? ` → ${row.currentAssignment.date_to}` : ' → ongoing'}
-                      {row.currentAssignment.optional ? ' · Optional' : ''}
-                    </p>
-                  ) : (
-                    <p className="muted-text" style={{ fontSize: '0.82rem', margin: '0.2rem 0 0' }}>No active assignment</p>
-                  )}
-                  {row.history.length > 1 && (
-                    <details style={{ marginTop: '0.4rem', fontSize: '0.78rem' }}>
-                      <summary className="muted-text" style={{ cursor: 'pointer' }}>{row.history.length} assignment records</summary>
-                      <ul style={{ margin: '0.35rem 0 0', paddingLeft: '1.1rem' }}>
-                        {row.history.map((a) => (
-                          <li key={a.id} className="muted-text">
-                            {a.dose_label}
-                            {!a.optional && <> · {formatFrequency(a.frequency)}</>}
-                            {' · '}{a.date_from}
-                            {a.date_to ? ` → ${a.date_to}` : ' → ongoing'}
-                          </li>
-                        ))}
-                      </ul>
-                    </details>
-                  )}
-                </div>
-                {canWrite && (
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '0.35rem' }}>
-                    {!row.currentAssignment && (
-                      <button type="button" className="button" style={{ padding: '0.25rem 0.6rem', fontSize: '0.78rem' }} onClick={() => { resetPlanForm(); setPlanMedId(row.medication.id); setPlanMedColor(row.medication.color); setPlanMedEmoji(row.medication.emoji ?? ''); }}>
-                        Add plan
-                      </button>
-                    )}
-                    {row.currentAssignment && (
-                      <button type="button" className="button button-secondary" style={{ padding: '0.25rem 0.6rem', fontSize: '0.78rem' }} onClick={() => startRevise(row)}>
-                        Revise
-                      </button>
-                    )}
-                    <button
-                      type="button"
-                      className="button button-danger"
-                      style={{ padding: '0.25rem 0.6rem', fontSize: '0.78rem' }}
-                      disabled={deleteMedMutation.isPending}
-                      onClick={() => { if (window.confirm(`Delete ${row.medication.name}?`)) deleteMedMutation.mutate(row.medication.id); }}
-                    >
-                      Delete
-                    </button>
-                  </div>
-                )}
-              </div>
-            </div>
-          ))
+              ))
+            )}
+          </div>
+        )}
+        {endMutation.isError && (
+          <div className="error-state" role="alert" style={{ marginTop: '0.75rem' }}>
+            Assignment could not be paused. Check the dates and try again.
+          </div>
+        )}
+        {deleteAssignmentMutation.isError && (
+          <div className="error-state" role="alert" style={{ marginTop: '0.75rem' }}>
+            {assignmentDeleteErrorMessage(deleteAssignmentMutation.error)}
+          </div>
+        )}
+      </section>
+
+      <section className="panel">
+        <div className="section-heading">
+          <div>
+            <p className="eyebrow">Together</p>
+            <h3>Bundles</h3>
+          </div>
+          {canWrite && !showCreateBundle && (
+            <button type="button" className="button" onClick={startNewBundle}>
+              + New bundle
+            </button>
+          )}
+        </div>
+
+        {bundlesQuery.isPending ? (
+          <div className="loading-state">Loading…</div>
+        ) : (
+          <div className="plan-entity-list">
+            {showCreateBundle && canWrite && (
+              <BundleCreateCard
+                assignments={bundleChoices}
+                medicationsById={medById}
+                saving={createBundleMutation.isPending}
+                error={createBundleMutation.isError}
+                emptyHint={
+                  bundleableAssignments(assignments, today).length >= 2
+                    ? 'Every scheduled medication is already in a bundle.'
+                    : 'You need two current scheduled assignments (not as-needed) to create a bundle.'
+                }
+                onCreate={(assignmentIds, name) => {
+                  createBundleMutation.reset();
+                  createBundleMutation.mutate({ assignmentIds, name });
+                }}
+                onCancel={resetBundleForm}
+              />
+            )}
+            {bundles.length === 0 && !showCreateBundle ? (
+              <p className="muted-text" style={{ fontSize: '0.88rem' }}>
+                No bundles yet.
+              </p>
+            ) : (
+              bundles.map((bundle) => (
+                <BundleCard
+                  key={bundle.id}
+                  bundle={bundle}
+                  canWrite={canWrite}
+                  deleting={deleteBundleMutation.isPending}
+                  onDelete={() => {
+                    if (window.confirm(`Delete bundle ${bundle.name}?`)) {
+                      deleteBundleMutation.mutate(bundle.id);
+                    }
+                  }}
+                />
+              ))
+            )}
+          </div>
+        )}
+        {deleteBundleMutation.isError && (
+          <div className="error-state" role="alert" style={{ marginTop: '0.75rem' }}>
+            Bundle could not be deleted. Try again.
+          </div>
         )}
       </section>
     </div>

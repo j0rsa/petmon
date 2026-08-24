@@ -1,10 +1,11 @@
 use crate::domain::medication::{
     day_before, hydrate_assignment, CreateMedAssignment, CreateMedFormulation, DoseFraction,
-    MedAssignment, MedAssignmentCore, MedAssignmentFilters, MedFrequency, MedType,
-    ReviseMedAssignment,
+    EndMedAssignment, MedAssignment, MedAssignmentCore, MedAssignmentFilters, MedFrequency,
+    MedType, ReviseMedAssignment,
 };
 use crate::error::{AppError, AppResult};
 use chrono::Utc;
+use chrono_tz::Tz;
 use sqlx::SqlitePool;
 use uuid::Uuid;
 
@@ -349,4 +350,56 @@ pub async fn revise(
         },
     )
     .await
+}
+
+#[tracing::instrument(skip(pool, req))]
+pub async fn end(
+    pool: &SqlitePool,
+    assignment_id: &str,
+    req: EndMedAssignment,
+    timezone: Tz,
+) -> AppResult<MedAssignment> {
+    let existing = get(pool, assignment_id).await?;
+    let today = Utc::now()
+        .with_timezone(&timezone)
+        .date_naive()
+        .format("%Y-%m-%d")
+        .to_string();
+    let ended_on = match req.ended_on {
+        Some(date) if !date.trim().is_empty() => date,
+        _ => day_before(&today).unwrap_or(today.clone()),
+    };
+    if ended_on.as_str() < existing.date_from.as_str() {
+        return Err(AppError::BadRequest(
+            "ended_on must be on or after the assignment start date".into(),
+        ));
+    }
+    if let Some(existing_to) = &existing.date_to {
+        if existing_to.as_str() < today.as_str() {
+            return Err(AppError::BadRequest("assignment is already ended".into()));
+        }
+    }
+    let now = Utc::now().to_rfc3339();
+    sqlx::query("UPDATE med_assignments SET date_to = ?, updated_at = ? WHERE id = ?")
+        .bind(&ended_on)
+        .bind(&now)
+        .bind(assignment_id)
+        .execute(pool)
+        .await?;
+    get(pool, assignment_id).await
+}
+
+#[tracing::instrument(skip(pool))]
+pub async fn delete(pool: &SqlitePool, assignment_id: &str) -> AppResult<()> {
+    get(pool, assignment_id).await?;
+    let result = sqlx::query("DELETE FROM med_assignments WHERE id = ?")
+        .bind(assignment_id)
+        .execute(pool)
+        .await?;
+    if result.rows_affected() == 0 {
+        return Err(AppError::NotFound(format!(
+            "Med assignment {assignment_id} not found"
+        )));
+    }
+    Ok(())
 }

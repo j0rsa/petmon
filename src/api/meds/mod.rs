@@ -1,4 +1,5 @@
 pub mod assignments;
+pub mod bundles;
 pub mod formulations;
 pub mod intake;
 pub mod medications;
@@ -10,6 +11,7 @@ pub fn configure(cfg: &mut web::ServiceConfig) {
         web::scope("/meds")
             .configure(formulations::configure)
             .configure(assignments::configure)
+            .configure(bundles::configure)
             .configure(intake::configure)
             .configure(medications::configure),
     );

@@ -25,6 +25,34 @@ struct MedIntakeRow {
     created_at: String,
 }
 
+#[tracing::instrument(skip(pool))]
+pub async fn list_for_assignment(
+    pool: &SqlitePool,
+    assignment_id: &str,
+) -> AppResult<Vec<MedIntakeRecord>> {
+    let rows = sqlx::query_as::<_, MedIntakeRow>(
+        "SELECT id, pet_id, medication_id, assignment_id, dose_fraction_override, liquid_dose_ml_override, occurred_at, local_date, taken, note, source_type, telegram_message_id, created_at
+         FROM med_intake_records WHERE assignment_id = ?",
+    )
+    .bind(assignment_id)
+    .fetch_all(pool)
+    .await?;
+    let mut out = Vec::with_capacity(rows.len());
+    for row in rows {
+        out.push(load_hydrated(pool, row_to_core(row)?).await?);
+    }
+    Ok(out)
+}
+
+#[tracing::instrument(skip(pool))]
+pub async fn delete_for_assignment(pool: &SqlitePool, assignment_id: &str) -> AppResult<u64> {
+    let result = sqlx::query("DELETE FROM med_intake_records WHERE assignment_id = ?")
+        .bind(assignment_id)
+        .execute(pool)
+        .await?;
+    Ok(result.rows_affected())
+}
+
 pub async fn set_telegram_message_id(
     pool: &SqlitePool,
     id: &str,
@@ -42,6 +70,25 @@ pub async fn set_telegram_message_id(
         )));
     }
     Ok(())
+}
+
+#[tracing::instrument(skip(pool))]
+pub async fn list_by_telegram_message_id(
+    pool: &SqlitePool,
+    message_id: i64,
+) -> AppResult<Vec<MedIntakeRecord>> {
+    let rows = sqlx::query_as::<_, MedIntakeRow>(
+        "SELECT id, pet_id, medication_id, assignment_id, dose_fraction_override, liquid_dose_ml_override, occurred_at, local_date, taken, note, source_type, telegram_message_id, created_at
+         FROM med_intake_records WHERE telegram_message_id = ? ORDER BY occurred_at, id",
+    )
+    .bind(message_id)
+    .fetch_all(pool)
+    .await?;
+    let mut out = Vec::with_capacity(rows.len());
+    for row in rows {
+        out.push(load_hydrated(pool, row_to_core(row)?).await?);
+    }
+    Ok(out)
 }
 
 fn parse_dose_fraction(raw: Option<String>) -> AppResult<Option<DoseFraction>> {

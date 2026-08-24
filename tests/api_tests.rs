@@ -297,6 +297,10 @@ async fn mcp_tools_list_names_have_no_slashes() {
     let names: Vec<_> = tools.iter().filter_map(|t| t["name"].as_str()).collect();
     assert!(names.contains(&"weight.records.create"));
     assert!(names.contains(&"pets.list"));
+    assert!(names.contains(&"health.meds.assignments.end"));
+    assert!(names.contains(&"health.meds.assignments.delete"));
+    assert!(names.contains(&"health.meds.bundles.list"));
+    assert!(names.contains(&"health.meds.bundles.intake.create"));
     assert!(!names.iter().any(|n| n.contains('/')));
 }
 
@@ -3358,4 +3362,451 @@ async fn med_intake_explicit_occurred_at_is_preserved() {
     assert_eq!(intake["occurred_at"].as_str(), Some(occurred_at));
     assert_eq!(intake["local_date"].as_str(), Some("2026-08-10"));
     assert_eq!(intake["taken"].as_bool(), Some(true));
+}
+
+#[actix_web::test]
+async fn med_intake_omitted_dates_defaults_to_now() {
+    let (app, _state) = build_dev_app!();
+    let pet_id = api_create_pet!(&app, "MedNowTest");
+
+    let req = test::TestRequest::post()
+        .uri("/api/v1/health/meds")
+        .set_json(serde_json::json!({
+            "pet_id": pet_id,
+            "name": "Daily pill",
+            "med_type": "pill",
+            "color": "#6366f1"
+        }))
+        .to_request();
+    let resp = test::call_service(&app, req).await;
+    assert_eq!(resp.status(), 201);
+    let med: serde_json::Value = test::read_body_json(resp).await;
+    let med_id = med["id"].as_str().unwrap();
+
+    let today = chrono::Utc::now().format("%Y-%m-%d").to_string();
+    let req = test::TestRequest::post()
+        .uri("/api/v1/health/meds/assignments")
+        .set_json(serde_json::json!({
+            "medication_id": med_id,
+            "tablet_strength_mg": 5.0,
+            "pill_shape": "round",
+            "dose_fraction": "whole",
+            "frequency": { "morning": 1, "midday": 0, "evening": 0, "every": 1, "unit": "days" },
+            "date_from": today,
+            "optional": true
+        }))
+        .to_request();
+    let resp = test::call_service(&app, req).await;
+    assert_eq!(resp.status(), 201);
+    let assign: serde_json::Value = test::read_body_json(resp).await;
+    let assign_id = assign["id"].as_str().unwrap();
+
+    let req = test::TestRequest::post()
+        .uri("/api/v1/health/meds/intake")
+        .set_json(serde_json::json!({
+            "pet_id": pet_id,
+            "medication_id": med_id,
+            "assignment_id": assign_id,
+            "taken": true,
+            "dose_fraction_override": "whole"
+        }))
+        .to_request();
+    let resp = test::call_service(&app, req).await;
+    assert_eq!(resp.status(), 201);
+    let intake: serde_json::Value = test::read_body_json(resp).await;
+    let occurred_at = intake["occurred_at"].as_str().expect("occurred_at missing");
+    assert!(
+        occurred_at.starts_with(&today),
+        "occurred_at '{occurred_at}' should default to today"
+    );
+    assert_eq!(intake["local_date"].as_str(), Some(today.as_str()));
+}
+
+#[actix_web::test]
+async fn med_assignment_end_and_delete() {
+    let (app, _state) = build_dev_app!();
+    let pet_id = api_create_pet!(&app, "MedEndTest");
+
+    let req = test::TestRequest::post()
+        .uri("/api/v1/health/meds")
+        .set_json(serde_json::json!({
+            "pet_id": pet_id,
+            "name": "Course pill",
+            "med_type": "pill",
+            "color": "#6366f1"
+        }))
+        .to_request();
+    let resp = test::call_service(&app, req).await;
+    assert_eq!(resp.status(), 201);
+    let med: serde_json::Value = test::read_body_json(resp).await;
+    let med_id = med["id"].as_str().unwrap();
+
+    let req = test::TestRequest::post()
+        .uri("/api/v1/health/meds/assignments")
+        .set_json(serde_json::json!({
+            "medication_id": med_id,
+            "tablet_strength_mg": 5.0,
+            "pill_shape": "round",
+            "dose_fraction": "whole",
+            "frequency": { "morning": 1, "midday": 0, "evening": 0, "every": 1, "unit": "days" },
+            "date_from": "2026-03-01",
+            "optional": true
+        }))
+        .to_request();
+    let resp = test::call_service(&app, req).await;
+    assert_eq!(resp.status(), 201);
+    let assign: serde_json::Value = test::read_body_json(resp).await;
+    let assign_id = assign["id"].as_str().unwrap().to_string();
+
+    let req = test::TestRequest::post()
+        .uri(&format!("/api/v1/health/meds/assignments/{assign_id}/end"))
+        .set_json(serde_json::json!({ "ended_on": "2026-03-10" }))
+        .to_request();
+    let resp = test::call_service(&app, req).await;
+    assert_eq!(resp.status(), 200);
+    let ended: serde_json::Value = test::read_body_json(resp).await;
+    assert_eq!(ended["date_to"].as_str(), Some("2026-03-10"));
+
+    let req = test::TestRequest::post()
+        .uri("/api/v1/health/meds/assignments")
+        .set_json(serde_json::json!({
+            "medication_id": med_id,
+            "tablet_strength_mg": 5.0,
+            "pill_shape": "round",
+            "dose_fraction": "whole",
+            "frequency": { "morning": 1, "midday": 0, "evening": 0, "every": 1, "unit": "days" },
+            "date_from": "2026-04-01",
+            "optional": true
+        }))
+        .to_request();
+    let resp = test::call_service(&app, req).await;
+    assert_eq!(resp.status(), 201);
+    let later: serde_json::Value = test::read_body_json(resp).await;
+    let later_id = later["id"].as_str().unwrap().to_string();
+
+    let req = test::TestRequest::post()
+        .uri("/api/v1/health/meds/intake")
+        .set_json(serde_json::json!({
+            "pet_id": pet_id,
+            "medication_id": med_id,
+            "assignment_id": later_id,
+            "taken": true,
+            "dose_fraction_override": "whole",
+            "local_date": "2026-04-01"
+        }))
+        .to_request();
+    let resp = test::call_service(&app, req).await;
+    assert_eq!(resp.status(), 201);
+
+    let req = test::TestRequest::delete()
+        .uri(&format!("/api/v1/health/meds/assignments/{later_id}"))
+        .to_request();
+    let resp = test::call_service(&app, req).await;
+    assert_eq!(resp.status(), 400);
+
+    let req = test::TestRequest::delete()
+        .uri(&format!(
+            "/api/v1/health/meds/assignments/{later_id}?cascade=true"
+        ))
+        .to_request();
+    let resp = test::call_service(&app, req).await;
+    assert_eq!(resp.status(), 204);
+
+    let req = test::TestRequest::get()
+        .uri(&format!(
+            "/api/v1/health/meds/intake?medication_id={med_id}"
+        ))
+        .to_request();
+    let resp = test::call_service(&app, req).await;
+    assert_eq!(resp.status(), 200);
+    let leftover: serde_json::Value = test::read_body_json(resp).await;
+    assert!(leftover.as_array().unwrap().is_empty());
+
+    let req = test::TestRequest::delete()
+        .uri(&format!("/api/v1/health/meds/assignments/{assign_id}"))
+        .to_request();
+    let resp = test::call_service(&app, req).await;
+    assert_eq!(resp.status(), 204);
+}
+
+#[actix_web::test]
+async fn medication_bundles_create_take_now_and_delete_with_medication() {
+    let (app, _state) = build_dev_app!();
+    let pet_id = api_create_pet!(&app, "MedBundleTest");
+
+    let req = test::TestRequest::post()
+        .uri("/api/v1/health/meds")
+        .set_json(serde_json::json!({
+            "pet_id": pet_id,
+            "name": "Prednisolone",
+            "med_type": "pill",
+            "color": "#6366f1",
+            "emoji": "💊"
+        }))
+        .to_request();
+    let resp = test::call_service(&app, req).await;
+    assert_eq!(resp.status(), 201);
+    let med_a: serde_json::Value = test::read_body_json(resp).await;
+    let med_a_id = med_a["id"].as_str().unwrap().to_string();
+
+    let req = test::TestRequest::post()
+        .uri("/api/v1/health/meds/assignments")
+        .set_json(serde_json::json!({
+            "medication_id": med_a_id,
+            "tablet_strength_mg": 5.0,
+            "pill_shape": "round",
+            "dose_fraction": "whole",
+            "frequency": {
+                "morning": 1,
+                "midday": 0,
+                "evening": 0,
+                "every": 1,
+                "unit": "days"
+            },
+            "date_from": "2026-01-01"
+        }))
+        .to_request();
+    let resp = test::call_service(&app, req).await;
+    assert_eq!(resp.status(), 201);
+    let assign_a: serde_json::Value = test::read_body_json(resp).await;
+    let assign_a_id = assign_a["id"].as_str().unwrap().to_string();
+
+    let req = test::TestRequest::post()
+        .uri("/api/v1/health/meds")
+        .set_json(serde_json::json!({
+            "pet_id": pet_id,
+            "name": "Gabapentin",
+            "med_type": "pill",
+            "color": "#22c55e",
+            "emoji": "🌙"
+        }))
+        .to_request();
+    let resp = test::call_service(&app, req).await;
+    assert_eq!(resp.status(), 201);
+    let med_b: serde_json::Value = test::read_body_json(resp).await;
+    let med_b_id = med_b["id"].as_str().unwrap().to_string();
+
+    let req = test::TestRequest::post()
+        .uri("/api/v1/health/meds/assignments")
+        .set_json(serde_json::json!({
+            "medication_id": med_b_id,
+            "tablet_strength_mg": 50.0,
+            "pill_shape": "capsule",
+            "dose_fraction": "whole",
+            "frequency": {
+                "morning": 1,
+                "midday": 0,
+                "evening": 0,
+                "every": 1,
+                "unit": "days"
+            },
+            "date_from": "2026-01-01"
+        }))
+        .to_request();
+    let resp = test::call_service(&app, req).await;
+    assert_eq!(resp.status(), 201);
+    let assign_b: serde_json::Value = test::read_body_json(resp).await;
+    let assign_b_id = assign_b["id"].as_str().unwrap().to_string();
+
+    let req = test::TestRequest::post()
+        .uri("/api/v1/health/meds")
+        .set_json(serde_json::json!({
+            "pet_id": pet_id,
+            "name": "Rescue",
+            "med_type": "pill",
+            "color": "#f97316"
+        }))
+        .to_request();
+    let resp = test::call_service(&app, req).await;
+    assert_eq!(resp.status(), 201);
+    let optional_med: serde_json::Value = test::read_body_json(resp).await;
+    let optional_med_id = optional_med["id"].as_str().unwrap().to_string();
+    let req = test::TestRequest::post()
+        .uri("/api/v1/health/meds/assignments")
+        .set_json(serde_json::json!({
+            "medication_id": optional_med_id,
+            "tablet_strength_mg": 5.0,
+            "pill_shape": "round",
+            "optional": true,
+            "date_from": "2026-01-01"
+        }))
+        .to_request();
+    let resp = test::call_service(&app, req).await;
+    assert_eq!(resp.status(), 201);
+    let optional_assign: serde_json::Value = test::read_body_json(resp).await;
+    let optional_assign_id = optional_assign["id"].as_str().unwrap().to_string();
+
+    let req = test::TestRequest::post()
+        .uri("/api/v1/health/meds/bundles")
+        .set_json(serde_json::json!({
+            "pet_id": pet_id,
+            "assignment_ids": [assign_a_id, optional_assign_id]
+        }))
+        .to_request();
+    let resp = test::call_service(&app, req).await;
+    assert_eq!(resp.status(), 400);
+
+    let req = test::TestRequest::post()
+        .uri("/api/v1/health/meds/bundles")
+        .set_json(serde_json::json!({
+            "pet_id": pet_id,
+            "assignment_ids": [assign_a_id]
+        }))
+        .to_request();
+    let resp = test::call_service(&app, req).await;
+    assert_eq!(resp.status(), 400);
+
+    let req = test::TestRequest::post()
+        .uri("/api/v1/health/meds/bundles")
+        .set_json(serde_json::json!({
+            "pet_id": pet_id,
+            "assignment_ids": [assign_a_id, assign_b_id]
+        }))
+        .to_request();
+    let resp = test::call_service(&app, req).await;
+    assert_eq!(resp.status(), 201);
+    let bundle: serde_json::Value = test::read_body_json(resp).await;
+    let bundle_id = bundle["id"].as_str().unwrap().to_string();
+    assert_eq!(bundle["name"].as_str(), Some("Prednisolone + Gabapentin"));
+    assert_eq!(bundle["items"].as_array().unwrap().len(), 2);
+    assert_eq!(
+        bundle["items"][0]["medication_id"].as_str(),
+        Some(med_a_id.as_str())
+    );
+    assert_eq!(
+        bundle["items"][1]["medication_id"].as_str(),
+        Some(med_b_id.as_str())
+    );
+
+    let req = test::TestRequest::get()
+        .uri(&format!("/api/v1/health/meds/bundles?pet_id={pet_id}"))
+        .to_request();
+    let resp = test::call_service(&app, req).await;
+    assert_eq!(resp.status(), 200);
+    let listed: serde_json::Value = test::read_body_json(resp).await;
+    assert_eq!(listed.as_array().unwrap().len(), 1);
+
+    let req = test::TestRequest::patch()
+        .uri(&format!("/api/v1/health/meds/bundles/{bundle_id}"))
+        .set_json(serde_json::json!({ "name": "Morning pair" }))
+        .to_request();
+    let resp = test::call_service(&app, req).await;
+    assert_eq!(resp.status(), 200);
+    let renamed: serde_json::Value = test::read_body_json(resp).await;
+    assert_eq!(renamed["name"].as_str(), Some("Morning pair"));
+
+    let req = test::TestRequest::post()
+        .uri(&format!("/api/v1/health/meds/bundles/{bundle_id}/intake"))
+        .set_json(serde_json::json!({}))
+        .to_request();
+    let resp = test::call_service(&app, req).await;
+    assert_eq!(resp.status(), 201);
+    let intakes: serde_json::Value = test::read_body_json(resp).await;
+    let intakes = intakes.as_array().unwrap();
+    assert_eq!(intakes.len(), 2);
+    assert_eq!(
+        intakes[0]["medication_id"].as_str(),
+        Some(med_a_id.as_str())
+    );
+    assert_eq!(
+        intakes[1]["medication_id"].as_str(),
+        Some(med_b_id.as_str())
+    );
+    assert_eq!(intakes[0]["taken"].as_bool(), Some(true));
+    assert_eq!(intakes[1]["taken"].as_bool(), Some(true));
+
+    let req = test::TestRequest::post()
+        .uri("/api/v1/health/meds")
+        .set_json(serde_json::json!({
+            "pet_id": pet_id,
+            "name": "Omeprazole",
+            "med_type": "pill",
+            "color": "#0ea5e9",
+            "emoji": "🔵"
+        }))
+        .to_request();
+    let resp = test::call_service(&app, req).await;
+    assert_eq!(resp.status(), 201);
+    let med_c: serde_json::Value = test::read_body_json(resp).await;
+    let med_c_id = med_c["id"].as_str().unwrap().to_string();
+    let req = test::TestRequest::post()
+        .uri("/api/v1/health/meds/assignments")
+        .set_json(serde_json::json!({
+            "medication_id": med_c_id,
+            "tablet_strength_mg": 10.0,
+            "pill_shape": "round",
+            "dose_fraction": "whole",
+            "frequency": {
+                "morning": 1,
+                "midday": 0,
+                "evening": 0,
+                "every": 1,
+                "unit": "days"
+            },
+            "date_from": "2026-01-01"
+        }))
+        .to_request();
+    let resp = test::call_service(&app, req).await;
+    assert_eq!(resp.status(), 201);
+    let assign_c: serde_json::Value = test::read_body_json(resp).await;
+    let assign_c_id = assign_c["id"].as_str().unwrap().to_string();
+
+    let req = test::TestRequest::post()
+        .uri("/api/v1/health/meds/bundles")
+        .set_json(serde_json::json!({
+            "pet_id": pet_id,
+            "assignment_ids": [assign_a_id, assign_b_id, assign_c_id]
+        }))
+        .to_request();
+    let resp = test::call_service(&app, req).await;
+    assert_eq!(resp.status(), 201);
+    let triple: serde_json::Value = test::read_body_json(resp).await;
+    let triple_id = triple["id"].as_str().unwrap().to_string();
+    assert_eq!(
+        triple["name"].as_str(),
+        Some("Prednisolone + Gabapentin + Omeprazole")
+    );
+    assert_eq!(triple["items"].as_array().unwrap().len(), 3);
+
+    let req = test::TestRequest::post()
+        .uri(&format!("/api/v1/health/meds/bundles/{triple_id}/intake"))
+        .set_json(serde_json::json!({
+            "occurred_at": "2026-08-20T08:15:00",
+            "local_date": "2026-08-20"
+        }))
+        .to_request();
+    let resp = test::call_service(&app, req).await;
+    assert_eq!(resp.status(), 201);
+    let delayed: serde_json::Value = test::read_body_json(resp).await;
+    let delayed = delayed.as_array().unwrap();
+    assert_eq!(delayed.len(), 3);
+    assert_eq!(
+        delayed[0]["occurred_at"].as_str(),
+        Some("2026-08-20T08:15:00")
+    );
+    assert_eq!(delayed[0]["local_date"].as_str(), Some("2026-08-20"));
+    for intake in delayed {
+        let req = test::TestRequest::delete()
+            .uri(&format!(
+                "/api/v1/health/meds/intake/{}",
+                intake["id"].as_str().unwrap()
+            ))
+            .to_request();
+        let resp = test::call_service(&app, req).await;
+        assert_eq!(resp.status(), 204);
+    }
+
+    let req = test::TestRequest::delete()
+        .uri(&format!("/api/v1/health/meds/{med_a_id}"))
+        .to_request();
+    let resp = test::call_service(&app, req).await;
+    assert_eq!(resp.status(), 204);
+
+    let req = test::TestRequest::get()
+        .uri(&format!("/api/v1/health/meds/bundles?pet_id={pet_id}"))
+        .to_request();
+    let resp = test::call_service(&app, req).await;
+    assert_eq!(resp.status(), 200);
+    let after_delete: serde_json::Value = test::read_body_json(resp).await;
+    assert!(after_delete.as_array().unwrap().is_empty());
 }

@@ -28,7 +28,8 @@ Push subscriptions remain per browser endpoint; notification read state and push
 ### Touching frontend (`frontend/src/`)
 1. **Storybook** — update existing stories or add new ones for the changed component/page; ensure mock fixtures cover the new states.
 2. **Tests** — update Vitest unit tests if any exist for the changed module.
-3. **CLAUDE.md** — if the change establishes a new UI convention or naming pattern, add it here.
+3. **Desktop + mobile** — every Storybook `play` function must also run at **360×700** (`asNarrowStory` from `frontend/src/stories/viewport.ts`). That size is the required floor, not an optional extra. The narrow twin must keep the same interactions and assert the UI still fits (`assertFitsNarrowViewport`).
+4. **CLAUDE.md** — if the change establishes a new UI convention or naming pattern, add it here.
 
 ### Locale-aware decimal inputs (iOS / EU keyboards)
 
@@ -73,6 +74,22 @@ When adding a tool in `src/mcp/tools.rs`, advertise only the dotted name. Legacy
 - VAPID JWT `sub` must be a real `mailto:` or `https:` contact URI. **Never** use `@localhost` — Apple/Safari return `403 BadJwtToken`.
 - Default subject is `https://petmon.j0rsa.com`; override with `VAPID_SUBJECT`. Keys auto-generate into `app_settings` unless `VAPID_PUBLIC_KEY` + `VAPID_PRIVATE_KEY` are set.
 - On load, invalid stored subjects (e.g. legacy `mailto:admin@localhost`) are rewritten automatically.
+
+## Medication intake Telegram
+
+Omit `occurred_at` and `local_date` for a real-time dose; the server stamps now and the Telegram line has no timestamp:
+
+`#pills <med name> <dosage> <med emoji>`
+
+Provide either date field for a delayed/backdated entry. The timestamp uses the caller's display date/time format:
+
+`#pills <med name> <dosage> <med emoji> - <timestamp>`
+
+A bundle Take now or Add record sends **one** Telegram message with one `#pills` line per member, in bundle order, joined by a newline. All intake records store the same `telegram_message_id`. Undoing one remaining dose edits that message; undoing the last remaining dose deletes it. Health bundle rows offer Add record, Take now, and Undo for the latest shared take.
+
+Medication accent color and emoji live on the medication identity, not on assignments.
+
+Treatment plan UI: known medications, assignments, and bundles are card lists, not HTML tables. Medications have a view state and an explicit Edit mode for name/color/emoji. Assignments are grouped by medication — the current course is the card, earlier paused/ended courses collapse under it. Assignment cards show how long the current uninterrupted course has run: from the first assignment after the last pause through today (if active) or through the latest end date. Press + New assignment to open the create form at the top of the Assignments list (Revise uses the same card). Bundles join two or more scheduled (not optional) assignments; press + New bundle to open the create form at the top of the Bundles list. The form lists current scheduled medications that are not already in a bundle. Bundles appear on Health as a Take now row when every member is due. Today's meds splits bundles and individual meds into labeled groups. Card actions sit on the header row, right-aligned on desktop; they wrap below the title on narrow screens. UI tests for this page (and new UI in general) cover desktop and 360×700.
 
 ## Terminology: BE vs FE split
 

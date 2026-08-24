@@ -3,8 +3,9 @@ use crate::domain::elimination::{
 };
 use crate::domain::health_state::{CreateHealthStateRecord, HealthStateRecordFilters};
 use crate::domain::medication::{
-    CreateMedAssignment, CreateMedIntakeRecord, CreateMedication, MedAssignmentFilters,
-    MedIntakeRecordFilters, ReviseMedAssignment, UpdateMedication,
+    CreateMedAssignment, CreateMedBundle, CreateMedBundleIntake, CreateMedIntakeRecord,
+    CreateMedication, EndMedAssignment, MedAssignmentFilters, MedIntakeRecordFilters,
+    ReviseMedAssignment, UpdateMedBundle, UpdateMedication,
 };
 use crate::domain::nutrition_record::BatchCreateNutritionRecords;
 use crate::domain::nutrition_record::{
@@ -591,7 +592,7 @@ fn tool_list() -> Value {
             },
             {
                 "name": "health.meds.create",
-                "description": "Register a medication identity (name, type, accent color). Formulation and dose live on assignments.",
+                "description": "Register a medication identity (name, type, accent color, emoji). Formulation and dose live on assignments.",
                 "inputSchema": {
                     "type": "object",
                     "required": ["pet_id", "name", "med_type"],
@@ -599,20 +600,22 @@ fn tool_list() -> Value {
                         "pet_id":   { "type": "string", "format": "uuid" },
                         "name":     { "type": "string" },
                         "med_type": { "type": "string", "enum": ["pill", "liquid"] },
-                        "color":    { "type": "string", "description": "CSS hex color, e.g. #6366f1" }
+                        "color":    { "type": "string", "description": "CSS hex color, e.g. #6366f1" },
+                        "emoji":    { "type": "string", "description": "Optional emoji used in medication Telegram messages" }
                     }
                 }
             },
             {
                 "name": "health.meds.update",
-                "description": "Update medication name or accent color.",
+                "description": "Update medication name, accent color, or emoji.",
                 "inputSchema": {
                     "type": "object",
                     "required": ["id"],
                     "properties": {
                         "id":    { "type": "string" },
                         "name":  { "type": "string" },
-                        "color": { "type": "string" }
+                        "color": { "type": "string" },
+                        "emoji": { "type": "string", "description": "Empty string clears the custom emoji" }
                     }
                 }
             },
@@ -708,6 +711,34 @@ fn tool_list() -> Value {
                 }
             },
             {
+                "name": "health.meds.assignments.end",
+                "description": "Pause an assignment by setting its end date. Defaults to yesterday in the server timezone so it is no longer due today.",
+                "inputSchema": {
+                    "type": "object",
+                    "required": ["id"],
+                    "properties": {
+                        "id": { "type": "string" },
+                        "ended_on": { "type": "string", "format": "date", "description": "Last active date. Defaults to yesterday." }
+                    }
+                }
+            },
+            {
+                "name": "health.meds.assignments.delete",
+                "description": "Delete an assignment. Fails if intake records exist unless cascade is true, which also deletes those records.",
+                "inputSchema": {
+                    "type": "object",
+                    "required": ["id"],
+                    "properties": {
+                        "id": { "type": "string" },
+                        "cascade": {
+                            "type": "boolean",
+                            "default": false,
+                            "description": "When true, also delete intake records logged against this assignment"
+                        }
+                    }
+                }
+            },
+            {
                 "name": "health.meds.assignments.daily",
                 "description": "Get medication assignments due on a date, filtered by their every-N-days/weeks cadence, with intake records.",
                 "inputSchema": {
@@ -736,7 +767,7 @@ fn tool_list() -> Value {
             },
             {
                 "name": "health.meds.intake.create",
-                "description": "Log medication intake by assignment. Optional/as-needed pills require dose_fraction_override; optional/as-needed liquids require liquid_dose_ml_override.",
+                "description": "Log medication intake by assignment. Omit occurred_at and local_date for a real-time entry (Telegram has no timestamp). Provide dates for a delayed/backdated entry. Optional/as-needed pills require dose_fraction_override; optional/as-needed liquids require liquid_dose_ml_override.",
                 "inputSchema": {
                     "type": "object",
                     "required": ["pet_id", "medication_id"],
@@ -760,6 +791,69 @@ fn tool_list() -> Value {
                     "type": "object",
                     "required": ["id"],
                     "properties": { "id": { "type": "string" } }
+                }
+            },
+            {
+                "name": "health.meds.bundles.list",
+                "description": "List medication bundles for a pet. Each bundle contains two or more scheduled medications so they can be taken together.",
+                "inputSchema": {
+                    "type": "object",
+                    "required": ["pet_id"],
+                    "properties": {
+                        "pet_id": { "type": "string", "format": "uuid" }
+                    }
+                }
+            },
+            {
+                "name": "health.meds.bundles.create",
+                "description": "Create a named bundle of two or more scheduled (non-optional) assignments. Members are stored by medication so they survive assignment pause/revise. Name defaults to the medication names joined with ' + '.",
+                "inputSchema": {
+                    "type": "object",
+                    "required": ["pet_id", "assignment_ids"],
+                    "properties": {
+                        "pet_id": { "type": "string", "format": "uuid" },
+                        "name": { "type": "string" },
+                        "assignment_ids": {
+                            "type": "array",
+                            "minItems": 2,
+                            "items": { "type": "string" }
+                        }
+                    }
+                }
+            },
+            {
+                "name": "health.meds.bundles.update",
+                "description": "Rename a medication bundle.",
+                "inputSchema": {
+                    "type": "object",
+                    "required": ["id", "name"],
+                    "properties": {
+                        "id": { "type": "string" },
+                        "name": { "type": "string" }
+                    }
+                }
+            },
+            {
+                "name": "health.meds.bundles.delete",
+                "description": "Delete a medication bundle. Does not delete the medications or intake records.",
+                "inputSchema": {
+                    "type": "object",
+                    "required": ["id"],
+                    "properties": { "id": { "type": "string" } }
+                }
+            },
+            {
+                "name": "health.meds.bundles.intake.create",
+                "description": "Log intake for every medication in a bundle in one call (Take now or a backdated Add record). Omit occurred_at and local_date for a real-time entry. Sends one Telegram message with one #pills line per member.",
+                "inputSchema": {
+                    "type": "object",
+                    "required": ["id"],
+                    "properties": {
+                        "id": { "type": "string" },
+                        "occurred_at": { "type": "string" },
+                        "local_date": { "type": "string", "format": "date" },
+                        "note": { "type": "string" }
+                    }
                 }
             },
 
@@ -1291,6 +1385,27 @@ pub async fn dispatch(
             let assignment = medication_service::revise_assignment(pool, &id, req).await?;
             Ok(json!(assignment))
         }
+        "health.meds.assignments.end" => {
+            let id = params["id"]
+                .as_str()
+                .ok_or_else(|| AppError::BadRequest("id required".to_string()))?
+                .to_string();
+            let req: EndMedAssignment =
+                serde_json::from_value(params).map_err(|e| AppError::BadRequest(e.to_string()))?;
+            let assignment = medication_service::end_assignment(pool, &id, req, timezone).await?;
+            Ok(json!(assignment))
+        }
+        "health.meds.assignments.delete" => {
+            let id = params["id"]
+                .as_str()
+                .ok_or_else(|| AppError::BadRequest("id required".to_string()))?;
+            let cascade = params
+                .get("cascade")
+                .and_then(|value| value.as_bool())
+                .unwrap_or(false);
+            medication_service::delete_assignment(pool, id, cascade).await?;
+            Ok(json!({ "deleted": true }))
+        }
         "health.meds.assignments.daily" => {
             let pet_id = require_uuid(&params, "pet_id")?;
             let date = params["date"]
@@ -1312,7 +1427,7 @@ pub async fn dispatch(
                 pool,
                 req,
                 timezone,
-                crate::domain::settings::DateFormat::default(),
+                crate::domain::user_settings::UserDisplaySettings::default(),
             )
             .await?;
             Ok(json!(record))
@@ -1323,6 +1438,51 @@ pub async fn dispatch(
                 .ok_or_else(|| AppError::BadRequest("id required".to_string()))?;
             medication_service::delete_intake(pool, id).await?;
             Ok(json!({ "deleted": true }))
+        }
+        "health.meds.bundles.list" => {
+            let pet_id = require_uuid(&params, "pet_id")?;
+            let bundles = medication_service::list_bundles(pool, pet_id).await?;
+            Ok(json!(bundles))
+        }
+        "health.meds.bundles.create" => {
+            let req: CreateMedBundle =
+                serde_json::from_value(params).map_err(|e| AppError::BadRequest(e.to_string()))?;
+            let bundle = medication_service::create_bundle(pool, req).await?;
+            Ok(json!(bundle))
+        }
+        "health.meds.bundles.update" => {
+            let id = params["id"]
+                .as_str()
+                .ok_or_else(|| AppError::BadRequest("id required".to_string()))?
+                .to_string();
+            let req: UpdateMedBundle =
+                serde_json::from_value(params).map_err(|e| AppError::BadRequest(e.to_string()))?;
+            let bundle = medication_service::update_bundle(pool, &id, req).await?;
+            Ok(json!(bundle))
+        }
+        "health.meds.bundles.delete" => {
+            let id = params["id"]
+                .as_str()
+                .ok_or_else(|| AppError::BadRequest("id required".to_string()))?;
+            medication_service::delete_bundle(pool, id).await?;
+            Ok(json!({ "deleted": true }))
+        }
+        "health.meds.bundles.intake.create" => {
+            let id = params["id"]
+                .as_str()
+                .ok_or_else(|| AppError::BadRequest("id required".to_string()))?
+                .to_string();
+            let req: CreateMedBundleIntake =
+                serde_json::from_value(params).map_err(|e| AppError::BadRequest(e.to_string()))?;
+            let records = medication_service::create_bundle_intake(
+                pool,
+                &id,
+                req,
+                timezone,
+                crate::domain::user_settings::UserDisplaySettings::default(),
+            )
+            .await?;
+            Ok(json!(records))
         }
 
         // ── Health context ────────────────────────────────────────────────────

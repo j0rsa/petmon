@@ -1,7 +1,6 @@
 use crate::auth::identity::Identity;
 use crate::auth::AppState;
 use crate::domain::medication::{CreateMedIntakeRecord, MedIntakeRecordFilters};
-use crate::domain::settings::DateFormat;
 use crate::domain::user_settings::{UserDisplaySettings, DISPLAY_KEY};
 use crate::error::AppResult;
 use crate::repo::user_settings;
@@ -27,21 +26,15 @@ pub async fn create_intake(
     body: web::Json<CreateMedIntakeRecord>,
 ) -> AppResult<HttpResponse> {
     let reader_key = req.extensions().get::<Identity>().map(Identity::reader_key);
-    let date_format = match reader_key {
+    let display = match reader_key {
         Some(reader_key) => {
-            user_settings::get::<UserDisplaySettings>(&state.pool, &reader_key, DISPLAY_KEY)
-                .await?
-                .date_format
+            user_settings::get::<UserDisplaySettings>(&state.pool, &reader_key, DISPLAY_KEY).await?
         }
-        None => DateFormat::default(),
+        None => UserDisplaySettings::default(),
     };
-    let record = medication_service::create_intake(
-        &state.pool,
-        body.into_inner(),
-        state.timezone,
-        date_format,
-    )
-    .await?;
+    let record =
+        medication_service::create_intake(&state.pool, body.into_inner(), state.timezone, display)
+            .await?;
     Ok(HttpResponse::Created().json(record))
 }
 

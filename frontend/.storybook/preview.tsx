@@ -1,8 +1,10 @@
 import type { Preview, Decorator } from '@storybook/react-vite';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import '../src/index.css';
+import { PWA_NARROW_VIEWPORT } from '../src/stories/viewport';
 
 const PWA_VIEWPORTS = {
+  pwaNarrow: PWA_NARROW_VIEWPORT,
   pwaMobile: {
     name: 'PWA Mobile (390×844)',
     styles: { width: '390px', height: '844px' },

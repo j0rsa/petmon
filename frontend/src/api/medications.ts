@@ -90,6 +90,20 @@ export interface DailyMedAssignment {
   intakes: MedIntakeRecord[];
 }
 
+export interface MedBundleItem {
+  medication_id: string;
+  medication: Medication;
+}
+
+export interface MedBundle {
+  id: string;
+  pet_id: string;
+  name: string;
+  items: MedBundleItem[];
+  created_at: string;
+  updated_at: string;
+}
+
 export interface CreateMedication {
   pet_id: string;
   name: string;
@@ -143,6 +157,18 @@ export interface CreateMedIntakeRecord {
   note?: string;
 }
 
+export interface CreateMedBundle {
+  pet_id: string;
+  name?: string;
+  assignment_ids: string[];
+}
+
+export interface CreateMedBundleIntake {
+  occurred_at?: string;
+  local_date?: string;
+  note?: string;
+}
+
 function toQueryString(params: Record<string, string | number | undefined>): string {
   const search = new URLSearchParams();
   for (const [key, value] of Object.entries(params)) {
@@ -176,6 +202,11 @@ export const medicationsApi = {
   reviseAssignment: (id: string, data: ReviseMedAssignment) =>
     api.post<MedAssignment>(`/health/meds/assignments/${id}/revise`, data),
 
+  endAssignment: (id: string, data: { ended_on?: string } = {}) =>
+    api.post<MedAssignment>(`/health/meds/assignments/${id}/end`, data),
+
+  deleteAssignment: (id: string) => api.delete(`/health/meds/assignments/${id}`),
+
   listIntake: (filters: {
     pet_id?: string;
     medication_id?: string;
@@ -188,4 +219,18 @@ export const medicationsApi = {
     api.post<MedIntakeRecord>('/health/meds/intake', data),
 
   deleteIntake: (id: string) => api.delete(`/health/meds/intake/${id}`),
+
+  listBundles: (petId: string) =>
+    api.get<MedBundle[]>(`/health/meds/bundles${toQueryString({ pet_id: petId })}`),
+
+  createBundle: (data: CreateMedBundle) =>
+    api.post<MedBundle>('/health/meds/bundles', data),
+
+  updateBundle: (id: string, data: { name: string }) =>
+    api.patch<MedBundle>(`/health/meds/bundles/${id}`, data),
+
+  deleteBundle: (id: string) => api.delete(`/health/meds/bundles/${id}`),
+
+  createBundleIntake: (id: string, data: CreateMedBundleIntake = {}) =>
+    api.post<MedIntakeRecord[]>(`/health/meds/bundles/${id}/intake`, data),
 };

@@ -13,6 +13,13 @@ export function shiftDate(date: string, offset: number): string {
   return `${y}-${m}-${d}`;
 }
 
+/** Inclusive calendar-day count. `2026-08-01` → `2026-08-01` is 1 day. */
+export function daysInclusive(from: string, to: string): number {
+  const start = new Date(`${from}T00:00:00`);
+  const end = new Date(`${to}T00:00:00`);
+  return Math.round((end.getTime() - start.getTime()) / 86_400_000) + 1;
+}
+
 export function formatDisplayDate(date: string, style: 'long' | 'short' = 'long') {
   const options: Intl.DateTimeFormatOptions =
     style === 'long'
