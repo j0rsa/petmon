@@ -11,6 +11,7 @@ pub mod nutrition;
 pub mod pets;
 pub mod push;
 pub mod settings;
+pub mod shortcuts;
 pub mod user_settings;
 pub mod weight;
 

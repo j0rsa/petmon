@@ -2621,6 +2621,26 @@ pre {
   padding: 0.65rem 0;
 }
 
+.med-intake-row__body {
+  flex: 1;
+  min-width: 0;
+}
+
+.med-intake-row__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+  align-items: center;
+}
+
+@media (max-width: 540px) {
+  .med-intake-row__actions {
+    flex-basis: 100%;
+    width: 100%;
+    justify-content: flex-start;
+  }
+}
+
 .med-intake-row:not(:last-child) {
   border-bottom: 1px solid var(--border-subtle);
 }

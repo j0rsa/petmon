@@ -1,12 +1,14 @@
-.PHONY: help build-be build-fe run-be run-dev-fe install-fe story seed-demo check check-fe check-be
+.PHONY: help build-be build-fe run-be run-dev-fe install-fe story seed-demo check check-fe check-be kill-be-port
 
 FE_DIR := frontend
+BE_PORT ?= 8080
 
 help:
 	@echo "Targets:"
 	@echo "  make build-be     Build the Rust backend"
 	@echo "  make build-fe     Build the frontend (output: frontend/dist/)"
-	@echo "  make run-be       Run the backend server (cargo run)"
+	@echo "  make run-be       Free port $(BE_PORT) and run the backend server"
+	@echo "  make kill-be-port Stop whatever is listening on port $(BE_PORT)"
 	@echo "  make run-dev-fe   Run the frontend dev server (Vite)"
 	@echo "  make story        Run the Storybook component server"
 	@echo "  make seed-demo    Reset DB and load demo data (ARGS='--append' to skip wipe)"
@@ -24,8 +26,17 @@ build-be:
 build-fe: install-fe
 	cd $(FE_DIR) && npm run build
 
-run-be:
-	-pkill -f 'target/debug/petmon' 2>/dev/null; sleep 0.3
+kill-be-port:
+	@pids=$$(lsof -ti tcp:$(BE_PORT) -sTCP:LISTEN 2>/dev/null); \
+	if [ -n "$$pids" ]; then \
+		echo "Killing listener(s) on port $(BE_PORT): $$pids"; \
+		kill $$pids 2>/dev/null || kill -9 $$pids; \
+		sleep 0.3; \
+	else \
+		echo "Port $(BE_PORT) is free"; \
+	fi
+
+run-be: kill-be-port
 	DEV_MODE=true STATIC_DIR=frontend/dist cargo run
 
 seed-demo:

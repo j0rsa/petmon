@@ -1910,6 +1910,70 @@ paths:
         '204':
           description: Intake record deleted
 
+  /shortcuts/med-intake/menu:
+    get:
+      tags: [Shortcuts]
+      summary: Med intake menu for Apple Shortcuts
+      description: |
+        Returns pipe-delimited choices (`label|take_token`) for scheduled daily meds.
+        Excludes optional meds and bundle members. Tokens expire after 24 hours.
+      x-required-scope: api_read
+      parameters:
+        - name: pet_id
+          in: query
+          required: true
+          schema: { type: string, format: uuid }
+        - name: date
+          in: query
+          required: true
+          schema: { type: string, format: date }
+      responses:
+        '200':
+          description: Shortcut menu choices
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [choices]
+                properties:
+                  choices:
+                    type: array
+                    items: { type: string }
+                    description: Each entry is `display label|take_token`.
+
+  /shortcuts/med-intake/take/{token}:
+    post:
+      tags: [Shortcuts]
+      summary: Take a med via shortcut token
+      description: Records a take-now intake for the med encoded in the opaque token from the menu endpoint.
+      x-required-scope: api_write
+      parameters:
+        - name: token
+          in: path
+          required: true
+          schema: { type: string }
+      responses:
+        '201':
+          description: Intake recorded
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/MedIntakeRecord' }
+
+  /shortcuts/med-intake.shortcut:
+    get:
+      tags: [Shortcuts]
+      summary: Download Apple Shortcut for med intake
+      description: Signed Apple Shortcut file (same for all users). Configure server URL, pet id, and API key on first run.
+      security: []
+      responses:
+        '200':
+          description: Signed `.shortcut` file
+          content:
+            application/octet-stream:
+              schema:
+                type: string
+                format: binary
+
   /nutrition/records:
     get:
       tags:

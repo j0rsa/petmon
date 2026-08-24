@@ -51,7 +51,10 @@ where
             // Public paths that bypass auth entirely
             let public = matches!(
                 req.path(),
-                "/api/v1/auth/info" | "/api/v1/health" | "/api/v1/info"
+                "/api/v1/auth/info"
+                    | "/api/v1/health"
+                    | "/api/v1/info"
+                    | "/api/v1/shortcuts/med-intake.shortcut"
             );
             if public {
                 let res = service.call(req).await?;

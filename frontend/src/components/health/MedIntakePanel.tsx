@@ -173,7 +173,7 @@ function DailyMedRow({
         doseFraction={iconFraction}
         size={40}
       />
-      <div style={{ flex: 1, minWidth: 0 }}>
+      <div className="med-intake-row__body">
         <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap' }}>
           <strong style={{ fontSize: '0.92rem' }}>{medication.name}</strong>
           {assignment.optional && (
@@ -208,7 +208,7 @@ function DailyMedRow({
         )}
       </div>
       {showActions && (
-        <div style={{ display: 'flex', gap: '0.35rem', alignItems: 'center' }}>
+        <div className="med-intake-row__actions">
           {developerMode && (
             <button
               type="button"
@@ -440,7 +440,7 @@ function BundleTakeRow({
           />
         ))}
       </div>
-      <div style={{ flex: 1, minWidth: 0 }}>
+      <div className="med-intake-row__body">
         <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap' }}>
           <strong style={{ fontSize: '0.92rem' }}>{bundle.name}</strong>
           <span
@@ -467,7 +467,7 @@ function BundleTakeRow({
         )}
       </div>
       {canWrite && (
-        <div style={{ display: 'flex', gap: '0.35rem', alignItems: 'center' }}>
+        <div className="med-intake-row__actions">
           <button
             type="button"
             className="button button-secondary"
@@ -611,6 +611,17 @@ export function MedIntakePanel({ petId }: MedIntakePanelProps) {
           <p className="eyebrow">Medications</p>
           <h3>Today&apos;s meds</h3>
         </div>
+        {!loading && !empty && (
+          <a
+            href="/api/v1/shortcuts/med-intake.shortcut"
+            download="petmon-med-intake.shortcut"
+            className="button button-secondary"
+            style={{ fontSize: '0.82rem', whiteSpace: 'nowrap' }}
+            title="Download an Apple Shortcut to log daily meds from your iPhone (configure URL, pet id, and API key on first run)"
+          >
+            Apple Shortcut
+          </a>
+        )}
       </div>
 
       {loading ? (

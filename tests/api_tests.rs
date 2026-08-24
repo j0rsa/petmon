@@ -31,7 +31,8 @@ macro_rules! build_app {
                     .configure(api::push::configure)
                     .configure(api::settings::configure)
                     .configure(api::settings::configure_api_tokens)
-                    .configure(api::user_settings::configure),
+                    .configure(api::user_settings::configure)
+                    .configure(api::shortcuts::configure),
             ),
         )
         .await
@@ -64,7 +65,8 @@ macro_rules! build_full_app {
                         .configure(api::push::configure)
                         .configure(api::settings::configure)
                         .configure(api::settings::configure_api_tokens)
-                        .configure(api::user_settings::configure),
+                        .configure(api::user_settings::configure)
+                        .configure(api::shortcuts::configure),
                 )
                 .service(
                     web::scope("/mcp")
@@ -3809,4 +3811,69 @@ async fn medication_bundles_create_take_now_and_delete_with_medication() {
     assert_eq!(resp.status(), 200);
     let after_delete: serde_json::Value = test::read_body_json(resp).await;
     assert!(after_delete.as_array().unwrap().is_empty());
+}
+
+#[actix_web::test]
+async fn shortcuts_med_intake_menu_take_and_download() {
+    let (app, _state) = build_dev_app!();
+    let pet_id = api_create_pet!(&app, "ShortcutMed");
+
+    let req = test::TestRequest::post()
+        .uri("/api/v1/health/meds")
+        .set_json(serde_json::json!({
+            "pet_id": pet_id,
+            "name": "Shortcut Pill",
+            "med_type": "pill",
+            "color": "#6366f1"
+        }))
+        .to_request();
+    let resp = test::call_service(&app, req).await;
+    assert_eq!(resp.status(), 201);
+    let med: serde_json::Value = test::read_body_json(resp).await;
+    let med_id = med["id"].as_str().unwrap();
+
+    let req = test::TestRequest::post()
+        .uri("/api/v1/health/meds/assignments")
+        .set_json(serde_json::json!({
+            "medication_id": med_id,
+            "tablet_strength_mg": 5.0,
+            "pill_shape": "round",
+            "dose_fraction": "whole",
+            "frequency": { "morning": 1, "midday": 0, "evening": 0, "every": 1, "unit": "days" },
+            "date_from": "2026-03-01"
+        }))
+        .to_request();
+    let resp = test::call_service(&app, req).await;
+    assert_eq!(resp.status(), 201);
+
+    let req = test::TestRequest::get()
+        .uri(&format!(
+            "/api/v1/shortcuts/med-intake/menu?pet_id={pet_id}&date=2026-03-15"
+        ))
+        .to_request();
+    let resp = test::call_service(&app, req).await;
+    assert_eq!(resp.status(), 200);
+    let menu: serde_json::Value = test::read_body_json(resp).await;
+    let choices = menu["choices"].as_array().unwrap();
+    assert_eq!(choices.len(), 1);
+    let choice = choices[0].as_str().unwrap();
+    assert!(choice.starts_with("Shortcut Pill · "));
+    let token = choice.split('|').nth(1).unwrap();
+
+    let req = test::TestRequest::post()
+        .uri(&format!("/api/v1/shortcuts/med-intake/take/{token}"))
+        .to_request();
+    let resp = test::call_service(&app, req).await;
+    assert_eq!(resp.status(), 201);
+    let intake: serde_json::Value = test::read_body_json(resp).await;
+    assert_eq!(intake["medication_id"].as_str(), Some(med_id));
+    assert_eq!(intake["source_type"].as_str(), Some("shortcut"));
+
+    let req = test::TestRequest::get()
+        .uri("/api/v1/shortcuts/med-intake.shortcut")
+        .to_request();
+    let resp = test::call_service(&app, req).await;
+    assert_eq!(resp.status(), 200);
+    let body = test::read_body(resp).await;
+    assert!(body.len() > 1_000);
 }

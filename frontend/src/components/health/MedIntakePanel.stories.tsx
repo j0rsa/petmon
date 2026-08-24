@@ -70,6 +70,7 @@ export const WithDailyMeds: Story = {
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement);
     await expect(canvas.getByRole('heading', { name: 'Meds' })).toBeInTheDocument();
+    await expect(canvas.getByRole('link', { name: 'Apple Shortcut' })).toBeInTheDocument();
     await expect(canvas.queryByRole('heading', { name: 'Bundles' })).not.toBeInTheDocument();
     await userEvent.click(canvas.getAllByRole('button', { name: 'Add record' })[0]!);
     await expect(canvas.getByText('Add medication record')).toBeInTheDocument();
