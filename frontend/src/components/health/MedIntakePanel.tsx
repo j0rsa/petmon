@@ -623,15 +623,15 @@ export function MedIntakePanel({ petId }: MedIntakePanelProps) {
         {!loading && !empty && (
           <a
             {...medIntakeShortcutLinkProps(undefined, appInfoQuery.data?.med_intake_shortcut_icloud_url)}
-            className="button button-secondary"
-            style={{ fontSize: '0.82rem', whiteSpace: 'nowrap' }}
+            className="shortcuts-import-link"
+            aria-label="Apple Shortcut"
             title={
               appInfoQuery.data?.med_intake_shortcut_icloud_url
                 ? 'Import the Petmon Take Meds shortcut from iCloud (configure URL, pet id, and API key on first run)'
                 : 'Download the Petmon Take Meds shortcut (iPhone needs an iCloud link — see docs/apple-shortcut-med-intake.md)'
             }
           >
-            Apple Shortcut
+            <img src="/icons/shortcuts.png" alt="" width={22} height={22} className="shortcuts-import-link__icon" />
           </a>
         )}
       </div>

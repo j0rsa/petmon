@@ -2613,6 +2613,28 @@ pre {
   color: var(--eyebrow);
 }
 
+.shortcuts-import-link {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 2.25rem;
+  height: 2.25rem;
+  border-radius: 10px;
+  background: var(--btn-secondary-bg);
+  color: var(--btn-secondary-text);
+  flex-shrink: 0;
+}
+
+.shortcuts-import-link:hover {
+  background: rgba(200, 200, 190, 0.16);
+}
+
+.shortcuts-import-link__icon {
+  display: block;
+  filter: invert(0.88);
+  opacity: 0.92;
+}
+
 .med-intake-row {
   display: flex;
   flex-wrap: wrap;
