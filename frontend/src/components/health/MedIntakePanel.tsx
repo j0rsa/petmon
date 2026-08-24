@@ -24,7 +24,7 @@ import {
 import { buildMedIntakeCurl } from '../../lib/medIntakeCurl';
 import { parseDecimal } from '../../lib/numbers';
 import { isDoseSupported } from '../../lib/pillDoseCuts';
-import { isoFromDateAndTime, nowTimeString } from '../../lib/time';
+import { medIntakeShortcutLinkProps } from '../../lib/medIntakeShortcut';
 import { usePermissions } from '../../context/usePermissions';
 import { useFormatTime } from '../../context/useDisplaySettings';
 import { useUserSettings } from '../../api/userSettings';
@@ -613,11 +613,10 @@ export function MedIntakePanel({ petId }: MedIntakePanelProps) {
         </div>
         {!loading && !empty && (
           <a
-            href="/api/v1/shortcuts/med-intake.shortcut"
-            download="petmon-med-intake.shortcut"
+            {...medIntakeShortcutLinkProps()}
             className="button button-secondary"
             style={{ fontSize: '0.82rem', whiteSpace: 'nowrap' }}
-            title="Download an Apple Shortcut to log daily meds from your iPhone (configure URL, pet id, and API key on first run)"
+            title="Add the Petmon Take Meds shortcut to log daily meds from your iPhone (configure URL, pet id, and API key on first run)"
           >
             Apple Shortcut
           </a>

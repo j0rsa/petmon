@@ -14,6 +14,7 @@ OUT_DIR = ROOT / "assets" / "shortcuts"
 UNSIGNED = OUT_DIR / "petmon-med-intake.unsigned.plist"
 BINARY = OUT_DIR / "petmon-med-intake.unsigned.shortcut"
 SIGNED = OUT_DIR / "petmon-med-intake.shortcut"
+PLACEHOLDER = "\ufffc"
 
 
 def wf_text(value: str) -> dict:
@@ -23,37 +24,30 @@ def wf_text(value: str) -> dict:
     }
 
 
-def wf_token_string(template: str, attachments: dict[str, dict]) -> dict:
+def wf_token_string(template: str, outputs: list[tuple[str, str]]) -> dict:
+    attachments: dict[str, dict] = {}
+    search_from = 0
+    for output_uuid, output_name in outputs:
+        idx = template.find(PLACEHOLDER, search_from)
+        if idx == -1:
+            raise ValueError(f"missing placeholder in template: {template!r}")
+        attachments[f"{{{idx}, 1}}"] = {
+            "Type": "ActionOutput",
+            "OutputUUID": output_uuid,
+            "OutputName": output_name,
+        }
+        search_from = idx + 1
     return {
-        "Value": {
-            "string": template,
-            "attachmentsByRange": attachments,
-        },
+        "Value": {"string": template, "attachmentsByRange": attachments},
         "WFSerializationType": "WFTextTokenString",
     }
 
 
-def action_output(uuid: str, output_name: str = "Text") -> dict:
-    return {
-        "Type": "ActionOutput",
-        "OutputUUID": uuid,
-        "OutputName": output_name,
-    }
-
-
-def attachment(range_key: str, output_uuid: str, output_name: str = "Text") -> tuple[str, dict]:
-    return range_key, {
-        "Type": "ActionOutput",
-        "OutputUUID": output_uuid,
-        "OutputName": output_name,
-    }
-
-
 def build_workflow() -> dict:
-    # Stable UUIDs for cross-action references.
     uid_server = str(uuid.uuid4()).upper()
     uid_pet = str(uuid.uuid4()).upper()
     uid_api_key = str(uuid.uuid4()).upper()
+    uid_date = str(uuid.uuid4()).upper()
     uid_date_fmt = str(uuid.uuid4()).upper()
 
     import_questions = [
@@ -65,8 +59,7 @@ def build_workflow() -> dict:
             "Text": (
                 "Petmon server URL\n\n"
                 "Use the site address from your browser, including https://.\n"
-                "Example: https://petmon.j0rsa.com\n\n"
-                "Docs: https://github.com/j0rsa/petmon"
+                "Example: https://petmon.j0rsa.com"
             ),
         },
         {
@@ -76,9 +69,8 @@ def build_workflow() -> dict:
             "ParameterKey": "WFTextActionText",
             "Text": (
                 "Pet ID\n\n"
-                "UUID of the pet you're logging meds for.\n"
-                "In Petmon: open the pet, copy the id from Settings → Developer mode, "
-                "or from the browser URL when viewing that pet."
+                "UUID of the pet you are logging meds for.\n"
+                "Copy it from Petmon Settings → Developer mode."
             ),
         },
         {
@@ -88,43 +80,27 @@ def build_workflow() -> dict:
             "ParameterKey": "WFTextActionText",
             "Text": (
                 "API key\n\n"
-                "Create one in Petmon → Settings → API tokens (needs Write scope).\n"
+                "Create one in Petmon → Settings → API tokens (Write scope).\n"
                 "Stored in plain text on this device."
             ),
         },
     ]
 
-    menu_url = wf_token_string(
-        "￼/api/v1/shortcuts/med-intake/menu?pet_id=￼&date=￼",
-        {
-            "{0, 1}": action_output(uid_server),
-            "{1, 2}": action_output(uid_pet),
-            "{2, 3}": action_output(uid_date_fmt, "Formatted Date"),
-        },
-    )
+    menu_url_template = f"{PLACEHOLDER}/api/v1/shortcuts/med-intake/menu?pet_id={PLACEHOLDER}&date={PLACEHOLDER}"
+    take_url_template = f"{PLACEHOLDER}/api/v1/shortcuts/med-intake/take/{PLACEHOLDER}"
+    auth_template = f"Bearer {PLACEHOLDER}"
 
-    auth_header = wf_token_string(
-        "Bearer ￼",
-        {"{7, 8}": action_output(uid_api_key)},
-    )
-
-    take_url = wf_token_string(
-        "￼/api/v1/shortcuts/med-intake/take/￼",
-        {
-            "{0, 1}": action_output(uid_server),
-            "{1, 2}": {
-                "Type": "ActionOutput",
-                "OutputUUID": str(uuid.uuid4()).upper(),  # filled below via repeat item
-                "OutputName": "Item from List",
-            },
-        },
-    )
+    repeat_uuid = str(uuid.uuid4()).upper()
+    split_uuid = str(uuid.uuid4()).upper()
+    token_uuid = str(uuid.uuid4()).upper()
+    post_uuid = str(uuid.uuid4()).upper()
 
     actions: list[dict] = [
         {
             "WFWorkflowActionIdentifier": "is.workflow.actions.gettext",
             "WFWorkflowActionParameters": {
                 "UUID": uid_server,
+                "CustomOutputName": "Server URL",
                 "WFTextActionText": "https://petmon.j0rsa.com",
             },
         },
@@ -132,6 +108,7 @@ def build_workflow() -> dict:
             "WFWorkflowActionIdentifier": "is.workflow.actions.gettext",
             "WFWorkflowActionParameters": {
                 "UUID": uid_pet,
+                "CustomOutputName": "Pet ID",
                 "WFTextActionText": "",
             },
         },
@@ -139,12 +116,16 @@ def build_workflow() -> dict:
             "WFWorkflowActionIdentifier": "is.workflow.actions.gettext",
             "WFWorkflowActionParameters": {
                 "UUID": uid_api_key,
+                "CustomOutputName": "API Key",
                 "WFTextActionText": "",
             },
         },
         {
-            "WFWorkflowActionIdentifier": "is.workflow.actions.date.current",
-            "WFWorkflowActionParameters": {},
+            "WFWorkflowActionIdentifier": "is.workflow.actions.date",
+            "WFWorkflowActionParameters": {
+                "UUID": uid_date,
+                "WFDateActionMode": "Current Date",
+            },
         },
         {
             "WFWorkflowActionIdentifier": "is.workflow.actions.format.date",
@@ -152,12 +133,20 @@ def build_workflow() -> dict:
                 "UUID": uid_date_fmt,
                 "WFDateFormatStyle": "Custom",
                 "WFDateFormat": "yyyy-MM-dd",
+                "WFISO8601IncludeTime": False,
             },
         },
         {
             "WFWorkflowActionIdentifier": "is.workflow.actions.downloadurl",
             "WFWorkflowActionParameters": {
-                "WFURL": menu_url,
+                "WFURL": wf_token_string(
+                    menu_url_template,
+                    [
+                        (uid_server, "Server URL"),
+                        (uid_pet, "Pet ID"),
+                        (uid_date_fmt, "Formatted Date"),
+                    ],
+                ),
                 "WFHTTPMethod": "GET",
                 "WFHTTPHeaders": {
                     "Value": {
@@ -165,17 +154,16 @@ def build_workflow() -> dict:
                             {
                                 "WFItemType": 0,
                                 "WFKey": wf_text("Authorization"),
-                                "WFValue": auth_header,
+                                "WFValue": wf_token_string(
+                                    auth_template,
+                                    [(uid_api_key, "API Key")],
+                                ),
                             }
                         ]
                     },
                     "WFSerializationType": "WFDictionaryFieldValue",
                 },
             },
-        },
-        {
-            "WFWorkflowActionIdentifier": "is.workflow.actions.detectDictionary",
-            "WFWorkflowActionParameters": {},
         },
         {
             "WFWorkflowActionIdentifier": "is.workflow.actions.getvalueforkey",
@@ -191,8 +179,17 @@ def build_workflow() -> dict:
             },
         },
         {
+            "WFWorkflowActionIdentifier": "is.workflow.actions.repeat.each",
+            "WFWorkflowActionParameters": {
+                "UUID": repeat_uuid,
+                "GroupingIdentifier": repeat_uuid,
+            },
+        },
+        {
             "WFWorkflowActionIdentifier": "is.workflow.actions.text.split",
             "WFWorkflowActionParameters": {
+                "UUID": split_uuid,
+                "GroupingIdentifier": repeat_uuid,
                 "WFTextSeparator": "Custom",
                 "WFTextCustomSeparator": "|",
             },
@@ -200,6 +197,8 @@ def build_workflow() -> dict:
         {
             "WFWorkflowActionIdentifier": "is.workflow.actions.getitemfromlist",
             "WFWorkflowActionParameters": {
+                "UUID": token_uuid,
+                "GroupingIdentifier": repeat_uuid,
                 "WFItemIndex": 2,
                 "WFItemSpecifier": "Item At Index",
             },
@@ -207,15 +206,14 @@ def build_workflow() -> dict:
         {
             "WFWorkflowActionIdentifier": "is.workflow.actions.downloadurl",
             "WFWorkflowActionParameters": {
+                "UUID": post_uuid,
+                "GroupingIdentifier": repeat_uuid,
                 "WFURL": wf_token_string(
-                    "￼/api/v1/shortcuts/med-intake/take/￼",
-                    {
-                        "{0, 1}": action_output(uid_server),
-                        "{1, 2}": {
-                            "Type": "ActionOutput",
-                            "OutputName": "Item from List",
-                        },
-                    },
+                    take_url_template,
+                    [
+                        (uid_server, "Server URL"),
+                        (token_uuid, "Item from List"),
+                    ],
                 ),
                 "WFHTTPMethod": "POST",
                 "WFHTTPHeaders": {
@@ -224,7 +222,10 @@ def build_workflow() -> dict:
                             {
                                 "WFItemType": 0,
                                 "WFKey": wf_text("Authorization"),
-                                "WFValue": auth_header,
+                                "WFValue": wf_token_string(
+                                    auth_template,
+                                    [(uid_api_key, "API Key")],
+                                ),
                             }
                         ]
                     },
@@ -240,38 +241,9 @@ def build_workflow() -> dict:
         },
     ]
 
-    # Wire repeat-around split → get token → post take.
-    repeat_uuid = str(uuid.uuid4()).upper()
-    split_uuid = str(uuid.uuid4()).upper()
-    token_uuid = str(uuid.uuid4()).upper()
-    post_uuid = str(uuid.uuid4()).upper()
-
-    actions[9]["WFWorkflowActionParameters"]["UUID"] = split_uuid
-    actions[10]["WFWorkflowActionParameters"]["UUID"] = token_uuid
-    actions[11]["WFWorkflowActionParameters"]["UUID"] = post_uuid
-
-    repeat_block = [
-        actions[9],
-        actions[10],
-        actions[11],
-    ]
-    for child in repeat_block:
-        child["WFWorkflowActionParameters"]["GroupingIdentifier"] = repeat_uuid
-
-    actions = actions[:9] + [
-        {
-            "WFWorkflowActionIdentifier": "is.workflow.actions.repeat.each",
-            "WFWorkflowActionParameters": {
-                "UUID": repeat_uuid,
-                "GroupingIdentifier": repeat_uuid,
-            },
-        },
-        *repeat_block,
-    ]
-
     return {
         "WFWorkflowActions": actions,
-        "WFWorkflowClientVersion": "2302.0.4",
+        "WFWorkflowClientVersion": "2700.0.4",
         "WFWorkflowClientRelease": "2.2",
         "WFWorkflowMinimumClientVersion": 900,
         "WFWorkflowMinimumClientVersionString": "900",

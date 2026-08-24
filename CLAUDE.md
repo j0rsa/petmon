@@ -20,7 +20,7 @@ Push subscriptions remain per browser endpoint; notification read state and push
 
 **Selected pet** is browser-local (`localStorage` key `petmon-selected-pet-id`), not a user setting. Restore it after refresh. While the pets query is pending, `data` is `undefined` — do not treat the `data ?? []` empty array as “no pets”, or the stored id is wiped and the UI falls back to the first pet.
 
-**Apple Shortcuts (med intake)** — one signed static file (`assets/shortcuts/petmon-med-intake.shortcut`), built on macOS via `scripts/build-med-intake-shortcut.py` and served at `GET /api/v1/shortcuts/med-intake.shortcut`. Personalization is runtime: import questions (URL, pet id, API key) + `GET /api/v1/shortcuts/med-intake/menu` returns pipe-delimited `label|token` choices; `POST /api/v1/shortcuts/med-intake/take/{token}` records intake. Bundles and optional meds excluded from menu for now.
+**Apple Shortcuts (med intake)** — one signed static file (`assets/shortcuts/petmon-med-intake.shortcut`), built on macOS via `scripts/build-med-intake-shortcut.py` and served at `GET /api/v1/shortcuts/med-intake.shortcut`. On iPhone/iPad the Health UI links via `shortcuts://import-shortcut/` (not a raw file download). Personalization is runtime: import questions (URL, pet id, API key) + menu/take APIs. Bundles and optional meds excluded from menu for now.
 
 ---
 1. **Tests** — update or add integration tests in `tests/api_tests.rs` covering the changed behaviour.
