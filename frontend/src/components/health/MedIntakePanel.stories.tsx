@@ -75,7 +75,7 @@ export const WithDailyMeds: Story = {
     const canvas = within(canvasElement);
     await expect(canvas.getByRole('heading', { name: 'Meds' })).toBeInTheDocument();
     await expect(canvas.getByRole('link', { name: 'Apple Shortcut' })).toBeInTheDocument();
-    await expect(canvas.getByRole('link', { name: 'AutoMate flow' })).toBeInTheDocument();
+    await expect(canvas.queryByRole('link', { name: 'AutoMate flow' })).not.toBeInTheDocument();
     await expect(canvas.queryByRole('heading', { name: 'Bundles' })).not.toBeInTheDocument();
     await userEvent.click(canvas.getAllByRole('button', { name: 'Add record' })[0]!);
     await expect(canvas.getByText('Add medication record')).toBeInTheDocument();
