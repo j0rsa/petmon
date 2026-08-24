@@ -16,3 +16,7 @@ frontend/coverage
 .env
 .env.local
 .claude
+
+# Apple Shortcut build intermediates (signed *.shortcut is committed)
+assets/shortcuts/*.unsigned.plist
+assets/shortcuts/*.unsigned.shortcut
