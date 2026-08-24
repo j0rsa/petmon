@@ -45,6 +45,8 @@ on:
 env:
   REGISTRY: ghcr.io
   IMAGE_NAME: ${{ github.repository }}
+  # PR checkout is the merge commit; pass head SHA so embedded git_sha matches Docker tags.
+  PETMON_GIT_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
 
 jobs:
   # ─────────────────────────────────────────────

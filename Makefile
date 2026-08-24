@@ -1,4 +1,4 @@
-.PHONY: help build-be build-fe run-be run-dev-fe install-fe story seed-demo check check-fe check-be kill-be-port
+.PHONY: help build-be build-fe run-be run-dev-fe install-fe story seed-demo check check-fe check-be kill-be-port build-med-intake-shortcut publish-med-intake-shortcut
 
 FE_DIR := frontend
 BE_PORT ?= 8080
@@ -16,6 +16,8 @@ help:
 	@echo "  make check        Run all checks (fe + be)"
 	@echo "  make check-fe     Typecheck, lint, and test the frontend"
 	@echo "  make check-be     Format, clippy, audit, and test the backend"
+	@echo "  make build-med-intake-shortcut  Build/sign the med-intake Apple Shortcut (macOS)"
+	@echo "  make publish-med-intake-shortcut  Build, open in Shortcuts, print iCloud publish steps"
 
 install-fe:
 	cd $(FE_DIR) && npm install
@@ -61,3 +63,9 @@ check-be:
 	DATABASE_URL="sqlite::memory:" cargo clippy --locked -- -D warnings
 
 	DATABASE_URL="sqlite::memory:" cargo test --locked
+
+build-med-intake-shortcut:
+	python3 scripts/build-med-intake-shortcut.py
+
+publish-med-intake-shortcut:
+	python3 scripts/publish-med-intake-shortcut.py

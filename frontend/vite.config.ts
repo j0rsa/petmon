@@ -15,16 +15,23 @@ import { playwright } from '@vitest/browser-playwright';
 
 const dirname = typeof __dirname !== 'undefined' ? __dirname : path.dirname(fileURLToPath(import.meta.url));
 
+function resolveGitSha(): string {
+  const fromEnv = process.env.PETMON_GIT_SHA?.trim();
+  if (fromEnv) {
+    return fromEnv.slice(0, 7);
+  }
+  try {
+    return execSync('git rev-parse --short HEAD', { encoding: 'utf-8' }).trim();
+  } catch {
+    // Non-git checkout (e.g. published crate tarball).
+    return 'unknown';
+  }
+}
+
 function readPetmonBuildInfo(): { version: string; gitSha: string } {
   const cargoToml = fs.readFileSync(path.join(dirname, '..', 'Cargo.toml'), 'utf-8');
   const version = cargoToml.match(/^version\s*=\s*"([^"]+)"/m)?.[1] ?? 'unknown';
-  let gitSha = 'unknown';
-  try {
-    gitSha = execSync('git rev-parse --short HEAD', { encoding: 'utf-8' }).trim();
-  } catch {
-    // Non-git checkout (e.g. published crate tarball).
-  }
-  return { version, gitSha };
+  return { version, gitSha: resolveGitSha() };
 }
 
 const isStorybookBuild =

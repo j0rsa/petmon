@@ -12,25 +12,31 @@ export function medIntakeShortcutFileUrl(origin = typeof window !== 'undefined' 
 }
 
 /**
- * On iPhone/iPad, open Shortcuts import UI directly.
- * Elsewhere, download the .shortcut file.
+ * Prefer the iCloud share link from server config (iPhone import).
+ * Otherwise download/open the self-hosted signed file.
  */
-export function medIntakeShortcutHref(origin = typeof window !== 'undefined' ? window.location.origin : ''): string {
-  const fileUrl = medIntakeShortcutFileUrl(origin);
-  if (!isAppleMobile()) {
-    return fileUrl;
+export function medIntakeShortcutHref(
+  origin = typeof window !== 'undefined' ? window.location.origin : '',
+  icloudUrl?: string | null,
+): string {
+  const trimmed = icloudUrl?.trim();
+  if (trimmed) {
+    return trimmed;
   }
-  const params = new URLSearchParams({
-    url: fileUrl,
-    name: SHORTCUT_NAME,
-  });
-  return `shortcuts://import-shortcut/?${params.toString()}`;
+  return medIntakeShortcutFileUrl(origin);
 }
 
-export function medIntakeShortcutLinkProps(origin = typeof window !== 'undefined' ? window.location.origin : '') {
+export function medIntakeShortcutLinkProps(
+  origin = typeof window !== 'undefined' ? window.location.origin : '',
+  icloudUrl?: string | null,
+) {
   const appleMobile = isAppleMobile();
+  const href = medIntakeShortcutHref(origin, icloudUrl);
+  const usesIcloud = Boolean(icloudUrl?.trim());
   return {
-    href: medIntakeShortcutHref(origin),
-    download: appleMobile ? undefined : 'petmon-med-intake.shortcut',
+    href,
+    download: appleMobile || usesIcloud ? undefined : 'petmon-med-intake.shortcut',
   } as const;
 }
+
+export { SHORTCUT_NAME };

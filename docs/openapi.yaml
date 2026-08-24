@@ -2579,6 +2579,10 @@ components:
         demo_mode:
           type: boolean
           description: True when the server started with DEMO_MODE (demo seed + UI banner).
+        med_intake_shortcut_icloud_url:
+          type: string
+          description: iCloud share link for the med-intake Apple Shortcut (iPhone import). Omitted when unset.
+          example: "https://www.icloud.com/shortcuts/abc123def4"
     ErrorResponse:
       type: object
       properties:

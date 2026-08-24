@@ -15,6 +15,7 @@ pub mod nutrition_status_service;
 pub mod pet_service;
 pub mod push_service;
 pub mod shortcut_menu;
+pub mod shortcut_publish;
 pub mod startup;
 pub mod telegram;
 pub mod weight_service;

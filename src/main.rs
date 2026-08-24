@@ -65,6 +65,9 @@ async fn main() -> anyhow::Result<()> {
         chrono_tz::UTC
     });
 
+    let med_intake_shortcut_icloud_url =
+        services::shortcut_publish::resolve_med_intake_icloud_url();
+
     let state = web::Data::new(auth::AppState::new_with_tz(
         pool,
         dev_mode,
@@ -72,6 +75,7 @@ async fn main() -> anyhow::Result<()> {
         config.static_dir.clone(),
         timezone,
         config.demo_mode,
+        med_intake_shortcut_icloud_url,
     ));
     let bind_addr = format!("{}:{}", config.host, config.port);
 

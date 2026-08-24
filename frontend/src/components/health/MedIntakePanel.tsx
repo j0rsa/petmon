@@ -26,6 +26,7 @@ import { parseDecimal } from '../../lib/numbers';
 import { isDoseSupported } from '../../lib/pillDoseCuts';
 import { medIntakeShortcutLinkProps } from '../../lib/medIntakeShortcut';
 import { isoFromDateAndTime, nowTimeString } from '../../lib/time';
+import { infoApi } from '../../api/info';
 import { usePermissions } from '../../context/usePermissions';
 import { useFormatTime } from '../../context/useDisplaySettings';
 import { useUserSettings } from '../../api/userSettings';
@@ -591,6 +592,13 @@ export function MedIntakePanel({ petId }: MedIntakePanelProps) {
     enabled: Boolean(petId),
   });
 
+  const appInfoQuery = useQuery({
+    queryKey: ['app-info'],
+    queryFn: infoApi.get,
+    staleTime: Infinity,
+    retry: false,
+  });
+
   function invalidate() {
     queryClient.invalidateQueries({ queryKey: ['med-daily', petId] });
     queryClient.invalidateQueries({ queryKey: ['med-intake'] });
@@ -614,10 +622,14 @@ export function MedIntakePanel({ petId }: MedIntakePanelProps) {
         </div>
         {!loading && !empty && (
           <a
-            {...medIntakeShortcutLinkProps()}
+            {...medIntakeShortcutLinkProps(undefined, appInfoQuery.data?.med_intake_shortcut_icloud_url)}
             className="button button-secondary"
             style={{ fontSize: '0.82rem', whiteSpace: 'nowrap' }}
-            title="Add the Petmon Take Meds shortcut to log daily meds from your iPhone (configure URL, pet id, and API key on first run)"
+            title={
+              appInfoQuery.data?.med_intake_shortcut_icloud_url
+                ? 'Import the Petmon Take Meds shortcut from iCloud (configure URL, pet id, and API key on first run)'
+                : 'Download the Petmon Take Meds shortcut (iPhone needs an iCloud link — see docs/apple-shortcut-med-intake.md)'
+            }
           >
             Apple Shortcut
           </a>
