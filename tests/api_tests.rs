@@ -3940,8 +3940,14 @@ async fn shortcuts_med_intake_menu_take_and_download() {
     let menu: serde_json::Value = test::read_body_json(resp).await;
     let choices = menu["choices"].as_array().unwrap();
     assert_eq!(choices.len(), 2);
+    let labels = menu["labels"].as_array().unwrap();
+    assert_eq!(labels.len(), 2);
     let lines = menu["lines"].as_array().unwrap();
     assert_eq!(lines.len(), 2);
+    assert_eq!(
+        labels[0].as_str().unwrap(),
+        choices[0]["label"].as_str().unwrap()
+    );
 
     let scheduled = choices
         .iter()

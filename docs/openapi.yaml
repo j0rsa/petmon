@@ -1915,9 +1915,9 @@ paths:
       tags: [Shortcuts]
       summary: Med intake menu for Apple Shortcuts
       description: |
-        Returns structured menu choices plus `lines` pipe-encoded for Shortcuts
-        (`label|token|kind|fractions_csv`). Includes scheduled and optional meds;
-        excludes bundle members. Tokens expire after 24 hours.
+        Returns structured menu choices plus human-readable `labels` for pickers and
+        `lines` pipe-encoded for Shortcuts (`label|token|kind|fractions_csv`).
+        Includes scheduled and optional meds; excludes bundle members. Tokens expire after 24 hours.
       x-required-scope: api_read
       parameters:
         - name: pet_id
@@ -4557,11 +4557,15 @@ components:
 
     MedIntakeShortcutMenu:
       type: object
-      required: [choices, lines]
+      required: [choices, labels, lines]
       properties:
         choices:
           type: array
           items: { $ref: '#/components/schemas/MedIntakeShortcutMenuChoice' }
+        labels:
+          type: array
+          items: { type: string }
+          description: Human-readable menu labels for Shortcuts / Automate pickers (same order as `lines`).
         lines:
           type: array
           items: { type: string }

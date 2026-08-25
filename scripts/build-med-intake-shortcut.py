@@ -58,32 +58,95 @@ def wf_output_ref(output_uuid: str, output_name: str) -> dict:
     }
 
 
+def wf_input_ref(output_uuid: str, output_name: str) -> dict:
+    return wf_output_ref(output_uuid, output_name)
+
+
+def wf_named_variable(name: str) -> dict:
+    return {
+        "Value": {"Type": "Variable", "VariableName": name},
+        "WFSerializationType": "WFTextTokenAttachment",
+    }
+
+
+def wf_conditional_input(
+    *,
+    output_uuid: str | None = None,
+    output_name: str | None = None,
+    variable_name: str | None = None,
+) -> dict:
+    if variable_name is not None:
+        inner = wf_named_variable(variable_name)
+    elif output_uuid is not None and output_name is not None:
+        inner = wf_output_ref(output_uuid, output_name)
+    else:
+        raise ValueError("conditional input requires output or variable")
+    return {"Type": "Variable", "Variable": inner}
+
+
 def wf_conditional(
     group: str,
-    repeat_group: str,
     mode: int,
     *,
     compare_to: str | None = None,
+    compare_variable: str | None = None,
     input_ref: dict | None = None,
+    input_variable: str | None = None,
+    output_uuid: str | None = None,
+    output_name: str | None = None,
 ) -> dict:
     params: dict = {
         "UUID": group,
-        "GroupingIdentifier": repeat_group,
+        "GroupingIdentifier": group,
         "WFControlFlowMode": mode,
     }
     if mode == 0:
         params["WFCondition"] = 4
-        params["WFConditionalActionString"] = compare_to or ""
-        params["WFInput"] = input_ref or {}
+        if compare_variable is not None:
+            params["WFConditionalActionString"] = wf_named_variable(compare_variable)
+        else:
+            params["WFConditionalActionString"] = compare_to or ""
+        if input_variable is not None:
+            params["WFInput"] = wf_conditional_input(variable_name=input_variable)
+        elif input_ref is not None:
+            params["WFInput"] = {"Type": "Variable", "Variable": input_ref}
+        elif output_uuid is not None and output_name is not None:
+            params["WFInput"] = wf_conditional_input(
+                output_uuid=output_uuid,
+                output_name=output_name,
+            )
     return {
         "WFWorkflowActionIdentifier": "is.workflow.actions.conditional",
         "WFWorkflowActionParameters": params,
     }
 
 
+def repeat_each_start(group: str, wf_input: dict) -> dict:
+    return {
+        "WFWorkflowActionIdentifier": "is.workflow.actions.repeat.each",
+        "WFWorkflowActionParameters": {
+            "UUID": group,
+            "GroupingIdentifier": group,
+            "WFControlFlowMode": 0,
+            "WFInput": wf_input,
+        },
+    }
+
+
+def repeat_each_end(group: str, end_uuid: str) -> dict:
+    return {
+        "WFWorkflowActionIdentifier": "is.workflow.actions.repeat.each",
+        "WFWorkflowActionParameters": {
+            "UUID": end_uuid,
+            "GroupingIdentifier": group,
+            "WFControlFlowMode": 2,
+        },
+    }
+
+
 def post_take_action(
     *,
-    repeat_group: str,
+    group: str,
     action_uuid: str,
     uid_server: str,
     uid_api_key: str,
@@ -94,7 +157,7 @@ def post_take_action(
         "WFWorkflowActionIdentifier": "is.workflow.actions.downloadurl",
         "WFWorkflowActionParameters": {
             "UUID": action_uuid,
-            "GroupingIdentifier": repeat_group,
+            "GroupingIdentifier": group,
             "WFURL": url_value,
             "WFHTTPMethod": "POST",
             "WFHTTPHeaders": {
@@ -143,7 +206,7 @@ def build_workflow() -> dict:
             "Text": (
                 "Pet ID\n\n"
                 "UUID of the pet you are logging meds for.\n"
-                "Copy it from Petmon Settings → Developer mode."
+                "Copy it from the pet profile card in Petmon."
             ),
         },
         {
@@ -165,8 +228,19 @@ def build_workflow() -> dict:
     take_liquid_url_template = f"{PLACEHOLDER}{TAKE_PATH}{PLACEHOLDER}?liquid_dose_ml={PLACEHOLDER}"
     auth_template = f"Bearer {PLACEHOLDER}"
 
-    repeat_uuid = str(uuid.uuid4()).upper()
+    uid_menu = str(uuid.uuid4()).upper()
+    uid_labels = str(uuid.uuid4()).upper()
+    uid_lines = str(uuid.uuid4()).upper()
+    uid_choose = str(uuid.uuid4()).upper()
+
+    repeat_sel_uuid = str(uuid.uuid4()).upper()
+    repeat_sel_end_uuid = str(uuid.uuid4()).upper()
+    repeat_lines_uuid = str(uuid.uuid4()).upper()
+    repeat_lines_end_uuid = str(uuid.uuid4()).upper()
+
+    if_line_uuid = str(uuid.uuid4()).upper()
     split_uuid = str(uuid.uuid4()).upper()
+    line_label_uuid = str(uuid.uuid4()).upper()
     token_uuid = str(uuid.uuid4()).upper()
     kind_uuid = str(uuid.uuid4()).upper()
     fractions_csv_uuid = str(uuid.uuid4()).upper()
@@ -178,8 +252,6 @@ def build_workflow() -> dict:
     post_scheduled_uuid = str(uuid.uuid4()).upper()
     post_pill_uuid = str(uuid.uuid4()).upper()
     post_liquid_uuid = str(uuid.uuid4()).upper()
-
-    kind_ref = wf_output_ref(kind_uuid, "Kind")
 
     actions: list[dict] = [
         {
@@ -217,6 +289,7 @@ def build_workflow() -> dict:
             "WFWorkflowActionIdentifier": "is.workflow.actions.format.date",
             "WFWorkflowActionParameters": {
                 "UUID": uid_date_fmt,
+                "CustomOutputName": "Formatted Date",
                 "WFDateFormatStyle": "Custom",
                 "WFDateFormat": "yyyy-MM-dd",
                 "WFISO8601IncludeTime": False,
@@ -225,6 +298,8 @@ def build_workflow() -> dict:
         {
             "WFWorkflowActionIdentifier": "is.workflow.actions.downloadurl",
             "WFWorkflowActionParameters": {
+                "UUID": uid_menu,
+                "CustomOutputName": "Menu",
                 "WFURL": wf_token_string(
                     menu_url_template,
                     [
@@ -254,28 +329,42 @@ def build_workflow() -> dict:
         {
             "WFWorkflowActionIdentifier": "is.workflow.actions.getvalueforkey",
             "WFWorkflowActionParameters": {
+                "UUID": uid_labels,
+                "CustomOutputName": "Labels",
+                "WFDictionaryKey": "labels",
+                "WFInput": wf_input_ref(uid_menu, "Menu"),
+            },
+        },
+        {
+            "WFWorkflowActionIdentifier": "is.workflow.actions.getvalueforkey",
+            "WFWorkflowActionParameters": {
+                "UUID": uid_lines,
+                "CustomOutputName": "Menu lines",
                 "WFDictionaryKey": "lines",
+                "WFInput": wf_input_ref(uid_menu, "Menu"),
             },
         },
         {
             "WFWorkflowActionIdentifier": "is.workflow.actions.choosefromlist",
             "WFWorkflowActionParameters": {
+                "UUID": uid_choose,
+                "CustomOutputName": "Selected meds",
+                "WFInput": wf_input_ref(uid_labels, "Labels"),
                 "WFChooseFromListActionShowMultipleSelection": True,
                 "WFChooseFromListActionPrompt": "Select meds to log",
             },
         },
-        {
-            "WFWorkflowActionIdentifier": "is.workflow.actions.repeat.each",
-            "WFWorkflowActionParameters": {
-                "UUID": repeat_uuid,
-                "GroupingIdentifier": repeat_uuid,
-            },
-        },
+        repeat_each_start(repeat_sel_uuid, wf_input_ref(uid_choose, "Selected meds")),
+        repeat_each_start(
+            repeat_lines_uuid,
+            wf_input_ref(uid_lines, "Menu lines"),
+        ),
         {
             "WFWorkflowActionIdentifier": "is.workflow.actions.text.split",
             "WFWorkflowActionParameters": {
                 "UUID": split_uuid,
-                "GroupingIdentifier": repeat_uuid,
+                "GroupingIdentifier": repeat_lines_uuid,
+                "CustomOutputName": "Split line",
                 "WFTextSeparator": "Custom",
                 "WFTextCustomSeparator": "|",
             },
@@ -283,60 +372,84 @@ def build_workflow() -> dict:
         {
             "WFWorkflowActionIdentifier": "is.workflow.actions.getitemfromlist",
             "WFWorkflowActionParameters": {
+                "UUID": line_label_uuid,
+                "GroupingIdentifier": repeat_lines_uuid,
+                "CustomOutputName": "Line label",
+                "WFItemIndex": 1,
+                "WFItemSpecifier": "Item At Index",
+                "WFInput": wf_input_ref(split_uuid, "Split line"),
+            },
+        },
+        wf_conditional(
+            if_line_uuid,
+            0,
+            compare_variable="Repeat Item",
+            output_uuid=line_label_uuid,
+            output_name="Line label",
+        ),
+        {
+            "WFWorkflowActionIdentifier": "is.workflow.actions.getitemfromlist",
+            "WFWorkflowActionParameters": {
                 "UUID": token_uuid,
-                "GroupingIdentifier": repeat_uuid,
+                "GroupingIdentifier": if_line_uuid,
                 "CustomOutputName": "Token",
                 "WFItemIndex": 2,
                 "WFItemSpecifier": "Item At Index",
+                "WFInput": wf_input_ref(split_uuid, "Split line"),
             },
         },
         {
             "WFWorkflowActionIdentifier": "is.workflow.actions.getitemfromlist",
             "WFWorkflowActionParameters": {
                 "UUID": kind_uuid,
-                "GroupingIdentifier": repeat_uuid,
+                "GroupingIdentifier": if_line_uuid,
                 "CustomOutputName": "Kind",
                 "WFItemIndex": 3,
                 "WFItemSpecifier": "Item At Index",
+                "WFInput": wf_input_ref(split_uuid, "Split line"),
             },
         },
         wf_conditional(
             if_kind_uuid,
-            repeat_uuid,
             0,
             compare_to="optional_pill",
-            input_ref=kind_ref,
+            output_uuid=kind_uuid,
+            output_name="Kind",
         ),
         {
             "WFWorkflowActionIdentifier": "is.workflow.actions.getitemfromlist",
             "WFWorkflowActionParameters": {
                 "UUID": fractions_csv_uuid,
-                "GroupingIdentifier": repeat_uuid,
+                "GroupingIdentifier": if_kind_uuid,
                 "CustomOutputName": "Fractions CSV",
                 "WFItemIndex": 4,
                 "WFItemSpecifier": "Item At Index",
+                "WFInput": wf_input_ref(split_uuid, "Split line"),
             },
         },
         {
             "WFWorkflowActionIdentifier": "is.workflow.actions.text.split",
             "WFWorkflowActionParameters": {
                 "UUID": split_fractions_uuid,
-                "GroupingIdentifier": repeat_uuid,
+                "GroupingIdentifier": if_kind_uuid,
+                "CustomOutputName": "Fraction options",
                 "WFTextSeparator": "Custom",
                 "WFTextCustomSeparator": ",",
+                "WFInput": wf_input_ref(fractions_csv_uuid, "Fractions CSV"),
             },
         },
         {
             "WFWorkflowActionIdentifier": "is.workflow.actions.choosefromlist",
             "WFWorkflowActionParameters": {
                 "UUID": picked_fraction_uuid,
-                "GroupingIdentifier": repeat_uuid,
+                "GroupingIdentifier": if_kind_uuid,
                 "CustomOutputName": "Dose fraction",
+                "WFInput": wf_input_ref(split_fractions_uuid, "Fraction options"),
                 "WFChooseFromListActionPrompt": "Dose fraction",
             },
         },
         post_take_action(
-            repeat_group=repeat_uuid,
+            group=if_kind_uuid,
             action_uuid=post_pill_uuid,
             uid_server=uid_server,
             uid_api_key=uid_api_key,
@@ -349,26 +462,26 @@ def build_workflow() -> dict:
                 ],
             ),
         ),
-        wf_conditional(if_kind_uuid, repeat_uuid, 1),
+        wf_conditional(if_kind_uuid, 1),
         wf_conditional(
             if_liquid_uuid,
-            repeat_uuid,
             0,
             compare_to="optional_liquid",
-            input_ref=kind_ref,
+            output_uuid=kind_uuid,
+            output_name="Kind",
         ),
         {
             "WFWorkflowActionIdentifier": "is.workflow.actions.ask",
             "WFWorkflowActionParameters": {
                 "UUID": ml_amount_uuid,
-                "GroupingIdentifier": repeat_uuid,
+                "GroupingIdentifier": if_liquid_uuid,
                 "CustomOutputName": "Liquid ml",
                 "WFAskActionPrompt": "Liquid dose (ml)",
                 "WFInputType": "Number",
             },
         },
         post_take_action(
-            repeat_group=repeat_uuid,
+            group=if_liquid_uuid,
             action_uuid=post_liquid_uuid,
             uid_server=uid_server,
             uid_api_key=uid_api_key,
@@ -381,9 +494,9 @@ def build_workflow() -> dict:
                 ],
             ),
         ),
-        wf_conditional(if_liquid_uuid, repeat_uuid, 1),
+        wf_conditional(if_liquid_uuid, 1),
         post_take_action(
-            repeat_group=repeat_uuid,
+            group=if_liquid_uuid,
             action_uuid=post_scheduled_uuid,
             uid_server=uid_server,
             uid_api_key=uid_api_key,
@@ -395,8 +508,11 @@ def build_workflow() -> dict:
                 ],
             ),
         ),
-        wf_conditional(if_liquid_uuid, repeat_uuid, 2),
-        wf_conditional(if_kind_uuid, repeat_uuid, 2),
+        wf_conditional(if_liquid_uuid, 2),
+        wf_conditional(if_kind_uuid, 2),
+        wf_conditional(if_line_uuid, 2),
+        repeat_each_end(repeat_lines_uuid, repeat_lines_end_uuid),
+        repeat_each_end(repeat_sel_uuid, repeat_sel_end_uuid),
         {
             "WFWorkflowActionIdentifier": "is.workflow.actions.showresult",
             "WFWorkflowActionParameters": {

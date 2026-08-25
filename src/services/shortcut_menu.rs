@@ -47,6 +47,8 @@ pub struct MedIntakeMenuChoice {
 #[derive(Debug, Serialize)]
 pub struct MedIntakeMenuResponse {
     pub choices: Vec<MedIntakeMenuChoice>,
+    /// Human-readable labels for Shortcuts / Automate pickers (same order as `lines`).
+    pub labels: Vec<String>,
     /// Pipe-encoded lines for Apple Shortcuts: `label|token|kind|fractions_csv`.
     pub lines: Vec<String>,
 }
@@ -165,6 +167,7 @@ pub async fn med_intake_menu(
     }
 
     choices.sort_by(|a, b| a.label.cmp(&b.label));
+    let labels = choices.iter().map(|choice| choice.label.clone()).collect();
     let lines = choices
         .iter()
         .map(|choice| {
@@ -178,7 +181,11 @@ pub async fn med_intake_menu(
         })
         .collect();
 
-    Ok(MedIntakeMenuResponse { choices, lines })
+    Ok(MedIntakeMenuResponse {
+        choices,
+        labels,
+        lines,
+    })
 }
 
 #[cfg(test)]
