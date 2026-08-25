@@ -1634,6 +1634,31 @@ pre {
   grid-column: 1 / -1;
 }
 
+.pet-info-id {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+}
+
+.pet-info-id__value {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  font-size: 0.82rem;
+  word-break: break-all;
+  padding: 0.2rem 0.45rem;
+  border-radius: 6px;
+  background: var(--surface-muted);
+}
+
+.pet-info-id__copy {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  padding: 0.25rem 0.55rem;
+  font-size: 0.78rem;
+  line-height: 1;
+}
+
 .pet-elimination-auto-tag {
   display: flex;
   flex-direction: column;
@@ -2633,6 +2658,28 @@ pre {
   display: block;
   filter: invert(0.88);
   opacity: 0.92;
+}
+
+.shortcuts-import-link__icon--color {
+  filter: none;
+  opacity: 1;
+}
+
+.med-intake-heading.section-heading {
+  align-items: flex-start;
+}
+
+.med-intake-title-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  min-width: 0;
+}
+
+.med-intake-title-row h3 {
+  margin: 0;
+  min-width: 0;
 }
 
 .med-intake-import-links {

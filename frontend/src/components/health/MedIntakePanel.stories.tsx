@@ -74,8 +74,11 @@ export const WithDailyMeds: Story = {
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement);
     await expect(canvas.getByRole('heading', { name: 'Meds' })).toBeInTheDocument();
+    await expect(canvas.getByRole('heading', { name: "Today's meds" })).toBeInTheDocument();
     await expect(canvas.getByRole('link', { name: 'Apple Shortcut' })).toBeInTheDocument();
-    await expect(canvas.queryByRole('link', { name: 'AutoMate flow' })).not.toBeInTheDocument();
+    await expect(canvas.getByRole('link', { name: 'AutoMate flow' })).toBeInTheDocument();
+    const titleRow = canvas.getByRole('heading', { name: "Today's meds" }).closest('.med-intake-title-row');
+    await expect(titleRow).toContainElement(canvas.getByRole('link', { name: 'Apple Shortcut' }));
     await expect(canvas.queryByRole('heading', { name: 'Bundles' })).not.toBeInTheDocument();
     await userEvent.click(canvas.getAllByRole('button', { name: 'Add record' })[0]!);
     await expect(canvas.getByText('Add medication record')).toBeInTheDocument();
@@ -90,6 +93,32 @@ export const WithDailyMeds: Story = {
 export const WithDeveloperMode: Story = {
   args: { petId: mockPetId },
   decorators: withMedData({ developerMode: true }),
+};
+
+function withAndroidUserAgent(): Story['decorators'] {
+  return [
+    (Story) => {
+      Object.defineProperty(navigator, 'userAgent', {
+        configurable: true,
+        value: 'Mozilla/5.0 (Linux; Android 14; Pixel 8) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Mobile Safari/537.36',
+      });
+      Object.defineProperty(navigator, 'userAgentData', {
+        configurable: true,
+        value: { platform: 'Android' },
+      });
+      return <Story />;
+    },
+  ];
+}
+
+export const WithDailyMedsAndroid: Story = {
+  args: { petId: mockPetId },
+  decorators: [...withMedData(), ...withAndroidUserAgent()],
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    await expect(canvas.getByRole('link', { name: 'AutoMate flow' })).toBeInTheDocument();
+    await expect(canvas.queryByRole('link', { name: 'Apple Shortcut' })).not.toBeInTheDocument();
+  },
 };
 
 export const WithBundle: Story = {
@@ -154,6 +183,7 @@ export const Empty: Story = {
 };
 
 export const WithDailyMedsNarrow = asNarrowStory(WithDailyMeds);
+export const WithDailyMedsAndroidNarrow = asNarrowStory(WithDailyMedsAndroid);
 export const WithBundleNarrow = asNarrowStory(WithBundle);
 export const WithBundleTakenNarrow = asNarrowStory(WithBundleTaken);
 export const EmptyNarrow = asNarrowStory(Empty);
