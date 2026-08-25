@@ -1,4 +1,4 @@
-import type { Meta, StoryObj } from '@storybook/react-vite';
+import type { Decorator, Meta, StoryObj } from '@storybook/react-vite';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { MemoryRouter } from 'react-router-dom';
 import { expect, userEvent, within } from 'storybook/test';
@@ -21,7 +21,7 @@ type Story = StoryObj<typeof meta>;
 const DESKTOP_USER_AGENT =
   'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36';
 
-function withDesktopUserAgent(): Story['decorators'] {
+function withDesktopUserAgent(): Decorator[] {
   return [
     (Story) => {
       Object.defineProperty(navigator, 'userAgent', {
@@ -47,7 +47,7 @@ function withMedDataCore({
   developerMode?: boolean;
   daily?: typeof mockDailyMedAssignments;
   bundles?: typeof mockMedBundles;
-} = {}): Story['decorators'] {
+} = {}): Decorator[] {
   return [
     (Story) => {
       const client = new QueryClient({
@@ -87,9 +87,9 @@ function withMedDataCore({
   ];
 }
 
-function withMedData(options?: Parameters<typeof withMedDataCore>[0]): Story['decorators'] {
+function withMedData(options?: Parameters<typeof withMedDataCore>[0]): Decorator[] {
   // Innermost decorator wins for navigator overrides (Storybook applies first listed last).
-  return [...withDesktopUserAgent()!, ...withMedDataCore(options)];
+  return [...withDesktopUserAgent(), ...withMedDataCore(options)];
 }
 
 export const WithDailyMeds: Story = {
@@ -119,7 +119,7 @@ export const WithDeveloperMode: Story = {
   decorators: withMedData({ developerMode: true }),
 };
 
-function withAndroidUserAgent(): Story['decorators'] {
+function withAndroidUserAgent(): Decorator[] {
   return [
     (Story) => {
       Object.defineProperty(navigator, 'userAgent', {
@@ -137,7 +137,7 @@ function withAndroidUserAgent(): Story['decorators'] {
 
 export const WithDailyMedsAndroid: Story = {
   args: { petId: mockPetId },
-  decorators: [...withAndroidUserAgent()!, ...withMedDataCore()],
+  decorators: [...withAndroidUserAgent(), ...withMedDataCore()],
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement);
     await expect(canvas.getByRole('link', { name: 'AutoMate flow' })).toBeInTheDocument();

@@ -7,7 +7,7 @@ export function medIntakeImportPlatform(): MedIntakeImportPlatform {
   }
 
   const ua = navigator.userAgent;
-  const platformHint = navigator.userAgentData?.platform;
+  const platformHint = (navigator as Navigator & { userAgentData?: { platform?: string } }).userAgentData?.platform;
 
   if (/Android/i.test(ua) || platformHint === 'Android') {
     return 'android';
