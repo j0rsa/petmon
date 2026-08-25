@@ -1,5 +1,5 @@
 import type { Meta, StoryObj } from '@storybook/react-vite';
-import { expect, userEvent, within } from 'storybook/test';
+import { expect, userEvent, waitFor, within } from 'storybook/test';
 import { mockPets } from '../../stories/fixtures';
 import { asNarrowStory } from '../../stories/viewport';
 import { PetInfoFields } from './PetInfoFields';
@@ -13,14 +13,24 @@ const meta = {
 export default meta;
 type Story = StoryObj<typeof meta>;
 
+function mockClipboard() {
+  Object.defineProperty(navigator, 'clipboard', {
+    configurable: true,
+    value: { writeText: () => Promise.resolve() },
+  });
+}
+
 export const FullProfile: Story = {
   args: { pet: mockPets[0] },
   play: async ({ canvasElement }) => {
+    mockClipboard();
     const canvas = within(canvasElement);
     await expect(canvas.getByText('Pet ID')).toBeInTheDocument();
     await expect(canvas.getByText(mockPets[0].id)).toBeInTheDocument();
     await userEvent.click(canvas.getByRole('button', { name: 'Copy pet ID' }));
-    await expect(canvas.getByRole('button', { name: 'Copied pet ID' })).toBeInTheDocument();
+    await waitFor(() => {
+      expect(canvas.getByRole('button', { name: 'Copied pet ID' })).toBeInTheDocument();
+    });
   },
 };
 

@@ -18,7 +18,26 @@ const meta = {
 export default meta;
 type Story = StoryObj<typeof meta>;
 
-function withMedData({
+const DESKTOP_USER_AGENT =
+  'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36';
+
+function withDesktopUserAgent(): Story['decorators'] {
+  return [
+    (Story) => {
+      Object.defineProperty(navigator, 'userAgent', {
+        configurable: true,
+        value: DESKTOP_USER_AGENT,
+      });
+      Object.defineProperty(navigator, 'userAgentData', {
+        configurable: true,
+        value: { platform: 'macOS' },
+      });
+      return <Story />;
+    },
+  ];
+}
+
+function withMedDataCore({
   empty = false,
   developerMode = false,
   daily = mockDailyMedAssignments,
@@ -68,6 +87,11 @@ function withMedData({
   ];
 }
 
+function withMedData(options?: Parameters<typeof withMedDataCore>[0]): Story['decorators'] {
+  // Innermost decorator wins for navigator overrides (Storybook applies first listed last).
+  return [...withDesktopUserAgent()!, ...withMedDataCore(options)];
+}
+
 export const WithDailyMeds: Story = {
   args: { petId: mockPetId },
   decorators: withMedData(),
@@ -113,7 +137,7 @@ function withAndroidUserAgent(): Story['decorators'] {
 
 export const WithDailyMedsAndroid: Story = {
   args: { petId: mockPetId },
-  decorators: [...withMedData(), ...withAndroidUserAgent()],
+  decorators: [...withAndroidUserAgent()!, ...withMedDataCore()],
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement);
     await expect(canvas.getByRole('link', { name: 'AutoMate flow' })).toBeInTheDocument();
