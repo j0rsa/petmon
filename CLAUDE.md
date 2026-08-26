@@ -24,6 +24,18 @@ Push subscriptions remain per browser endpoint; notification read state and push
 
 **AutoMate (med intake, Android)** — flow file (`assets/automate/Petmon Take Meds.flo`), bootstrap via `make build-med-intake-automate`, served at `GET /api/v1/shortcuts/meds/intake.flo`. Android can import self-hosted `.flo` directly. Optional Automate Community link in `assets/shortcuts/publish.json` (`automate_community_url`) or `MED_INTAKE_AUTOMATE_COMMUNITY_URL`; exposed on `/api/v1/info` → `med_intake_automate_community_url`. Publish: `make automate`. Build/export steps: `docs/automate-med-intake.md`. Take requests may pass `?source=automate`. Same menu/take API as Shortcuts.
 
+### Device flow contracts (Shortcuts + AutoMate)
+
+Neither engine can portably count a list or dedupe strings, so the server has to hand them values they can compare. Three parts of the menu/take API exist only for that and must not regress:
+
+- **`status`** (`ok` | `empty`) on `GET /shortcuts/meds/intake/menu` — the "nothing due today" branch. Do not make the device infer it from an empty `choices` array.
+- **Unique `labels`** — the flows carry a chosen label out of the picker and find its `lines` entry by string equality. `shortcut_menu::disambiguate_labels` appends ` (2)`, ` (3)`, … so two meds with the same name+dose can't log one tap twice.
+- **`fraction_labels`** / field 4 of `lines` — display spellings (`1`, `3/4`, `1/2`, …) that the dose picker echoes straight back as `?dose_fraction=`. `DoseFraction` therefore parses both those and the canonical names (`three_quarter`); `DoseFraction::label()`'s `½` glyphs are for the web UI only and do **not** survive a query param. MCP schemas keep the canonical enum.
+
+**The take endpoint is real-time only.** It accepts no `occurred_at` / `local_date` — the server stamps its own local time, so `#pills` has no timestamp, matching a web Take now. Do not add a timestamp param back: the take token is unsigned, so that would hand anyone holding one a backdating primitive, and a device flow has no backdating UI anyway. Backdated doses go through `POST /health/meds/intake`. `MedIntakeTakeQuery` is `deny_unknown_fields`, so a drifted generator gets a `400` instead of a silently dropped timestamp (which would read as a backdated dose landing on today). The device's own day is still used for the *menu* `?date=`; if it disagrees with the server's day the due-date check rejects the take with `400` rather than filing it on the wrong day.
+
+**Testing shortcut logic without deploying** — `make check-shortcut` (in `make check` and CI) lints the generated plist and runs it through `scripts/shortcut_sim.py`, a small interpreter that executes the real plist against a fake HTTP client; `make sim-shortcut` runs the same interpreter against a local server; `make shortcut-engine-test` builds a no-prompt harness for Apple's engine (needs one manual import click, gitignored — it bakes an API key). Nested loops shadow `Repeat Item`, so always reference a loop's item via `shortcut_plist.repeat_item(<group>)`; the linter rejects bare references. `make check-shortcut-publish` is deliberately outside `make check` — clearing it needs the manual iCloud share flow.
+
 ---
 1. **Tests** — update or add integration tests in `tests/api_tests.rs` covering the changed behaviour.
 2. **API spec** — reflect any new/changed/removed endpoints or fields in `docs/openapi.yaml`.

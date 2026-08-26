@@ -3938,6 +3938,7 @@ async fn shortcuts_med_intake_menu_take_and_download() {
     let resp = test::call_service(&app, req).await;
     assert_eq!(resp.status(), 200);
     let menu: serde_json::Value = test::read_body_json(resp).await;
+    assert_eq!(menu["status"].as_str(), Some("ok"));
     let choices = menu["choices"].as_array().unwrap();
     assert_eq!(choices.len(), 2);
     let labels = menu["labels"].as_array().unwrap();
@@ -3971,9 +3972,31 @@ async fn shortcuts_med_intake_menu_take_and_download() {
     let prn_token = optional["token"].as_str().unwrap();
     assert!(optional["fractions"].as_array().unwrap().len() >= 4);
 
+    // The dose pickers on device show and return the display forms, so those are
+    // what the line carries and what the take endpoint has to parse.
+    let fraction_labels: Vec<&str> = optional["fraction_labels"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(|v| v.as_str().unwrap())
+        .collect();
+    assert_eq!(
+        fraction_labels,
+        ["1", "3/4", "1/2", "1/3", "1/4", "1/8", "1/16"]
+    );
+    let optional_line = lines
+        .iter()
+        .map(|line| line.as_str().unwrap())
+        .find(|line| line.contains("|optional_pill|"))
+        .expect("optional pill line");
+    assert!(
+        optional_line.ends_with("|1,3/4,1/2,1/3,1/4,1/8,1/16"),
+        "line carries display fractions: {optional_line}"
+    );
+
     let req = test::TestRequest::post()
         .uri(&format!(
-            "/api/v1/shortcuts/meds/intake/take/{prn_token}?dose_fraction=half"
+            "/api/v1/shortcuts/meds/intake/take/{prn_token}?dose_fraction=1/2"
         ))
         .to_request();
     let resp = test::call_service(&app, req).await;
@@ -3981,6 +4004,20 @@ async fn shortcuts_med_intake_menu_take_and_download() {
     let prn_intake: serde_json::Value = test::read_body_json(resp).await;
     assert_eq!(prn_intake["medication_id"].as_str(), Some(prn_med_id));
     assert_eq!(prn_intake["dose_fraction_override"].as_str(), Some("half"));
+
+    // Canonical spelling still works for existing API clients.
+    let req = test::TestRequest::post()
+        .uri(&format!(
+            "/api/v1/shortcuts/meds/intake/take/{prn_token}?dose_fraction=three_quarter"
+        ))
+        .to_request();
+    let resp = test::call_service(&app, req).await;
+    assert_eq!(resp.status(), 201);
+    let prn_intake: serde_json::Value = test::read_body_json(resp).await;
+    assert_eq!(
+        prn_intake["dose_fraction_override"].as_str(),
+        Some("three_quarter")
+    );
 
     let req = test::TestRequest::get()
         .uri("/api/v1/shortcuts/meds/intake.shortcut")
@@ -3998,4 +4035,173 @@ async fn shortcuts_med_intake_menu_take_and_download() {
     let flo = test::read_body(resp).await;
     assert!(flo.starts_with(b"LAFl"));
     assert!(flo.len() > 200);
+}
+
+/// Shortcuts and Automate cannot portably count a list, so an empty menu has to
+/// be recognisable from a field value.
+#[actix_web::test]
+async fn shortcuts_med_intake_menu_reports_empty() {
+    let (app, _state) = build_dev_app!();
+    let pet_id = api_create_pet!(&app, "NoMeds");
+
+    let req = test::TestRequest::get()
+        .uri(&format!(
+            "/api/v1/shortcuts/meds/intake/menu?pet_id={pet_id}&date=2026-03-15"
+        ))
+        .to_request();
+    let resp = test::call_service(&app, req).await;
+    assert_eq!(resp.status(), 200);
+    let menu: serde_json::Value = test::read_body_json(resp).await;
+    assert_eq!(menu["status"].as_str(), Some("empty"));
+    assert!(menu["labels"].as_array().unwrap().is_empty());
+    assert!(menu["lines"].as_array().unwrap().is_empty());
+}
+
+/// The device flows match a picked label back to a line by string equality, so
+/// two identical labels would log both doses on one tap.
+#[actix_web::test]
+async fn shortcuts_med_intake_menu_labels_are_unique() {
+    let (app, _state) = build_dev_app!();
+    let pet_id = api_create_pet!(&app, "TwinMeds");
+
+    for color in ["#6366f1", "#22c55e"] {
+        let req = test::TestRequest::post()
+            .uri("/api/v1/health/meds")
+            .set_json(serde_json::json!({
+                "pet_id": pet_id,
+                "name": "Twin Pill",
+                "med_type": "pill",
+                "color": color
+            }))
+            .to_request();
+        let resp = test::call_service(&app, req).await;
+        assert_eq!(resp.status(), 201);
+        let med: serde_json::Value = test::read_body_json(resp).await;
+
+        let req = test::TestRequest::post()
+            .uri("/api/v1/health/meds/assignments")
+            .set_json(serde_json::json!({
+                "medication_id": med["id"].as_str().unwrap(),
+                "tablet_strength_mg": 5.0,
+                "pill_shape": "round",
+                "dose_fraction": "whole",
+                "frequency": { "morning": 1, "midday": 0, "evening": 0, "every": 1, "unit": "days" },
+                "date_from": "2026-03-01"
+            }))
+            .to_request();
+        let resp = test::call_service(&app, req).await;
+        assert_eq!(resp.status(), 201);
+    }
+
+    let req = test::TestRequest::get()
+        .uri(&format!(
+            "/api/v1/shortcuts/meds/intake/menu?pet_id={pet_id}&date=2026-03-15"
+        ))
+        .to_request();
+    let resp = test::call_service(&app, req).await;
+    assert_eq!(resp.status(), 200);
+    let menu: serde_json::Value = test::read_body_json(resp).await;
+    let labels: Vec<&str> = menu["labels"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(|v| v.as_str().unwrap())
+        .collect();
+    assert_eq!(labels.len(), 2);
+    assert_ne!(labels[0], labels[1], "labels must be distinguishable");
+    assert!(labels[1].ends_with(" (2)"), "got {:?}", labels[1]);
+
+    // Every line still starts with its own label, so lookup by label works.
+    for (label, line) in labels.iter().zip(menu["lines"].as_array().unwrap()) {
+        assert!(line.as_str().unwrap().starts_with(&format!("{label}|")));
+    }
+}
+
+#[actix_web::test]
+async fn shortcuts_med_intake_take_is_realtime_only() {
+    let (app, _state) = build_dev_app!();
+    let pet_id = api_create_pet!(&app, "DeviceClock");
+
+    let req = test::TestRequest::post()
+        .uri("/api/v1/health/meds")
+        .set_json(serde_json::json!({
+            "pet_id": pet_id,
+            "name": "Clock Pill",
+            "med_type": "pill",
+            "color": "#6366f1"
+        }))
+        .to_request();
+    let resp = test::call_service(&app, req).await;
+    assert_eq!(resp.status(), 201);
+    let med: serde_json::Value = test::read_body_json(resp).await;
+    let med_id = med["id"].as_str().unwrap();
+
+    let req = test::TestRequest::post()
+        .uri("/api/v1/health/meds/assignments")
+        .set_json(serde_json::json!({
+            "medication_id": med_id,
+            "tablet_strength_mg": 5.0,
+            "pill_shape": "round",
+            "dose_fraction": "whole",
+            "frequency": { "morning": 1, "midday": 0, "evening": 0, "every": 1, "unit": "days" },
+            "date_from": "2026-03-01"
+        }))
+        .to_request();
+    let resp = test::call_service(&app, req).await;
+    assert_eq!(resp.status(), 201);
+
+    let today = chrono::Local::now().format("%Y-%m-%d").to_string();
+    let req = test::TestRequest::get()
+        .uri(&format!(
+            "/api/v1/shortcuts/meds/intake/menu?pet_id={pet_id}&date={today}"
+        ))
+        .to_request();
+    let resp = test::call_service(&app, req).await;
+    let menu: serde_json::Value = test::read_body_json(resp).await;
+    let token = menu["choices"][0]["token"].as_str().unwrap().to_string();
+
+    // The server stamps the time, so the dose lands on the server's today.
+    let req = test::TestRequest::post()
+        .uri(&format!("/api/v1/shortcuts/meds/intake/take/{token}"))
+        .to_request();
+    let resp = test::call_service(&app, req).await;
+    assert_eq!(resp.status(), 201);
+    let intake: serde_json::Value = test::read_body_json(resp).await;
+    let occurred_at = intake["occurred_at"].as_str().unwrap().to_string();
+    let local_date = intake["local_date"].as_str().unwrap().to_string();
+    assert!(occurred_at.starts_with(&local_date), "got {occurred_at}");
+
+    // There is no way to pass a clock: a timestamp param is rejected, not
+    // quietly dropped, so a drifted generator fails loudly instead of filing a
+    // dose that looks backdated but landed on today.
+    for rejected in [
+        "occurred_at=2026-03-15T08:30:00",
+        "local_date=2026-03-15",
+        "occured_at=2026-03-15T08:30:00", // typo in a hand-written call
+    ] {
+        let req = test::TestRequest::post()
+            .uri(&format!(
+                "/api/v1/shortcuts/meds/intake/take/{token}?{rejected}"
+            ))
+            .to_request();
+        let resp = test::call_service(&app, req).await;
+        assert_eq!(resp.status(), 400, "{rejected} must be rejected");
+    }
+
+    // The params the flows do send stay accepted.
+    let req = test::TestRequest::post()
+        .uri(&format!(
+            "/api/v1/shortcuts/meds/intake/take/{token}?dose_fraction=1/2&source=automate"
+        ))
+        .to_request();
+    let resp = test::call_service(&app, req).await;
+    assert_eq!(resp.status(), 201);
+    let intake: serde_json::Value = test::read_body_json(resp).await;
+    assert_eq!(intake["local_date"].as_str(), Some(local_date.as_str()));
+
+    let req = test::TestRequest::post()
+        .uri("/api/v1/shortcuts/meds/intake/take/not-a-token")
+        .to_request();
+    let resp = test::call_service(&app, req).await;
+    assert_eq!(resp.status(), 400);
 }

@@ -18,6 +18,8 @@ on:
       - 'frontend/tsconfig*.json'
       - 'frontend/eslint.config.js'
       - 'frontend/.storybook/**'
+      - 'scripts/**'
+      - 'assets/**'
       - 'Dockerfile'
       - '.github/workflows/**'
       - '.config/**'
@@ -38,6 +40,8 @@ on:
       - 'frontend/tsconfig*.json'
       - 'frontend/eslint.config.js'
       - 'frontend/.storybook/**'
+      - 'scripts/**'
+      - 'assets/**'
       - 'Dockerfile'
       - '.github/workflows/**'
       - '.config/**'
@@ -270,6 +274,29 @@ jobs:
         run: cargo clippy --locked -- -D warnings
 
   # ─────────────────────────────────────────────
+  # Stream 3: Apple Shortcut / AutoMate generators
+  # Signing and importing need macOS + a GUI click, so CI checks the generated
+  # plist structurally and runs the workflow through the interpreter instead.
+  # ─────────────────────────────────────────────
+  shortcut-check:
+    name: Shortcut (validate + test)
+    runs-on: ubuntu-latest
+    needs: version-check
+    if: always() && !failure() && !cancelled()
+    steps:
+      - uses: actions/checkout@v4.2.2
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Validate generated workflow
+        run: python3 scripts/build-med-intake-shortcut.py --validate-only
+
+      - name: Simulate the shortcut (no server, no device)
+        run: python3 -m unittest discover -s scripts/tests -v
+
+  # ─────────────────────────────────────────────
   # Stream 2: Backend test (arch-independent)
   # ─────────────────────────────────────────────
   backend-test:
@@ -380,12 +407,13 @@ jobs:
   docker:
     name: Docker multiarch image
     runs-on: ubuntu-latest
-    needs: [frontend, backend-amd64, backend-arm64, version-check]
+    needs: [frontend, backend-amd64, backend-arm64, shortcut-check, version-check]
     if: |
       always() &&
       needs.frontend.result == 'success' &&
       needs.backend-amd64.result == 'success' &&
       needs.backend-arm64.result == 'success' &&
+      needs.shortcut-check.result == 'success' &&
       !cancelled()
     # Main pushes publish v<version>, latest, and sha-*. PRs publish pr-<number>-<run>-<sha>.
     permissions:

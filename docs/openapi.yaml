@@ -1916,8 +1916,9 @@ paths:
       summary: Med intake menu for Apple Shortcuts
       description: |
         Returns structured menu choices plus human-readable `labels` for pickers and
-        `lines` pipe-encoded for Shortcuts (`label|token|kind|fractions_csv`).
-        Includes scheduled and optional meds; excludes bundle members. Tokens expire after 24 hours.
+        `lines` pipe-encoded for Shortcuts (`label|token|kind[|fraction_labels_csv]`).
+        Includes scheduled and optional meds; excludes bundle members. Labels are
+        unique; `status` is `empty` when nothing is due. Tokens expire after 24 hours.
       x-required-scope: api_read
       parameters:
         - name: pet_id
@@ -1941,9 +1942,21 @@ paths:
       tags: [Shortcuts]
       summary: Take a med via shortcut token
       description: |
-        Records a take-now intake for the med encoded in the opaque token from the menu
-        endpoint. Optional meds require `dose_fraction` / `liquid_dose_ml` query params or
+        Records an intake for the med encoded in the token from the menu endpoint.
+        Optional meds require `dose_fraction` / `liquid_dose_ml` query params or
         JSON body overrides.
+
+        **Real-time only.** The dose is always stamped with the server's current
+        local time, exactly like a Take now from the web UI, so the Telegram
+        `#pills` line carries no timestamp. There is no way to backdate through
+        this endpoint — use `POST /health/meds/intake` for that. Unknown query
+        params (including `occurred_at` / `local_date`) are rejected with `400`
+        rather than ignored, so a drifted client fails loudly.
+
+        The token is base64url JSON — readable and mintable by anyone, so it is a
+        handle rather than an authorization. The request still needs an
+        `api_write` bearer token, and the medication, assignment, and due date are
+        re-validated server-side.
       x-required-scope: api_write
       parameters:
         - name: token
@@ -1953,7 +1966,7 @@ paths:
         - name: dose_fraction
           in: query
           required: false
-          schema: { $ref: '#/components/schemas/DoseFraction' }
+          schema: { $ref: '#/components/schemas/DoseFractionParam' }
         - name: liquid_dose_ml
           in: query
           required: false
@@ -4408,6 +4421,32 @@ components:
       type: string
       enum: [whole, half, third, quarter, three_quarter, eighth, sixteenth]
 
+    DoseFractionParam:
+      type: string
+      description: |
+        Dose fraction as either the canonical name or its display form — `half`
+        and `1/2` are the same value. The Shortcuts / AutoMate dose pickers show
+        the display forms (`MedIntakeShortcutMenuChoice.fraction_labels`) and
+        send the chosen string back verbatim. Always stored and returned in
+        canonical form.
+      enum:
+        [
+          whole,
+          half,
+          third,
+          quarter,
+          three_quarter,
+          eighth,
+          sixteenth,
+          '1',
+          '3/4',
+          '1/2',
+          '1/3',
+          '1/4',
+          '1/8',
+          '1/16',
+        ]
+
     MedFrequency:
       type: object
       properties:
@@ -4557,19 +4596,32 @@ components:
 
     MedIntakeShortcutMenu:
       type: object
-      required: [choices, labels, lines]
+      required: [status, choices, labels, lines]
       properties:
+        status:
+          type: string
+          enum: [ok, empty]
+          description: |
+            `empty` when nothing is due. Shortcuts and AutoMate cannot portably
+            count a list, so they branch on this value instead of on the length
+            of `labels`.
         choices:
           type: array
           items: { $ref: '#/components/schemas/MedIntakeShortcutMenuChoice' }
         labels:
           type: array
           items: { type: string }
-          description: Human-readable menu labels for Shortcuts / Automate pickers (same order as `lines`).
+          description: |
+            Human-readable menu labels for Shortcuts / Automate pickers (same
+            order as `lines`). Guaranteed unique — duplicates get a ` (2)`,
+            ` (3)`, … suffix, because the device flows look a line up by its
+            label.
         lines:
           type: array
           items: { type: string }
-          description: Pipe-encoded rows for Apple Shortcuts (`label|token|kind|fractions_csv`).
+          description: |
+            Pipe-encoded rows for Apple Shortcuts:
+            `label|token|kind[|fraction_labels_csv]`.
 
     MedIntakeShortcutMenuChoice:
       type: object
@@ -4584,6 +4636,13 @@ components:
           type: array
           items: { $ref: '#/components/schemas/DoseFraction' }
           description: Present for optional pills; allowed dose fractions for the picker.
+        fraction_labels:
+          type: array
+          items: { type: string }
+          example: ['1', '3/4', '1/2', '1/3', '1/4', '1/8', '1/16']
+          description: |
+            Display forms of `fractions`, in the same order. What the on-device
+            dose picker shows and sends back as `dose_fraction`.
 
     MedIntakeRecord:
       type: object

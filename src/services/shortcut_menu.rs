@@ -4,11 +4,19 @@ use chrono::{Duration, Utc};
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
-use crate::domain::medication::{DailyMedAssignment, DoseFraction, MedType};
+use crate::domain::medication::{DailyMedAssignment, MedType, DOSE_FRACTIONS};
 use crate::error::{AppError, AppResult};
 use crate::services::medication_service;
 use sqlx::SqlitePool;
 
+/// What a take token carries.
+///
+/// The token is base64url JSON, not a signed or encrypted blob: anyone can read
+/// it and anyone can mint one. It is a *convenience* handle, not an
+/// authorization — every take still requires an `api_write` bearer token, and
+/// `repo::med_intake_records::create` re-validates that the medication belongs
+/// to the pet, that the assignment belongs to the medication, and that the
+/// assignment is active and due. Do not put anything private in here.
 #[derive(Debug, Serialize, Deserialize)]
 pub struct TakeTokenPayload {
     pub pet_id: String,
@@ -40,30 +48,37 @@ pub struct MedIntakeMenuChoice {
     pub label: String,
     pub token: String,
     pub kind: MenuChoiceKind,
+    /// Canonical fraction names (`three_quarter`), for API clients.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub fractions: Option<Vec<&'static str>>,
+    /// Display forms of `fractions`, same order (`3/4`). This is what the
+    /// Shortcuts / AutoMate dose pickers show and send back as
+    /// `?dose_fraction=`; the take endpoint parses both spellings.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub fraction_labels: Option<Vec<&'static str>>,
+}
+
+#[derive(Debug, Clone, Copy, Serialize, PartialEq, Eq)]
+#[serde(rename_all = "snake_case")]
+pub enum MenuStatus {
+    Ok,
+    Empty,
 }
 
 #[derive(Debug, Serialize)]
 pub struct MedIntakeMenuResponse {
+    /// `empty` when nothing is due. Shortcuts and AutoMate cannot count a list
+    /// portably, so they branch on this string instead of on `labels.count`.
+    pub status: MenuStatus,
     pub choices: Vec<MedIntakeMenuChoice>,
     /// Human-readable labels for Shortcuts / Automate pickers (same order as `lines`).
+    /// Guaranteed unique — the pickers match a selection back to a line by label.
     pub labels: Vec<String>,
-    /// Pipe-encoded lines for Apple Shortcuts: `label|token|kind|fractions_csv`.
+    /// Pipe-encoded lines for Apple Shortcuts: `label|token|kind[|fractions_csv]`.
     pub lines: Vec<String>,
 }
 
 const TOKEN_TTL: Duration = Duration::hours(24);
-
-const ALL_DOSE_FRACTIONS: [DoseFraction; 7] = [
-    DoseFraction::Whole,
-    DoseFraction::ThreeQuarter,
-    DoseFraction::Half,
-    DoseFraction::Third,
-    DoseFraction::Quarter,
-    DoseFraction::Eighth,
-    DoseFraction::Sixteenth,
-];
 
 fn encode_take_token(pet_id: Uuid, medication_id: &str, assignment_id: &str) -> AppResult<String> {
     let payload = TakeTokenPayload {
@@ -127,7 +142,36 @@ fn choice_kind(item: &DailyMedAssignment) -> MenuChoiceKind {
 }
 
 fn pill_fractions() -> Vec<&'static str> {
-    ALL_DOSE_FRACTIONS.iter().map(|f| f.as_str()).collect()
+    DOSE_FRACTIONS.iter().map(|f| f.as_str()).collect()
+}
+
+fn pill_fraction_labels() -> Vec<&'static str> {
+    DOSE_FRACTIONS.iter().map(|f| f.display_str()).collect()
+}
+
+/// Make every label unique by suffixing ` (2)`, ` (3)`, …
+///
+/// The Shortcuts and AutoMate flows carry a *label* out of the picker and look
+/// the line up by string equality, so two identical labels would log both doses
+/// on a single tap. Two courses of the same medication with the same dose (one
+/// scheduled, one optional) are enough to collide.
+fn disambiguate_labels(choices: &mut [MedIntakeMenuChoice]) {
+    let mut used: std::collections::HashSet<String> = std::collections::HashSet::new();
+    for choice in choices.iter_mut() {
+        if used.contains(&choice.label) {
+            let base = choice.label.clone();
+            let mut suffix = 2;
+            loop {
+                let candidate = format!("{base} ({suffix})");
+                if !used.contains(&candidate) {
+                    choice.label = candidate;
+                    break;
+                }
+                suffix += 1;
+            }
+        }
+        used.insert(choice.label.clone());
+    }
 }
 
 /// Menu for Apple Shortcuts. Includes scheduled and optional meds; excludes bundle members.
@@ -153,25 +197,28 @@ pub async fn med_intake_menu(
         let label = menu_label(&item);
         let token = encode_take_token(pet_id, &item.medication.id, &item.assignment.id)?;
         let kind = choice_kind(&item);
-        let fractions = if kind == MenuChoiceKind::OptionalPill {
-            Some(pill_fractions())
-        } else {
-            None
-        };
+        let is_pill_choice = kind == MenuChoiceKind::OptionalPill;
         choices.push(MedIntakeMenuChoice {
             label,
             token,
             kind,
-            fractions,
+            fractions: is_pill_choice.then(pill_fractions),
+            fraction_labels: is_pill_choice.then(pill_fraction_labels),
         });
     }
 
     choices.sort_by(|a, b| a.label.cmp(&b.label));
+    disambiguate_labels(&mut choices);
     let labels = choices.iter().map(|choice| choice.label.clone()).collect();
     let lines = choices
         .iter()
         .map(|choice| {
-            let fractions_csv = choice.fractions.as_ref().map(|values| values.join(","));
+            // The pickers show and return the display forms, so that is what the
+            // line carries.
+            let fractions_csv = choice
+                .fraction_labels
+                .as_ref()
+                .map(|values| values.join(","));
             encode_line(
                 &choice.label,
                 &choice.token,
@@ -181,7 +228,14 @@ pub async fn med_intake_menu(
         })
         .collect();
 
+    let status = if choices.is_empty() {
+        MenuStatus::Empty
+    } else {
+        MenuStatus::Ok
+    };
+
     Ok(MedIntakeMenuResponse {
+        status,
         choices,
         labels,
         lines,
@@ -191,6 +245,7 @@ pub async fn med_intake_menu(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::domain::medication::DoseFraction;
 
     #[test]
     fn take_token_roundtrip_and_expiry() {
@@ -208,11 +263,55 @@ mod tests {
             "Gabapentin · As needed",
             "tok123",
             MenuChoiceKind::OptionalPill,
-            Some("whole,half"),
+            Some("1,1/2"),
         );
+        assert_eq!(line, "Gabapentin · As needed|tok123|optional_pill|1,1/2");
+    }
+
+    #[test]
+    fn pill_fraction_labels_round_trip_through_parse() {
+        for (name, label) in pill_fractions().iter().zip(pill_fraction_labels()) {
+            let by_name = DoseFraction::parse(name).expect("canonical name parses");
+            let by_label = DoseFraction::parse(label).expect("display label parses");
+            assert_eq!(by_name, by_label, "{name} vs {label}");
+            assert_eq!(by_name.display_str(), label);
+        }
+    }
+
+    fn choice(label: &str) -> MedIntakeMenuChoice {
+        MedIntakeMenuChoice {
+            label: label.to_string(),
+            token: "tok".into(),
+            kind: MenuChoiceKind::Scheduled,
+            fractions: None,
+            fraction_labels: None,
+        }
+    }
+
+    #[test]
+    fn duplicate_labels_are_suffixed() {
+        let mut choices = vec![choice("Vetmedin · 1 tab"), choice("Vetmedin · 1 tab")];
+        disambiguate_labels(&mut choices);
+        assert_eq!(choices[0].label, "Vetmedin · 1 tab");
+        assert_eq!(choices[1].label, "Vetmedin · 1 tab (2)");
+    }
+
+    #[test]
+    fn suffixing_skips_a_label_that_already_looks_suffixed() {
+        let mut choices = vec![
+            choice("Vetmedin · 1 tab"),
+            choice("Vetmedin · 1 tab (2)"),
+            choice("Vetmedin · 1 tab"),
+        ];
+        disambiguate_labels(&mut choices);
+        let labels: Vec<&str> = choices.iter().map(|c| c.label.as_str()).collect();
         assert_eq!(
-            line,
-            "Gabapentin · As needed|tok123|optional_pill|whole,half"
+            labels,
+            [
+                "Vetmedin · 1 tab",
+                "Vetmedin · 1 tab (2)",
+                "Vetmedin · 1 tab (3)"
+            ]
         );
     }
 }

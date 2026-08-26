@@ -10,29 +10,43 @@ import sys
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
+sys.path.insert(0, str(ROOT / "scripts"))
+
+from med_intake_workflow import build_workflow, workflow_digest  # noqa: E402
+
 BUILD = ROOT / "scripts" / "build-med-intake-shortcut.py"
 SHORTCUT_NAME = "Petmon Take Meds"
 SIGNED = ROOT / "assets" / "shortcuts" / f"{SHORTCUT_NAME}.shortcut"
 PUBLISH = ROOT / "assets" / "shortcuts" / "publish.json"
 ICLOUD_PREFIX = "https://www.icloud.com/shortcuts/"
+DIGEST_KEY = "workflow_sha256"
 
 
-def save_publish_config(icloud_url: str) -> None:
+def save_publish_config(icloud_url: str) -> str:
+    """Record the link plus the logic it was published from.
+
+    The digest lets `build-med-intake-shortcut.py --check-publish` notice that
+    the workflow changed but the iCloud link — the only import path that works
+    on iPhone — still points at the old logic.
+    """
     cfg = load_publish_config()
     cfg["icloud_url"] = icloud_url
+    digest = workflow_digest(build_workflow())
+    cfg[DIGEST_KEY] = digest
     PUBLISH.write_text(json.dumps(cfg, indent=2) + "\n", encoding="utf-8")
+    return digest
 
 
 def load_publish_config() -> dict[str, str]:
+    """Read publish.json, keeping any keys this script does not know about."""
+    defaults = {"icloud_url": "", "automate_community_url": "", DIGEST_KEY: ""}
     if not PUBLISH.exists():
-        return {"icloud_url": "", "automate_community_url": ""}
+        return defaults
     data = json.loads(PUBLISH.read_text(encoding="utf-8"))
     if not isinstance(data, dict):
         raise ValueError(f"{PUBLISH} must be a JSON object")
-    return {
-        "icloud_url": str(data.get("icloud_url", "")).strip(),
-        "automate_community_url": str(data.get("automate_community_url", "")).strip(),
-    }
+    cfg = {**defaults, **{key: str(value).strip() for key, value in data.items()}}
+    return cfg
 
 
 def validate_icloud_url(url: str) -> str:
@@ -92,9 +106,10 @@ def interactive_publish() -> int:
     print_instructions(cfg.get("icloud_url", ""))
     open_for_sharing()
     url = prompt_icloud_url()
-    save_publish_config(url)
+    digest = save_publish_config(url)
     print(f"\nUpdated {PUBLISH}")
     print(f"  icloud_url: {url}")
+    print(f"  {DIGEST_KEY}: {digest[:12]}…")
     print("Commit publish.json and redeploy so /api/v1/info serves the new link.")
     return 0
 
@@ -123,9 +138,10 @@ def main() -> int:
 
     if args.set_url:
         url = validate_icloud_url(args.set_url)
-        save_publish_config(url)
+        digest = save_publish_config(url)
         print(f"Updated {PUBLISH}")
         print(f"  icloud_url: {url}")
+        print(f"  {DIGEST_KEY}: {digest[:12]}…")
         print("Redeploy (or restart) the server so /api/v1/info serves the new link.")
         return 0
 

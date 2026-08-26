@@ -20,3 +20,9 @@ frontend/coverage
 # Apple Shortcut build intermediates (signed *.shortcut is committed)
 assets/shortcuts/*.unsigned.plist
 assets/shortcuts/*.unsigned.shortcut
+# Local test harness build (make shortcut-engine-test) — bakes an API key in
+assets/shortcuts/harness/
+
+# python build scripts
+scripts/__pycache__/
+scripts/**/__pycache__/

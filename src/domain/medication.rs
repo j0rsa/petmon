@@ -89,28 +89,52 @@ impl PillShape {
     }
 }
 
+/// A fraction of one tablet.
+///
+/// Serialized as the snake_case name (`three_quarter`). The ASCII display forms
+/// (`3/4`) are accepted on input too: the Shortcuts/AutoMate dose pickers show
+/// [`Self::display_str`] and send the chosen string straight back as a query
+/// parameter.
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "snake_case")]
 pub enum DoseFraction {
+    #[serde(alias = "1")]
     Whole,
+    #[serde(alias = "1/2")]
     Half,
+    #[serde(alias = "1/3")]
     Third,
+    #[serde(alias = "1/4")]
     Quarter,
+    #[serde(alias = "3/4")]
     ThreeQuarter,
+    #[serde(alias = "1/8")]
     Eighth,
+    #[serde(alias = "1/16")]
     Sixteenth,
 }
+
+/// Coarsest first, matching the order the dose pickers show.
+pub const DOSE_FRACTIONS: [DoseFraction; 7] = [
+    DoseFraction::Whole,
+    DoseFraction::ThreeQuarter,
+    DoseFraction::Half,
+    DoseFraction::Third,
+    DoseFraction::Quarter,
+    DoseFraction::Eighth,
+    DoseFraction::Sixteenth,
+];
 
 impl DoseFraction {
     pub fn parse(s: &str) -> Option<Self> {
         match s {
-            "whole" => Some(Self::Whole),
-            "half" => Some(Self::Half),
-            "third" => Some(Self::Third),
-            "quarter" => Some(Self::Quarter),
-            "three_quarter" => Some(Self::ThreeQuarter),
-            "eighth" => Some(Self::Eighth),
-            "sixteenth" => Some(Self::Sixteenth),
+            "whole" | "1" => Some(Self::Whole),
+            "half" | "1/2" => Some(Self::Half),
+            "third" | "1/3" => Some(Self::Third),
+            "quarter" | "1/4" => Some(Self::Quarter),
+            "three_quarter" | "3/4" => Some(Self::ThreeQuarter),
+            "eighth" | "1/8" => Some(Self::Eighth),
+            "sixteenth" | "1/16" => Some(Self::Sixteenth),
             _ => None,
         }
     }
@@ -135,6 +159,23 @@ impl DoseFraction {
             Self::Quarter => "¼",
             Self::ThreeQuarter => "¾",
             Self::Eighth => "⅛",
+            Self::Sixteenth => "1/16",
+        }
+    }
+
+    /// ASCII display form, and the value [`Self::parse`] accepts back.
+    ///
+    /// Unlike [`Self::label`] this avoids the vulgar-fraction glyphs (`½`),
+    /// which do not survive a round trip through a URL query parameter typed by
+    /// a shortcut.
+    pub fn display_str(self) -> &'static str {
+        match self {
+            Self::Whole => "1",
+            Self::Half => "1/2",
+            Self::Third => "1/3",
+            Self::Quarter => "1/4",
+            Self::ThreeQuarter => "3/4",
+            Self::Eighth => "1/8",
             Self::Sixteenth => "1/16",
         }
     }

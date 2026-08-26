@@ -28,13 +28,18 @@ pub struct MedIntakeMenuQuery {
     pub date: String,
 }
 
+/// Query params of a shortcut take.
+///
+/// `deny_unknown_fields` is the point, not a detail: this endpoint is real-time
+/// only, so an `occurred_at` / `local_date` from a generator that has drifted
+/// must fail loudly instead of being silently dropped, which would look like a
+/// backdated dose that quietly landed on today.
 #[derive(serde::Deserialize, Default)]
+#[serde(deny_unknown_fields)]
 pub struct MedIntakeTakeQuery {
     pub dose_fraction: Option<DoseFraction>,
     pub liquid_dose_ml: Option<f64>,
-    #[serde(alias = "dose_fraction_override")]
     dose_fraction_override: Option<DoseFraction>,
-    #[serde(alias = "liquid_dose_ml_override")]
     liquid_dose_ml_override: Option<f64>,
     /// Intake source label (e.g. `shortcut`, `automate`). Defaults to `shortcut`.
     pub source: Option<String>,
@@ -97,6 +102,10 @@ pub async fn med_intake_take(
         .unwrap_or("shortcut")
         .to_string();
 
+    // Real-time only: no caller can pass a clock, so the repo stamps
+    // server-local now and Telegram prints the plain `#pills` line, exactly
+    // like a take from the web UI. Backdating goes through the normal intake
+    // API instead.
     let record = medication_service::create_intake(
         &state.pool,
         CreateMedIntakeRecord {
