@@ -49,6 +49,24 @@ Neither engine can portably count a list or dedupe strings, so the server has to
 3. **Desktop + mobile** — every Storybook `play` function must also run at **360×700** (`asNarrowStory` from `frontend/src/stories/viewport.ts`). That size is the required floor, not an optional extra. The narrow twin must keep the same interactions and assert the UI still fits (`assertFitsNarrowViewport`).
 4. **CLAUDE.md** — if the change establishes a new UI convention or naming pattern, add it here.
 
+### PWA chrome: safe areas and the demo banner
+
+The app is installed full-bleed (`viewport-fit=cover` + `apple-mobile-web-app-status-bar-style: black-translucent`), so the top and bottom strips of the web view sit under the status bar / camera hole and the home indicator. Four `:root` variables in `frontend/src/index.css` own that:
+
+| Variable | Meaning |
+|----------|---------|
+| `--device-top` / `--device-bottom` | The physical inset (`env(safe-area-inset-*)`). |
+| `--safe-top` / `--safe-bottom` | What edge-touching UI should pad by — the device inset, unless something else already covers that strip. |
+| `--demo-banner-height` | Height reserved for the fixed demo banner; `0px` when it is not mounted. |
+
+Rules:
+- **Never read `env(safe-area-inset-*)` directly** outside those definitions — use the variables, so a story can simulate a notched phone (`withDeviceInsets()` from `frontend/src/stories/viewport.tsx`). `env()` is always 0 in a desktop browser, which is why notch bugs ship unnoticed.
+- **Top padding is not mobile-only.** `.content` clears `--safe-top` at every breakpoint; a landscape phone or iPad PWA is wider than 768px and still notched.
+- **Whatever is topmost owns the top inset.** `:root:has(.demo-banner)` sets `--safe-top: 0` and folds the inset into `--demo-banner-height`, so content below it is not padded twice.
+- **Nothing in flow above `.app-shell`.** The banner is `position: fixed` and the shell reserves its height as `padding-top` inside `min-height: 100dvh` (border-box). An in-flow banner above a `100vh` shell made every page — even ones that fit — scroll by the banner's height, which is what left the fixed bottom nav floating over a rubber-band gap on iOS. Use `100dvh` (with a `100vh` fallback line) for full-height boxes.
+
+Regression cover lives in `Layout.stories.tsx` / `DemoBanner.stories.tsx`: `assertShellSpansOneViewport`, `assertBottomNavPinned`, `assertTextClearsTopInset`.
+
 ### Locale-aware decimal inputs (iOS / EU keyboards)
 
 Mobile decimal fields often show a comma (`,`) instead of a dot (`.`). **Never use `type="number"` for free-form decimal entry** — iOS rejects or mishandles comma input.
@@ -107,7 +125,7 @@ A bundle Take now or Add record sends **one** Telegram message with one `#pills`
 
 Medication accent color and emoji live on the medication identity, not on assignments.
 
-Treatment plan UI: known medications, assignments, and bundles are card lists, not HTML tables. Medications have a view state and an explicit Edit mode for name/color/emoji. Assignments are grouped by medication — the current course is the card, earlier paused/ended courses collapse under it. Assignment cards show how long the current uninterrupted course has run: from the first assignment after the last pause through today (if active) or through the latest end date. Press + New assignment to open the create form at the top of the Assignments list (Revise uses the same card). Bundles join two or more scheduled (not optional) assignments; press + New bundle to open the create form at the top of the Bundles list. The form lists current scheduled medications that are not already in a bundle. Bundles appear on Health as a Take now row when every member is due. Today's meds splits bundles and individual meds into labeled groups. Card actions sit on the header row, right-aligned on desktop; they wrap below the title on narrow screens. UI tests for this page (and new UI in general) cover desktop and 360×700.
+Treatment plan UI: known medications, assignments, and bundles are card lists, not HTML tables. Medications have a view state and an explicit Edit mode for name/color/emoji. Assignments are grouped by medication — the current course is the card, earlier paused/ended courses collapse under it. Assignment cards show how long the current uninterrupted course has run: from the first assignment after the last pause through today (if active) or through the latest end date. Press + New assignment to open the create form at the top of the Assignments list (Revise uses the same card). Bundles join two or more scheduled (not optional) assignments; press + New bundle to open the create form at the top of the Bundles list. The form lists current scheduled medications that are not already in a bundle. Bundles appear on Health as a Take now row when every member is due. Today's meds splits bundles and individual meds into labeled groups. Card actions sit on the header row, right-aligned on desktop; they wrap below the title on narrow screens. **Exception:** the Today's meds shortcut/AutoMate import icons stay on the header row at the card's right edge at *every* width — two 36px icons fit beside that short title, and `.med-intake-heading.section-heading` deliberately overrides the below-640px stacking to keep them there. They are a card action, never markup nested next to the `<h3>`. UI tests for this page (and new UI in general) cover desktop and 360×700; `assertHeaderActionPlacement` in `frontend/src/stories/viewport.tsx` checks the placement at both sizes.
 
 ## Terminology: BE vs FE split
 

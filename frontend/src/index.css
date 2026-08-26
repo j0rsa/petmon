@@ -1,5 +1,23 @@
 :root {
   color-scheme: dark;
+
+  /* ── Device chrome ──────────────────────────────────────────────
+     The app runs full-bleed in a PWA (`viewport-fit=cover` plus a translucent
+     status bar), so the top and bottom strips of the web view sit under the
+     clock / camera hole and the home indicator.
+
+     `--device-*` is the physical inset; `--safe-*` is what edge-touching UI
+     should pad by, which differs only when something else already covers that
+     strip (see the demo banner below). Nothing reads `env()` directly, so a
+     story can simulate a notched phone by overriding `--device-top`. */
+  --device-top: env(safe-area-inset-top, 0px);
+  --device-bottom: env(safe-area-inset-bottom, 0px);
+  --safe-top: var(--device-top);
+  --safe-bottom: var(--device-bottom);
+
+  /* Height the fixed demo banner occupies; 0 when it is not mounted. */
+  --demo-banner-height: 0px;
+
   font-family: 'DM Mono', 'SFMono-Regular', Consolas, 'Courier New', monospace;
   line-height: 1.5;
   font-weight: 400;
@@ -81,6 +99,21 @@
   background: var(--bg);
 }
 
+/* The banner is the topmost element, so it owns the top inset: it pads itself
+   below the status bar and everything else clears its full height instead of
+   applying the inset a second time. */
+:root:has(.demo-banner) {
+  --demo-banner-height: calc(2rem + var(--device-top));
+  --safe-top: 0px;
+}
+
+@media (max-width: 768px) {
+  /* The warning wraps to two lines on a phone. */
+  :root:has(.demo-banner) {
+    --demo-banner-height: calc(3.05rem + var(--device-top));
+  }
+}
+
 * {
   box-sizing: border-box;
 }
@@ -112,6 +145,9 @@ a {
 
 #root {
   min-height: 100vh;
+  /* dvh, so an iOS toolbar cannot make the shell taller than the visible area
+     and leave the fixed bottom nav floating over a scrollable gap. */
+  min-height: 100dvh;
 }
 
 h1,
@@ -161,6 +197,11 @@ pre {
   display: grid;
   grid-template-columns: 280px minmax(0, 1fr);
   min-height: 100vh;
+  min-height: 100dvh;
+  /* Border-box, so the shell still spans exactly one viewport: the banner's
+     strip is padding rather than extra document height. Without this the page
+     scrolled by the banner's height on every screen, short ones included. */
+  padding-top: var(--demo-banner-height);
 }
 
 .signed-out-state {
@@ -171,31 +212,53 @@ pre {
 }
 
 .demo-banner {
-  position: sticky;
+  position: fixed;
   top: 0;
+  left: 0;
+  right: 0;
   z-index: 200;
-  width: 100%;
-  padding: 0.45rem 1rem;
+  height: var(--demo-banner-height);
+  /* Keep the text clear of the notch; the strip itself may run under it. */
+  padding: var(--device-top) 1rem 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
   text-align: center;
   font-size: 0.78rem;
+  line-height: 1.25;
   font-weight: 600;
   letter-spacing: 0.04em;
   text-transform: uppercase;
   color: var(--accent-bright);
-  background: var(--warning-bg);
+  /* Opaque: it is fixed over scrolling content, and --warning-bg is translucent. */
+  background: linear-gradient(var(--warning-bg), var(--warning-bg)), var(--bg);
   border-bottom: 1px solid var(--warning-border);
+}
+
+@media (max-width: 768px) {
+  .demo-banner {
+    padding-left: 0.75rem;
+    padding-right: 0.75rem;
+    font-size: 0.7rem;
+    letter-spacing: 0.02em;
+  }
 }
 
 .sidebar {
   padding: 1.5rem 1.25rem;
+  padding-top: calc(1.5rem + var(--safe-top));
   border-right: 1px solid var(--border-subtle);
   background: var(--surface-sidebar);
   display: flex;
   flex-direction: column;
   gap: 1.25rem;
   position: sticky;
-  top: 0;
+  /* Stick below the banner, and stop short of it, so the shell does not
+     overflow by the banner's height. */
+  top: var(--demo-banner-height);
   height: 100vh;
+  height: calc(100dvh - var(--demo-banner-height));
 }
 
 .sidebar-wordmark {
@@ -288,6 +351,9 @@ pre {
 
 .content {
   padding: 2rem;
+  /* Every breakpoint clears the status bar / camera hole, not just mobile: a
+     landscape phone or an iPad PWA is over 768px wide and still notched. */
+  padding-top: calc(2rem + var(--safe-top));
   max-width: 920px;
   min-width: 0;
 }
@@ -837,7 +903,7 @@ pre {
 #wellbeing,
 #weight {
   scroll-margin-top: 0.5rem;
-  scroll-margin-bottom: calc(5rem + env(safe-area-inset-bottom));
+  scroll-margin-bottom: calc(5rem + var(--safe-bottom));
 }
 
 .bottom-nav {
@@ -851,8 +917,8 @@ pre {
 
   .content {
     padding: 1rem;
-    padding-top: calc(3rem + env(safe-area-inset-top));
-    padding-bottom: calc(5rem + env(safe-area-inset-bottom));
+    padding-top: calc(3rem + var(--safe-top));
+    padding-bottom: calc(5rem + var(--safe-bottom));
   }
 
   .two-column-grid {
@@ -870,8 +936,8 @@ pre {
     bottom: 0;
     left: 0;
     right: 0;
-    height: calc(4rem + env(safe-area-inset-bottom));
-    padding-bottom: env(safe-area-inset-bottom);
+    height: calc(4rem + var(--safe-bottom));
+    padding-bottom: var(--safe-bottom);
     background: var(--surface-sidebar);
     border-top: 1px solid var(--border-subtle);
     z-index: 100;
@@ -977,7 +1043,7 @@ pre {
 .bottom-nav-sheet {
   display: none;
   position: fixed;
-  bottom: calc(4rem + env(safe-area-inset-bottom));
+  bottom: calc(4rem + var(--safe-bottom));
   left: 0;
   right: 0;
   background: var(--surface-elevated);
@@ -1110,7 +1176,7 @@ pre {
 
 .bottom-nav-sheet-version {
   margin: 0.25rem 1rem 0.75rem;
-  padding-bottom: calc(0.25rem + env(safe-area-inset-bottom));
+  padding-bottom: calc(0.25rem + var(--safe-bottom));
   text-align: center;
 }
 
@@ -1206,7 +1272,8 @@ pre {
 
 .notification-center {
   position: fixed;
-  top: 0.85rem;
+  /* Below the status bar, and below the demo banner when it is up. */
+  top: calc(0.85rem + var(--safe-top) + var(--demo-banner-height));
   right: 0.85rem;
   z-index: 130;
 }
@@ -2359,8 +2426,8 @@ pre {
 @media (max-width: 640px) {
   .content {
     padding: 1rem;
-    padding-top: calc(3rem + env(safe-area-inset-top));
-    padding-bottom: calc(5rem + env(safe-area-inset-bottom));
+    padding-top: calc(3rem + var(--safe-top));
+    padding-bottom: calc(5rem + var(--safe-bottom));
   }
 
   .page-header,
@@ -2665,20 +2732,19 @@ pre {
   opacity: 1;
 }
 
+/* Card action at the card's right edge. Unlike button actions, two 36px icons
+   fit beside this short title at any width, so this heading opts out of the
+   narrow stacking that `.section-heading` applies below 640px (two classes beat
+   one, so this wins regardless of source order). */
 .med-intake-heading.section-heading {
-  align-items: flex-start;
-}
-
-.med-intake-title-row {
-  display: flex;
+  flex-direction: row;
   align-items: center;
   justify-content: space-between;
-  gap: 0.5rem;
-  min-width: 0;
+  gap: 0.75rem;
 }
 
-.med-intake-title-row h3 {
-  margin: 0;
+/* Let the title block shrink instead of pushing the icons out of the card. */
+.med-intake-heading > :first-child {
   min-width: 0;
 }
 

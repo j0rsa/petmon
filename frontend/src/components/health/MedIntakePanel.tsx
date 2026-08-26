@@ -623,48 +623,48 @@ export function MedIntakePanel({ petId }: MedIntakePanelProps) {
       <div className="section-heading med-intake-heading">
         <div>
           <p className="eyebrow">Medications</p>
-          <div className="med-intake-title-row">
-            <h3>Today&apos;s meds</h3>
-            {!loading && !empty && (
-              <div className="med-intake-import-links">
-                {showMedIntakeShortcutLink() && (
-                  <a
-                    {...medIntakeShortcutLinkProps(undefined, appInfoQuery.data?.med_intake_shortcut_icloud_url)}
-                    className="shortcuts-import-link"
-                    aria-label="Apple Shortcut"
-                    title={
-                      appInfoQuery.data?.med_intake_shortcut_icloud_url
-                        ? 'Import the Petmon Take Meds shortcut from iCloud (configure URL, pet id, and API key on first run)'
-                        : 'Download the Petmon Take Meds shortcut (iPhone needs an iCloud link — see docs/apple-shortcut-med-intake.md)'
-                    }
-                  >
-                    <img src="/icons/shortcuts.png" alt="" width={22} height={22} className="shortcuts-import-link__icon" />
-                  </a>
-                )}
-                {showMedIntakeAutomateLink() && (
-                  <a
-                    {...medIntakeAutomateLinkProps(undefined, appInfoQuery.data?.med_intake_automate_community_url)}
-                    className="shortcuts-import-link"
-                    aria-label="AutoMate flow"
-                    title={
-                      appInfoQuery.data?.med_intake_automate_community_url
-                        ? 'Open the Petmon Take Meds flow on Automate Community (configure URL, pet id, and API key on first run)'
-                        : 'Download the Petmon Take Meds AutoMate flow (see docs/automate-med-intake.md)'
-                    }
-                  >
-                    <img
-                      src="/icons/automate.png"
-                      alt=""
-                      width={22}
-                      height={22}
-                      className="shortcuts-import-link__icon shortcuts-import-link__icon--color"
-                    />
-                  </a>
-                )}
-              </div>
+          <h3>Today&apos;s meds</h3>
+        </div>
+        {/* Card action, so it sits on the header row at the card's right edge
+            and wraps below the title on narrow screens. */}
+        {!loading && !empty && (
+          <div className="med-intake-import-links">
+            {showMedIntakeShortcutLink() && (
+              <a
+                {...medIntakeShortcutLinkProps(undefined, appInfoQuery.data?.med_intake_shortcut_icloud_url)}
+                className="shortcuts-import-link"
+                aria-label="Apple Shortcut"
+                title={
+                  appInfoQuery.data?.med_intake_shortcut_icloud_url
+                    ? 'Import the Petmon Take Meds shortcut from iCloud (configure URL, pet id, and API key on first run)'
+                    : 'Download the Petmon Take Meds shortcut (iPhone needs an iCloud link — see docs/apple-shortcut-med-intake.md)'
+                }
+              >
+                <img src="/icons/shortcuts.png" alt="" width={22} height={22} className="shortcuts-import-link__icon" />
+              </a>
+            )}
+            {showMedIntakeAutomateLink() && (
+              <a
+                {...medIntakeAutomateLinkProps(undefined, appInfoQuery.data?.med_intake_automate_community_url)}
+                className="shortcuts-import-link"
+                aria-label="AutoMate flow"
+                title={
+                  appInfoQuery.data?.med_intake_automate_community_url
+                    ? 'Open the Petmon Take Meds flow on Automate Community (configure URL, pet id, and API key on first run)'
+                    : 'Download the Petmon Take Meds AutoMate flow (see docs/automate-med-intake.md)'
+                }
+              >
+                <img
+                  src="/icons/automate.png"
+                  alt=""
+                  width={22}
+                  height={22}
+                  className="shortcuts-import-link__icon shortcuts-import-link__icon--color"
+                />
+              </a>
             )}
           </div>
-        </div>
+        )}
       </div>
 
       {loading ? (

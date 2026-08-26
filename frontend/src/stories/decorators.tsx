@@ -56,23 +56,30 @@ function seedUserSettings(client: QueryClient) {
   client.setQueryData(['user-settings', 'developer_mode'], mockDeveloperModeSettings);
 }
 
+function layoutDataDecorator(appInfo: typeof mockAppInfo): Decorator {
+  return function LayoutDataDecorator(Story) {
+    const client = makeMockClient();
+    client.setQueryData(['pets'], mockPets);
+    client.setQueryData(['me'], { subject: 'dev', email: null, name: 'Dev', display_name: 'Dev', kind: 'dev', scopes: [] });
+    client.setQueryData(['app-info'], appInfo);
+    seedUserSettings(client);
+    client.setQueryData(['notifications-unread-count'], { count: 1 });
+    client.setQueryData(['notifications'], mockNotifications);
+    return (
+      <QueryClientProvider client={client}>
+        <DisplaySettingsProvider>
+          <Story />
+        </DisplaySettingsProvider>
+      </QueryClientProvider>
+    );
+  };
+}
+
 /** Seeds the minimum query data needed for Layout (me, pets, app-info, display settings). */
-export const withLayoutData: Decorator = (Story) => {
-  const client = makeMockClient();
-  client.setQueryData(['pets'], mockPets);
-  client.setQueryData(['me'], { subject: 'dev', email: null, name: 'Dev', display_name: 'Dev', kind: 'dev', scopes: [] });
-  client.setQueryData(['app-info'], mockAppInfo);
-  seedUserSettings(client);
-  client.setQueryData(['notifications-unread-count'], { count: 1 });
-  client.setQueryData(['notifications'], mockNotifications);
-  return (
-    <QueryClientProvider client={client}>
-      <DisplaySettingsProvider>
-        <Story />
-      </DisplaySettingsProvider>
-    </QueryClientProvider>
-  );
-};
+export const withLayoutData: Decorator = layoutDataDecorator(mockAppInfo);
+
+/** Same, with `DEMO_MODE` on, so the demo banner renders. */
+export const withDemoLayoutData: Decorator = layoutDataDecorator({ ...mockAppInfo, demo_mode: true });
 
 export function withSelectedPet(petId = mockPetId): Decorator {
   return function SelectedPetDecorator(Story) {

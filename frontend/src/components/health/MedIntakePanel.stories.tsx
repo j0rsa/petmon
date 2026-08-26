@@ -6,7 +6,7 @@ import { MedIntakePanel } from './MedIntakePanel';
 import { SelectedPetProvider } from '../../context/SelectedPetContext';
 import { mockDailyMedAssignments, mockBundleDailyAssignments, mockDeveloperModeSettings, mockMedBundles, mockPetId, mockPets } from '../../stories/fixtures';
 import { localToday } from '../../lib/dates';
-import { asNarrowStory } from '../../stories/viewport';
+import { asNarrowStory, assertHeaderActionPlacement } from '../../stories/viewport';
 
 const meta = {
   title: 'Components/Health/MedIntakePanel',
@@ -101,8 +101,11 @@ export const WithDailyMeds: Story = {
     await expect(canvas.getByRole('heading', { name: "Today's meds" })).toBeInTheDocument();
     await expect(canvas.getByRole('link', { name: 'Apple Shortcut' })).toBeInTheDocument();
     await expect(canvas.getByRole('link', { name: 'AutoMate flow' })).toBeInTheDocument();
-    const titleRow = canvas.getByRole('heading', { name: "Today's meds" }).closest('.med-intake-title-row');
-    await expect(titleRow).toContainElement(canvas.getByRole('link', { name: 'Apple Shortcut' }));
+    // Import links are a card action on the header row, not text trailing the
+    // title: right-aligned on desktop, wrapped below the title when narrow.
+    assertHeaderActionPlacement(canvasElement, "Today's meds", 'AutoMate flow');
+    const links = canvas.getByRole('link', { name: 'Apple Shortcut' }).closest('.med-intake-import-links');
+    await expect(links?.parentElement).toHaveClass('section-heading');
     await expect(canvas.queryByRole('heading', { name: 'Bundles' })).not.toBeInTheDocument();
     await userEvent.click(canvas.getAllByRole('button', { name: 'Add record' })[0]!);
     await expect(canvas.getByText('Add medication record')).toBeInTheDocument();
