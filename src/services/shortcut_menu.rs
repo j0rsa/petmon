@@ -182,8 +182,7 @@ pub async fn med_intake_menu(
 ) -> AppResult<MedIntakeMenuResponse> {
     let daily = medication_service::daily_assignments(pool, pet_id, date).await?;
     let bundled = bundled_medication_ids(pool, pet_id).await?;
-    let taken_today =
-        crate::repo::med_intake_records::taken_assignment_ids_on(pool, pet_id, date).await?;
+    let taken_today = crate::repo::med_intake_records::taken_counts_on(pool, pet_id, date).await?;
 
     let mut choices = Vec::new();
     for item in daily {
@@ -195,8 +194,11 @@ pub async fn med_intake_menu(
         {
             continue;
         }
-        if !item.assignment.optional && taken_today.contains(&item.assignment.id) {
-            continue;
+        if !item.assignment.optional {
+            let taken = taken_today.get(&item.assignment.id).copied().unwrap_or(0);
+            if taken >= item.assignment.frequency.expected_doses() {
+                continue;
+            }
         }
 
         let label = menu_label(&item);

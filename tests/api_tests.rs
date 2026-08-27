@@ -4093,6 +4093,106 @@ async fn shortcuts_med_intake_menu_labels_are_unique() {
     }
 }
 
+/// A med with morning + evening frequency stays in the menu after the morning
+/// take and disappears only once both doses are recorded.
+#[actix_web::test]
+async fn shortcuts_med_intake_menu_multi_dose_per_day() {
+    let (app, _state) = build_dev_app!();
+    let pet_id = api_create_pet!(&app, "MultiDose");
+
+    let resp = test::call_service(
+        &app,
+        test::TestRequest::post()
+            .uri("/api/v1/health/meds")
+            .set_json(serde_json::json!({
+                "pet_id": pet_id, "name": "TwiceDaily", "med_type": "pill", "color": "#6366f1"
+            }))
+            .to_request(),
+    )
+    .await;
+    assert_eq!(resp.status(), 201);
+    let med: serde_json::Value = test::read_body_json(resp).await;
+    let med_id = med["id"].as_str().unwrap();
+
+    let resp = test::call_service(
+        &app,
+        test::TestRequest::post()
+            .uri("/api/v1/health/meds/assignments")
+            .set_json(serde_json::json!({
+                "medication_id": med_id,
+                "tablet_strength_mg": 5.0,
+                "pill_shape": "round",
+                "dose_fraction": "whole",
+                "frequency": { "morning": 1, "midday": 0, "evening": 1, "every": 1, "unit": "days" },
+                "date_from": "2026-03-01"
+            }))
+            .to_request(),
+    )
+    .await;
+    assert_eq!(resp.status(), 201);
+
+    let today = chrono::Local::now().format("%Y-%m-%d").to_string();
+    let menu_url = format!("/api/v1/shortcuts/meds/intake/menu?pet_id={pet_id}&date={today}");
+
+    // Before any take: appears once.
+    let menu: serde_json::Value = test::read_body_json(
+        test::call_service(&app, test::TestRequest::get().uri(&menu_url).to_request()).await,
+    )
+    .await;
+    assert_eq!(menu["choices"].as_array().unwrap().len(), 1);
+
+    // First take (morning dose).
+    let token = menu["choices"][0]["token"].as_str().unwrap().to_string();
+    assert_eq!(
+        test::call_service(
+            &app,
+            test::TestRequest::post()
+                .uri(&format!("/api/v1/shortcuts/meds/intake/take/{token}"))
+                .to_request(),
+        )
+        .await
+        .status(),
+        201
+    );
+
+    // After first take: still appears (evening dose still due).
+    let menu: serde_json::Value = test::read_body_json(
+        test::call_service(&app, test::TestRequest::get().uri(&menu_url).to_request()).await,
+    )
+    .await;
+    assert_eq!(
+        menu["choices"].as_array().unwrap().len(),
+        1,
+        "should still appear after first of two daily doses"
+    );
+
+    // Second take (evening dose) — token is the same assignment.
+    let token2 = menu["choices"][0]["token"].as_str().unwrap().to_string();
+    assert_eq!(
+        test::call_service(
+            &app,
+            test::TestRequest::post()
+                .uri(&format!("/api/v1/shortcuts/meds/intake/take/{token2}"))
+                .to_request(),
+        )
+        .await
+        .status(),
+        201
+    );
+
+    // After both takes: disappears from the menu.
+    let menu: serde_json::Value = test::read_body_json(
+        test::call_service(&app, test::TestRequest::get().uri(&menu_url).to_request()).await,
+    )
+    .await;
+    assert_eq!(
+        menu["choices"].as_array().unwrap().len(),
+        0,
+        "should disappear once all daily doses are taken"
+    );
+    assert_eq!(menu["status"].as_str(), Some("empty"));
+}
+
 /// A taken scheduled dose disappears from the menu; an optional dose stays.
 #[actix_web::test]
 async fn shortcuts_med_intake_menu_hides_taken_scheduled() {
