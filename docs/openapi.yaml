@@ -1916,9 +1916,10 @@ paths:
       summary: Med intake menu for Apple Shortcuts
       description: |
         Returns structured menu choices plus human-readable `labels` for pickers and
-        `lines` pipe-encoded for Shortcuts (`label|token|kind[|fraction_labels_csv]`).
-        Includes scheduled and optional meds; excludes bundle members. Labels are
-        unique; `status` is `empty` when nothing is due. Tokens expire after 24 hours.
+        `lines` pipe-encoded for Shortcuts (`label|assignment_id|kind[|fraction_labels_csv]`).
+        Includes scheduled and optional meds; excludes bundle members. Scheduled meds
+        already taken the required number of times today are omitted. Labels are
+        unique; `status` is `empty` when nothing is due.
       x-required-scope: api_read
       parameters:
         - name: pet_id
@@ -1937,14 +1938,13 @@ paths:
               schema:
                 $ref: '#/components/schemas/MedIntakeShortcutMenu'
 
-  /shortcuts/meds/intake/take/{token}:
+  /shortcuts/meds/intake/take:
     post:
       tags: [Shortcuts]
-      summary: Take a med via shortcut token
+      summary: Record a medication take from the shortcut
       description: |
-        Records an intake for the med encoded in the token from the menu endpoint.
-        Optional meds require `dose_fraction` / `liquid_dose_ml` query params or
-        JSON body overrides.
+        Records a real-time intake for the medication identified by `pet_id`,
+        `medication_id`, and `assignment_id` (all from the menu choice).
 
         **Real-time only.** The dose is always stamped with the server's current
         local time, exactly like a Take now from the web UI, so the Telegram
@@ -1953,38 +1953,36 @@ paths:
         params (including `occurred_at` / `local_date`) are rejected with `400`
         rather than ignored, so a drifted client fails loudly.
 
-        The token is base64url JSON — readable and mintable by anyone, so it is a
-        handle rather than an authorization. The request still needs an
-        `api_write` bearer token, and the medication, assignment, and due date are
-        re-validated server-side.
+        Auth: `api_write` bearer token (same `pm_api_…` token used for the menu).
       x-required-scope: api_write
       parameters:
-        - name: token
-          in: path
+        - name: pet_id
+          in: query
+          required: true
+          schema: { type: string, format: uuid }
+        - name: medication_id
+          in: query
+          required: true
+          schema: { type: string }
+        - name: assignment_id
+          in: query
           required: true
           schema: { type: string }
         - name: dose_fraction
           in: query
           required: false
           schema: { $ref: '#/components/schemas/DoseFractionParam' }
+          description: Required for `optional_pill` kind.
         - name: liquid_dose_ml
           in: query
           required: false
           schema: { type: number, format: double }
+          description: Required for `optional_liquid` kind.
         - name: source
           in: query
           required: false
-          schema: { type: string, example: automate }
+          schema: { type: string, example: shortcut }
           description: Intake source label stored on the record (default `shortcut`).
-      requestBody:
-        required: false
-        content:
-          application/json:
-            schema:
-              type: object
-              properties:
-                dose_fraction_override: { $ref: '#/components/schemas/DoseFraction' }
-                liquid_dose_ml_override: { type: number, format: double }
       responses:
         '201':
           description: Intake recorded
@@ -2007,20 +2005,6 @@ paths:
                 type: string
                 format: binary
 
-  /shortcuts/meds/intake.flo:
-    get:
-      tags: [Shortcuts]
-      summary: Download AutoMate flow for med intake
-      description: AutoMate `.flo` file (same for all users). Configure server URL, pet id, and API key on first run. See docs/automate-med-intake.md.
-      security: []
-      responses:
-        '200':
-          description: AutoMate `.flo` file
-          content:
-            application/octet-stream:
-              schema:
-                type: string
-                format: binary
 
   /nutrition/records:
     get:
@@ -4427,7 +4411,7 @@ components:
         Dose fraction as either the canonical name or its display form — `half`
         and `1/2` are the same value. The Shortcuts / AutoMate dose pickers show
         the display forms (`MedIntakeShortcutMenuChoice.fraction_labels`) and
-        send the chosen string back verbatim. Always stored and returned in
+        sends the chosen string back verbatim. Always stored and returned in
         canonical form.
       enum:
         [
@@ -4602,9 +4586,8 @@ components:
           type: string
           enum: [ok, empty]
           description: |
-            `empty` when nothing is due. Shortcuts and AutoMate cannot portably
-            count a list, so they branch on this value instead of on the length
-            of `labels`.
+            `empty` when nothing is due. Branch on this value rather than
+            counting `choices`.
         choices:
           type: array
           items: { $ref: '#/components/schemas/MedIntakeShortcutMenuChoice' }
@@ -4612,23 +4595,21 @@ components:
           type: array
           items: { type: string }
           description: |
-            Human-readable menu labels for Shortcuts / Automate pickers (same
-            order as `lines`). Guaranteed unique — duplicates get a ` (2)`,
-            ` (3)`, … suffix, because the device flows look a line up by its
-            label.
+            Human-readable menu labels in the same order as `choices`.
+            Guaranteed unique — duplicates get a ` (2)`, ` (3)`, … suffix.
         lines:
           type: array
           items: { type: string }
           description: |
-            Pipe-encoded rows for Apple Shortcuts:
-            `label|token|kind[|fraction_labels_csv]`.
+            Pipe-encoded rows: `label|assignment_id|kind[|fraction_labels_csv]`.
 
     MedIntakeShortcutMenuChoice:
       type: object
-      required: [label, token, kind]
+      required: [label, medication_id, assignment_id, kind]
       properties:
         label: { type: string }
-        token: { type: string }
+        medication_id: { type: string }
+        assignment_id: { type: string }
         kind:
           type: string
           enum: [scheduled, optional_pill, optional_liquid]
