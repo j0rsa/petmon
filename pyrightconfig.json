@@ -1,6 +1,5 @@
 {
   "include": [
-    "scripts",
     "shortcuts"
   ],
   "exclude": [
@@ -8,10 +7,6 @@
     "node_modules",
     "target",
     "frontend"
-  ],
-  "extraPaths": [
-    "scripts",
-    "shortcuts"
   ],
   "pythonVersion": "3.11"
 }
