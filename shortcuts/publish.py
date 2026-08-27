@@ -28,7 +28,7 @@ ICLOUD_PREFIX = "https://www.icloud.com/shortcuts/"
 
 
 def load_config() -> dict[str, str]:
-    defaults = {"icloud_url": "", "automate_community_url": ""}
+    defaults = {"icloud_url": ""}
     if not PUBLISH.exists():
         return defaults
     data = json.loads(PUBLISH.read_text(encoding="utf-8"))
@@ -60,7 +60,7 @@ def build() -> None:
 def print_instructions(current_url: str) -> None:
     print()
     print("Publish to iCloud (manual — Apple has no upload API):")
-    print("  1. Shortcuts should open with "Petmon Take Meds".")
+    print("  1. Shortcuts should open with 'Petmon Take Meds'.")
     print("  2. Tap Share → Share Link (or Get Link). Allow untrusted shortcuts if prompted.")
     print("  3. Copy the iCloud URL (https://www.icloud.com/shortcuts/…).")
     print()
