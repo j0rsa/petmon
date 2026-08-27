@@ -28,4 +28,5 @@ shortcuts/__pycache__/
 
 # Cherri build artifacts (the signed .shortcut is committed, these are not)
 shortcuts/*_unsigned.shortcut
+shortcuts/"Petmon Take Meds".shortcut
 shortcuts/med-intake.patched.shortcut

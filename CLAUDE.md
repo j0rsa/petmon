@@ -39,16 +39,17 @@ AutoMate cannot count a list, index an array of objects, or dedupe strings, so t
 
 ### Editing the Cherri shortcut
 
-Hard-won rules for **v1.3.2** (also in the source header — the published docs contradict some of them):
+Hard-won rules for **v2.3.0** (also in the source header):
 
-- **`const` for any value an action consumes; `@` only for a mutable accumulator.** `const` compiles to `Type: ActionOutput` with the producing action's UUID; `@name` compiles to a by-name `Type: Variable`, which Apple only honours *inside* a text field's `attachmentsByRange`. As a whole-field parameter it silently fails to bind — that is how `Format Date` lost its input. A mutable value reaches an action by being interpolated into a `const`.
-- `@name` appears only on the left of an assignment or type declaration; action arguments, `if` operands, `for` collections and `{interpolation}` all take the **bare** name.
+- **`const` for any value an action consumes; `@` only for a mutable accumulator.** `const` compiles to `Type: ActionOutput` with the producing action's UUID; `@name` compiles to a by-name `Type: Variable`. A mutable value reaches an action by being interpolated into a `const`.
+- `@` is **required** on all mutable variable references (v2.2+ enforced); `const` references remain bare: `alert(x)`, `"{x}"`.
+- Loop variables are mutable — capture them as text consts via `"{@var}"` before conditions. `getValue` results need `.text` coercion in conditions: `if label.text == pickText`.
 - `#define` must precede `#include`; there is no `else if`; compiler error positions can be stale (bisect the file).
 - Import questions cannot be variable values and each fills exactly one action argument, so each feeds its own `text(question )` — the space before `)` is load-bearing.
-- **Cherri bug:** every import question gets `ActionIndex: 0`. `shortcuts/build.py` re-points each at the Text action producing its constant via `QUESTION_TARGETS` and fails if two collide. It also verifies every variable reference resolves, since a dangling one leaves the parameter empty at run time rather than failing.
+- `shortcuts/build.py` re-points each import question's `ActionIndex` at the Text action producing its constant via `QUESTION_TARGETS` and fails if two collide. It also verifies every variable reference resolves, since a dangling one leaves the parameter empty at run time rather than failing.
 - Shortcuts hands a **4xx body to the next action** instead of stopping, so a take is only counted as logged when the response contains an `id`.
 - `shortcuts sign` needs its input named `*.shortcut` and takes Cherri's XML directly (no `plutil -convert binary1`).
-- `make check-shortcut-publish` is deliberately outside `make check` — clearing it needs the manual iCloud share flow. The digest covers the `.cherri` source plus compiler version, because Cherri mints fresh UUIDs per compile.
+- `#include 'actions/scripting'` is not needed in v2.3.0 — scripting actions are auto-included.
 
 ---
 1. **Tests** — update or add integration tests in `tests/api_tests.rs` covering the changed behaviour.
