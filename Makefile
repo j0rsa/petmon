@@ -1,4 +1,4 @@
-.PHONY: help build-be build-fe run-be run-dev-fe install-fe story seed-demo check check-fe check-be check-shortcut kill-be-port build-shortcut publish-shortcut shortcut
+.PHONY: help build-be build-fe run-be run-dev-fe install-fe story seed-demo check check-fe check-be check-shortcut install-cherri kill-be-port build-shortcut publish-shortcut shortcut
 
 FE_DIR := frontend
 BE_PORT ?= 8080
@@ -66,10 +66,20 @@ check-be:
 
 	DATABASE_URL="sqlite::memory:" cargo test --locked
 
-# Compile the Cherri source and verify the plist it produces. Needs the Cherri
-# compiler v2.3.0 (v2+ can't be installed via go install due to module path;
-# download from https://github.com/electrikmilk/cherri/releases/tag/v2.3.0);
-# no macOS, no server required.
+# Install the Cherri v2.3.0 compiler to ~/.local/bin/cherri.
+# v2+ cannot be installed via `go install` due to the module path change.
+CHERRI_VERSION := v2.3.0
+CHERRI_INSTALL := $(HOME)/.local/bin/cherri
+install-cherri:
+	@mkdir -p "$(HOME)/.local/bin"
+	curl -fsSL "https://github.com/electrikmilk/cherri/releases/download/$(CHERRI_VERSION)/cherri_darwin-arm64.zip" \
+	  -o /tmp/cherri.zip
+	unzip -o /tmp/cherri.zip -d "$(HOME)/.local/bin" cherri
+	chmod +x "$(CHERRI_INSTALL)"
+	@"$(CHERRI_INSTALL)" --version
+
+# Compile the Cherri source and verify the plist it produces.
+# Needs Cherri v2.3.0 — run `make install-cherri` first if not already installed.
 check-shortcut:
 	python3 shortcuts/build.py --check
 

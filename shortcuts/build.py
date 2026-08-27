@@ -185,7 +185,22 @@ def main() -> int:
     parser.add_argument(
         "--check", action="store_true", help="compile and verify only, do not sign"
     )
-    parser.add_argument("--cherri", default=shutil.which("cherri") or "cherri")
+    parser.add_argument(
+        "--cherri",
+        default=shutil.which("cherri")
+        or next(
+            (
+                str(p)
+                for p in [
+                    Path.home() / ".local" / "bin" / "cherri",
+                    Path.home() / "bin" / "cherri",
+                    Path("/usr/local/bin/cherri"),
+                ]
+                if p.exists()
+            ),
+            "cherri",
+        ),
+    )
     args = parser.parse_args()
 
     unsigned = compile_source(args.cherri)
