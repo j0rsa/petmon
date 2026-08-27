@@ -124,6 +124,24 @@ async fn load_hydrated(pool: &SqlitePool, core: MedIntakeCore) -> AppResult<MedI
     Ok(hydrate_intake(medication.med_type, core, assignment))
 }
 
+/// Returns the set of assignment IDs for which a `taken = 1` record exists on
+/// the given local date. Used by the shortcut menu to omit already-taken scheduled doses.
+pub async fn taken_assignment_ids_on(
+    pool: &SqlitePool,
+    pet_id: Uuid,
+    date: &str,
+) -> AppResult<std::collections::HashSet<String>> {
+    let rows: Vec<(String,)> = sqlx::query_as(
+        "SELECT DISTINCT assignment_id FROM med_intake_records \
+         WHERE pet_id = ? AND local_date = ? AND taken = 1",
+    )
+    .bind(pet_id)
+    .bind(date)
+    .fetch_all(pool)
+    .await?;
+    Ok(rows.into_iter().map(|(id,)| id).collect())
+}
+
 pub const DEFAULT_RECENT_LIMIT: i64 = 20;
 
 #[tracing::instrument(skip(pool, filters))]

@@ -1,4 +1,4 @@
-.PHONY: help build-be build-fe run-be run-dev-fe install-fe story seed-demo check check-fe check-be check-shortcut check-shortcut-publish test-shortcut sim-shortcut shortcut-engine-test kill-be-port build-med-intake-shortcut publish-med-intake-shortcut shortcut build-med-intake-automate publish-med-intake-automate automate
+.PHONY: help build-be build-fe run-be run-dev-fe install-fe story seed-demo check check-fe check-be check-shortcut kill-be-port build-shortcut publish-shortcut shortcut build-med-intake-automate publish-med-intake-automate automate
 
 FE_DIR := frontend
 BE_PORT ?= 8080
@@ -16,12 +16,9 @@ help:
 	@echo "  make check        Run all checks (fe + be + shortcut)"
 	@echo "  make check-fe     Typecheck, lint, and test the frontend"
 	@echo "  make check-be     Format, clippy, audit, and test the backend"
-	@echo "  make check-shortcut  Validate the shortcut plist and run its tests (no macOS needed)"
-	@echo "  make check-shortcut-publish  Check the iCloud link against the committed shortcut logic"
-	@echo "  make sim-shortcut ARGS='--pet <uuid> --key <token>'  Run the shortcut logic against a live server"
-	@echo "  make shortcut-engine-test ARGS='--pet <uuid> --key <token>'  Build the no-tap harness for the real Shortcuts app"
-	@echo "  make build-med-intake-shortcut  Build/sign the med-intake Apple Shortcut (macOS)"
-	@echo "  make publish-med-intake-shortcut  Build, open in Shortcuts, print iCloud publish steps"
+	@echo "  make check-shortcut  Compile shortcuts/med-intake.cherri and verify the plist"
+	@echo "  make build-shortcut  Compile + sign the med-intake Apple Shortcut (macOS)"
+	@echo "  make publish-shortcut  Build, open in Shortcuts, print iCloud publish steps"
 	@echo "  make shortcut  Build/sign, open Shortcuts, prompt for iCloud URL → publish.json"
 	@echo "  make build-med-intake-automate  Bootstrap or validate AutoMate .flo"
 	@echo "  make publish-med-intake-automate  Print Automate Community publish steps"
@@ -72,36 +69,23 @@ check-be:
 
 	DATABASE_URL="sqlite::memory:" cargo test --locked
 
-# Tier 1: structure + behaviour of the generated plist. No macOS, no server.
-check-shortcut: test-shortcut
-	python3 scripts/build-med-intake-shortcut.py --validate-only
+# Compile the Cherri source and verify the plist it produces. Needs the Cherri
+# compiler v2.3.0 (v2+ can't be installed via go install due to module path;
+# download from https://github.com/electrikmilk/cherri/releases/tag/v2.3.0);
+# no macOS, no server required.
+check-shortcut:
+	python3 shortcuts/build.py --check
 
-test-shortcut:
-	python3 -m unittest discover -s scripts/tests
+# Same, plus signing — macOS only, and it rewrites the committed .shortcut.
+build-shortcut:
+	python3 shortcuts/build.py
 
-# Release check: does the published iCloud link still match the committed logic?
-# Not part of `make check` — clearing it needs the manual Apple share flow.
-check-shortcut-publish:
-	python3 scripts/build-med-intake-shortcut.py --check-publish
+publish-shortcut:
+	python3 shortcuts/publish.py
 
-# Tier 2: the same plist, real HTTP against a running Petmon.
-#   make sim-shortcut ARGS="--pet <uuid> --key <api token> --dry-run"
-sim-shortcut:
-	python3 scripts/simulate-med-intake-shortcut.py $(ARGS)
-
-# Tier 3: a no-tap variant for the real Shortcuts engine. Import it once by
-# double-clicking the file, then `shortcuts run "Petmon Take Meds (Test)"`.
-shortcut-engine-test:
-	python3 scripts/build-med-intake-shortcut.py --harness $(ARGS)
-
-build-med-intake-shortcut:
-	python3 scripts/build-med-intake-shortcut.py
-
-publish-med-intake-shortcut:
-	python3 scripts/publish-med-intake-shortcut.py
-
+# Build, sign, open Shortcuts, then record the iCloud link in publish.json.
 shortcut:
-	python3 scripts/publish-med-intake-shortcut.py --await-url
+	python3 shortcuts/publish.py --await-url
 
 build-med-intake-automate:
 	python3 scripts/build-med-intake-automate.py --check

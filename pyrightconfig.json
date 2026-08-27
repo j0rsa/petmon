@@ -1,10 +1,17 @@
 {
-  "include": ["scripts"],
-  "exclude": ["**/__pycache__", "node_modules", "target", "frontend"],
-  "extraPaths": ["scripts"],
-  "executionEnvironments": [
-    { "root": "scripts", "extraPaths": ["scripts"] },
-    { "root": "scripts/tests", "extraPaths": ["scripts"] }
+  "include": [
+    "scripts",
+    "shortcuts"
+  ],
+  "exclude": [
+    "**/__pycache__",
+    "node_modules",
+    "target",
+    "frontend"
+  ],
+  "extraPaths": [
+    "scripts",
+    "shortcuts"
   ],
   "pythonVersion": "3.11"
 }

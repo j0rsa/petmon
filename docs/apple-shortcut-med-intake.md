@@ -2,7 +2,9 @@
 
 Petmon ships a signed **Petmon Take Meds** shortcut for logging daily medications from an iPhone. The shortcut asks for server URL, pet id, and API key on first import, then fetches today’s menu and records takes via the shortcuts API.
 
-See also: [API endpoints](#api-endpoints) · [Server logic](#server-logic) · [Shortcut workflow](#shortcut-workflow-on-device) · [Local testing](#local-testing-no-deployment) · [Build & publish](#build-macos)
+Source: [`shortcuts/med-intake.cherri`](../shortcuts/med-intake.cherri), compiled with [Cherri](https://cherrilang.org).
+
+See also: [API endpoints](#api-endpoints) · [Server logic](#server-logic) · [Shortcut workflow](#shortcut-workflow-on-device) · [Build](#build) · [Publish](#publish-to-icloud-iphone-import)
 
 ## Overview
 
@@ -15,9 +17,9 @@ sequenceDiagram
   User->>Shortcuts: Run "Petmon Take Meds"
   Shortcuts->>API: GET /shortcuts/meds/intake/menu?pet_id&date<br/>Authorization: Bearer pm_api_…
   API-->>Shortcuts: { status, choices, labels, lines }
-  alt status == "empty"
+  alt no choices
     Shortcuts->>User: "Nothing due in Petmon today."
-  else status == "ok"
+  else
     User->>Shortcuts: Multi-select meds
     loop Each selected med
       alt scheduled
@@ -30,7 +32,7 @@ sequenceDiagram
         Shortcuts->>API: POST …/take/{token}?liquid_dose_ml=0.4
       end
       API-->>Shortcuts: 201 MedIntakeRecord
-      Shortcuts->>Shortcuts: Append label to the Logged list
+      Shortcuts->>Shortcuts: Append label if the response has an id
     end
     Shortcuts->>User: "Petmon logged: <labels>" (or "No doses were logged…")
   end
@@ -40,7 +42,19 @@ sequenceDiagram
 
 Android users: see [`docs/automate-med-intake.md`](automate-med-intake.md) (AutoMate `.flo` download or Community link).
 
-**Out of scope (for now):** bundle members, choosing a dose for a *scheduled* med (the assignment fixes it), and backdating. The shortcut logs the dose as taken **now** and the take endpoint is real-time only — it stamps the server’s clock and accepts no timestamp at all. Backdated doses go through the web UI or `POST /health/meds/intake`.
+**Out of scope (for now):** bundle members, choosing a dose for a *scheduled* med (the assignment fixes it), and backdating. The take endpoint is real-time only.
+
+## Why Cherri
+
+The workflow was hand-written as a plist generator first. Shortcuts imports a malformed plist without complaint and then does the wrong thing silently, which cost three shipped-but-broken releases:
+
+| Symptom | Cause |
+|---|---|
+| Nothing logged, no error | A bare `Repeat Item` reference inside nested loops resolved to the *inner* loop |
+| Menu always empty | `Format Date` had no input, so the request asked for `&date=` |
+| "Please choose a value for each parameter" | Required action parameters we had no way to know about |
+
+Cherri is a compiler with an action database (`cherri --action=<name>`, `cherri --docs=<category>`), so parameters and their forms come from the compiler rather than from guesswork, and loops bind names instead of magic variables. It emits a `.shortcut` file, so distribution — signed file, iCloud link, the Health-page button — is unchanged.
 
 ## Server logic
 
@@ -52,17 +66,13 @@ Implementation: `src/services/shortcut_menu.rs`, handlers in `src/api/shortcuts.
 2. **Include** scheduled meds due on `date` and **optional** (as-needed) meds active on `date`.
 3. **Exclude** medications that appear in any bundle for the pet.
 4. For each row, build a display label: `{medication name} · {dose_label}`, then **disambiguate duplicates** by appending ` (2)`, ` (3)`, …
-5. Encode a **take token** (see below) and return:
+5. Encode a **take token** (see below) and return `status`, `choices`, `labels`, and `lines`.
 
 ```json
 {
   "status": "ok",
   "choices": [
-    {
-      "label": "Benazepril · 1 tab",
-      "token": "eyJw…",
-      "kind": "scheduled"
-    },
+    { "label": "Benazepril · 1 tab", "token": "eyJw…", "kind": "scheduled" },
     {
       "label": "Gabapentin · As needed",
       "token": "eyJw…",
@@ -71,26 +81,18 @@ Implementation: `src/services/shortcut_menu.rs`, handlers in `src/api/shortcuts.
       "fraction_labels": ["1", "3/4", "1/2", "1/3", "1/4", "1/8", "1/16"]
     }
   ],
-  "labels": [
-    "Benazepril · 1 tab",
-    "Gabapentin · As needed"
-  ],
-  "lines": [
-    "Benazepril · 1 tab|eyJw…|scheduled",
-    "Gabapentin · As needed|eyJw…|optional_pill|1,3/4,1/2,1/3,1/4,1/8,1/16"
-  ]
+  "labels": ["Benazepril · 1 tab", "Gabapentin · As needed"],
+  "lines": ["Benazepril · 1 tab|eyJw…|scheduled", "Gabapentin · As needed|eyJw…|optional_pill|1,3/4,…"]
 }
 ```
 
-The shortcut picker uses `labels`; after selection it matches each chosen label to the parallel `lines` entry, splits on `|`, and reads token, kind, and the optional dose list.
+The Cherri shortcut reads `choices` directly — it can index dictionaries, so it needs neither `lines` nor `status`. Both stay in the response for the **AutoMate** (Android) flow, which cannot:
 
-Three contracts the device flows depend on:
-
-| Contract | Why |
-|----------|-----|
-| `status` is `"ok"` or `"empty"` | Neither Shortcuts nor AutoMate can portably count a list, so “nothing due today” has to be a value they can compare. |
-| `labels` are **unique** | The flows carry a label out of the picker and find its line by string equality. Two identical labels would log two doses from one tap. |
-| `lines` field 4 uses `fraction_labels` | The dose picker shows that string and sends it straight back as `?dose_fraction=`, so it must be a spelling the API parses. `3/4` and `three_quarter` are both accepted. |
+| Contract | Why it exists |
+|----------|---------------|
+| `status` is `"ok"` or `"empty"` | AutoMate cannot count a list, so “nothing due today” has to be a value it can compare. |
+| `labels` are **unique** | A flow carries a label out of the picker and finds its entry by string equality. Two identical labels would log two doses from one tap. |
+| `lines` — pipe-encoded, field 4 = `fraction_labels` | AutoMate splits strings; it cannot walk an array of objects. |
 
 ### Take tokens
 
@@ -115,11 +117,11 @@ Decodes the token, rejects expired/invalid tokens, and calls the same intake pat
 | `optional_pill` | `?dose_fraction=1/2` (or `half`; body `{ "dose_fraction_override": "half" }`) |
 | `optional_liquid` | `?liquid_dose_ml=0.4` (body `{ "liquid_dose_ml_override": 0.4 }`) |
 
-**Timing: none.** This endpoint is real-time only. It takes no `occurred_at` / `local_date` — the server stamps its own local time, so the Telegram `#pills` line has no timestamp, exactly like a Take now from the web UI. Backdating deliberately isn’t reachable from a device flow (also worth noting: the take token is unsigned, so a backdating param here would be a backdating primitive for anyone holding one). Use the web UI or `POST /health/meds/intake` for a delayed entry.
+**Timing: none.** This endpoint is real-time only. It takes no `occurred_at` / `local_date` — the server stamps its own local time, so the Telegram `#pills` line has no timestamp, exactly like a Take now from the web UI. Backdating deliberately isn’t reachable from a device flow (the take token is unsigned, so a backdating param here would be a backdating primitive for anyone holding one). Use the web UI or `POST /health/meds/intake` for a delayed entry.
 
-Unknown query params are **rejected** with `400`, so an `occurred_at` from a generator that has drifted fails loudly instead of being silently dropped — a dropped one would look like a backdated dose that quietly landed on today. Only `dose_fraction`, `liquid_dose_ml`, their `_override` spellings, and `source` are accepted.
+Unknown query params are **rejected** with `400` (`MedIntakeTakeQuery` is `deny_unknown_fields`), so a drifted client fails loudly instead of having a timestamp silently dropped.
 
-The device’s calendar day still matters for the *menu* (`?date=`), which the shortcut fills from the phone’s clock. If the phone and the server are on different days, the menu is the phone’s day while the record lands on the server’s — the due-date re-validation then rejects it loudly with `400` instead of filing the dose on the wrong day.
+The device’s calendar day still matters for the *menu* (`?date=`), which the shortcut fills from the phone’s clock. If phone and server are on different days, the due-date re-validation rejects the take with `400` rather than filing the dose on the wrong day.
 
 Auth: menu requires `api_read`; take requires `api_write` (Bearer API token in the shortcut).
 
@@ -129,64 +131,90 @@ Auth: menu requires `api_read`; take requires `api_write` (Bearer API token in t
 
 ## Shortcut workflow (on device)
 
-Generated by `scripts/med_intake_workflow.py` → `build_workflow()`.
-
 | Step | Action |
 |------|--------|
 | Import questions | Server URL, pet UUID, API key (Write scope) |
-| 1 | Read configured Server URL, Pet ID, API Key |
-| 2 | Current date → `yyyy-MM-dd` for the menu (the phone’s own day) |
+| 1 | Three Text actions hold the answers |
+| 2 | Current date → `yyyy-MM-dd` (the phone’s own day) |
 | 3 | `GET {server}/api/v1/shortcuts/meds/intake/menu?…` |
-| 4 | Read `status`, `labels`, `lines` from the response |
-| 5 | `status` is `empty` → show “Nothing due in Petmon today.” and stop |
-| 6 | Multi-select from `labels`: “Select meds to log” |
-| 7 | For each chosen label, loop the `lines`, split on `\|`, compare field 1 with the **selected** label |
-| 7a | `optional_pill` → choose from the dose list → `POST …/take/{token}?dose_fraction=…` |
-| 7b | `optional_liquid` → ask ml → `POST …/take/{token}?liquid_dose_ml=…` |
-| 7c | otherwise (`scheduled`) → `POST …/take/{token}` |
-| 8 | After each successful POST, append the label to the **Logged** variable |
-| 9 | Show `Logged` — or “No doses were logged…” when it is empty |
+| 4 | Read `choices`; if it has no items, show “Nothing due in Petmon today.” and stop |
+| 5 | Multi-select from `labels`: “Select meds to log” |
+| 6 | For each chosen label, loop `choices` and compare `label` with the **selected** label |
+| 6a | `scheduled` → `POST …/take/{token}` |
+| 6b | `optional_pill` → choose from `fraction_labels` → `POST …?dose_fraction=…` |
+| 6c | `optional_liquid` → ask ml → `POST …?liquid_dose_ml=…` |
+| 7 | Append the label to `logged` **only if the response contains an `id`** |
+| 8 | Show `logged` — or “No doses were logged…” when it is empty |
 
-Two details that are easy to get wrong and have both broken this shortcut before:
+Step 7 is deliberate: Shortcuts hands a 4xx body to the next action instead of stopping the run, so an unchecked POST would let a failed take report itself as logged.
 
-- **Nested loops shadow `Repeat Item`.** Step 7 runs a loop over `lines` *inside* the loop over selected labels, so a bare `Repeat Item` reference resolves to the inner (line) item and the comparison never matches — the shortcut silently logs nothing. Every loop reference is built with `shortcut_plist.repeat_item(<loop group>)`, which emits an action-output reference keyed by that loop’s group UUID. `shortcut_lint` rejects bare `Repeat Item` / `Repeat Index` variable references.
-- **Report what was recorded, not what was selected.** The final message reads the `Logged` accumulator, so a run where every POST failed cannot claim success. A non-2xx response aborts the run in Shortcuts, so failures are loud.
+## Cherri notes
 
-After workflow changes: rebuild on macOS, commit `.shortcut`, republish iCloud, update `publish.json`.
+Hard-won specifics for **v1.3.2**, all encoded as comments in the source:
 
-## Local testing (no deployment)
+- **`const`, not `@`, for anything an action consumes.** `const` compiles to `Type: ActionOutput` carrying the producing action's UUID; `@name` compiles to a by-name `Type: Variable`. Apple only uses the by-name form *inside* a text field's `attachmentsByRange` — as a whole-field parameter it silently fails to bind, which is exactly how `Format Date` ended up with no input.
+- **The docs’ `@` examples don’t match the parser.** `@name` only on the left of an assignment or a type declaration; action arguments, `if` operands, `for` collections and interpolation take the bare name.
+- **`#define` must precede `#include`.**
+- **Import questions** cannot be used as variable values and each fills exactly one action argument, so each one feeds its own `text(question )` action. The space before `)` is load-bearing — Cherri advances one character past a question reference.
+- **Error positions can be stale**; bisect the file rather than trusting them.
+- **No `else if`** — use consecutive `if`s.
 
-Importing a shortcut needs a GUI confirmation on macOS and iOS (`open -g` will not do it), and `shortcuts run` only takes an already-installed shortcut. So the engine itself cannot be driven from CI. Three tiers cover it instead, from cheapest to most faithful.
+### Cherri bug we work around
 
-### Tier 1 — structure + behaviour, no macOS and no server
+`cherri` v1.3.2 writes `ActionIndex: 0` for *every* import question, so the second and third questions would overwrite the first Text action and leave the pet id and API key empty. `shortcuts/build.py` re-points each question at the Text action producing its constant (matching the prompt’s first line through `QUESTION_TARGETS`), and refuses to build if two questions land on the same action.
 
-```bash
-make check-shortcut          # part of `make check`
-```
+## Build
 
-- `scripts/shortcut_lint.py` — static checks on the generated plist: token-string placeholders match their attachment offsets, output references resolve to *earlier* actions with the expected name, loop references point at an enclosing loop, control-flow markers nest correctly (`0 → 1* → 2` per `GroupingIdentifier`), HTTP actions carry an `Authorization` header, import questions point at an action that has the parameter they set.
-- `scripts/shortcut_sim.py` — a small interpreter for the action subset the shortcut uses. It executes the **same generated plist** against a fake HTTP client and a scripted user, so the tests assert which requests fire, in which order, with which query parameters. It raises on any action it does not implement, so a silently skipped step cannot pass.
-- `scripts/tests/test_med_intake_shortcut.py` — the actual expectations: one POST per selected med with its own token, no timestamp param, dose options taken from the server, empty-menu message, nothing-logged message, abort on server error, and regression tests for the two bugs above (a bare `Repeat Item` and unbalanced control flow must fail the linter).
-
-### Tier 2 — real HTTP against a locally running Petmon
+Needs the compiler:
 
 ```bash
-make run-be                                                    # in another terminal
-make sim-shortcut ARGS="--pet <uuid> --key <api token> --dry-run"
-make sim-shortcut ARGS="--pet <uuid> --key <api token>"
+go install github.com/electrikmilk/cherri@latest      # ~/go/bin/cherri
 ```
-
-Same interpreter, real requests (`scripts/simulate-med-intake-shortcut.py`). This is what catches auth problems, menu-shape drift, and dose parsing. `--dry-run` performs the menu GET but skips the takes; `--select 'Label'` and `--dose 1/2` narrow what it does. Exit status is non-zero when nothing was logged.
-
-### Tier 3 — the real Shortcuts engine (macOS, one manual click)
 
 ```bash
-make shortcut-engine-test ARGS="--pet <uuid> --key <api token> --server http://localhost:8080"
-open "assets/shortcuts/harness/Petmon Take Meds (Test).shortcut"   # click Add Shortcut once
-shortcuts run "Petmon Take Meds (Test)"
+make check-shortcut     # compile + verify (no macOS, no server) — part of `make check` and CI
+make build-shortcut     # compile + verify + sign (macOS)
 ```
 
-The harness variant has the config baked in and every prompt replaced by a fixed choice (take everything on the menu, first dose option, `--ml` for liquids), so it runs with no taps and returns the logged labels as its output. Use it to confirm that Apple’s engine agrees with the interpreter about action semantics. It embeds an API key, so `assets/shortcuts/harness/` is gitignored.
+`shortcuts/build.py` does three things: compiles, corrects the import-question wiring, and verifies that **every variable reference resolves** — a reference to something no earlier action defines leaves the parameter empty at run time instead of failing, which is the whole family of bugs above.
+
+| File | Purpose |
+|------|---------|
+| `shortcuts/med-intake.cherri` | The workflow |
+| `shortcuts/build.py` | Compile → patch → verify → sign |
+| `shortcuts/publish.py` | Record the iCloud link and detect drift |
+| `assets/shortcuts/Petmon Take Meds.shortcut` | Signed binary **committed to git** (embedded in the Docker image) |
+
+Two macOS quirks worth knowing: `shortcuts sign` requires the input file to be named `*.shortcut` (anything else reports “isn't in the correct format” whatever the contents), and it accepts the XML plist Cherri emits — no `plutil -convert binary1` step.
+
+## Publish to iCloud (iPhone import)
+
+iOS **does not** import self-hosted `.shortcut` URLs. Use an **iCloud share link**.
+
+```bash
+make shortcut     # build, sign, open Shortcuts, prompt for the link
+```
+
+Or step by step:
+
+```bash
+make publish-shortcut
+# Shortcuts → Share → Share Link, then:
+python3 shortcuts/publish.py --set-url 'https://www.icloud.com/shortcuts/XXXXXXXX'
+git add assets/shortcuts/publish.json
+git commit -m "chore: update med intake shortcut iCloud link"
+```
+
+Redeploy so `GET /api/v1/info` returns the new URL.
+
+`make check-shortcut-publish` fails while `publish.json`’s digest differs from the current source — that state means iPhone users are still importing the old logic. It is deliberately **not** part of `make check`, because clearing it needs the manual Apple share flow. The digest covers `med-intake.cherri` plus the compiler version, not the compiled plist: Cherri mints fresh action UUIDs on every compile, so the plist is never byte-identical twice.
+
+### Config
+
+| Source | Precedence |
+|--------|------------|
+| `MED_INTAKE_SHORTCUT_ICLOUD_URL` env | Highest |
+| `assets/shortcuts/publish.json` → `icloud_url` | Committed default |
 
 ## API endpoints
 
@@ -199,77 +227,10 @@ The harness variant has the config baked in and every prompt replaced by a fixed
 
 OpenAPI: `/api/docs` → **Shortcuts** tag.
 
-## Generator layout
-
-| File | Role |
-|------|------|
-| `scripts/shortcut_plist.py` | Plist serialization helpers (token strings, control flow, one function per action). Petmon-free. |
-| `scripts/shortcut_lint.py` | Structural validation of a generated workflow. |
-| `scripts/shortcut_sim.py` | Interpreter used by the tests and the live simulator. |
-| `scripts/med_intake_workflow.py` | The Petmon workflow itself, plus the harness variant. |
-| `scripts/build-med-intake-shortcut.py` | CLI: validate, write the plist, sign, build the harness. |
-| `scripts/tests/` | `python3 -m unittest discover -s scripts/tests` |
-
-Action UUIDs are derived with `uuid5` from a fixed namespace plus a `LOGIC_VERSION` marker, so the same source always produces byte-identical output. That makes `workflow_sha256` (the sha256 of the XML plist) a meaningful record of *which logic* was published — signing itself is not reproducible.
-
-## Build (macOS)
-
-Requires macOS with the Shortcuts CLI (`shortcuts sign`) and Python 3.
-
-```bash
-make build-med-intake-shortcut
-# or: python3 scripts/build-med-intake-shortcut.py
-python3 scripts/build-med-intake-shortcut.py --validate-only   # no macOS needed
-```
-
-Outputs:
-
-| File | Purpose |
-|------|---------|
-| `assets/shortcuts/Petmon Take Meds.unsigned.plist` | Generated workflow (gitignored) |
-| `assets/shortcuts/Petmon Take Meds.shortcut` | Signed binary **committed to git** (embedded in the Docker image) |
-
-Linux CI skips signing; the committed signed file from a Mac is used.
-
-## Publish to iCloud (iPhone import)
-
-iOS **does not** import self-hosted `.shortcut` URLs via `shortcuts://import-shortcut`. Use an **iCloud share link** instead.
-
-```bash
-make shortcut
-```
-
-Builds/signs the shortcut, opens it in Shortcuts, then prompts for the iCloud share URL and writes `assets/shortcuts/publish.json` (`icloud_url` **and** `workflow_sha256`).
-
-Or step by step:
-
-```bash
-make publish-med-intake-shortcut
-```
-
-After Shortcuts → Share → Share Link:
-
-```bash
-python3 scripts/publish-med-intake-shortcut.py --set-url 'https://www.icloud.com/shortcuts/XXXXXXXX'
-git add assets/shortcuts/publish.json
-git commit -m "chore: update med intake shortcut iCloud link"
-```
-
-Redeploy so `GET /api/v1/info` returns the new URL.
-
-### Config
-
-| Source | Precedence |
-|--------|------------|
-| `MED_INTAKE_SHORTCUT_ICLOUD_URL` env | Highest |
-| `assets/shortcuts/publish.json` → `icloud_url` | Committed default |
-
 ## Updating shortcut logic
 
-1. Edit `scripts/med_intake_workflow.py` (`build_workflow()`).
-2. `make check-shortcut` — linter plus simulated run.
-3. `make sim-shortcut ARGS="--pet <uuid> --key <token>"` against a local server.
-4. `make shortcut` on a Mac and commit the new `Petmon Take Meds.shortcut`.
-5. Share a **new** iCloud link and record it with `--set-url`, which also stores the new `workflow_sha256`.
-
-`make check-shortcut-publish` fails while `publish.json`’s digest differs from the committed workflow — that state means iPhone users are still importing the old logic. It is deliberately **not** part of `make check`, because clearing it requires the manual Apple share flow.
+1. Edit `shortcuts/med-intake.cherri`.
+2. `make check-shortcut` — compiles and verifies the plist.
+3. `make build-shortcut` on a Mac, import the file, run it end to end.
+4. Commit the new `assets/shortcuts/Petmon Take Meds.shortcut`.
+5. Share a **new** iCloud link and record it with `--set-url`, which also stores the new digest.

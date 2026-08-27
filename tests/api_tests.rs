@@ -1601,17 +1601,23 @@ async fn elimination_duration_profile_returns_buckets() {
 async fn elimination_classifier_rolling_window_disambiguates_overlap() {
     let (app, _state) = build_dev_app!();
     let pet_id = api_create_pet!(&app, "ContextCat");
+    let today = chrono::Local::now().date_naive();
+    let d = |n: i64| {
+        (today - chrono::Duration::days(n))
+            .format("%Y-%m-%d")
+            .to_string()
+    };
     for (event_type, duration, occurred) in [
-        ("urination", 44, "2026-05-28T08:00:00"),
-        ("urination", 46, "2026-05-29T08:00:00"),
-        ("urination", 45, "2026-05-30T08:00:00"),
-        ("urination", 47, "2026-05-31T08:00:00"),
-        ("defecation", 118, "2026-05-28T10:00:00"),
-        ("defecation", 122, "2026-05-29T10:00:00"),
-        ("defecation", 120, "2026-05-30T10:00:00"),
-        ("defecation", 119, "2026-05-31T10:00:00"),
+        ("urination", 44, format!("{}T08:00:00", d(6))),
+        ("urination", 46, format!("{}T08:00:00", d(5))),
+        ("urination", 45, format!("{}T08:00:00", d(4))),
+        ("urination", 47, format!("{}T08:00:00", d(3))),
+        ("defecation", 118, format!("{}T10:00:00", d(6))),
+        ("defecation", 122, format!("{}T10:00:00", d(5))),
+        ("defecation", 120, format!("{}T10:00:00", d(4))),
+        ("defecation", 119, format!("{}T10:00:00", d(3))),
     ] {
-        api_create_elimination!(&app, pet_id, event_type, duration, occurred);
+        api_create_elimination!(&app, pet_id, event_type, duration, occurred.as_str());
     }
     api_enable_elimination_auto_categorize!(&app, pet_id);
 
@@ -1625,9 +1631,11 @@ async fn elimination_classifier_rolling_window_disambiguates_overlap() {
     let retrain: serde_json::Value = test::read_body_json(resp).await;
     assert_eq!(retrain["trained"].as_bool(), Some(true));
 
-    api_create_elimination!(&app, pet_id, "defecation", 120, "2026-06-01T23:00:00");
+    let defecation_ts = format!("{}T23:00:00", d(1));
+    api_create_elimination!(&app, pet_id, "defecation", 120, defecation_ts.as_str());
 
-    let body = api_create_elimination!(&app, pet_id, "general", 55, "2026-06-02T01:00:00");
+    let general_ts = format!("{}T01:00:00", d(0));
+    let body = api_create_elimination!(&app, pet_id, "general", 55, general_ts.as_str());
     assert_eq!(
         body["event_type"].as_str(),
         Some("urination"),
@@ -1646,17 +1654,23 @@ async fn elimination_classifier_rolling_window_disambiguates_overlap() {
 async fn elimination_classifier_status_and_retrain() {
     let (app, _state) = build_dev_app!();
     let pet_id = api_create_pet!(&app, "ClassifierStatus");
+    let today = chrono::Local::now().date_naive();
+    let d = |n: i64| {
+        (today - chrono::Duration::days(n))
+            .format("%Y-%m-%d")
+            .to_string()
+    };
     for (event_type, duration, occurred) in [
-        ("urination", 44, "2026-05-28T08:00:00"),
-        ("urination", 46, "2026-05-29T08:00:00"),
-        ("urination", 45, "2026-05-30T08:00:00"),
-        ("urination", 47, "2026-05-31T08:00:00"),
-        ("defecation", 118, "2026-05-28T10:00:00"),
-        ("defecation", 122, "2026-05-29T10:00:00"),
-        ("defecation", 120, "2026-05-30T10:00:00"),
-        ("defecation", 119, "2026-05-31T10:00:00"),
+        ("urination", 44, format!("{}T08:00:00", d(6))),
+        ("urination", 46, format!("{}T08:00:00", d(5))),
+        ("urination", 45, format!("{}T08:00:00", d(4))),
+        ("urination", 47, format!("{}T08:00:00", d(3))),
+        ("defecation", 118, format!("{}T10:00:00", d(6))),
+        ("defecation", 122, format!("{}T10:00:00", d(5))),
+        ("defecation", 120, format!("{}T10:00:00", d(4))),
+        ("defecation", 119, format!("{}T10:00:00", d(3))),
     ] {
-        api_create_elimination!(&app, pet_id, event_type, duration, occurred);
+        api_create_elimination!(&app, pet_id, event_type, duration, occurred.as_str());
     }
     api_enable_elimination_auto_categorize!(&app, pet_id);
 
@@ -4117,6 +4131,132 @@ async fn shortcuts_med_intake_menu_labels_are_unique() {
     }
 }
 
+/// A taken scheduled dose disappears from the menu; an optional dose stays.
+#[actix_web::test]
+async fn shortcuts_med_intake_menu_hides_taken_scheduled() {
+    let (app, _state) = build_dev_app!();
+    let pet_id = api_create_pet!(&app, "HideAfterTake");
+
+    let resp = test::call_service(
+        &app,
+        test::TestRequest::post()
+            .uri("/api/v1/health/meds")
+            .set_json(serde_json::json!({
+                "pet_id": pet_id, "name": "Daily Pill", "med_type": "pill", "color": "#6366f1"
+            }))
+            .to_request(),
+    )
+    .await;
+    assert_eq!(resp.status(), 201);
+    let med: serde_json::Value = test::read_body_json(resp).await;
+    let med_id = med["id"].as_str().unwrap();
+
+    let resp = test::call_service(
+        &app,
+        test::TestRequest::post()
+            .uri("/api/v1/health/meds/assignments")
+            .set_json(serde_json::json!({
+                "medication_id": med_id,
+                "tablet_strength_mg": 5.0,
+                "pill_shape": "round",
+                "dose_fraction": "whole",
+                "frequency": { "morning": 1, "midday": 0, "evening": 0, "every": 1, "unit": "days" },
+                "date_from": "2026-03-01"
+            }))
+            .to_request(),
+    )
+    .await;
+    assert_eq!(resp.status(), 201);
+
+    let resp = test::call_service(
+        &app,
+        test::TestRequest::post()
+            .uri("/api/v1/health/meds")
+            .set_json(serde_json::json!({
+                "pet_id": pet_id, "name": "PRN Pill", "med_type": "pill", "color": "#22c55e"
+            }))
+            .to_request(),
+    )
+    .await;
+    assert_eq!(resp.status(), 201);
+    let prn: serde_json::Value = test::read_body_json(resp).await;
+    let prn_id = prn["id"].as_str().unwrap();
+
+    let resp = test::call_service(
+        &app,
+        test::TestRequest::post()
+            .uri("/api/v1/health/meds/assignments")
+            .set_json(serde_json::json!({
+                "medication_id": prn_id,
+                "tablet_strength_mg": 2.5,
+                "pill_shape": "round",
+                "frequency": { "morning": 0, "midday": 0, "evening": 0, "every": 1, "unit": "days" },
+                "date_from": "2026-03-01",
+                "optional": true
+            }))
+            .to_request(),
+    )
+    .await;
+    assert_eq!(resp.status(), 201);
+
+    let today = chrono::Local::now().format("%Y-%m-%d").to_string();
+
+    // Both appear before any take.
+    let resp = test::call_service(
+        &app,
+        test::TestRequest::get()
+            .uri(&format!(
+                "/api/v1/shortcuts/meds/intake/menu?pet_id={pet_id}&date={today}"
+            ))
+            .to_request(),
+    )
+    .await;
+    assert_eq!(resp.status(), 200);
+    let menu: serde_json::Value = test::read_body_json(resp).await;
+    assert_eq!(menu["status"].as_str(), Some("ok"));
+    assert_eq!(menu["choices"].as_array().unwrap().len(), 2);
+
+    let token = menu["choices"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|c| c["kind"].as_str() == Some("scheduled"))
+        .unwrap()["token"]
+        .as_str()
+        .unwrap()
+        .to_string();
+
+    let resp = test::call_service(
+        &app,
+        test::TestRequest::post()
+            .uri(&format!("/api/v1/shortcuts/meds/intake/take/{token}"))
+            .to_request(),
+    )
+    .await;
+    assert_eq!(resp.status(), 201);
+
+    // After taking the scheduled dose it must not appear; the optional PRN stays.
+    let resp = test::call_service(
+        &app,
+        test::TestRequest::get()
+            .uri(&format!(
+                "/api/v1/shortcuts/meds/intake/menu?pet_id={pet_id}&date={today}"
+            ))
+            .to_request(),
+    )
+    .await;
+    assert_eq!(resp.status(), 200);
+    let menu: serde_json::Value = test::read_body_json(resp).await;
+    let choices = menu["choices"].as_array().unwrap();
+    assert_eq!(choices.len(), 1, "taken scheduled should disappear");
+    assert_eq!(
+        choices[0]["kind"].as_str(),
+        Some("optional_pill"),
+        "only the PRN should remain"
+    );
+    assert_eq!(menu["status"].as_str(), Some("ok"));
+}
+
 #[actix_web::test]
 async fn shortcuts_med_intake_take_is_realtime_only() {
     let (app, _state) = build_dev_app!();
@@ -4167,6 +4307,7 @@ async fn shortcuts_med_intake_take_is_realtime_only() {
     let resp = test::call_service(&app, req).await;
     assert_eq!(resp.status(), 201);
     let intake: serde_json::Value = test::read_body_json(resp).await;
+
     let occurred_at = intake["occurred_at"].as_str().unwrap().to_string();
     let local_date = intake["local_date"].as_str().unwrap().to_string();
     assert!(occurred_at.starts_with(&local_date), "got {occurred_at}");
