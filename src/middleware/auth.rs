@@ -55,8 +55,7 @@ where
                     | "/api/v1/health"
                     | "/api/v1/info"
                     | "/api/v1/shortcuts/meds/intake.shortcut"
-                    | "/api/v1/shortcuts/meds/intake.flo"
-            );
+);
             if public {
                 let res = service.call(req).await?;
                 return Ok(res.map_into_left_body());
