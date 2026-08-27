@@ -1,6 +1,7 @@
 import type { CSSProperties } from 'react';
 import type { MedAssignment, Medication } from '../../api/medications';
 import { useFormatDate } from '../../context/useDisplaySettings';
+import { daysInclusive } from '../../lib/dates';
 import {
   assignmentHistoryLabel,
   assignmentScheduleLabel,
@@ -30,10 +31,14 @@ interface AssignmentGroupCardProps {
 function dateRangeLabel(
   assignment: MedAssignment,
   formatDate: (date: string, style?: 'long' | 'short') => string,
+  today: string,
 ): string {
   const from = formatDate(assignment.date_from, 'short');
-  if (assignment.date_to == null) return `${from} → ongoing`;
-  return `${from} → ${formatDate(assignment.date_to, 'short')}`;
+  const end = assignment.date_to ?? today;
+  const days = daysInclusive(assignment.date_from, end);
+  const count = days === 1 ? '1 day' : `${days} days`;
+  if (assignment.date_to == null) return `${count} · ${from} → ongoing`;
+  return `${count} · ${from} → ${formatDate(assignment.date_to, 'short')}`;
 }
 
 export function AssignmentGroupCard({
@@ -141,7 +146,7 @@ export function AssignmentGroupCard({
         </div>
         <div>
           <dt>Dates</dt>
-          <dd>{dateRangeLabel(current, formatDate)}</dd>
+          <dd>{dateRangeLabel(current, formatDate, today)}</dd>
         </div>
       </dl>
 
@@ -161,7 +166,7 @@ export function AssignmentGroupCard({
                     <span className="muted-text">
                       {assignmentScheduleLabel(assignment)}
                       {' · '}
-                      {dateRangeLabel(assignment, formatDate)}
+                      {dateRangeLabel(assignment, formatDate, today)}
                     </span>
                   </div>
                   {canWrite && (

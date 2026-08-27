@@ -121,7 +121,8 @@ export const Ended: Story = {
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement);
     await expect(canvas.getByText('Ended')).toBeInTheDocument();
-    await expect(canvas.getByText(courseEnded(current.date_from, shiftDate(today, -1)))).toBeInTheDocument();
+    // Both "On course" and "Dates" rows show the same text for a single-assignment ended course.
+    await expect(canvas.getAllByText(courseEnded(current.date_from, shiftDate(today, -1)))[0]).toBeInTheDocument();
     await expect(canvas.queryByRole('button', { name: 'Revise Prednisolone' })).not.toBeInTheDocument();
     await expect(canvas.getByRole('button', { name: 'Assign' })).toBeInTheDocument();
     assertHeaderActionOnDesktop(canvasElement, 'Prednisolone', 'Delete Prednisolone assignment');
