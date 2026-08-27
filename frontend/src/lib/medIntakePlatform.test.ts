@@ -1,9 +1,5 @@
 import { afterEach, describe, expect, it } from 'vitest';
-import {
-  medIntakeImportPlatform,
-  showMedIntakeAutomateLink,
-  showMedIntakeShortcutLink,
-} from './medIntakePlatform';
+import { medIntakeImportPlatform, showMedIntakeShortcutLink } from './medIntakePlatform';
 
 function mockUserAgent(userAgent: string, platform?: string) {
   Object.defineProperty(globalThis.navigator, 'userAgent', {
@@ -23,39 +19,36 @@ describe('medIntakeImportPlatform', () => {
     );
   });
 
-  it('detects Android from user agent', () => {
+  it('does not show shortcut link on Android', () => {
     mockUserAgent(
       'Mozilla/5.0 (Linux; Android 14; Pixel 8) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Mobile Safari/537.36',
     );
-    expect(medIntakeImportPlatform()).toBe('android');
-    expect(showMedIntakeAutomateLink()).toBe(true);
+    expect(medIntakeImportPlatform()).toBe('other');
     expect(showMedIntakeShortcutLink()).toBe(false);
   });
 
-  it('detects Android from userAgentData when UA omits Android', () => {
+  it('does not show shortcut link on desktop', () => {
     mockUserAgent(
-      'Mozilla/5.0 (Linux; armv81) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-      'Android',
+      'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
     );
-    expect(medIntakeImportPlatform()).toBe('android');
+    expect(medIntakeImportPlatform()).toBe('other');
     expect(showMedIntakeShortcutLink()).toBe(false);
   });
 
-  it('detects iOS', () => {
+  it('shows shortcut link on iOS', () => {
     mockUserAgent(
       'Mozilla/5.0 (iPhone; CPU iPhone OS 18_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.0 Mobile/15E148 Safari/604.1',
     );
     expect(medIntakeImportPlatform()).toBe('ios');
     expect(showMedIntakeShortcutLink()).toBe(true);
-    expect(showMedIntakeAutomateLink()).toBe(false);
   });
 
-  it('shows both links on desktop', () => {
+  it('detects iOS from userAgentData platform hint', () => {
     mockUserAgent(
-      'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+      'Mozilla/5.0 AppleWebKit/537.36 (KHTML, like Gecko) Safari/537.36',
+      'iOS',
     );
-    expect(medIntakeImportPlatform()).toBe('desktop');
+    expect(medIntakeImportPlatform()).toBe('ios');
     expect(showMedIntakeShortcutLink()).toBe(true);
-    expect(showMedIntakeAutomateLink()).toBe(true);
   });
 });

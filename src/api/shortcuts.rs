@@ -14,13 +14,7 @@ use crate::services::{medication_service, shortcut_menu};
 #[include = "Petmon Take Meds.shortcut"]
 struct ShortcutAssets;
 
-#[derive(RustEmbed)]
-#[folder = "assets/automate"]
-#[include = "Petmon Take Meds.flo"]
-struct AutomateAssets;
-
 const SHORTCUT_FILENAME: &str = "Petmon Take Meds.shortcut";
-const AUTOMATE_FILENAME: &str = "Petmon Take Meds.flo";
 
 #[derive(serde::Deserialize)]
 pub struct MedIntakeMenuQuery {
@@ -128,20 +122,6 @@ pub async fn med_intake_take(
     Ok(HttpResponse::Created().json(record))
 }
 
-#[get("/meds/intake.flo")]
-pub async fn download_med_intake_automate() -> HttpResponse {
-    match AutomateAssets::get(AUTOMATE_FILENAME) {
-        Some(content) => HttpResponse::Ok()
-            .insert_header((header::CONTENT_TYPE, "application/octet-stream"))
-            .insert_header((
-                header::CONTENT_DISPOSITION,
-                format!("attachment; filename=\"{AUTOMATE_FILENAME}\""),
-            ))
-            .body(content.data.to_vec()),
-        None => HttpResponse::NotFound().body(format!("{AUTOMATE_FILENAME} not found")),
-    }
-}
-
 #[get("/meds/intake.shortcut")]
 pub async fn download_med_intake_shortcut() -> HttpResponse {
     match ShortcutAssets::get(SHORTCUT_FILENAME) {
@@ -161,7 +141,6 @@ pub fn configure(cfg: &mut web::ServiceConfig) {
         web::scope("/shortcuts")
             .service(med_intake_menu_handler)
             .service(med_intake_take)
-            .service(download_med_intake_automate)
             .service(download_med_intake_shortcut),
     );
 }

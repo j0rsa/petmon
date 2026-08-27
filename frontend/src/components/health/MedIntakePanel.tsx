@@ -25,11 +25,7 @@ import { buildMedIntakeCurl } from '../../lib/medIntakeCurl';
 import { parseDecimal } from '../../lib/numbers';
 import { isDoseSupported } from '../../lib/pillDoseCuts';
 import { medIntakeShortcutLinkProps } from '../../lib/medIntakeShortcut';
-import { medIntakeAutomateLinkProps } from '../../lib/medIntakeAutomate';
-import {
-  showMedIntakeAutomateLink,
-  showMedIntakeShortcutLink,
-} from '../../lib/medIntakePlatform';
+import { showMedIntakeShortcutLink } from '../../lib/medIntakePlatform';
 import { isoFromDateAndTime, nowTimeString } from '../../lib/time';
 import { infoApi } from '../../api/info';
 import { usePermissions } from '../../context/usePermissions';
@@ -641,26 +637,6 @@ export function MedIntakePanel({ petId }: MedIntakePanelProps) {
                 }
               >
                 <img src="/icons/shortcuts.png" alt="" width={22} height={22} className="shortcuts-import-link__icon" />
-              </a>
-            )}
-            {showMedIntakeAutomateLink() && (
-              <a
-                {...medIntakeAutomateLinkProps(undefined, appInfoQuery.data?.med_intake_automate_community_url)}
-                className="shortcuts-import-link"
-                aria-label="AutoMate flow"
-                title={
-                  appInfoQuery.data?.med_intake_automate_community_url
-                    ? 'Open the Petmon Take Meds flow on Automate Community (configure URL, pet id, and API key on first run)'
-                    : 'Download the Petmon Take Meds AutoMate flow (see docs/automate-med-intake.md)'
-                }
-              >
-                <img
-                  src="/icons/automate.png"
-                  alt=""
-                  width={22}
-                  height={22}
-                  className="shortcuts-import-link__icon shortcuts-import-link__icon--color"
-                />
               </a>
             )}
           </div>

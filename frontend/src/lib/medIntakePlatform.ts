@@ -1,29 +1,22 @@
-export type MedIntakeImportPlatform = 'android' | 'ios' | 'desktop';
+export type MedIntakeImportPlatform = 'ios' | 'other';
 
-/** Detect which med-intake import link(s) to show for the current device. */
+/** Detect whether the current device is iOS. */
 export function medIntakeImportPlatform(): MedIntakeImportPlatform {
   if (typeof navigator === 'undefined') {
-    return 'desktop';
+    return 'other';
   }
 
   const ua = navigator.userAgent;
   const platformHint = (navigator as Navigator & { userAgentData?: { platform?: string } }).userAgentData?.platform;
 
-  if (/Android/i.test(ua) || platformHint === 'Android') {
-    return 'android';
-  }
-
   if (/iPhone|iPad|iPod/i.test(ua) || platformHint === 'iOS') {
     return 'ios';
   }
 
-  return 'desktop';
+  return 'other';
 }
 
+/** The Apple Shortcuts import link is only useful on iOS. */
 export function showMedIntakeShortcutLink(platform = medIntakeImportPlatform()): boolean {
-  return platform === 'ios' || platform === 'desktop';
-}
-
-export function showMedIntakeAutomateLink(platform = medIntakeImportPlatform()): boolean {
-  return platform === 'android' || platform === 'desktop';
+  return platform === 'ios';
 }

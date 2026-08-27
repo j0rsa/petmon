@@ -6,7 +6,7 @@ import { MedIntakePanel } from './MedIntakePanel';
 import { SelectedPetProvider } from '../../context/SelectedPetContext';
 import { mockDailyMedAssignments, mockBundleDailyAssignments, mockDeveloperModeSettings, mockMedBundles, mockPetId, mockPets } from '../../stories/fixtures';
 import { localToday } from '../../lib/dates';
-import { asNarrowStory, assertHeaderActionPlacement } from '../../stories/viewport';
+import { asNarrowStory } from '../../stories/viewport';
 
 const meta = {
   title: 'Components/Health/MedIntakePanel',
@@ -72,7 +72,6 @@ function withMedDataCore({
       client.setQueryData(['med-bundles', mockPetId], empty ? [] : bundles);
       client.setQueryData(['app-info'], {
         med_intake_shortcut_icloud_url: 'https://www.icloud.com/shortcuts/abc123def4',
-        med_intake_automate_community_url: 'https://llamalab.com/automate/community/flows/12345',
       });
       return (
         <MemoryRouter>
@@ -99,13 +98,8 @@ export const WithDailyMeds: Story = {
     const canvas = within(canvasElement);
     await expect(canvas.getByRole('heading', { name: 'Meds' })).toBeInTheDocument();
     await expect(canvas.getByRole('heading', { name: "Today's meds" })).toBeInTheDocument();
-    await expect(canvas.getByRole('link', { name: 'Apple Shortcut' })).toBeInTheDocument();
-    await expect(canvas.getByRole('link', { name: 'AutoMate flow' })).toBeInTheDocument();
-    // Import links are a card action on the header row, not text trailing the
-    // title: right-aligned on desktop, wrapped below the title when narrow.
-    assertHeaderActionPlacement(canvasElement, "Today's meds", 'AutoMate flow');
-    const links = canvas.getByRole('link', { name: 'Apple Shortcut' }).closest('.med-intake-import-links');
-    await expect(links?.parentElement).toHaveClass('section-heading');
+    // Shortcut link is iOS-only; desktop stories show no import link.
+    await expect(canvas.queryByRole('link', { name: 'Apple Shortcut' })).not.toBeInTheDocument();
     await expect(canvas.queryByRole('heading', { name: 'Bundles' })).not.toBeInTheDocument();
     await userEvent.click(canvas.getAllByRole('button', { name: 'Add record' })[0]!);
     await expect(canvas.getByText('Add medication record')).toBeInTheDocument();
@@ -122,31 +116,6 @@ export const WithDeveloperMode: Story = {
   decorators: withMedData({ developerMode: true }),
 };
 
-function withAndroidUserAgent(): Decorator[] {
-  return [
-    (Story) => {
-      Object.defineProperty(navigator, 'userAgent', {
-        configurable: true,
-        value: 'Mozilla/5.0 (Linux; Android 14; Pixel 8) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Mobile Safari/537.36',
-      });
-      Object.defineProperty(navigator, 'userAgentData', {
-        configurable: true,
-        value: { platform: 'Android' },
-      });
-      return <Story />;
-    },
-  ];
-}
-
-export const WithDailyMedsAndroid: Story = {
-  args: { petId: mockPetId },
-  decorators: [...withAndroidUserAgent(), ...withMedDataCore()],
-  play: async ({ canvasElement }) => {
-    const canvas = within(canvasElement);
-    await expect(canvas.getByRole('link', { name: 'AutoMate flow' })).toBeInTheDocument();
-    await expect(canvas.queryByRole('link', { name: 'Apple Shortcut' })).not.toBeInTheDocument();
-  },
-};
 
 export const WithBundle: Story = {
   args: { petId: mockPetId },
@@ -210,7 +179,6 @@ export const Empty: Story = {
 };
 
 export const WithDailyMedsNarrow = asNarrowStory(WithDailyMeds);
-export const WithDailyMedsAndroidNarrow = asNarrowStory(WithDailyMedsAndroid);
 export const WithBundleNarrow = asNarrowStory(WithBundle);
 export const WithBundleTakenNarrow = asNarrowStory(WithBundleTaken);
 export const EmptyNarrow = asNarrowStory(Empty);

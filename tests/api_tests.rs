@@ -668,7 +668,6 @@ async fn app_info_reports_demo_mode() {
         chrono_tz::UTC,
         true,
         None,
-        None,
     ));
     let app = build_full_app!(state);
 
@@ -690,7 +689,6 @@ async fn app_info_includes_med_intake_shortcut_icloud_url() {
         chrono_tz::UTC,
         false,
         Some("https://www.icloud.com/shortcuts/abc123def4".into()),
-        None,
     ));
     let app = build_full_app!(state);
 
@@ -702,32 +700,6 @@ async fn app_info_includes_med_intake_shortcut_icloud_url() {
         body.get("med_intake_shortcut_icloud_url")
             .and_then(|v| v.as_str()),
         Some("https://www.icloud.com/shortcuts/abc123def4")
-    );
-}
-
-#[actix_web::test]
-async fn app_info_includes_med_intake_automate_community_url() {
-    let pool = setup_pool().await;
-    let state = web::Data::new(AppState::new_with_tz(
-        pool,
-        false,
-        None,
-        None,
-        chrono_tz::UTC,
-        false,
-        None,
-        Some("https://llamalab.com/automate/community/flows/12345".into()),
-    ));
-    let app = build_full_app!(state);
-
-    let req = test::TestRequest::get().uri("/api/v1/info").to_request();
-    let resp = test::call_service(&app, req).await;
-    assert_eq!(resp.status(), 200);
-    let body: serde_json::Value = test::read_body_json(resp).await;
-    assert_eq!(
-        body.get("med_intake_automate_community_url")
-            .and_then(|v| v.as_str()),
-        Some("https://llamalab.com/automate/community/flows/12345")
     );
 }
 
@@ -820,7 +792,6 @@ async fn nutrition_record_default_occurred_at_uses_configured_timezone() {
         None,
         "Asia/Tokyo".parse().unwrap(),
         false,
-        None,
         None,
     ));
     let app = build_app!(state);
@@ -4040,15 +4011,6 @@ async fn shortcuts_med_intake_menu_take_and_download() {
     assert_eq!(resp.status(), 200);
     let body = test::read_body(resp).await;
     assert!(body.len() > 1_000);
-
-    let req = test::TestRequest::get()
-        .uri("/api/v1/shortcuts/meds/intake.flo")
-        .to_request();
-    let resp = test::call_service(&app, req).await;
-    assert_eq!(resp.status(), 200);
-    let flo = test::read_body(resp).await;
-    assert!(flo.starts_with(b"LAFl"));
-    assert!(flo.len() > 200);
 }
 
 /// Shortcuts and Automate cannot portably count a list, so an empty menu has to

@@ -1,4 +1,4 @@
-.PHONY: help build-be build-fe run-be run-dev-fe install-fe story seed-demo check check-fe check-be check-shortcut kill-be-port build-shortcut publish-shortcut shortcut build-med-intake-automate publish-med-intake-automate automate
+.PHONY: help build-be build-fe run-be run-dev-fe install-fe story seed-demo check check-fe check-be check-shortcut kill-be-port build-shortcut publish-shortcut shortcut
 
 FE_DIR := frontend
 BE_PORT ?= 8080
@@ -20,9 +20,6 @@ help:
 	@echo "  make build-shortcut  Compile + sign the med-intake Apple Shortcut (macOS)"
 	@echo "  make publish-shortcut  Build, open in Shortcuts, print iCloud publish steps"
 	@echo "  make shortcut  Build/sign, open Shortcuts, prompt for iCloud URL → publish.json"
-	@echo "  make build-med-intake-automate  Bootstrap or validate AutoMate .flo"
-	@echo "  make publish-med-intake-automate  Print Automate Community publish steps"
-	@echo "  make automate  Prompt for Automate Community URL → publish.json"
 
 install-fe:
 	cd $(FE_DIR) && npm install
@@ -87,11 +84,3 @@ publish-shortcut:
 shortcut:
 	python3 shortcuts/publish.py --await-url
 
-build-med-intake-automate:
-	python3 scripts/build-med-intake-automate.py --check
-
-publish-med-intake-automate:
-	python3 scripts/publish-med-intake-automate.py
-
-automate:
-	python3 scripts/publish-med-intake-automate.py --await-url

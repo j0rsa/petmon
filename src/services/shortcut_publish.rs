@@ -10,8 +10,6 @@ struct MedIntakePublishAssets;
 struct PublishConfig {
     #[serde(default)]
     icloud_url: Option<String>,
-    #[serde(default)]
-    automate_community_url: Option<String>,
 }
 
 /// iCloud Shortcuts share link for med intake import on iPhone/iPad.
@@ -29,21 +27,6 @@ pub fn resolve_med_intake_icloud_url() -> Option<String> {
         .and_then(|url| normalize_icloud_url(&url))
 }
 
-/// Automate Community link for med intake import on Android.
-///
-/// Priority: `MED_INTAKE_AUTOMATE_COMMUNITY_URL` env, then `assets/shortcuts/publish.json`.
-pub fn resolve_med_intake_automate_community_url() -> Option<String> {
-    if let Ok(raw) = std::env::var("MED_INTAKE_AUTOMATE_COMMUNITY_URL") {
-        if let Some(url) = normalize_automate_community_url(&raw) {
-            return Some(url);
-        }
-    }
-
-    load_publish_config()?
-        .automate_community_url
-        .and_then(|url| normalize_automate_community_url(&url))
-}
-
 fn load_publish_config() -> Option<PublishConfig> {
     let embedded = MedIntakePublishAssets::get("publish.json")?;
     serde_json::from_slice(&embedded.data).ok()
@@ -58,21 +41,6 @@ fn normalize_icloud_url(raw: &str) -> Option<String> {
         tracing::warn!(
             url,
             "med intake shortcut icloud_url must start with https://www.icloud.com/shortcuts/"
-        );
-        return None;
-    }
-    Some(url.to_string())
-}
-
-fn normalize_automate_community_url(raw: &str) -> Option<String> {
-    let url = raw.trim();
-    if url.is_empty() {
-        return None;
-    }
-    if !url.starts_with("https://llamalab.com/automate/community/flows/") {
-        tracing::warn!(
-            url,
-            "med intake automate_community_url must start with https://llamalab.com/automate/community/flows/"
         );
         return None;
     }
