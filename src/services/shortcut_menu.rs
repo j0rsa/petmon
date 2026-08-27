@@ -136,8 +136,7 @@ pub async fn med_intake_menu(
 ) -> AppResult<MedIntakeMenuResponse> {
     let daily = medication_service::daily_assignments(pool, pet_id, date).await?;
     let bundled = bundled_medication_ids(pool, pet_id).await?;
-    let taken_today =
-        crate::repo::med_intake_records::taken_counts_on(pool, pet_id, date).await?;
+    let taken_today = crate::repo::med_intake_records::taken_counts_on(pool, pet_id, date).await?;
 
     let mut choices = Vec::new();
     for item in daily {
@@ -215,7 +214,10 @@ mod tests {
             MenuChoiceKind::OptionalPill,
             Some("1,1/2"),
         );
-        assert_eq!(line, "Gabapentin · As needed|assign-abc|optional_pill|1,1/2");
+        assert_eq!(
+            line,
+            "Gabapentin · As needed|assign-abc|optional_pill|1,1/2"
+        );
     }
 
     #[test]
