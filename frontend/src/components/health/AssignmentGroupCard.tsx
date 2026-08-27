@@ -165,7 +165,8 @@ export function AssignmentGroupCard({
                     </div>
                     <span className="muted-text">
                       {assignmentScheduleLabel(assignment)}
-                      {' · '}
+                    </span>
+                    <span className="muted-text">
                       {dateRangeLabel(assignment, formatDate, today)}
                     </span>
                   </div>

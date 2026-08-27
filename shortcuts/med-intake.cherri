@@ -94,16 +94,16 @@ if dueCount == 0 {
                shadow the outer one — the bug that silently logged nothing.
                Use .text on getValue results in conditions (v2.2+ type checking). */
             if label.text == pickText {
-                const token = getValue(entry, "token")
+                const medID = getValue(entry, "medication_id")
+                const assignID = getValue(entry, "assignment_id")
                 const kind = getValue(entry, "kind")
+                const takeBase = text("{server}/api/v1/shortcuts/meds/intake/take?pet_id={pet}&medication_id={medID}&assignment_id={assignID}" )
 
                 /* The kinds are mutually exclusive, and Cherri has no `else if`.
-                   Each branch builds the whole URL, because a `const` cannot be
-                   reassigned and a reassignable `@` would not bind as an
-                   action argument. */
+                   Each branch builds the full URL because a `const` cannot be
+                   reassigned. */
                 if kind.text == "scheduled" {
-                    const scheduledURL = text("{server}/api/v1/shortcuts/meds/intake/take/{token}" )
-                    const scheduledTake = jsonRequest(scheduledURL, "POST", {}, {"Authorization": "Bearer {key}"})
+                    const scheduledTake = jsonRequest(takeBase, "POST", {}, {"Authorization": "Bearer {key}"})
                     const scheduledRecord = getDictionary(scheduledTake)
                     const scheduledID = getValue(scheduledRecord, "id")
                     if scheduledID {
@@ -115,7 +115,7 @@ if dueCount == 0 {
                        the canonical `three_quarter`. */
                     const doseOptions = getValue(entry, "fraction_labels")
                     const dose = chooseFromList(doseOptions, "Dose for {label}")
-                    const pillURL = text("{server}/api/v1/shortcuts/meds/intake/take/{token}?dose_fraction={dose}" )
+                    const pillURL = text("{takeBase}&dose_fraction={dose}" )
                     const pillTake = jsonRequest(pillURL, "POST", {}, {"Authorization": "Bearer {key}"})
                     const pillRecord = getDictionary(pillTake)
                     const pillID = getValue(pillRecord, "id")
@@ -125,7 +125,7 @@ if dueCount == 0 {
                 }
                 if kind.text == "optional_liquid" {
                     const ml = prompt("Millilitres for {label}", "Number")
-                    const liquidURL = text("{server}/api/v1/shortcuts/meds/intake/take/{token}?liquid_dose_ml={ml}" )
+                    const liquidURL = text("{takeBase}&liquid_dose_ml={ml}" )
                     const liquidTake = jsonRequest(liquidURL, "POST", {}, {"Authorization": "Bearer {key}"})
                     const liquidRecord = getDictionary(liquidTake)
                     const liquidID = getValue(liquidRecord, "id")

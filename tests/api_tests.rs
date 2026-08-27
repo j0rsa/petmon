@@ -3939,10 +3939,13 @@ async fn shortcuts_med_intake_menu_take_and_download() {
         .iter()
         .find(|c| c["kind"].as_str() == Some("scheduled"))
         .unwrap();
-    let token = scheduled["token"].as_str().unwrap();
+    let sched_med_id = scheduled["medication_id"].as_str().unwrap();
+    let sched_assign_id = scheduled["assignment_id"].as_str().unwrap();
 
     let req = test::TestRequest::post()
-        .uri(&format!("/api/v1/shortcuts/meds/intake/take/{token}"))
+        .uri(&format!(
+            "/api/v1/shortcuts/meds/intake/take?pet_id={pet_id}&medication_id={sched_med_id}&assignment_id={sched_assign_id}"
+        ))
         .to_request();
     let resp = test::call_service(&app, req).await;
     assert_eq!(resp.status(), 201);
@@ -3954,7 +3957,8 @@ async fn shortcuts_med_intake_menu_take_and_download() {
         .iter()
         .find(|c| c["kind"].as_str() == Some("optional_pill"))
         .unwrap();
-    let prn_token = optional["token"].as_str().unwrap();
+    let prn_med_id_val = optional["medication_id"].as_str().unwrap();
+    let prn_assign_id = optional["assignment_id"].as_str().unwrap();
     assert!(optional["fractions"].as_array().unwrap().len() >= 4);
 
     // The dose pickers on device show and return the display forms, so those are
@@ -3981,7 +3985,7 @@ async fn shortcuts_med_intake_menu_take_and_download() {
 
     let req = test::TestRequest::post()
         .uri(&format!(
-            "/api/v1/shortcuts/meds/intake/take/{prn_token}?dose_fraction=1/2"
+            "/api/v1/shortcuts/meds/intake/take?pet_id={pet_id}&medication_id={prn_med_id_val}&assignment_id={prn_assign_id}&dose_fraction=1/2"
         ))
         .to_request();
     let resp = test::call_service(&app, req).await;
@@ -3993,7 +3997,7 @@ async fn shortcuts_med_intake_menu_take_and_download() {
     // Canonical spelling still works for existing API clients.
     let req = test::TestRequest::post()
         .uri(&format!(
-            "/api/v1/shortcuts/meds/intake/take/{prn_token}?dose_fraction=three_quarter"
+            "/api/v1/shortcuts/meds/intake/take?pet_id={pet_id}&medication_id={prn_med_id_val}&assignment_id={prn_assign_id}&dose_fraction=three_quarter"
         ))
         .to_request();
     let resp = test::call_service(&app, req).await;
@@ -4131,7 +4135,7 @@ async fn shortcuts_med_intake_menu_multi_dose_per_day() {
     .await;
     assert_eq!(resp.status(), 201);
 
-    let today = chrono::Local::now().format("%Y-%m-%d").to_string();
+    let today = chrono::Utc::now().format("%Y-%m-%d").to_string();
     let menu_url = format!("/api/v1/shortcuts/meds/intake/menu?pet_id={pet_id}&date={today}");
 
     // Before any take: appears once.
@@ -4142,12 +4146,16 @@ async fn shortcuts_med_intake_menu_multi_dose_per_day() {
     assert_eq!(menu["choices"].as_array().unwrap().len(), 1);
 
     // First take (morning dose).
-    let token = menu["choices"][0]["token"].as_str().unwrap().to_string();
+    let choice0 = &menu["choices"][0];
+    let mid = choice0["medication_id"].as_str().unwrap();
+    let aid = choice0["assignment_id"].as_str().unwrap();
     assert_eq!(
         test::call_service(
             &app,
             test::TestRequest::post()
-                .uri(&format!("/api/v1/shortcuts/meds/intake/take/{token}"))
+                .uri(&format!(
+                    "/api/v1/shortcuts/meds/intake/take?pet_id={pet_id}&medication_id={mid}&assignment_id={aid}"
+                ))
                 .to_request(),
         )
         .await
@@ -4166,13 +4174,17 @@ async fn shortcuts_med_intake_menu_multi_dose_per_day() {
         "should still appear after first of two daily doses"
     );
 
-    // Second take (evening dose) — token is the same assignment.
-    let token2 = menu["choices"][0]["token"].as_str().unwrap().to_string();
+    // Second take (evening dose) — same assignment.
+    let choice0 = &menu["choices"][0];
+    let mid = choice0["medication_id"].as_str().unwrap();
+    let aid = choice0["assignment_id"].as_str().unwrap();
     assert_eq!(
         test::call_service(
             &app,
             test::TestRequest::post()
-                .uri(&format!("/api/v1/shortcuts/meds/intake/take/{token2}"))
+                .uri(&format!(
+                    "/api/v1/shortcuts/meds/intake/take?pet_id={pet_id}&medication_id={mid}&assignment_id={aid}"
+                ))
                 .to_request(),
         )
         .await
@@ -4261,7 +4273,7 @@ async fn shortcuts_med_intake_menu_hides_taken_scheduled() {
     .await;
     assert_eq!(resp.status(), 201);
 
-    let today = chrono::Local::now().format("%Y-%m-%d").to_string();
+    let today = chrono::Utc::now().format("%Y-%m-%d").to_string();
 
     // Both appear before any take.
     let resp = test::call_service(
@@ -4278,12 +4290,17 @@ async fn shortcuts_med_intake_menu_hides_taken_scheduled() {
     assert_eq!(menu["status"].as_str(), Some("ok"));
     assert_eq!(menu["choices"].as_array().unwrap().len(), 2);
 
-    let token = menu["choices"]
+    let scheduled_choice = menu["choices"]
         .as_array()
         .unwrap()
         .iter()
         .find(|c| c["kind"].as_str() == Some("scheduled"))
-        .unwrap()["token"]
+        .unwrap();
+    let s_mid = scheduled_choice["medication_id"]
+        .as_str()
+        .unwrap()
+        .to_string();
+    let s_aid = scheduled_choice["assignment_id"]
         .as_str()
         .unwrap()
         .to_string();
@@ -4291,7 +4308,9 @@ async fn shortcuts_med_intake_menu_hides_taken_scheduled() {
     let resp = test::call_service(
         &app,
         test::TestRequest::post()
-            .uri(&format!("/api/v1/shortcuts/meds/intake/take/{token}"))
+            .uri(&format!(
+                "/api/v1/shortcuts/meds/intake/take?pet_id={pet_id}&medication_id={s_mid}&assignment_id={s_aid}"
+            ))
             .to_request(),
     )
     .await;
@@ -4352,7 +4371,7 @@ async fn shortcuts_med_intake_take_is_realtime_only() {
     let resp = test::call_service(&app, req).await;
     assert_eq!(resp.status(), 201);
 
-    let today = chrono::Local::now().format("%Y-%m-%d").to_string();
+    let today = chrono::Utc::now().format("%Y-%m-%d").to_string();
     let req = test::TestRequest::get()
         .uri(&format!(
             "/api/v1/shortcuts/meds/intake/menu?pet_id={pet_id}&date={today}"
@@ -4360,12 +4379,15 @@ async fn shortcuts_med_intake_take_is_realtime_only() {
         .to_request();
     let resp = test::call_service(&app, req).await;
     let menu: serde_json::Value = test::read_body_json(resp).await;
-    let token = menu["choices"][0]["token"].as_str().unwrap().to_string();
+    let choice = &menu["choices"][0];
+    let t_mid = choice["medication_id"].as_str().unwrap().to_string();
+    let t_aid = choice["assignment_id"].as_str().unwrap().to_string();
+    let take_base = format!(
+        "/api/v1/shortcuts/meds/intake/take?pet_id={pet_id}&medication_id={t_mid}&assignment_id={t_aid}"
+    );
 
     // The server stamps the time, so the dose lands on the server's today.
-    let req = test::TestRequest::post()
-        .uri(&format!("/api/v1/shortcuts/meds/intake/take/{token}"))
-        .to_request();
+    let req = test::TestRequest::post().uri(&take_base).to_request();
     let resp = test::call_service(&app, req).await;
     assert_eq!(resp.status(), 201);
     let intake: serde_json::Value = test::read_body_json(resp).await;
@@ -4383,9 +4405,7 @@ async fn shortcuts_med_intake_take_is_realtime_only() {
         "occured_at=2026-03-15T08:30:00", // typo in a hand-written call
     ] {
         let req = test::TestRequest::post()
-            .uri(&format!(
-                "/api/v1/shortcuts/meds/intake/take/{token}?{rejected}"
-            ))
+            .uri(&format!("{take_base}&{rejected}"))
             .to_request();
         let resp = test::call_service(&app, req).await;
         assert_eq!(resp.status(), 400, "{rejected} must be rejected");
@@ -4393,17 +4413,16 @@ async fn shortcuts_med_intake_take_is_realtime_only() {
 
     // The params the flows do send stay accepted.
     let req = test::TestRequest::post()
-        .uri(&format!(
-            "/api/v1/shortcuts/meds/intake/take/{token}?dose_fraction=1/2&source=automate"
-        ))
+        .uri(&format!("{take_base}&dose_fraction=1/2&source=automate"))
         .to_request();
     let resp = test::call_service(&app, req).await;
     assert_eq!(resp.status(), 201);
     let intake: serde_json::Value = test::read_body_json(resp).await;
     assert_eq!(intake["local_date"].as_str(), Some(local_date.as_str()));
 
+    // Missing required params → 400.
     let req = test::TestRequest::post()
-        .uri("/api/v1/shortcuts/meds/intake/take/not-a-token")
+        .uri("/api/v1/shortcuts/meds/intake/take")
         .to_request();
     let resp = test::call_service(&app, req).await;
     assert_eq!(resp.status(), 400);

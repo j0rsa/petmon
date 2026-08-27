@@ -22,37 +22,22 @@ pub struct MedIntakeMenuQuery {
     pub date: String,
 }
 
-/// Query params of a shortcut take.
+/// Query params of the shortcut take endpoint.
 ///
 /// `deny_unknown_fields` is the point, not a detail: this endpoint is real-time
 /// only, so an `occurred_at` / `local_date` from a generator that has drifted
 /// must fail loudly instead of being silently dropped, which would look like a
 /// backdated dose that quietly landed on today.
-#[derive(serde::Deserialize, Default)]
+#[derive(serde::Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct MedIntakeTakeQuery {
+    pub pet_id: String,
+    pub medication_id: String,
+    pub assignment_id: String,
     pub dose_fraction: Option<DoseFraction>,
     pub liquid_dose_ml: Option<f64>,
-    dose_fraction_override: Option<DoseFraction>,
-    liquid_dose_ml_override: Option<f64>,
-    /// Intake source label (e.g. `shortcut`, `automate`). Defaults to `shortcut`.
+    /// Intake source label (e.g. `shortcut`). Defaults to `shortcut`.
     pub source: Option<String>,
-}
-
-#[derive(serde::Deserialize, Default)]
-pub struct MedIntakeTakeBody {
-    pub dose_fraction_override: Option<DoseFraction>,
-    pub liquid_dose_ml_override: Option<f64>,
-}
-
-impl MedIntakeTakeQuery {
-    fn dose_fraction_override(&self) -> Option<DoseFraction> {
-        self.dose_fraction_override.or(self.dose_fraction)
-    }
-
-    fn liquid_dose_ml_override(&self) -> Option<f64> {
-        self.liquid_dose_ml_override.or(self.liquid_dose_ml)
-    }
 }
 
 #[get("/meds/intake/menu")]
@@ -67,26 +52,14 @@ pub async fn med_intake_menu_handler(
     Ok(HttpResponse::Ok().json(menu))
 }
 
-#[post("/meds/intake/take/{token}")]
+#[post("/meds/intake/take")]
 #[require_scope("api_write")]
 pub async fn med_intake_take(
     state: web::Data<AppState>,
-    token: web::Path<String>,
     query: web::Query<MedIntakeTakeQuery>,
-    body: Option<web::Json<MedIntakeTakeBody>>,
 ) -> AppResult<HttpResponse> {
-    let payload = shortcut_menu::decode_take_token(&token)?;
-    let pet_id = Uuid::parse_str(&payload.pet_id)
-        .map_err(|_| AppError::BadRequest("invalid pet_id in token".into()))?;
-
-    let dose_fraction_override = body
-        .as_ref()
-        .and_then(|b| b.dose_fraction_override)
-        .or_else(|| query.dose_fraction_override());
-    let liquid_dose_ml_override = body
-        .as_ref()
-        .and_then(|b| b.liquid_dose_ml_override)
-        .or_else(|| query.liquid_dose_ml_override());
+    let pet_id = Uuid::parse_str(&query.pet_id)
+        .map_err(|_| AppError::BadRequest("invalid pet_id".into()))?;
 
     let source_type = query
         .source
@@ -104,10 +77,10 @@ pub async fn med_intake_take(
         &state.pool,
         CreateMedIntakeRecord {
             pet_id: pet_id.to_string(),
-            medication_id: payload.medication_id,
-            assignment_id: Some(payload.assignment_id),
-            dose_fraction_override,
-            liquid_dose_ml_override,
+            medication_id: query.medication_id.clone(),
+            assignment_id: Some(query.assignment_id.clone()),
+            dose_fraction_override: query.dose_fraction,
+            liquid_dose_ml_override: query.liquid_dose_ml,
             taken: Some(true),
             occurred_at: None,
             local_date: None,

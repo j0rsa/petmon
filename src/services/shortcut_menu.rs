@@ -1,29 +1,10 @@
-use base64::engine::general_purpose::URL_SAFE_NO_PAD;
-use base64::Engine;
-use chrono::{Duration, Utc};
-use serde::{Deserialize, Serialize};
+use serde::Serialize;
 use uuid::Uuid;
 
 use crate::domain::medication::{DailyMedAssignment, MedType, DOSE_FRACTIONS};
-use crate::error::{AppError, AppResult};
+use crate::error::AppResult;
 use crate::services::medication_service;
 use sqlx::SqlitePool;
-
-/// What a take token carries.
-///
-/// The token is base64url JSON, not a signed or encrypted blob: anyone can read
-/// it and anyone can mint one. It is a *convenience* handle, not an
-/// authorization — every take still requires an `api_write` bearer token, and
-/// `repo::med_intake_records::create` re-validates that the medication belongs
-/// to the pet, that the assignment belongs to the medication, and that the
-/// assignment is active and due. Do not put anything private in here.
-#[derive(Debug, Serialize, Deserialize)]
-pub struct TakeTokenPayload {
-    pub pet_id: String,
-    pub medication_id: String,
-    pub assignment_id: String,
-    exp: i64,
-}
 
 #[derive(Debug, Clone, Copy, Serialize, PartialEq, Eq)]
 #[serde(rename_all = "snake_case")]
@@ -46,14 +27,15 @@ impl MenuChoiceKind {
 #[derive(Debug, Serialize)]
 pub struct MedIntakeMenuChoice {
     pub label: String,
-    pub token: String,
+    pub medication_id: String,
+    pub assignment_id: String,
     pub kind: MenuChoiceKind,
     /// Canonical fraction names (`three_quarter`), for API clients.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub fractions: Option<Vec<&'static str>>,
-    /// Display forms of `fractions`, same order (`3/4`). This is what the
-    /// Shortcuts / AutoMate dose pickers show and send back as
-    /// `?dose_fraction=`; the take endpoint parses both spellings.
+    /// Display forms of `fractions`, same order (`3/4`). Dose pickers show
+    /// and echo these back as `?dose_fraction=`; the take endpoint parses
+    /// both display spellings and canonical names.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub fraction_labels: Option<Vec<&'static str>>,
 }
@@ -67,40 +49,13 @@ pub enum MenuStatus {
 
 #[derive(Debug, Serialize)]
 pub struct MedIntakeMenuResponse {
-    /// `empty` when nothing is due. Shortcuts and AutoMate cannot count a list
-    /// portably, so they branch on this string instead of on `labels.count`.
+    /// `empty` when nothing is due; branch on this rather than counting `choices`.
     pub status: MenuStatus,
     pub choices: Vec<MedIntakeMenuChoice>,
-    /// Human-readable labels for Shortcuts / Automate pickers (same order as `lines`).
-    /// Guaranteed unique — the pickers match a selection back to a line by label.
+    /// Human-readable labels in the same order as `choices`. Guaranteed unique.
     pub labels: Vec<String>,
-    /// Pipe-encoded lines for Apple Shortcuts: `label|token|kind[|fractions_csv]`.
+    /// Pipe-encoded lines: `label|assignment_id|kind[|fractions_csv]`.
     pub lines: Vec<String>,
-}
-
-const TOKEN_TTL: Duration = Duration::hours(24);
-
-fn encode_take_token(pet_id: Uuid, medication_id: &str, assignment_id: &str) -> AppResult<String> {
-    let payload = TakeTokenPayload {
-        pet_id: pet_id.to_string(),
-        medication_id: medication_id.to_string(),
-        assignment_id: assignment_id.to_string(),
-        exp: (Utc::now() + TOKEN_TTL).timestamp(),
-    };
-    let json = serde_json::to_vec(&payload).map_err(|e| AppError::Internal(e.to_string()))?;
-    Ok(URL_SAFE_NO_PAD.encode(json))
-}
-
-pub fn decode_take_token(token: &str) -> AppResult<TakeTokenPayload> {
-    let bytes = URL_SAFE_NO_PAD
-        .decode(token)
-        .map_err(|_| AppError::BadRequest("invalid take token".into()))?;
-    let payload: TakeTokenPayload = serde_json::from_slice(&bytes)
-        .map_err(|_| AppError::BadRequest("invalid take token payload".into()))?;
-    if payload.exp < Utc::now().timestamp() {
-        return Err(AppError::BadRequest("take token expired".into()));
-    }
-    Ok(payload)
 }
 
 async fn bundled_medication_ids(
@@ -120,13 +75,13 @@ fn menu_label(item: &DailyMedAssignment) -> String {
 
 fn encode_line(
     label: &str,
-    token: &str,
+    assignment_id: &str,
     kind: MenuChoiceKind,
     fractions_csv: Option<&str>,
 ) -> String {
     match fractions_csv {
-        Some(csv) => format!("{label}|{token}|{}|{csv}", kind.as_line_str()),
-        None => format!("{label}|{token}|{}", kind.as_line_str()),
+        Some(csv) => format!("{label}|{assignment_id}|{}|{csv}", kind.as_line_str()),
+        None => format!("{label}|{assignment_id}|{}", kind.as_line_str()),
     }
 }
 
@@ -151,10 +106,9 @@ fn pill_fraction_labels() -> Vec<&'static str> {
 
 /// Make every label unique by suffixing ` (2)`, ` (3)`, …
 ///
-/// The Shortcuts and AutoMate flows carry a *label* out of the picker and look
-/// the line up by string equality, so two identical labels would log both doses
-/// on a single tap. Two courses of the same medication with the same dose (one
-/// scheduled, one optional) are enough to collide.
+/// The Shortcuts flow carries a picked label out of the multi-select and finds
+/// its choice by string equality, so two identical labels would log both doses
+/// on a single tap.
 fn disambiguate_labels(choices: &mut [MedIntakeMenuChoice]) {
     let mut used: std::collections::HashSet<String> = std::collections::HashSet::new();
     for choice in choices.iter_mut() {
@@ -182,7 +136,8 @@ pub async fn med_intake_menu(
 ) -> AppResult<MedIntakeMenuResponse> {
     let daily = medication_service::daily_assignments(pool, pet_id, date).await?;
     let bundled = bundled_medication_ids(pool, pet_id).await?;
-    let taken_today = crate::repo::med_intake_records::taken_counts_on(pool, pet_id, date).await?;
+    let taken_today =
+        crate::repo::med_intake_records::taken_counts_on(pool, pet_id, date).await?;
 
     let mut choices = Vec::new();
     for item in daily {
@@ -202,12 +157,12 @@ pub async fn med_intake_menu(
         }
 
         let label = menu_label(&item);
-        let token = encode_take_token(pet_id, &item.medication.id, &item.assignment.id)?;
         let kind = choice_kind(&item);
         let is_pill_choice = kind == MenuChoiceKind::OptionalPill;
         choices.push(MedIntakeMenuChoice {
             label,
-            token,
+            medication_id: item.medication.id.clone(),
+            assignment_id: item.assignment.id.clone(),
             kind,
             fractions: is_pill_choice.then(pill_fractions),
             fraction_labels: is_pill_choice.then(pill_fraction_labels),
@@ -220,15 +175,13 @@ pub async fn med_intake_menu(
     let lines = choices
         .iter()
         .map(|choice| {
-            // The pickers show and return the display forms, so that is what the
-            // line carries.
             let fractions_csv = choice
                 .fraction_labels
                 .as_ref()
                 .map(|values| values.join(","));
             encode_line(
                 &choice.label,
-                &choice.token,
+                &choice.assignment_id,
                 choice.kind,
                 fractions_csv.as_deref(),
             )
@@ -255,24 +208,14 @@ mod tests {
     use crate::domain::medication::DoseFraction;
 
     #[test]
-    fn take_token_roundtrip_and_expiry() {
-        let pet_id = Uuid::parse_str("550e8400-e29b-41d4-a716-446655440000").unwrap();
-        let token = encode_take_token(pet_id, "med-1", "assign-1").unwrap();
-        let decoded = decode_take_token(&token).unwrap();
-        assert_eq!(decoded.pet_id, pet_id.to_string());
-        assert_eq!(decoded.medication_id, "med-1");
-        assert_eq!(decoded.assignment_id, "assign-1");
-    }
-
-    #[test]
     fn encode_line_includes_kind_and_fractions() {
         let line = encode_line(
             "Gabapentin · As needed",
-            "tok123",
+            "assign-abc",
             MenuChoiceKind::OptionalPill,
             Some("1,1/2"),
         );
-        assert_eq!(line, "Gabapentin · As needed|tok123|optional_pill|1,1/2");
+        assert_eq!(line, "Gabapentin · As needed|assign-abc|optional_pill|1,1/2");
     }
 
     #[test]
@@ -288,7 +231,8 @@ mod tests {
     fn choice(label: &str) -> MedIntakeMenuChoice {
         MedIntakeMenuChoice {
             label: label.to_string(),
-            token: "tok".into(),
+            medication_id: "med-1".into(),
+            assignment_id: "assign-1".into(),
             kind: MenuChoiceKind::Scheduled,
             fractions: None,
             fraction_labels: None,
