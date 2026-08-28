@@ -1,3 +1,4 @@
+import { useEffect } from 'react';
 import { Navigate, Route, Routes, useParams } from 'react-router-dom';
 import { AuthGuard } from './components/AuthGuard';
 import { Layout } from './components/Layout';
@@ -19,6 +20,16 @@ import SettingsPage from './pages/SettingsPage';
 import AuthCallbackPage from './pages/AuthCallbackPage';
 
 export default function App() {
+  useEffect(() => {
+    if (sessionStorage.getItem('pwa-post-auth-reload')) {
+      sessionStorage.removeItem('pwa-post-auth-reload');
+      // The PWA WebView may have been in browser rendering context during
+      // the OIDC redirect; reload now that we are back at the destination
+      // so env(safe-area-inset-*) re-evaluates in standalone mode.
+      window.location.reload();
+    }
+  }, []);
+
   return (
     <Routes>
       {/* Public — no layout, no auth */}
