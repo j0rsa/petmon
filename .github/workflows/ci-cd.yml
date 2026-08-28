@@ -18,6 +18,9 @@ on:
       - 'frontend/tsconfig*.json'
       - 'frontend/eslint.config.js'
       - 'frontend/.storybook/**'
+      - 'scripts/**'
+      - 'shortcuts/**'
+      - 'assets/**'
       - 'Dockerfile'
       - '.github/workflows/**'
       - '.config/**'
@@ -38,6 +41,9 @@ on:
       - 'frontend/tsconfig*.json'
       - 'frontend/eslint.config.js'
       - 'frontend/.storybook/**'
+      - 'scripts/**'
+      - 'shortcuts/**'
+      - 'assets/**'
       - 'Dockerfile'
       - '.github/workflows/**'
       - '.config/**'
@@ -45,6 +51,8 @@ on:
 env:
   REGISTRY: ghcr.io
   IMAGE_NAME: ${{ github.repository }}
+  # PR checkout is the merge commit; pass head SHA so embedded git_sha matches Docker tags.
+  PETMON_GIT_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
 
 jobs:
   # ─────────────────────────────────────────────
@@ -268,6 +276,34 @@ jobs:
         run: cargo clippy --locked -- -D warnings
 
   # ─────────────────────────────────────────────
+  # Stream 3: Apple Shortcut / AutoMate generators
+  # Signing and importing need macOS + a GUI click, so CI checks the generated
+  # plist structurally and runs the workflow through the interpreter instead.
+  # ─────────────────────────────────────────────
+  shortcut-check:
+    name: Shortcut (compile + verify)
+    runs-on: ubuntu-latest
+    needs: version-check
+    if: always() && !failure() && !cancelled()
+    steps:
+      - uses: actions/checkout@v4.2.2
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      # The Cherri compiler is Go, so compiling and verifying the plist works on
+      # Linux. Only `shortcuts sign` needs macOS, and the signed file is committed.
+      - name: Install Cherri
+        run: |
+          curl -fsSL https://github.com/electrikmilk/cherri/releases/download/v2.3.0/cherri_linux-x86_64.zip -o /tmp/cherri.zip
+          unzip -o /tmp/cherri.zip -d /usr/local/bin cherri
+          chmod +x /usr/local/bin/cherri
+
+      - name: Compile and verify the shortcut
+        run: python3 shortcuts/build.py --check --cherri cherri
+
+  # ─────────────────────────────────────────────
   # Stream 2: Backend test (arch-independent)
   # ─────────────────────────────────────────────
   backend-test:
@@ -378,12 +414,13 @@ jobs:
   docker:
     name: Docker multiarch image
     runs-on: ubuntu-latest
-    needs: [frontend, backend-amd64, backend-arm64, version-check]
+    needs: [frontend, backend-amd64, backend-arm64, shortcut-check, version-check]
     if: |
       always() &&
       needs.frontend.result == 'success' &&
       needs.backend-amd64.result == 'success' &&
       needs.backend-arm64.result == 'success' &&
+      needs.shortcut-check.result == 'success' &&
       !cancelled()
     # Main pushes publish v<version>, latest, and sha-*. PRs publish pr-<number>-<run>-<sha>.
     permissions:

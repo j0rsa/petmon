@@ -124,6 +124,29 @@ async fn load_hydrated(pool: &SqlitePool, core: MedIntakeCore) -> AppResult<MedI
     Ok(hydrate_intake(medication.med_type, core, assignment))
 }
 
+/// Returns the number of `taken = 1` records per assignment ID on the given
+/// local date. Used by the shortcut menu to decide whether a scheduled dose
+/// still has remaining takes (e.g. morning taken but evening not yet).
+pub async fn taken_counts_on(
+    pool: &SqlitePool,
+    pet_id: Uuid,
+    date: &str,
+) -> AppResult<std::collections::HashMap<String, u32>> {
+    let rows: Vec<(String, i64)> = sqlx::query_as(
+        "SELECT assignment_id, COUNT(*) FROM med_intake_records \
+         WHERE pet_id = ? AND local_date = ? AND taken = 1 \
+         GROUP BY assignment_id",
+    )
+    .bind(pet_id)
+    .bind(date)
+    .fetch_all(pool)
+    .await?;
+    Ok(rows
+        .into_iter()
+        .map(|(id, count)| (id, count as u32))
+        .collect())
+}
+
 pub const DEFAULT_RECENT_LIMIT: i64 = 20;
 
 #[tracing::instrument(skip(pool, filters))]

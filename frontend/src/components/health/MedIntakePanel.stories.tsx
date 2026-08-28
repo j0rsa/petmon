@@ -1,4 +1,4 @@
-import type { Meta, StoryObj } from '@storybook/react-vite';
+import type { Decorator, Meta, StoryObj } from '@storybook/react-vite';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { MemoryRouter } from 'react-router-dom';
 import { expect, userEvent, within } from 'storybook/test';
@@ -18,7 +18,26 @@ const meta = {
 export default meta;
 type Story = StoryObj<typeof meta>;
 
-function withMedData({
+const DESKTOP_USER_AGENT =
+  'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36';
+
+function withDesktopUserAgent(): Decorator[] {
+  return [
+    (Story) => {
+      Object.defineProperty(navigator, 'userAgent', {
+        configurable: true,
+        value: DESKTOP_USER_AGENT,
+      });
+      Object.defineProperty(navigator, 'userAgentData', {
+        configurable: true,
+        value: { platform: 'macOS' },
+      });
+      return <Story />;
+    },
+  ];
+}
+
+function withMedDataCore({
   empty = false,
   developerMode = false,
   daily = mockDailyMedAssignments,
@@ -28,7 +47,7 @@ function withMedData({
   developerMode?: boolean;
   daily?: typeof mockDailyMedAssignments;
   bundles?: typeof mockMedBundles;
-} = {}): Story['decorators'] {
+} = {}): Decorator[] {
   return [
     (Story) => {
       const client = new QueryClient({
@@ -51,6 +70,9 @@ function withMedData({
         empty ? [] : daily,
       );
       client.setQueryData(['med-bundles', mockPetId], empty ? [] : bundles);
+      client.setQueryData(['app-info'], {
+        med_intake_shortcut_icloud_url: 'https://www.icloud.com/shortcuts/abc123def4',
+      });
       return (
         <MemoryRouter>
           <QueryClientProvider client={client}>
@@ -64,12 +86,20 @@ function withMedData({
   ];
 }
 
+function withMedData(options?: Parameters<typeof withMedDataCore>[0]): Decorator[] {
+  // Innermost decorator wins for navigator overrides (Storybook applies first listed last).
+  return [...withDesktopUserAgent(), ...withMedDataCore(options)];
+}
+
 export const WithDailyMeds: Story = {
   args: { petId: mockPetId },
   decorators: withMedData(),
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement);
     await expect(canvas.getByRole('heading', { name: 'Meds' })).toBeInTheDocument();
+    await expect(canvas.getByRole('heading', { name: "Today's meds" })).toBeInTheDocument();
+    // Shortcut link shows on macOS (desktop stories run with a macOS UA).
+    await expect(canvas.getByRole('link', { name: 'Apple Shortcut' })).toBeInTheDocument();
     await expect(canvas.queryByRole('heading', { name: 'Bundles' })).not.toBeInTheDocument();
     await userEvent.click(canvas.getAllByRole('button', { name: 'Add record' })[0]!);
     await expect(canvas.getByText('Add medication record')).toBeInTheDocument();
@@ -85,6 +115,7 @@ export const WithDeveloperMode: Story = {
   args: { petId: mockPetId },
   decorators: withMedData({ developerMode: true }),
 };
+
 
 export const WithBundle: Story = {
   args: { petId: mockPetId },

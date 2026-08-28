@@ -1,0 +1,12 @@
+{
+  "include": [
+    "shortcuts"
+  ],
+  "exclude": [
+    "**/__pycache__",
+    "node_modules",
+    "target",
+    "frontend"
+  ],
+  "pythonVersion": "3.11"
+}

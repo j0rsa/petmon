@@ -24,7 +24,10 @@ import {
 import { buildMedIntakeCurl } from '../../lib/medIntakeCurl';
 import { parseDecimal } from '../../lib/numbers';
 import { isDoseSupported } from '../../lib/pillDoseCuts';
+import { medIntakeShortcutLinkProps } from '../../lib/medIntakeShortcut';
+import { showMedIntakeShortcutLink } from '../../lib/medIntakePlatform';
 import { isoFromDateAndTime, nowTimeString } from '../../lib/time';
+import { infoApi } from '../../api/info';
 import { usePermissions } from '../../context/usePermissions';
 import { useFormatTime } from '../../context/useDisplaySettings';
 import { useUserSettings } from '../../api/userSettings';
@@ -173,7 +176,7 @@ function DailyMedRow({
         doseFraction={iconFraction}
         size={40}
       />
-      <div style={{ flex: 1, minWidth: 0 }}>
+      <div className="med-intake-row__body">
         <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap' }}>
           <strong style={{ fontSize: '0.92rem' }}>{medication.name}</strong>
           {assignment.optional && (
@@ -208,7 +211,7 @@ function DailyMedRow({
         )}
       </div>
       {showActions && (
-        <div style={{ display: 'flex', gap: '0.35rem', alignItems: 'center' }}>
+        <div className="med-intake-row__actions">
           {developerMode && (
             <button
               type="button"
@@ -440,7 +443,7 @@ function BundleTakeRow({
           />
         ))}
       </div>
-      <div style={{ flex: 1, minWidth: 0 }}>
+      <div className="med-intake-row__body">
         <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap' }}>
           <strong style={{ fontSize: '0.92rem' }}>{bundle.name}</strong>
           <span
@@ -467,7 +470,7 @@ function BundleTakeRow({
         )}
       </div>
       {canWrite && (
-        <div style={{ display: 'flex', gap: '0.35rem', alignItems: 'center' }}>
+        <div className="med-intake-row__actions">
           <button
             type="button"
             className="button button-secondary"
@@ -590,6 +593,13 @@ export function MedIntakePanel({ petId }: MedIntakePanelProps) {
     enabled: Boolean(petId),
   });
 
+  const appInfoQuery = useQuery({
+    queryKey: ['app-info'],
+    queryFn: infoApi.get,
+    staleTime: Infinity,
+    retry: false,
+  });
+
   function invalidate() {
     queryClient.invalidateQueries({ queryKey: ['med-daily', petId] });
     queryClient.invalidateQueries({ queryKey: ['med-intake'] });
@@ -606,11 +616,31 @@ export function MedIntakePanel({ petId }: MedIntakePanelProps) {
 
   return (
     <section className="panel" id="medications">
-      <div className="section-heading">
+      <div className="section-heading med-intake-heading">
         <div>
           <p className="eyebrow">Medications</p>
           <h3>Today&apos;s meds</h3>
         </div>
+        {/* Card action, so it sits on the header row at the card's right edge
+            and wraps below the title on narrow screens. */}
+        {!loading && !empty && (
+          <div className="med-intake-import-links">
+            {showMedIntakeShortcutLink() && (
+              <a
+                {...medIntakeShortcutLinkProps(undefined, appInfoQuery.data?.med_intake_shortcut_icloud_url)}
+                className="shortcuts-import-link"
+                aria-label="Apple Shortcut"
+                title={
+                  appInfoQuery.data?.med_intake_shortcut_icloud_url
+                    ? 'Import the Petmon Take Meds shortcut from iCloud (configure URL, pet id, and API key on first run)'
+                    : 'Download the Petmon Take Meds shortcut (iPhone needs an iCloud link — see docs/apple-shortcut-med-intake.md)'
+                }
+              >
+                <img src="/icons/shortcuts.png" alt="" width={22} height={22} className="shortcuts-import-link__icon" />
+              </a>
+            )}
+          </div>
+        )}
       </div>
 
       {loading ? (

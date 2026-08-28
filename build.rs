@@ -23,18 +23,26 @@ fn main() {
     // ── Version info ──────────────────────────────────────────────────────────
     let version = env::var("CARGO_PKG_VERSION").unwrap_or_else(|_| "unknown".to_string());
 
-    let git_sha = Command::new("git")
-        .args(["rev-parse", "--short", "HEAD"])
-        .output()
+    println!("cargo:rerun-if-env-changed=PETMON_GIT_SHA");
+
+    let git_sha = env::var("PETMON_GIT_SHA")
         .ok()
-        .and_then(|o| {
-            if o.status.success() {
-                Some(o.stdout)
-            } else {
-                None
-            }
+        .map(|s| s.trim().chars().take(7).collect::<String>())
+        .filter(|s| !s.is_empty())
+        .or_else(|| {
+            Command::new("git")
+                .args(["rev-parse", "--short", "HEAD"])
+                .output()
+                .ok()
+                .and_then(|o| {
+                    if o.status.success() {
+                        Some(o.stdout)
+                    } else {
+                        None
+                    }
+                })
+                .map(|b| String::from_utf8_lossy(&b).trim().to_string())
         })
-        .map(|b| String::from_utf8_lossy(&b).trim().to_string())
         .unwrap_or_else(|| "unknown".to_string());
 
     let out_dir = PathBuf::from(env::var("OUT_DIR").expect("OUT_DIR"));

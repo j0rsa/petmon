@@ -1,19 +1,25 @@
-.PHONY: help build-be build-fe run-be run-dev-fe install-fe story seed-demo check check-fe check-be
+.PHONY: help build-be build-fe run-be run-dev-fe install-fe story seed-demo check check-fe check-be check-shortcut install-cherri kill-be-port build-shortcut publish-shortcut shortcut
 
 FE_DIR := frontend
+BE_PORT ?= 8080
 
 help:
 	@echo "Targets:"
 	@echo "  make build-be     Build the Rust backend"
 	@echo "  make build-fe     Build the frontend (output: frontend/dist/)"
-	@echo "  make run-be       Run the backend server (cargo run)"
+	@echo "  make run-be       Free port $(BE_PORT) and run the backend server"
+	@echo "  make kill-be-port Stop whatever is listening on port $(BE_PORT)"
 	@echo "  make run-dev-fe   Run the frontend dev server (Vite)"
 	@echo "  make story        Run the Storybook component server"
 	@echo "  make seed-demo    Reset DB and load demo data (ARGS='--append' to skip wipe)"
 	@echo "  make install-fe   Install frontend npm dependencies"
-	@echo "  make check        Run all checks (fe + be)"
+	@echo "  make check        Run all checks (fe + be + shortcut)"
 	@echo "  make check-fe     Typecheck, lint, and test the frontend"
 	@echo "  make check-be     Format, clippy, audit, and test the backend"
+	@echo "  make check-shortcut  Compile shortcuts/med-intake.cherri and verify the plist"
+	@echo "  make build-shortcut  Compile + sign the med-intake Apple Shortcut (macOS)"
+	@echo "  make publish-shortcut  Build, open in Shortcuts, print iCloud publish steps"
+	@echo "  make shortcut  Build/sign, open Shortcuts, prompt for iCloud URL → publish.json"
 
 install-fe:
 	cd $(FE_DIR) && npm install
@@ -24,8 +30,17 @@ build-be:
 build-fe: install-fe
 	cd $(FE_DIR) && npm run build
 
-run-be:
-	-pkill -f 'target/debug/petmon' 2>/dev/null; sleep 0.3
+kill-be-port:
+	@pids=$$(lsof -ti tcp:$(BE_PORT) -sTCP:LISTEN 2>/dev/null); \
+	if [ -n "$$pids" ]; then \
+		echo "Killing listener(s) on port $(BE_PORT): $$pids"; \
+		kill $$pids 2>/dev/null || kill -9 $$pids; \
+		sleep 0.3; \
+	else \
+		echo "Port $(BE_PORT) is free"; \
+	fi
+
+run-be: kill-be-port
 	DEV_MODE=true STATIC_DIR=frontend/dist cargo run
 
 seed-demo:
@@ -37,7 +52,7 @@ run-dev-fe: install-fe
 story: install-fe
 	cd $(FE_DIR) && npm run storybook
 
-check: check-fe check-be
+check: check-fe check-be check-shortcut
 
 check-fe: install-fe
 	cd $(FE_DIR) && npx tsc --noEmit
@@ -50,3 +65,32 @@ check-be:
 	DATABASE_URL="sqlite::memory:" cargo clippy --locked -- -D warnings
 
 	DATABASE_URL="sqlite::memory:" cargo test --locked
+
+# Install the Cherri v2.3.0 compiler to ~/.local/bin/cherri.
+# v2+ cannot be installed via `go install` due to the module path change.
+CHERRI_VERSION := v2.3.0
+CHERRI_INSTALL := $(HOME)/.local/bin/cherri
+install-cherri:
+	@mkdir -p "$(HOME)/.local/bin"
+	curl -fsSL "https://github.com/electrikmilk/cherri/releases/download/$(CHERRI_VERSION)/cherri_darwin-arm64.zip" \
+	  -o /tmp/cherri.zip
+	unzip -o /tmp/cherri.zip -d "$(HOME)/.local/bin" cherri
+	chmod +x "$(CHERRI_INSTALL)"
+	@"$(CHERRI_INSTALL)" --version
+
+# Compile the Cherri source and verify the plist it produces.
+# Needs Cherri v2.3.0 — run `make install-cherri` first if not already installed.
+check-shortcut:
+	python3 shortcuts/build.py --check
+
+# Same, plus signing — macOS only, and it rewrites the committed .shortcut.
+build-shortcut:
+	python3 shortcuts/build.py
+
+publish-shortcut:
+	python3 shortcuts/publish.py
+
+# Build, sign, open Shortcuts, then record the iCloud link in publish.json.
+shortcut:
+	python3 shortcuts/publish.py --await-url
+

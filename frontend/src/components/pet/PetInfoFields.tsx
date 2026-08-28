@@ -1,3 +1,5 @@
+import { useState } from 'react';
+import { Copy } from 'lucide-react';
 import { PET_SPECIES_LABELS, PET_STATUS_LABELS, type Pet } from '../../types';
 
 function formatBirthDate(value?: string) {
@@ -14,6 +16,7 @@ interface PetInfoFieldsProps {
 }
 
 export function PetInfoFields({ pet }: PetInfoFieldsProps) {
+  const [idCopied, setIdCopied] = useState(false);
   const telegramChats = [...new Set([
     pet.telegram_nutrition_chat_id?.trim(),
     pet.telegram_meds_chat_id?.trim(),
@@ -29,6 +32,27 @@ export function PetInfoFields({ pet }: PetInfoFieldsProps) {
 
   return (
     <dl className="pet-info-fields">
+      <div className="pet-info-row pet-info-row-full">
+        <dt>Pet ID</dt>
+        <dd className="pet-info-id">
+          <code className="pet-info-id__value">{pet.id}</code>
+          <button
+            type="button"
+            className="button button-secondary pet-info-id__copy"
+            aria-label={idCopied ? 'Copied pet ID' : 'Copy pet ID'}
+            title={idCopied ? 'Copied' : 'Copy pet ID'}
+            onClick={() => {
+              navigator.clipboard.writeText(pet.id).then(() => {
+                setIdCopied(true);
+                setTimeout(() => setIdCopied(false), 2000);
+              });
+            }}
+          >
+            <Copy size={14} aria-hidden="true" />
+            <span>{idCopied ? 'Copied' : 'Copy'}</span>
+          </button>
+        </dd>
+      </div>
       {rows.map((row) => (
         <div key={row.label} className="pet-info-row">
           <dt>{row.label}</dt>

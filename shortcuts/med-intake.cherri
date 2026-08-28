@@ -1,0 +1,160 @@
+/*
+Petmon — Take Meds.
+
+Compiled with Cherri (https://cherrilang.org) instead of a hand-written plist, so
+every action's parameters come from a compiler that knows them.
+
+WHY `const` AND NOT `@` ALMOST EVERYWHERE
+Cherri emits two different references (shortcutgen.go): `const` becomes
+`Type: ActionOutput` with the producing action's UUID, `@name` becomes
+`Type: Variable` with a name. Apple's own shortcuts only use the `Variable` form
+*inside* a text field's `attachmentsByRange`; whole-field parameters get
+`ActionOutput`. A `Variable` attachment in a whole-field parameter silently fails
+to bind — that is exactly how `Format Date` ended up with no input and the menu
+request asked for `&date=`.
+
+So: `const` for any value an action consumes, `@` only for a mutable accumulator,
+which reaches the outside world through string interpolation.
+
+SYNTAX NOTES for Cherri v2.3.0:
+  * `@name` is required for all mutable variable references (v2.2+ enforced)
+  * `const` (magic variable) references remain bare: `alert(x)`, `"{x}"`
+  * loop variables are mutable — use `"{@var}"` to capture one as a text const
+    before conditions, since getValue results have `variable` type at compile time
+    and conditions require [text number bool action date]; use `.text` coercion
+    on getValue results in conditions: `if label.text == pickText`
+  * `#include 'actions/scripting'` removed in v2.3.0 (scripting auto-included)
+  * `#define` must precede `#include`
+  * error positions can be stale; bisect the file rather than trusting them
+
+Build:  make cherri-dev   (compile + verify, unsigned)
+        make shortcut     (signed, replaces assets/shortcuts/Petmon Take Meds.shortcut)
+*/
+
+#define name "Petmon Take Meds"
+#define color orange
+#define glyph pill
+
+#include 'actions/calendar'
+#include 'actions/web'
+
+#question serverURL "Petmon server URL
+
+Use the site address from your browser, including https://.
+Example: https://petmon.j0rsa.com" "https://petmon.j0rsa.com"
+
+#question petID "Pet ID
+
+UUID of the pet you are logging meds for.
+Copy it from the pet profile card in Petmon." ""
+
+#question apiKey "API key
+
+Create one in Petmon → Settings → API tokens (Write scope).
+Stored in plain text on this device." ""
+
+#question verboseSetting "Verbose notifications
+
+Show a confirmation banner after logging.
+Off: 0, off, false, no  |  On: 1, on, true, yes" "off"
+
+/* Shortcuts cannot use an import question as a variable value, and each question
+   fills exactly one action argument — so each one feeds a Text action whose
+   output is usable everywhere.
+
+   The space before `)` is load-bearing: Cherri advances one character past a
+   question reference, and without it that character is the `)`, which reports as
+   "Too many arguments". */
+const server = text(serverURL )
+const pet = text(petID )
+const key = text(apiKey )
+const verbose = text(verboseSetting )
+
+/* The device's own day, so the list matches what the phone shows even when the
+   server runs in another time zone. */
+const now = currentDate()
+const today = formatDate(now, "Custom", "yyyy-MM-dd")
+
+const menuResponse = downloadURL("{server}/api/v1/shortcuts/meds/intake/menu?pet_id={pet}&date={today}", {"Authorization": "Bearer {key}"})
+const menu = getDictionary(menuResponse)
+const choices = getValue(menu, "choices")
+const dueCount = count(choices)
+
+if dueCount == 0 {
+    alert("Nothing due in Petmon today.", "Petmon")
+} else {
+    const labels = getValue(menu, "labels")
+    const selected = chooseFromList(labels, "Select meds to log", true)
+    nothing()
+    @logged: array
+
+    for pick in selected {
+        /* Capture the outer loop variable as a text const (v2.2+: getValue results
+           need .text coercion in conditions; loop vars captured via "{}" are text). */
+        const pickText = "{@pick}"
+        for choice in choices {
+            const entry = getDictionary(@choice)
+            const label = getValue(entry, "label")
+
+            /* `pick` and `choice` are separate names, so the inner loop cannot
+               shadow the outer one — the bug that silently logged nothing.
+               Use .text on getValue results in conditions (v2.2+ type checking). */
+            if label.text == pickText {
+                const medID = getValue(entry, "medication_id")
+                const assignID = getValue(entry, "assignment_id")
+                const kind = getValue(entry, "kind")
+                const takeBase = text("{server}/api/v1/shortcuts/meds/intake/take?pet_id={pet}&medication_id={medID}&assignment_id={assignID}" )
+
+                /* The kinds are mutually exclusive, and Cherri has no `else if`.
+                   Each branch builds the full URL because a `const` cannot be
+                   reassigned. */
+                if kind.text == "scheduled" {
+                    const scheduledTake = jsonRequest(takeBase, "POST", {}, {"Authorization": "Bearer {key}"})
+                    const scheduledRecord = getDictionary(scheduledTake)
+                    const scheduledID = getValue(scheduledRecord, "id")
+                    if scheduledID {
+                        @logged += label
+                    }
+                }
+                if kind.text == "optional_pill" {
+                    /* Display spellings (`3/4`); the API parses those as well as
+                       the canonical `three_quarter`. */
+                    const doseOptions = getValue(entry, "fraction_labels")
+                    const dose = chooseFromList(doseOptions, "Dose for {label}")
+                    const pillURL = text("{takeBase}&dose_fraction={dose}" )
+                    const pillTake = jsonRequest(pillURL, "POST", {}, {"Authorization": "Bearer {key}"})
+                    const pillRecord = getDictionary(pillTake)
+                    const pillID = getValue(pillRecord, "id")
+                    if pillID {
+                        @logged += label
+                    }
+                }
+                if kind.text == "optional_liquid" {
+                    const ml = prompt("Millilitres for {label}", "Number")
+                    const liquidURL = text("{takeBase}&liquid_dose_ml={ml}" )
+                    const liquidTake = jsonRequest(liquidURL, "POST", {}, {"Authorization": "Bearer {key}"})
+                    const liquidRecord = getDictionary(liquidTake)
+                    const liquidID = getValue(liquidRecord, "id")
+                    if liquidID {
+                        @logged += label
+                    }
+                }
+            }
+        }
+    }
+
+    /* Report only what the server acknowledged with a record id: Shortcuts hands
+       a 4xx body to the next action instead of stopping, so an unchecked POST
+       would report a failure as logged.
+
+       `logged` is mutable, so it reaches the condition through interpolation
+       into a const — a Variable attachment would not bind here either. */
+    const summary = text("{logged}" )
+    if summary == "" {
+        alert("No doses were logged. Check the Petmon server URL, pet id, and API key.", "Petmon")
+    } else {
+        if verbose == "1" || verbose == "on" || verbose == "true" || verbose == "True" || verbose == "yes" {
+            alert("Petmon logged: {logged}", "Petmon")
+        }
+    }
+}

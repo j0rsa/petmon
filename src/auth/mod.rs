@@ -1,14 +1,13 @@
-pub mod identity;
-pub mod oidc;
+use std::sync::Arc;
 
 use chrono_tz::Tz;
 use sqlx::SqlitePool;
-use std::sync::Arc;
 
-use oidc::OidcValidator;
+use crate::auth::oidc::OidcValidator;
 
-/// Shared application state injected into every handler.
-#[derive(Clone)]
+pub mod identity;
+pub mod oidc;
+
 pub struct AppState {
     pub pool: SqlitePool,
     pub dev_mode: bool,
@@ -17,6 +16,8 @@ pub struct AppState {
     pub timezone: Tz,
     /// True when `DEMO_MODE` env is set (demo seed + UI banner).
     pub demo_mode: bool,
+    /// iCloud share link for the med-intake shortcut (iPhone import). From env or publish.json.
+    pub med_intake_shortcut_icloud_url: Option<String>,
 }
 
 impl AppState {
@@ -26,7 +27,15 @@ impl AppState {
         oidc: Option<OidcValidator>,
         static_dir: Option<String>,
     ) -> Self {
-        AppState::new_with_tz(pool, dev_mode, oidc, static_dir, chrono_tz::UTC, false)
+        AppState::new_with_tz(
+            pool,
+            dev_mode,
+            oidc,
+            static_dir,
+            chrono_tz::UTC,
+            false,
+            None,
+        )
     }
 
     pub fn new_with_tz(
@@ -36,6 +45,7 @@ impl AppState {
         static_dir: Option<String>,
         timezone: Tz,
         demo_mode: bool,
+        med_intake_shortcut_icloud_url: Option<String>,
     ) -> Self {
         AppState {
             pool,
@@ -44,6 +54,7 @@ impl AppState {
             static_dir,
             timezone,
             demo_mode,
+            med_intake_shortcut_icloud_url,
         }
     }
 }

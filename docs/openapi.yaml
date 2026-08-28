@@ -1910,6 +1910,102 @@ paths:
         '204':
           description: Intake record deleted
 
+  /shortcuts/meds/intake/menu:
+    get:
+      tags: [Shortcuts]
+      summary: Med intake menu for Apple Shortcuts
+      description: |
+        Returns structured menu choices plus human-readable `labels` for pickers and
+        `lines` pipe-encoded for Shortcuts (`label|assignment_id|kind[|fraction_labels_csv]`).
+        Includes scheduled and optional meds; excludes bundle members. Scheduled meds
+        already taken the required number of times today are omitted. Labels are
+        unique; `status` is `empty` when nothing is due.
+      x-required-scope: api_read
+      parameters:
+        - name: pet_id
+          in: query
+          required: true
+          schema: { type: string, format: uuid }
+        - name: date
+          in: query
+          required: true
+          schema: { type: string, format: date }
+      responses:
+        '200':
+          description: Shortcut menu
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MedIntakeShortcutMenu'
+
+  /shortcuts/meds/intake/take:
+    post:
+      tags: [Shortcuts]
+      summary: Record a medication take from the shortcut
+      description: |
+        Records a real-time intake for the medication identified by `pet_id`,
+        `medication_id`, and `assignment_id` (all from the menu choice).
+
+        **Real-time only.** The dose is always stamped with the server's current
+        local time, exactly like a Take now from the web UI, so the Telegram
+        `#pills` line carries no timestamp. There is no way to backdate through
+        this endpoint — use `POST /health/meds/intake` for that. Unknown query
+        params (including `occurred_at` / `local_date`) are rejected with `400`
+        rather than ignored, so a drifted client fails loudly.
+
+        Auth: `api_write` bearer token (same `pm_api_…` token used for the menu).
+      x-required-scope: api_write
+      parameters:
+        - name: pet_id
+          in: query
+          required: true
+          schema: { type: string, format: uuid }
+        - name: medication_id
+          in: query
+          required: true
+          schema: { type: string }
+        - name: assignment_id
+          in: query
+          required: true
+          schema: { type: string }
+        - name: dose_fraction
+          in: query
+          required: false
+          schema: { $ref: '#/components/schemas/DoseFractionParam' }
+          description: Required for `optional_pill` kind.
+        - name: liquid_dose_ml
+          in: query
+          required: false
+          schema: { type: number, format: double }
+          description: Required for `optional_liquid` kind.
+        - name: source
+          in: query
+          required: false
+          schema: { type: string, example: shortcut }
+          description: Intake source label stored on the record (default `shortcut`).
+      responses:
+        '201':
+          description: Intake recorded
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/MedIntakeRecord' }
+
+  /shortcuts/meds/intake.shortcut:
+    get:
+      tags: [Shortcuts]
+      summary: Download Apple Shortcut for med intake
+      description: Signed Apple Shortcut file (same for all users). Configure server URL, pet id, and API key on first run.
+      security: []
+      responses:
+        '200':
+          description: Signed `.shortcut` file
+          content:
+            application/octet-stream:
+              schema:
+                type: string
+                format: binary
+
+
   /nutrition/records:
     get:
       tags:
@@ -2515,6 +2611,14 @@ components:
         demo_mode:
           type: boolean
           description: True when the server started with DEMO_MODE (demo seed + UI banner).
+        med_intake_shortcut_icloud_url:
+          type: string
+          description: iCloud share link for the med-intake Apple Shortcut (iPhone import). Omitted when unset.
+          example: "https://www.icloud.com/shortcuts/abc123def4"
+        med_intake_automate_community_url:
+          type: string
+          description: Automate Community link for the med-intake flow (Android import). Omitted when unset.
+          example: "https://llamalab.com/automate/community/flows/12345"
     ErrorResponse:
       type: object
       properties:
@@ -4301,6 +4405,32 @@ components:
       type: string
       enum: [whole, half, third, quarter, three_quarter, eighth, sixteenth]
 
+    DoseFractionParam:
+      type: string
+      description: |
+        Dose fraction as either the canonical name or its display form — `half`
+        and `1/2` are the same value. The Shortcuts / AutoMate dose pickers show
+        the display forms (`MedIntakeShortcutMenuChoice.fraction_labels`) and
+        sends the chosen string back verbatim. Always stored and returned in
+        canonical form.
+      enum:
+        [
+          whole,
+          half,
+          third,
+          quarter,
+          three_quarter,
+          eighth,
+          sixteenth,
+          '1',
+          '3/4',
+          '1/2',
+          '1/3',
+          '1/4',
+          '1/8',
+          '1/16',
+        ]
+
     MedFrequency:
       type: object
       properties:
@@ -4447,6 +4577,53 @@ components:
           type: string
           format: date
           description: Last active date. Defaults to yesterday in the server timezone.
+
+    MedIntakeShortcutMenu:
+      type: object
+      required: [status, choices, labels, lines]
+      properties:
+        status:
+          type: string
+          enum: [ok, empty]
+          description: |
+            `empty` when nothing is due. Branch on this value rather than
+            counting `choices`.
+        choices:
+          type: array
+          items: { $ref: '#/components/schemas/MedIntakeShortcutMenuChoice' }
+        labels:
+          type: array
+          items: { type: string }
+          description: |
+            Human-readable menu labels in the same order as `choices`.
+            Guaranteed unique — duplicates get a ` (2)`, ` (3)`, … suffix.
+        lines:
+          type: array
+          items: { type: string }
+          description: |
+            Pipe-encoded rows: `label|assignment_id|kind[|fraction_labels_csv]`.
+
+    MedIntakeShortcutMenuChoice:
+      type: object
+      required: [label, medication_id, assignment_id, kind]
+      properties:
+        label: { type: string }
+        medication_id: { type: string }
+        assignment_id: { type: string }
+        kind:
+          type: string
+          enum: [scheduled, optional_pill, optional_liquid]
+        fractions:
+          type: array
+          items: { $ref: '#/components/schemas/DoseFraction' }
+          description: Present for optional pills; allowed dose fractions for the picker.
+        fraction_labels:
+          type: array
+          items: { type: string }
+          example: ['1', '3/4', '1/2', '1/3', '1/4', '1/8', '1/16']
+          description: |
+            Display forms of `fractions`, in the same order. What the on-device
+            dose picker shows and sends back as `dose_fraction`.
 
     MedIntakeRecord:
       type: object
