@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { ApiError } from '../api/client';
 import { settingsApi } from '../api/settings';
 import type { ApiTokenCreated, ApiTokenPublic, ApiTokenScope, OidcConfigPublic, TelegramConfigPublic } from '../api/settings';
 import { useUserSettings } from '../api/userSettings';
@@ -723,6 +724,13 @@ function ApiTokensSection() {
             >
               {createMutation.isPending ? 'Creating…' : '+ Create token'}
             </button>
+            {createMutation.isError && (
+              <p style={{ fontSize: '0.82rem', color: 'var(--error-text)', marginTop: '0.5rem' }}>
+                {createMutation.error instanceof ApiError
+                  ? ((createMutation.error.body as { message?: string })?.message ?? 'Failed to create token.')
+                  : 'Failed to create token.'}
+              </p>
+            )}
           </div>
         </div>
       )}

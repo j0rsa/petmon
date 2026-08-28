@@ -2727,6 +2727,46 @@ async fn api_token_create_persists_owner_subject() {
     assert_eq!(owner.as_deref(), Some("dev"));
 }
 
+/// A session authenticated with an API token can create a new token; the new
+/// token inherits the owner_subject from the existing token.
+#[actix_web::test]
+async fn api_token_can_create_another_token_inheriting_owner() {
+    let pool = setup_pool().await;
+    let raw = "pm_api_create_via_token_000000000000000000000000000000000000000000000";
+    seed_token_for_owner(&pool, raw, "all", "oidc-user-sub").await;
+    let state = web::Data::new(AppState::new(pool.clone(), false, None, None));
+    let app = build_full_app!(state);
+
+    let resp = test::call_service(
+        &app,
+        test::TestRequest::post()
+            .uri("/api/v1/api-tokens")
+            .insert_header(("Authorization", format!("Bearer {raw}")))
+            .set_json(serde_json::json!({ "alias": "second-device" }))
+            .to_request(),
+    )
+    .await;
+    assert_eq!(
+        resp.status(),
+        201,
+        "should allow token creation via API token"
+    );
+    let body: serde_json::Value = test::read_body_json(resp).await;
+    let id = body["id"].as_str().unwrap();
+
+    let owner: Option<String> =
+        sqlx::query_scalar("SELECT owner_subject FROM api_tokens WHERE id = ?")
+            .bind(id)
+            .fetch_one(&pool)
+            .await
+            .unwrap();
+    assert_eq!(
+        owner.as_deref(),
+        Some("oidc-user-sub"),
+        "new token must inherit owner_subject from the authenticating token"
+    );
+}
+
 #[actix_web::test]
 async fn api_token_created_with_explicit_scopes() {
     let (app, _state) = build_dev_app!();

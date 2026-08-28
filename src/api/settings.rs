@@ -108,18 +108,18 @@ pub async fn create_token(
         .cloned()
         .ok_or_else(|| AppError::Internal("missing identity in request".to_string()))?;
 
+    // API tokens carry owner_subject from the original OIDC session, so
+    // all three identity kinds are allowed. The OIDC guard below is only
+    // meaningful for OIDC sessions (where the new token's owner comes from
+    // the live OIDC claims); for API token sessions the owner is already
+    // recorded and OIDC need not be configured.
     match &identity.kind {
-        IdentityKind::ApiToken { .. } => {
-            return Err(AppError::BadRequest(
-                "API tokens cannot be created using another API token. Authenticate via OIDC."
-                    .to_string(),
-            ));
-        }
-        IdentityKind::Oidc | IdentityKind::Dev => {}
+        IdentityKind::ApiToken { .. } | IdentityKind::Oidc | IdentityKind::Dev => {}
     }
 
-    // If OIDC is disabled (dev mode only path) we still allow it
-    if !state.dev_mode && state.oidc.is_none() {
+    // Require OIDC to be configured only when the session itself is OIDC —
+    // that is the only case where we derive owner_subject from live OIDC claims.
+    if !state.dev_mode && matches!(&identity.kind, IdentityKind::Oidc) && state.oidc.is_none() {
         return Err(AppError::BadRequest(
             "OIDC must be configured before API tokens can be created.".to_string(),
         ));
