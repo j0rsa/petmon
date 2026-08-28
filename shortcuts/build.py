@@ -32,6 +32,7 @@ QUESTION_TARGETS = {
     "Petmon server URL": "server",
     "Pet ID": "pet",
     "API key": "key",
+    "Verbose notifications": "verbose",  # first line of the #question prompt
 }
 
 GET_TEXT = "is.workflow.actions.gettext"
@@ -99,9 +100,23 @@ def repoint_questions(workflow: dict) -> list[str]:
             question["ActionIndex"] = target
 
         parameters = actions[target]["WFWorkflowActionParameters"]
-        if question["ParameterKey"] not in parameters:
-            # The question would have nothing to overwrite.
-            parameters[question["ParameterKey"]] = ""
+        key = question["ParameterKey"]
+        # iOS's import-question handler only recognises WFTextTokenString serialised
+        # dicts as fill targets. Cherri v2.3.0 emits a plain "" string for empty Text
+        # actions; that plain string is silently skipped and the questions dialog never
+        # appears. Convert to the proper WFTextTokenString form so iOS shows the
+        # onboarding wizard on first install.
+        empty_token_string = {
+            "Value": {"attachmentsByRange": {}, "string": ""},
+            "WFSerializationType": "WFTextTokenString",
+        }
+        current_val = parameters.get(key)
+        if not isinstance(current_val, dict):
+            if current_val is None:
+                changes.append(f"{first_line!r}: added missing {key}")
+            else:
+                changes.append(f"{first_line!r}: converted {key} from plain string to WFTextTokenString")
+            parameters[key] = empty_token_string
     return changes
 
 

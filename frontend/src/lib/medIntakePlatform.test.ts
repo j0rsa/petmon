@@ -27,14 +27,6 @@ describe('medIntakeImportPlatform', () => {
     expect(showMedIntakeShortcutLink()).toBe(false);
   });
 
-  it('does not show shortcut link on desktop', () => {
-    mockUserAgent(
-      'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-    );
-    expect(medIntakeImportPlatform()).toBe('other');
-    expect(showMedIntakeShortcutLink()).toBe(false);
-  });
-
   it('shows shortcut link on iOS', () => {
     mockUserAgent(
       'Mozilla/5.0 (iPhone; CPU iPhone OS 18_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.0 Mobile/15E148 Safari/604.1',
@@ -49,6 +41,23 @@ describe('medIntakeImportPlatform', () => {
       'iOS',
     );
     expect(medIntakeImportPlatform()).toBe('ios');
+    expect(showMedIntakeShortcutLink()).toBe(true);
+  });
+
+  it('shows shortcut link on macOS', () => {
+    mockUserAgent(
+      'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+    );
+    expect(medIntakeImportPlatform()).toBe('macos');
+    expect(showMedIntakeShortcutLink()).toBe(true);
+  });
+
+  it('detects macOS from userAgentData platform hint', () => {
+    mockUserAgent(
+      'Mozilla/5.0 AppleWebKit/537.36 (KHTML, like Gecko) Safari/537.36',
+      'macOS',
+    );
+    expect(medIntakeImportPlatform()).toBe('macos');
     expect(showMedIntakeShortcutLink()).toBe(true);
   });
 });

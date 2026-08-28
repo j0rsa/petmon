@@ -53,6 +53,11 @@ Copy it from the pet profile card in Petmon." ""
 Create one in Petmon → Settings → API tokens (Write scope).
 Stored in plain text on this device." ""
 
+#question verboseSetting "Verbose notifications
+
+Show a confirmation banner after logging.
+Off: 0, off, false, no  |  On: 1, on, true, yes" "off"
+
 /* Shortcuts cannot use an import question as a variable value, and each question
    fills exactly one action argument — so each one feeds a Text action whose
    output is usable everywhere.
@@ -63,6 +68,7 @@ Stored in plain text on this device." ""
 const server = text(serverURL )
 const pet = text(petID )
 const key = text(apiKey )
+const verbose = text(verboseSetting )
 
 /* The device's own day, so the list matches what the phone shows even when the
    server runs in another time zone. */
@@ -147,6 +153,8 @@ if dueCount == 0 {
     if summary == "" {
         alert("No doses were logged. Check the Petmon server URL, pet id, and API key.", "Petmon")
     } else {
-        alert("Petmon logged: {logged}", "Petmon")
+        if verbose == "1" || verbose == "on" || verbose == "true" || verbose == "True" || verbose == "yes" {
+            alert("Petmon logged: {logged}", "Petmon")
+        }
     }
 }

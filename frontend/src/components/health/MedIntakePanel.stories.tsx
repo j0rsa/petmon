@@ -98,8 +98,8 @@ export const WithDailyMeds: Story = {
     const canvas = within(canvasElement);
     await expect(canvas.getByRole('heading', { name: 'Meds' })).toBeInTheDocument();
     await expect(canvas.getByRole('heading', { name: "Today's meds" })).toBeInTheDocument();
-    // Shortcut link is iOS-only; desktop stories show no import link.
-    await expect(canvas.queryByRole('link', { name: 'Apple Shortcut' })).not.toBeInTheDocument();
+    // Shortcut link shows on macOS (desktop stories run with a macOS UA).
+    await expect(canvas.getByRole('link', { name: 'Apple Shortcut' })).toBeInTheDocument();
     await expect(canvas.queryByRole('heading', { name: 'Bundles' })).not.toBeInTheDocument();
     await userEvent.click(canvas.getAllByRole('button', { name: 'Add record' })[0]!);
     await expect(canvas.getByText('Add medication record')).toBeInTheDocument();
