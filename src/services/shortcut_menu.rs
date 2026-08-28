@@ -58,17 +58,6 @@ pub struct MedIntakeMenuResponse {
     pub lines: Vec<String>,
 }
 
-async fn bundled_medication_ids(
-    pool: &SqlitePool,
-    pet_id: Uuid,
-) -> AppResult<std::collections::HashSet<String>> {
-    let bundles = crate::repo::med_bundles::list_by_pet(pool, pet_id).await?;
-    Ok(bundles
-        .into_iter()
-        .flat_map(|bundle| bundle.items.into_iter().map(|item| item.medication_id))
-        .collect())
-}
-
 fn menu_label(item: &DailyMedAssignment) -> String {
     format!("{} · {}", item.medication.name, item.assignment.dose_label)
 }
@@ -128,21 +117,19 @@ fn disambiguate_labels(choices: &mut [MedIntakeMenuChoice]) {
     }
 }
 
-/// Menu for Apple Shortcuts. Includes scheduled and optional meds; excludes bundle members.
+/// Menu for Apple Shortcuts. Includes scheduled and optional meds, including bundle members.
+/// Bundle members are taken individually via the standard take endpoint; the shortcut does
+/// not need to know about bundle grouping.
 pub async fn med_intake_menu(
     pool: &SqlitePool,
     pet_id: Uuid,
     date: &str,
 ) -> AppResult<MedIntakeMenuResponse> {
     let daily = medication_service::daily_assignments(pool, pet_id, date).await?;
-    let bundled = bundled_medication_ids(pool, pet_id).await?;
     let taken_today = crate::repo::med_intake_records::taken_counts_on(pool, pet_id, date).await?;
 
     let mut choices = Vec::new();
     for item in daily {
-        if bundled.contains(&item.medication.id) {
-            continue;
-        }
         if !item.assignment.optional
             && !crate::domain::medication::assignment_due_on(&item.assignment, date)
         {
