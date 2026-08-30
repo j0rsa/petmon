@@ -12,6 +12,7 @@ struct MedicationRow {
     med_type: String,
     color: String,
     emoji: Option<String>,
+    description: Option<String>,
     created_at: String,
     updated_at: String,
 }
@@ -26,6 +27,7 @@ fn row_to_medication(row: MedicationRow) -> AppResult<Medication> {
         med_type,
         color: row.color,
         emoji: row.emoji,
+        description: row.description,
         created_at: row.created_at,
         updated_at: row.updated_at,
     })
@@ -34,7 +36,7 @@ fn row_to_medication(row: MedicationRow) -> AppResult<Medication> {
 #[tracing::instrument(skip(pool))]
 pub async fn list_by_pet(pool: &SqlitePool, pet_id: Uuid) -> AppResult<Vec<Medication>> {
     let rows = sqlx::query_as::<_, MedicationRow>(
-        "SELECT id, pet_id, name, med_type, color, emoji, created_at, updated_at
+        "SELECT id, pet_id, name, med_type, color, emoji, description, created_at, updated_at
          FROM medications WHERE pet_id = ? ORDER BY name ASC",
     )
     .bind(pet_id)
@@ -46,7 +48,7 @@ pub async fn list_by_pet(pool: &SqlitePool, pet_id: Uuid) -> AppResult<Vec<Medic
 #[tracing::instrument(skip(pool))]
 pub async fn get(pool: &SqlitePool, id: &str) -> AppResult<Medication> {
     let row = sqlx::query_as::<_, MedicationRow>(
-        "SELECT id, pet_id, name, med_type, color, emoji, created_at, updated_at
+        "SELECT id, pet_id, name, med_type, color, emoji, description, created_at, updated_at
          FROM medications WHERE id = ?",
     )
     .bind(id)
@@ -65,9 +67,11 @@ pub async fn create(pool: &SqlitePool, req: CreateMedication) -> AppResult<Medic
     let color = req.color.unwrap_or_else(|| "#6366f1".to_string());
     let emoji = req.emoji.filter(|emoji| !emoji.trim().is_empty());
 
+    let description = req.description.filter(|d| !d.trim().is_empty());
+
     sqlx::query(
-        "INSERT INTO medications (id, pet_id, name, med_type, color, emoji, created_at, updated_at)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+        "INSERT INTO medications (id, pet_id, name, med_type, color, emoji, description, created_at, updated_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
     )
     .bind(&id)
     .bind(pet_id)
@@ -75,6 +79,7 @@ pub async fn create(pool: &SqlitePool, req: CreateMedication) -> AppResult<Medic
     .bind(req.med_type.as_str())
     .bind(&color)
     .bind(&emoji)
+    .bind(&description)
     .bind(&now)
     .bind(&now)
     .execute(pool)
@@ -94,13 +99,19 @@ pub async fn update(pool: &SqlitePool, id: &str, req: UpdateMedication) -> AppRe
         Some(emoji) => Some(emoji),
         None => existing.emoji,
     };
+    let description = match req.description {
+        Some(d) if d.trim().is_empty() => None,
+        Some(d) => Some(d),
+        None => existing.description,
+    };
 
     sqlx::query(
-        "UPDATE medications SET name = ?, color = ?, emoji = ?, updated_at = ? WHERE id = ?",
+        "UPDATE medications SET name = ?, color = ?, emoji = ?, description = ?, updated_at = ? WHERE id = ?",
     )
     .bind(&name)
     .bind(&color)
     .bind(&emoji)
+    .bind(&description)
     .bind(&now)
     .bind(id)
     .execute(pool)

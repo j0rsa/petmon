@@ -1990,6 +1990,47 @@ paths:
             application/json:
               schema: { $ref: '#/components/schemas/MedIntakeRecord' }
 
+  /shortcuts/meds/intake/take-bundle:
+    post:
+      tags: [Shortcuts]
+      summary: Record a bundle take from the shortcut
+      description: |
+        Records real-time intake for every member of the bundle in a single request.
+        Returns an object with `id` (the bundle id) and `records` (one per member).
+
+        **Real-time only.** Same semantics as `/shortcuts/meds/intake/take` — no
+        backdating, `deny_unknown_fields`. Unknown params are rejected with `400`.
+
+        Auth: `api_write` bearer token.
+      x-required-scope: api_write
+      parameters:
+        - name: pet_id
+          in: query
+          required: true
+          schema: { type: string, format: uuid }
+        - name: bundle_id
+          in: query
+          required: true
+          schema: { type: string }
+        - name: source
+          in: query
+          required: false
+          schema: { type: string, example: shortcut }
+          description: Intake source label (default `shortcut`).
+      responses:
+        '201':
+          description: All bundle member intakes recorded
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [id, records]
+                properties:
+                  id: { type: string, description: The bundle id. }
+                  records:
+                    type: array
+                    items: { $ref: '#/components/schemas/MedIntakeRecord' }
+
   /shortcuts/meds/intake.shortcut:
     get:
       tags: [Shortcuts]
@@ -4519,6 +4560,12 @@ components:
         date_from: { type: string, format: date }
         date_to: { type: string, format: date, nullable: true }
         optional: { type: boolean }
+        meal_wait_minutes:
+          type: integer
+          nullable: true
+          description: |
+            Minutes to wait before feeding after taking this medication. When set, the
+            Apple Shortcut starts a countdown timer after a successful take.
         created_at: { type: string, format: date-time }
         updated_at: { type: string, format: date-time }
       required: [id, medication_id, pet_id, formulation_id, formulation, dose_label, frequency, date_from, optional, created_at, updated_at]
@@ -4545,6 +4592,10 @@ components:
         optional:
           type: boolean
           description: As-needed medication; dosage is provided for each intake and no schedule is required
+        meal_wait_minutes:
+          type: integer
+          nullable: true
+          description: Minutes to wait before feeding after taking this medication.
       required: [medication_id, date_from]
 
     ReviseMedAssignment:
@@ -4568,6 +4619,10 @@ components:
         optional:
           type: boolean
           description: As-needed medication; dosage is provided for each intake and no schedule is required
+        meal_wait_minutes:
+          type: integer
+          nullable: true
+          description: Minutes to wait before feeding after taking this medication.
       required: [effective_from]
 
     EndMedAssignment:
@@ -4605,14 +4660,21 @@ components:
 
     MedIntakeShortcutMenuChoice:
       type: object
-      required: [label, medication_id, assignment_id, kind]
+      required: [label, kind]
       properties:
         label: { type: string }
-        medication_id: { type: string }
-        assignment_id: { type: string }
+        medication_id:
+          type: string
+          description: Present for individual (non-bundle) choices.
+        assignment_id:
+          type: string
+          description: Present for individual (non-bundle) choices.
+        bundle_id:
+          type: string
+          description: Present for bundle choices. Use with `POST /shortcuts/meds/intake/take-bundle`.
         kind:
           type: string
-          enum: [scheduled, optional_pill, optional_liquid]
+          enum: [bundle, scheduled, optional_pill, optional_liquid]
         fractions:
           type: array
           items: { $ref: '#/components/schemas/DoseFraction' }
@@ -4624,6 +4686,11 @@ components:
           description: |
             Display forms of `fractions`, in the same order. What the on-device
             dose picker shows and sends back as `dose_fraction`.
+        meal_wait_minutes:
+          type: integer
+          description: |
+            When present and > 0, start a countdown timer for this many minutes after
+            a successful take. For bundles, this is the maximum across all members.
 
     MedIntakeRecord:
       type: object

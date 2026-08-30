@@ -26,6 +26,9 @@ SYNTAX NOTES for Cherri v2.3.0:
   * `#include 'actions/scripting'` removed in v2.3.0 (scripting auto-included)
   * `#define` must precede `#include`
   * error positions can be stale; bisect the file rather than trusting them
+  * `getValue` results have `variable` type; `qty(number, unit)` requires `number`,
+    so coerce via `getNumbers(value)` which accepts `variable` and returns a number.
+    `getNumbers` is in the `basic` category (auto-included, no extra `#include` needed).
 
 Build:  make cherri-dev   (compile + verify, unsigned)
         make shortcut     (signed, replaces assets/shortcuts/Petmon Take Meds.shortcut)
@@ -100,20 +103,38 @@ if dueCount == 0 {
                shadow the outer one — the bug that silently logged nothing.
                Use .text on getValue results in conditions (v2.2+ type checking). */
             if label.text == pickText {
-                const medID = getValue(entry, "medication_id")
-                const assignID = getValue(entry, "assignment_id")
                 const kind = getValue(entry, "kind")
-                const takeBase = text("{server}/api/v1/shortcuts/meds/intake/take?pet_id={pet}&medication_id={medID}&assignment_id={assignID}" )
 
-                /* The kinds are mutually exclusive, and Cherri has no `else if`.
-                   Each branch builds the full URL because a `const` cannot be
-                   reassigned. */
+                if kind.text == "bundle" {
+                    const bundleID = getValue(entry, "bundle_id")
+                    const bundleTakeURL = text("{server}/api/v1/shortcuts/meds/intake/take-bundle?pet_id={pet}&bundle_id={bundleID}" )
+                    const bundleTake = jsonRequest(bundleTakeURL, "POST", {}, {"Authorization": "Bearer {key}"})
+                    const bundleRecord = getDictionary(bundleTake)
+                    const bundleRecordID = getValue(bundleRecord, "id")
+                    if bundleRecordID {
+                        @logged += label
+                        const bundleWait = getValue(entry, "meal_wait_minutes")
+                        if bundleWait {
+                            const bundleWaitNum = getNumbers(bundleWait)
+                            startTimer(qty(bundleWaitNum, "min"))
+                        }
+                    }
+                }
+
                 if kind.text == "scheduled" {
+                    const medID = getValue(entry, "medication_id")
+                    const assignID = getValue(entry, "assignment_id")
+                    const takeBase = text("{server}/api/v1/shortcuts/meds/intake/take?pet_id={pet}&medication_id={medID}&assignment_id={assignID}" )
                     const scheduledTake = jsonRequest(takeBase, "POST", {}, {"Authorization": "Bearer {key}"})
                     const scheduledRecord = getDictionary(scheduledTake)
                     const scheduledID = getValue(scheduledRecord, "id")
                     if scheduledID {
                         @logged += label
+                        const scheduledWait = getValue(entry, "meal_wait_minutes")
+                        if scheduledWait {
+                            const scheduledWaitNum = getNumbers(scheduledWait)
+                            startTimer(qty(scheduledWaitNum, "min"))
+                        }
                     }
                 }
                 if kind.text == "optional_pill" {
@@ -127,6 +148,11 @@ if dueCount == 0 {
                     const pillID = getValue(pillRecord, "id")
                     if pillID {
                         @logged += label
+                        const pillWait = getValue(entry, "meal_wait_minutes")
+                        if pillWait {
+                            const pillWaitNum = getNumbers(pillWait)
+                            startTimer(qty(pillWaitNum, "min"))
+                        }
                     }
                 }
                 if kind.text == "optional_liquid" {
@@ -137,6 +163,11 @@ if dueCount == 0 {
                     const liquidID = getValue(liquidRecord, "id")
                     if liquidID {
                         @logged += label
+                        const liquidWait = getValue(entry, "meal_wait_minutes")
+                        if liquidWait {
+                            const liquidWaitNum = getNumbers(liquidWait)
+                            startTimer(qty(liquidWaitNum, "min"))
+                        }
                     }
                 }
             }

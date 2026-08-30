@@ -34,6 +34,7 @@ export interface Medication {
   med_type: MedType;
   color: string;
   emoji: string | null;
+  description: string | null;
   created_at: string;
   updated_at: string;
 }
@@ -61,6 +62,7 @@ export interface MedAssignment {
   date_from: string;
   date_to: string | null;
   optional: boolean;
+  meal_wait_minutes: number | null;
   created_at: string;
   updated_at: string;
 }
@@ -110,12 +112,14 @@ export interface CreateMedication {
   med_type: MedType;
   color?: string;
   emoji?: string;
+  description?: string;
 }
 
 export interface UpdateMedication {
   name?: string;
   color?: string;
   emoji?: string;
+  description?: string;
 }
 
 export interface CreateMedAssignment {
@@ -130,6 +134,7 @@ export interface CreateMedAssignment {
   date_from: string;
   date_to?: string | null;
   optional?: boolean;
+  meal_wait_minutes?: number | null;
 }
 
 export interface ReviseMedAssignment {
@@ -143,6 +148,7 @@ export interface ReviseMedAssignment {
   effective_from: string;
   date_to?: string | null;
   optional?: boolean;
+  meal_wait_minutes?: number | null;
 }
 
 export interface CreateMedIntakeRecord {
@@ -201,6 +207,9 @@ export const medicationsApi = {
 
   reviseAssignment: (id: string, data: ReviseMedAssignment) =>
     api.post<MedAssignment>(`/health/meds/assignments/${id}/revise`, data),
+
+  patchAssignment: (id: string, data: { meal_wait_minutes: number | null }) =>
+    api.patch<MedAssignment>(`/health/meds/assignments/${id}`, data),
 
   endAssignment: (id: string, data: { ended_on?: string } = {}) =>
     api.post<MedAssignment>(`/health/meds/assignments/${id}/end`, data),

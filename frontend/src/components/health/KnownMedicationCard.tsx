@@ -27,6 +27,7 @@ function KnownMedicationEditor({
   const [name, setName] = useState(medication.name);
   const [color, setColor] = useState(medication.color);
   const [emoji, setEmoji] = useState(medication.emoji ?? '');
+  const [description, setDescription] = useState(medication.description ?? '');
 
   return (
     <>
@@ -72,6 +73,17 @@ function KnownMedicationEditor({
         </label>
         <span className="status-pill">{medTypeLabel(medication.med_type)}</span>
       </div>
+      <label className="plan-entity__edit-field" style={{ gridColumn: '1 / -1' }}>
+        <span className="plan-entity__label">Description</span>
+        <textarea
+          aria-label={`Description for ${medication.name}`}
+          value={description}
+          rows={2}
+          placeholder="Optional notes (e.g. purpose, storage, side effects)"
+          style={{ resize: 'vertical', minHeight: '3.5rem' }}
+          onChange={(event) => setDescription(event.target.value)}
+        />
+      </label>
       <div className="button-row">
         <button
           type="button"
@@ -81,6 +93,7 @@ function KnownMedicationEditor({
             name: name.trim(),
             color,
             emoji: emoji.trim(),
+            description: description.trim(),
           })}
         >
           {saving ? 'Saving…' : 'Save'}
@@ -135,6 +148,11 @@ export function KnownMedicationCard({
                   {medication.emoji ?? '💊'}
                 </span>
               </div>
+              {medication.description && (
+                <p className="muted-text" style={{ fontSize: '0.82rem', margin: '0.2rem 0 0' }}>
+                  {medication.description}
+                </p>
+              )}
             </div>
             {canWrite && (
               <div className="plan-entity__actions">

@@ -607,12 +607,26 @@ export function MedIntakePanel({ petId }: MedIntakePanelProps) {
   }
 
   const items = dailyQuery.data ?? [];
-  const dueBundles = (bundlesQuery.data ?? []).flatMap((bundle) => {
-    const members = bundleDailyMembers(bundle, items);
-    return members ? [{ bundle, members }] : [];
-  });
+  const dueBundles = (bundlesQuery.data ?? [])
+    .flatMap((bundle) => {
+      const members = bundleDailyMembers(bundle, items);
+      return members ? [{ bundle, members }] : [];
+    })
+    .sort((a, b) => a.bundle.name.localeCompare(b.bundle.name));
+
+  const bundleMemberIds = new Set(
+    dueBundles.flatMap(({ members }) => members.map((m) => m.medication.id)),
+  );
+  const individualItems = items.filter((item) => !bundleMemberIds.has(item.medication.id));
+  const scheduledItems = individualItems
+    .filter((item) => !item.assignment.optional)
+    .sort((a, b) => a.medication.name.localeCompare(b.medication.name));
+  const optionalItems = individualItems
+    .filter((item) => item.assignment.optional)
+    .sort((a, b) => a.medication.name.localeCompare(b.medication.name));
+
   const loading = dailyQuery.isPending || bundlesQuery.isPending;
-  const empty = items.length === 0 && dueBundles.length === 0;
+  const empty = scheduledItems.length === 0 && optionalItems.length === 0 && dueBundles.length === 0;
 
   return (
     <section className="panel" id="medications">
@@ -666,10 +680,26 @@ export function MedIntakePanel({ petId }: MedIntakePanelProps) {
               ))}
             </div>
           )}
-          {items.length > 0 && (
+          {scheduledItems.length > 0 && (
             <div className="med-intake-group">
               <h4 className="med-intake-group__title">Meds</h4>
-              {items.map((item) => (
+              {scheduledItems.map((item) => (
+                <DailyMedRow
+                  key={item.medication.id}
+                  item={item}
+                  petId={petId}
+                  canWrite={canWrite}
+                  developerMode={developerSettings.enabled}
+                  panelDate={today}
+                  onLogged={invalidate}
+                />
+              ))}
+            </div>
+          )}
+          {optionalItems.length > 0 && (
+            <div className="med-intake-group">
+              <h4 className="med-intake-group__title">Optional</h4>
+              {optionalItems.map((item) => (
                 <DailyMedRow
                   key={item.medication.id}
                   item={item}

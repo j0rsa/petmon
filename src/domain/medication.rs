@@ -288,6 +288,7 @@ pub struct Medication {
     pub med_type: MedType,
     pub color: String,
     pub emoji: Option<String>,
+    pub description: Option<String>,
     pub created_at: String,
     pub updated_at: String,
 }
@@ -299,6 +300,7 @@ pub struct CreateMedication {
     pub med_type: MedType,
     pub color: Option<String>,
     pub emoji: Option<String>,
+    pub description: Option<String>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -306,6 +308,8 @@ pub struct UpdateMedication {
     pub name: Option<String>,
     pub color: Option<String>,
     pub emoji: Option<String>,
+    /// `Some("")` clears the description; `None` leaves it unchanged.
+    pub description: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -340,6 +344,7 @@ pub struct MedAssignment {
     pub date_from: String,
     pub date_to: Option<String>,
     pub optional: bool,
+    pub meal_wait_minutes: Option<i32>,
     pub created_at: String,
     pub updated_at: String,
 }
@@ -359,6 +364,7 @@ pub struct CreateMedAssignment {
     pub date_from: String,
     pub date_to: Option<String>,
     pub optional: Option<bool>,
+    pub meal_wait_minutes: Option<i32>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -373,6 +379,7 @@ pub struct ReviseMedAssignment {
     pub effective_from: String,
     pub date_to: Option<String>,
     pub optional: Option<bool>,
+    pub meal_wait_minutes: Option<i32>,
 }
 
 #[derive(Debug, Deserialize, Default)]
@@ -546,6 +553,7 @@ pub fn hydrate_assignment(
         date_from: assignment.date_from,
         date_to: assignment.date_to,
         optional: assignment.optional,
+        meal_wait_minutes: assignment.meal_wait_minutes,
         created_at: assignment.created_at,
         updated_at: assignment.updated_at,
     }
@@ -563,6 +571,7 @@ pub struct MedAssignmentCore {
     pub date_from: String,
     pub date_to: Option<String>,
     pub optional: bool,
+    pub meal_wait_minutes: Option<i32>,
     pub created_at: String,
     pub updated_at: String,
 }

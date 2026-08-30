@@ -44,8 +44,10 @@ export default function HealthTreatmentPlanPage() {
   const [medType, setMedType] = useState<'pill' | 'liquid'>('pill');
   const [medColor, setMedColor] = useState(() => randomMedColor());
   const [medEmoji, setMedEmoji] = useState('');
+  const [medDescription, setMedDescription] = useState('');
 
   const [planMedId, setPlanMedId] = useState<string | null>(null);
+  const [planMealWait, setPlanMealWait] = useState('');
   const [formulation, setFormulation] = useState<FormulationPickerValue>(defaultFormulationPickerValue);
   const [reuseFormulationId, setReuseFormulationId] = useState<string | null>(null);
   const [liquidDoseMl, setLiquidDoseMl] = useState('2.5');
@@ -95,12 +97,14 @@ export default function HealthTreatmentPlanPage() {
         med_type: medType,
         color: medColor,
         emoji: medEmoji.trim() || undefined,
+        description: medDescription.trim() || undefined,
       }),
     onSuccess: () => {
       setMedName('');
       setMedType('pill');
       setMedColor(randomMedColor());
       setMedEmoji('');
+      setMedDescription('');
       setShowCreateMed(false);
       invalidate();
     },
@@ -115,11 +119,18 @@ export default function HealthTreatmentPlanPage() {
     },
   });
 
+  function parsedMealWait(): number | null {
+    if (planMealWait === '') return null;
+    const n = parseInt(planMealWait, 10);
+    return n > 0 ? n : null;
+  }
+
   function buildPlanBase() {
     return {
       ...(planOptional ? {} : { frequency: planFrequency }),
       date_to: planTo.trim() || null,
       optional: planOptional,
+      meal_wait_minutes: parsedMealWait(),
     };
   }
 
@@ -219,6 +230,12 @@ export default function HealthTreatmentPlanPage() {
     onSuccess: invalidate,
   });
 
+  const patchTimerMutation = useMutation({
+    mutationFn: ({ id, minutes }: { id: string; minutes: number | null }) =>
+      medicationsApi.patchAssignment(id, { meal_wait_minutes: minutes }),
+    onSuccess: invalidate,
+  });
+
   const deleteMedMutation = useMutation({
     mutationFn: (id: string) => medicationsApi.delete(id),
     onSuccess: invalidate,
@@ -261,6 +278,7 @@ export default function HealthTreatmentPlanPage() {
     setPlanFrom(today);
     setPlanTo('');
     setPlanOptional(false);
+    setPlanMealWait('');
     setPlanOpen(false);
     setShowCreateBundle(false);
   }
@@ -329,6 +347,7 @@ export default function HealthTreatmentPlanPage() {
     setPlanFrequency(assignment.frequency);
     setPlanOptional(assignment.optional);
     setPlanTo(assignment.date_to ?? '');
+    setPlanMealWait(assignment.meal_wait_minutes != null ? String(assignment.meal_wait_minutes) : '');
     setReviseFrom(today);
   }
 
@@ -360,6 +379,7 @@ export default function HealthTreatmentPlanPage() {
               createMedMutation.reset();
               setMedColor(randomMedColor());
               setMedEmoji('');
+              setMedDescription('');
               setShowCreateMed(true);
             }}
           >
@@ -409,11 +429,21 @@ export default function HealthTreatmentPlanPage() {
               />
             </label>
           </div>
+          <div className="form-row" style={{ marginBottom: '0.75rem' }}>
+            <label style={{ fontSize: '0.82rem' }}>Description (optional)</label>
+            <textarea
+              value={medDescription}
+              rows={2}
+              placeholder="e.g. purpose, storage, side effects"
+              style={{ resize: 'vertical' }}
+              onChange={(e) => setMedDescription(e.target.value)}
+            />
+          </div>
           <div style={{ display: 'flex', gap: '0.5rem', marginTop: '1rem' }}>
             <button type="button" className="button" disabled={!medName.trim() || createMedMutation.isPending} onClick={() => createMedMutation.mutate()}>
               {createMedMutation.isPending ? 'Saving…' : 'Save medication'}
             </button>
-            <button type="button" className="button button-secondary" onClick={() => { createMedMutation.reset(); setShowCreateMed(false); }}>Cancel</button>
+            <button type="button" className="button button-secondary" onClick={() => { createMedMutation.reset(); setMedDescription(''); setShowCreateMed(false); }}>Cancel</button>
           </div>
           {createMedMutation.isError && (
             <div className="error-state" role="alert" style={{ marginTop: '0.75rem' }}>
@@ -513,6 +543,8 @@ export default function HealthTreatmentPlanPage() {
                 onReviseFromChange={setReviseFrom}
                 planTo={planTo}
                 onPlanToChange={setPlanTo}
+                mealWaitMinutes={planMealWait}
+                onMealWaitMinutesChange={setPlanMealWait}
                 saving={createPlanMutation.isPending || reviseMutation.isPending}
                 error={createPlanMutation.isError || reviseMutation.isError}
                 onSave={() => {
@@ -538,6 +570,7 @@ export default function HealthTreatmentPlanPage() {
                   canAssign={!activeMedicationIds.has(group.medicationId)}
                   deleting={deleteAssignmentMutation.isPending}
                   pausing={endMutation.isPending}
+                  patchingTimer={patchTimerMutation.isPending}
                   onRevise={startRevise}
                   onPause={handlePause}
                   onAssign={() => startNewAssignment(group.medicationId)}
@@ -547,6 +580,7 @@ export default function HealthTreatmentPlanPage() {
                       deleteAssignmentMutation.mutate(assignment.id);
                     }
                   }}
+                  onPatchTimer={(id, minutes) => patchTimerMutation.mutate({ id, minutes })}
                 />
               ))
             )}

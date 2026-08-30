@@ -89,6 +89,14 @@ pub async fn end_assignment(
     med_assignments::end(pool, id, req, timezone).await
 }
 
+pub async fn patch_assignment_timer(
+    pool: &SqlitePool,
+    id: &str,
+    meal_wait_minutes: Option<i32>,
+) -> AppResult<MedAssignment> {
+    med_assignments::patch_meal_wait(pool, id, meal_wait_minutes).await
+}
+
 #[tracing::instrument(skip(pool))]
 pub async fn delete_assignment(pool: &SqlitePool, id: &str, cascade: bool) -> AppResult<()> {
     let intakes = med_intake_records::list_for_assignment(pool, id).await?;

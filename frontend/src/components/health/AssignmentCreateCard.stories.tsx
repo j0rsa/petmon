@@ -29,6 +29,7 @@ function Playground({ revising = false, initialMedId = null }: PlaygroundProps) 
   const [planFrom, setPlanFrom] = useState(today);
   const [reviseFrom, setReviseFrom] = useState(today);
   const [planTo, setPlanTo] = useState('');
+  const [mealWaitMinutes, setMealWaitMinutes] = useState('');
 
   return (
     <AssignmentCreateCard
@@ -54,6 +55,8 @@ function Playground({ revising = false, initialMedId = null }: PlaygroundProps) 
       onReviseFromChange={setReviseFrom}
       planTo={planTo}
       onPlanToChange={setPlanTo}
+      mealWaitMinutes={mealWaitMinutes}
+      onMealWaitMinutesChange={setMealWaitMinutes}
       saving={false}
       error={false}
       onSave={() => {}}

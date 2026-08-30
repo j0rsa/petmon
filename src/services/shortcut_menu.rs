@@ -1,4 +1,5 @@
 use serde::Serialize;
+use std::collections::{HashMap, HashSet};
 use uuid::Uuid;
 
 use crate::domain::medication::{DailyMedAssignment, MedType, DOSE_FRACTIONS};
@@ -9,6 +10,7 @@ use sqlx::SqlitePool;
 #[derive(Debug, Clone, Copy, Serialize, PartialEq, Eq)]
 #[serde(rename_all = "snake_case")]
 pub enum MenuChoiceKind {
+    Bundle,
     Scheduled,
     OptionalPill,
     OptionalLiquid,
@@ -17,9 +19,19 @@ pub enum MenuChoiceKind {
 impl MenuChoiceKind {
     fn as_line_str(self) -> &'static str {
         match self {
+            Self::Bundle => "bundle",
             Self::Scheduled => "scheduled",
             Self::OptionalPill => "optional_pill",
             Self::OptionalLiquid => "optional_liquid",
+        }
+    }
+
+    /// Sort order: bundles first, then scheduled, then optional.
+    fn sort_key(self) -> u8 {
+        match self {
+            Self::Bundle => 0,
+            Self::Scheduled => 1,
+            Self::OptionalPill | Self::OptionalLiquid => 2,
         }
     }
 }
@@ -27,8 +39,12 @@ impl MenuChoiceKind {
 #[derive(Debug, Serialize)]
 pub struct MedIntakeMenuChoice {
     pub label: String,
-    pub medication_id: String,
-    pub assignment_id: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub medication_id: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub assignment_id: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub bundle_id: Option<String>,
     pub kind: MenuChoiceKind,
     /// Canonical fraction names (`three_quarter`), for API clients.
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -38,6 +54,9 @@ pub struct MedIntakeMenuChoice {
     /// both display spellings and canonical names.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub fraction_labels: Option<Vec<&'static str>>,
+    /// Minutes to wait before feeding after taking this medication.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub meal_wait_minutes: Option<i32>,
 }
 
 #[derive(Debug, Clone, Copy, Serialize, PartialEq, Eq)]
@@ -62,15 +81,10 @@ fn menu_label(item: &DailyMedAssignment) -> String {
     format!("{} · {}", item.medication.name, item.assignment.dose_label)
 }
 
-fn encode_line(
-    label: &str,
-    assignment_id: &str,
-    kind: MenuChoiceKind,
-    fractions_csv: Option<&str>,
-) -> String {
+fn encode_line(label: &str, id: &str, kind: MenuChoiceKind, fractions_csv: Option<&str>) -> String {
     match fractions_csv {
-        Some(csv) => format!("{label}|{assignment_id}|{}|{csv}", kind.as_line_str()),
-        None => format!("{label}|{assignment_id}|{}", kind.as_line_str()),
+        Some(csv) => format!("{label}|{id}|{}|{csv}", kind.as_line_str()),
+        None => format!("{label}|{id}|{}", kind.as_line_str()),
     }
 }
 
@@ -117,9 +131,9 @@ fn disambiguate_labels(choices: &mut [MedIntakeMenuChoice]) {
     }
 }
 
-/// Menu for Apple Shortcuts. Includes scheduled and optional meds, including bundle members.
-/// Bundle members are taken individually via the standard take endpoint; the shortcut does
-/// not need to know about bundle grouping.
+/// Menu for Apple Shortcuts. Bundles appear as single entries; their member
+/// meds are excluded from individual choices. Includes scheduled and optional
+/// individual meds.
 pub async fn med_intake_menu(
     pool: &SqlitePool,
     pet_id: Uuid,
@@ -127,9 +141,66 @@ pub async fn med_intake_menu(
 ) -> AppResult<MedIntakeMenuResponse> {
     let daily = medication_service::daily_assignments(pool, pet_id, date).await?;
     let taken_today = crate::repo::med_intake_records::taken_counts_on(pool, pet_id, date).await?;
+    let bundles = crate::repo::med_bundles::list_by_pet(pool, pet_id).await?;
+
+    let daily_by_med: HashMap<String, &DailyMedAssignment> = daily
+        .iter()
+        .map(|item| (item.medication.id.clone(), item))
+        .collect();
+
+    let mut bundle_member_med_ids: HashSet<String> = HashSet::new();
+    let mut bundle_choices: Vec<MedIntakeMenuChoice> = Vec::new();
+
+    for bundle in &bundles {
+        let mut all_due = true;
+        let mut max_wait: Option<i32> = None;
+        for item in &bundle.items {
+            let Some(daily_item) = daily_by_med.get(&item.medication_id) else {
+                all_due = false;
+                break;
+            };
+            if daily_item.assignment.optional {
+                all_due = false;
+                break;
+            }
+            if !crate::domain::medication::assignment_due_on(&daily_item.assignment, date) {
+                all_due = false;
+                break;
+            }
+            let taken = taken_today
+                .get(&daily_item.assignment.id)
+                .copied()
+                .unwrap_or(0);
+            if taken >= daily_item.assignment.frequency.expected_doses() {
+                all_due = false;
+                break;
+            }
+            if let Some(w) = daily_item.assignment.meal_wait_minutes {
+                max_wait = Some(max_wait.unwrap_or(0).max(w));
+            }
+        }
+        if all_due {
+            for item in &bundle.items {
+                bundle_member_med_ids.insert(item.medication_id.clone());
+            }
+            bundle_choices.push(MedIntakeMenuChoice {
+                label: bundle.name.clone(),
+                medication_id: None,
+                assignment_id: None,
+                bundle_id: Some(bundle.id.clone()),
+                kind: MenuChoiceKind::Bundle,
+                fractions: None,
+                fraction_labels: None,
+                meal_wait_minutes: max_wait,
+            });
+        }
+    }
 
     let mut choices = Vec::new();
-    for item in daily {
+    for item in &daily {
+        if bundle_member_med_ids.contains(&item.medication.id) {
+            continue;
+        }
         if !item.assignment.optional
             && !crate::domain::medication::assignment_due_on(&item.assignment, date)
         {
@@ -142,20 +213,28 @@ pub async fn med_intake_menu(
             }
         }
 
-        let label = menu_label(&item);
-        let kind = choice_kind(&item);
+        let label = menu_label(item);
+        let kind = choice_kind(item);
         let is_pill_choice = kind == MenuChoiceKind::OptionalPill;
         choices.push(MedIntakeMenuChoice {
             label,
-            medication_id: item.medication.id.clone(),
-            assignment_id: item.assignment.id.clone(),
+            medication_id: Some(item.medication.id.clone()),
+            assignment_id: Some(item.assignment.id.clone()),
+            bundle_id: None,
             kind,
             fractions: is_pill_choice.then(pill_fractions),
             fraction_labels: is_pill_choice.then(pill_fraction_labels),
+            meal_wait_minutes: item.assignment.meal_wait_minutes,
         });
     }
+    choices.extend(bundle_choices);
 
-    choices.sort_by(|a, b| a.label.cmp(&b.label));
+    choices.sort_by(|a, b| {
+        a.kind
+            .sort_key()
+            .cmp(&b.kind.sort_key())
+            .then_with(|| a.label.cmp(&b.label))
+    });
     disambiguate_labels(&mut choices);
     let labels = choices.iter().map(|choice| choice.label.clone()).collect();
     let lines = choices
@@ -165,12 +244,13 @@ pub async fn med_intake_menu(
                 .fraction_labels
                 .as_ref()
                 .map(|values| values.join(","));
-            encode_line(
-                &choice.label,
-                &choice.assignment_id,
-                choice.kind,
-                fractions_csv.as_deref(),
-            )
+            // Use bundle_id for bundle choices, assignment_id for others.
+            let id = choice
+                .bundle_id
+                .as_deref()
+                .or(choice.assignment_id.as_deref())
+                .unwrap_or("");
+            encode_line(&choice.label, id, choice.kind, fractions_csv.as_deref())
         })
         .collect();
 
@@ -220,11 +300,13 @@ mod tests {
     fn choice(label: &str) -> MedIntakeMenuChoice {
         MedIntakeMenuChoice {
             label: label.to_string(),
-            medication_id: "med-1".into(),
-            assignment_id: "assign-1".into(),
+            medication_id: Some("med-1".into()),
+            assignment_id: Some("assign-1".into()),
+            bundle_id: None,
             kind: MenuChoiceKind::Scheduled,
             fractions: None,
             fraction_labels: None,
+            meal_wait_minutes: None,
         }
     }
 
