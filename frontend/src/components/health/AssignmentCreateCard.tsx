@@ -29,6 +29,8 @@ interface AssignmentCreateCardProps {
   onReviseFromChange: (value: string) => void;
   planTo: string;
   onPlanToChange: (value: string) => void;
+  mealWaitMinutes: string;
+  onMealWaitMinutesChange: (value: string) => void;
   saving: boolean;
   error: boolean;
   onSave: () => void;
@@ -80,6 +82,8 @@ export function AssignmentCreateCard({
   onReviseFromChange,
   planTo,
   onPlanToChange,
+  mealWaitMinutes,
+  onMealWaitMinutesChange,
   saving,
   error,
   onSave,
@@ -236,6 +240,33 @@ export function AssignmentCreateCard({
               />
             </div>
           </div>
+          <label className="plan-entity__check" htmlFor="meal-wait-enabled">
+            <input
+              id="meal-wait-enabled"
+              type="checkbox"
+              checked={mealWaitMinutes !== ''}
+              onChange={(e) => {
+                if (!e.target.checked) onMealWaitMinutesChange('');
+                else onMealWaitMinutesChange('30');
+              }}
+            />
+            Set meal wait timer (shortcut starts a countdown after logging)
+          </label>
+          {mealWaitMinutes !== '' && (
+            <div className="form-row">
+              <label htmlFor="meal-wait-minutes" style={{ fontSize: '0.82rem' }}>
+                Wait before feeding (minutes)
+              </label>
+              <input
+                id="meal-wait-minutes"
+                type="text"
+                inputMode="numeric"
+                value={mealWaitMinutes}
+                style={{ maxWidth: '8rem' }}
+                onChange={(e) => onMealWaitMinutesChange(e.target.value)}
+              />
+            </div>
+          )}
         </>
       )}
       <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>

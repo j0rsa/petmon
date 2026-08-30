@@ -810,6 +810,7 @@ async fn seed_medications(pool: &SqlitePool, demo_pets: &[Pet]) -> AppResult<usi
             med_type: MedType::Pill,
             color: Some("#f97316".to_string()),
             emoji: Some("🦴".to_string()),
+            description: None,
         },
     )
     .await?;
@@ -834,6 +835,7 @@ async fn seed_medications(pool: &SqlitePool, demo_pets: &[Pet]) -> AppResult<usi
             date_from: date_from.clone(),
             date_to: None,
             optional: Some(false),
+            meal_wait_minutes: None,
         },
     )
     .await?;
@@ -846,6 +848,7 @@ async fn seed_medications(pool: &SqlitePool, demo_pets: &[Pet]) -> AppResult<usi
             med_type: MedType::Liquid,
             color: Some("#22c55e".to_string()),
             emoji: Some("💧".to_string()),
+            description: None,
         },
     )
     .await?;
@@ -870,6 +873,7 @@ async fn seed_medications(pool: &SqlitePool, demo_pets: &[Pet]) -> AppResult<usi
             date_from,
             date_to: None,
             optional: Some(true),
+            meal_wait_minutes: None,
         },
     )
     .await?;

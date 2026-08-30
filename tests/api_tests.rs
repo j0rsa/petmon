@@ -4467,3 +4467,192 @@ async fn shortcuts_med_intake_take_is_realtime_only() {
     let resp = test::call_service(&app, req).await;
     assert_eq!(resp.status(), 400);
 }
+
+#[actix_web::test]
+async fn assignment_meal_wait_minutes_stored_and_returned() {
+    let (app, _state) = build_dev_app!();
+    let pet_id = api_create_pet!(&app, "MealWaitPet");
+
+    // Create a medication
+    let req = test::TestRequest::post()
+        .uri("/api/v1/health/meds")
+        .set_json(serde_json::json!({
+            "pet_id": pet_id,
+            "name": "MealWait Pill",
+            "med_type": "pill",
+            "color": "#6366f1"
+        }))
+        .to_request();
+    let resp = test::call_service(&app, req).await;
+    assert_eq!(resp.status(), 201);
+    let med: serde_json::Value = test::read_body_json(resp).await;
+    let med_id = med["id"].as_str().unwrap();
+
+    // Create an assignment with meal_wait_minutes
+    let req = test::TestRequest::post()
+        .uri("/api/v1/health/meds/assignments")
+        .set_json(serde_json::json!({
+            "medication_id": med_id,
+            "tablet_strength_mg": 5.0,
+            "pill_shape": "round",
+            "dose_fraction": "whole",
+            "frequency": { "morning": 1, "midday": 0, "evening": 0, "every": 1, "unit": "days" },
+            "date_from": "2026-03-01",
+            "meal_wait_minutes": 40
+        }))
+        .to_request();
+    let resp = test::call_service(&app, req).await;
+    assert_eq!(resp.status(), 201);
+    let assignment: serde_json::Value = test::read_body_json(resp).await;
+    assert_eq!(assignment["meal_wait_minutes"].as_i64(), Some(40));
+    let assignment_id = assignment["id"].as_str().unwrap().to_string();
+
+    // Fetching the assignment list should return meal_wait_minutes
+    let req = test::TestRequest::get()
+        .uri(&format!("/api/v1/health/meds/assignments?pet_id={pet_id}"))
+        .to_request();
+    let resp = test::call_service(&app, req).await;
+    assert_eq!(resp.status(), 200);
+    let assignments: serde_json::Value = test::read_body_json(resp).await;
+    let first = &assignments[0];
+    assert_eq!(first["meal_wait_minutes"].as_i64(), Some(40));
+
+    // Assignment also appears in shortcut menu with meal_wait_minutes
+    let today = chrono::Utc::now().format("%Y-%m-%d").to_string();
+    let req = test::TestRequest::get()
+        .uri(&format!(
+            "/api/v1/shortcuts/meds/intake/menu?pet_id={pet_id}&date={today}"
+        ))
+        .to_request();
+    let resp = test::call_service(&app, req).await;
+    assert_eq!(resp.status(), 200);
+    let menu: serde_json::Value = test::read_body_json(resp).await;
+    let choices = menu["choices"].as_array().unwrap();
+    let choice = choices
+        .iter()
+        .find(|c| c["assignment_id"].as_str() == Some(&assignment_id));
+    assert!(choice.is_some(), "assignment should appear in menu");
+    assert_eq!(
+        choice.unwrap()["meal_wait_minutes"].as_i64(),
+        Some(40),
+        "meal_wait_minutes should be present in menu choice"
+    );
+}
+
+#[actix_web::test]
+async fn shortcuts_bundle_take_creates_records_and_returns_id() {
+    let (app, _state) = build_dev_app!();
+    let pet_id = api_create_pet!(&app, "BundleTakePet");
+
+    // Create two medications
+    let create_med = |name: &'static str| {
+        test::TestRequest::post()
+            .uri("/api/v1/health/meds")
+            .set_json(serde_json::json!({
+                "pet_id": pet_id,
+                "name": name,
+                "med_type": "pill",
+                "color": "#6366f1"
+            }))
+    };
+    let resp = test::call_service(&app, create_med("BundleMed A").to_request()).await;
+    assert_eq!(resp.status(), 201);
+    let med_a: serde_json::Value = test::read_body_json(resp).await;
+    let med_a_id = med_a["id"].as_str().unwrap();
+
+    let resp = test::call_service(&app, create_med("BundleMed B").to_request()).await;
+    assert_eq!(resp.status(), 201);
+    let med_b: serde_json::Value = test::read_body_json(resp).await;
+    let med_b_id = med_b["id"].as_str().unwrap();
+
+    // Create assignments for both meds
+    let create_assignment = |med_id: &str| {
+        test::TestRequest::post()
+            .uri("/api/v1/health/meds/assignments")
+            .set_json(serde_json::json!({
+                "medication_id": med_id,
+                "tablet_strength_mg": 5.0,
+                "pill_shape": "round",
+                "dose_fraction": "whole",
+                "frequency": { "morning": 1, "midday": 0, "evening": 0, "every": 1, "unit": "days" },
+                "date_from": "2026-03-01"
+            }))
+    };
+    let resp = test::call_service(&app, create_assignment(med_a_id).to_request()).await;
+    assert_eq!(resp.status(), 201);
+    let assign_a: serde_json::Value = test::read_body_json(resp).await;
+    let assign_a_id = assign_a["id"].as_str().unwrap();
+
+    let resp = test::call_service(&app, create_assignment(med_b_id).to_request()).await;
+    assert_eq!(resp.status(), 201);
+    let assign_b: serde_json::Value = test::read_body_json(resp).await;
+    let assign_b_id = assign_b["id"].as_str().unwrap();
+
+    // Create a bundle of both assignments
+    let req = test::TestRequest::post()
+        .uri("/api/v1/health/meds/bundles")
+        .set_json(serde_json::json!({
+            "pet_id": pet_id,
+            "name": "Morning Bundle",
+            "assignment_ids": [assign_a_id, assign_b_id]
+        }))
+        .to_request();
+    let resp = test::call_service(&app, req).await;
+    assert_eq!(resp.status(), 201);
+    let bundle: serde_json::Value = test::read_body_json(resp).await;
+    let bundle_id = bundle["id"].as_str().unwrap().to_string();
+
+    // Bundle should appear in shortcut menu as a single bundle choice
+    let today = chrono::Utc::now().format("%Y-%m-%d").to_string();
+    let req = test::TestRequest::get()
+        .uri(&format!(
+            "/api/v1/shortcuts/meds/intake/menu?pet_id={pet_id}&date={today}"
+        ))
+        .to_request();
+    let resp = test::call_service(&app, req).await;
+    assert_eq!(resp.status(), 200);
+    let menu: serde_json::Value = test::read_body_json(resp).await;
+    let choices = menu["choices"].as_array().unwrap();
+    // Both individual meds should be excluded; the bundle should be present
+    let bundle_choice = choices
+        .iter()
+        .find(|c| c["kind"].as_str() == Some("bundle"));
+    assert!(bundle_choice.is_some(), "bundle should appear in menu");
+    assert_eq!(
+        bundle_choice.unwrap()["bundle_id"].as_str(),
+        Some(bundle_id.as_str())
+    );
+    // Individual med choices should not appear
+    assert!(
+        choices
+            .iter()
+            .all(|c| c["kind"].as_str() != Some("scheduled")),
+        "individual scheduled meds should be excluded when in a due bundle"
+    );
+
+    // Take the bundle via the shortcut take-bundle endpoint
+    let req = test::TestRequest::post()
+        .uri(&format!(
+            "/api/v1/shortcuts/meds/intake/take-bundle?pet_id={pet_id}&bundle_id={bundle_id}"
+        ))
+        .to_request();
+    let resp = test::call_service(&app, req).await;
+    assert_eq!(resp.status(), 201);
+    let result: serde_json::Value = test::read_body_json(resp).await;
+    assert_eq!(
+        result["id"].as_str(),
+        Some(bundle_id.as_str()),
+        "response id matches bundle_id"
+    );
+    let records = result["records"].as_array().unwrap();
+    assert_eq!(records.len(), 2, "one record per bundle member");
+
+    // Unknown params must be rejected (real-time only)
+    let req = test::TestRequest::post()
+        .uri(&format!(
+            "/api/v1/shortcuts/meds/intake/take-bundle?pet_id={pet_id}&bundle_id={bundle_id}&occurred_at=2026-03-15T08:30:00"
+        ))
+        .to_request();
+    let resp = test::call_service(&app, req).await;
+    assert_eq!(resp.status(), 400, "backdating param must be rejected");
+}

@@ -4,7 +4,7 @@ use crate::domain::medication::{
 };
 use crate::error::{AppError, AppResult};
 use crate::services::medication_service;
-use actix_web::{delete, get, post, web, HttpResponse};
+use actix_web::{delete, get, patch, post, web, HttpResponse};
 use petmon_macros::require_scope;
 use uuid::Uuid;
 
@@ -83,6 +83,24 @@ pub async fn delete_assignment(
 }
 
 #[derive(serde::Deserialize)]
+pub struct PatchAssignmentBody {
+    pub meal_wait_minutes: Option<i32>,
+}
+
+#[patch("/{id}")]
+#[require_scope("api_write")]
+pub async fn patch_assignment(
+    state: web::Data<AppState>,
+    id: web::Path<String>,
+    body: web::Json<PatchAssignmentBody>,
+) -> AppResult<HttpResponse> {
+    let assignment =
+        medication_service::patch_assignment_timer(&state.pool, &id, body.meal_wait_minutes)
+            .await?;
+    Ok(HttpResponse::Ok().json(assignment))
+}
+
+#[derive(serde::Deserialize)]
 pub struct DeleteAssignmentQuery {
     #[serde(default)]
     pub cascade: bool,
@@ -95,6 +113,7 @@ pub fn configure(cfg: &mut web::ServiceConfig) {
             .service(list_assignments)
             .service(create_assignment)
             .service(revise_assignment)
+            .service(patch_assignment)
             .service(end_assignment)
             .service(delete_assignment),
     );

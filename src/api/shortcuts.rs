@@ -95,6 +95,55 @@ pub async fn med_intake_take(
     Ok(HttpResponse::Created().json(record))
 }
 
+#[derive(serde::Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct MedIntakeTakeBundleQuery {
+    pub pet_id: String,
+    pub bundle_id: String,
+    pub source: Option<String>,
+}
+
+#[derive(serde::Serialize)]
+pub struct BundleTakeResponse {
+    pub id: String,
+    pub records: Vec<crate::domain::medication::MedIntakeRecord>,
+}
+
+#[post("/meds/intake/take-bundle")]
+#[require_scope("api_write")]
+pub async fn med_intake_take_bundle(
+    state: web::Data<AppState>,
+    query: web::Query<MedIntakeTakeBundleQuery>,
+) -> AppResult<HttpResponse> {
+    let pet_id = Uuid::parse_str(&query.pet_id)
+        .map_err(|_| AppError::BadRequest("invalid pet_id".into()))?;
+    let _ = pet_id; // validated; bundle_id scopes the operation
+    let source_type = query
+        .source
+        .as_deref()
+        .map(str::trim)
+        .filter(|s| !s.is_empty())
+        .unwrap_or("shortcut")
+        .to_string();
+    let records = medication_service::create_bundle_intake(
+        &state.pool,
+        &query.bundle_id,
+        crate::domain::medication::CreateMedBundleIntake {
+            occurred_at: None,
+            local_date: None,
+            note: None,
+            source_type: Some(source_type),
+        },
+        state.timezone,
+        UserDisplaySettings::default(),
+    )
+    .await?;
+    Ok(HttpResponse::Created().json(BundleTakeResponse {
+        id: query.bundle_id.clone(),
+        records,
+    }))
+}
+
 #[get("/meds/intake.shortcut")]
 pub async fn download_med_intake_shortcut() -> HttpResponse {
     match ShortcutAssets::get(SHORTCUT_FILENAME) {
@@ -114,6 +163,7 @@ pub fn configure(cfg: &mut web::ServiceConfig) {
         web::scope("/shortcuts")
             .service(med_intake_menu_handler)
             .service(med_intake_take)
+            .service(med_intake_take_bundle)
             .service(download_med_intake_shortcut),
     );
 }

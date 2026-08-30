@@ -1,5 +1,6 @@
-import type { CSSProperties } from 'react';
+import { type CSSProperties, useState } from 'react';
 import type { MedAssignment, Medication } from '../../api/medications';
+import { parseDecimal } from '../../lib/numbers';
 import { useFormatDate } from '../../context/useDisplaySettings';
 import { daysInclusive } from '../../lib/dates';
 import {
@@ -22,10 +23,12 @@ interface AssignmentGroupCardProps {
   canAssign: boolean;
   deleting: boolean;
   pausing: boolean;
+  patchingTimer: boolean;
   onRevise: (assignment: MedAssignment) => void;
   onPause: (assignment: MedAssignment) => void;
   onAssign: () => void;
   onDelete: (assignment: MedAssignment) => void;
+  onPatchTimer: (id: string, minutes: number | null) => void;
 }
 
 function dateRangeLabel(
@@ -50,12 +53,16 @@ export function AssignmentGroupCard({
   canAssign,
   deleting,
   pausing,
+  patchingTimer,
   onRevise,
   onPause,
   onAssign,
   onDelete,
+  onPatchTimer,
 }: AssignmentGroupCardProps) {
   const formatDate = useFormatDate();
+  const [editingTimer, setEditingTimer] = useState(false);
+  const [timerInput, setTimerInput] = useState('');
   const name = medication?.name ?? 'Unknown';
   const status = assignmentStatus(current, today);
   const accent = medication?.color ?? 'var(--accent)';
@@ -141,6 +148,60 @@ export function AssignmentGroupCard({
             {formulationLabel(
               current.formulation.tablet_strength_mg,
               current.formulation.pill_shape,
+            )}
+          </dd>
+        </div>
+        <div>
+          <dt>Meal wait</dt>
+          <dd>
+            {editingTimer ? (
+              <span style={{ display: 'inline-flex', alignItems: 'center', gap: '0.4rem', flexWrap: 'wrap' }}>
+                <input
+                  type="text"
+                  inputMode="numeric"
+                  value={timerInput}
+                  placeholder="minutes"
+                  style={{ width: '6rem' }}
+                  onChange={(e) => setTimerInput(e.target.value)}
+                />
+                <button
+                  type="button"
+                  className="button button-compact"
+                  disabled={patchingTimer}
+                  onClick={() => {
+                    const n = timerInput.trim() === '' ? null : Math.round(parseDecimal(timerInput));
+                    if (timerInput.trim() !== '' && !(Number.isFinite(n) && (n as number) > 0)) return;
+                    onPatchTimer(current.id, n);
+                    setEditingTimer(false);
+                  }}
+                >
+                  Save
+                </button>
+                <button
+                  type="button"
+                  className="button button-secondary button-compact"
+                  onClick={() => setEditingTimer(false)}
+                >
+                  Cancel
+                </button>
+              </span>
+            ) : (
+              <span style={{ display: 'inline-flex', alignItems: 'center', gap: '0.4rem' }}>
+                <span>{current.meal_wait_minutes != null ? `${current.meal_wait_minutes} min` : '—'}</span>
+                {canWrite && (
+                  <button
+                    type="button"
+                    className="button button-secondary button-compact"
+                    style={{ fontSize: '0.72rem', padding: '0.1rem 0.4rem' }}
+                    onClick={() => {
+                      setTimerInput(current.meal_wait_minutes != null ? String(current.meal_wait_minutes) : '');
+                      setEditingTimer(true);
+                    }}
+                  >
+                    Edit
+                  </button>
+                )}
+              </span>
             )}
           </dd>
         </div>

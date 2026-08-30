@@ -21,6 +21,7 @@ struct MedAssignmentRow {
     date_from: String,
     date_to: Option<String>,
     optional: i64,
+    meal_wait_minutes: Option<i32>,
     created_at: String,
     updated_at: String,
 }
@@ -46,6 +47,7 @@ fn row_to_core(row: MedAssignmentRow) -> AppResult<MedAssignmentCore> {
         date_from: row.date_from,
         date_to: row.date_to,
         optional: row.optional != 0,
+        meal_wait_minutes: row.meal_wait_minutes,
         created_at: row.created_at,
         updated_at: row.updated_at,
     })
@@ -160,7 +162,7 @@ pub async fn list(
     filters: &MedAssignmentFilters,
 ) -> AppResult<Vec<MedAssignment>> {
     let mut query = String::from(
-        "SELECT id, medication_id, pet_id, formulation_id, dose_fraction, liquid_dose_ml, frequency_json, date_from, date_to, optional, created_at, updated_at
+        "SELECT id, medication_id, pet_id, formulation_id, dose_fraction, liquid_dose_ml, frequency_json, date_from, date_to, optional, meal_wait_minutes, created_at, updated_at
          FROM med_assignments WHERE 1=1",
     );
     if filters.pet_id.is_some() {
@@ -192,7 +194,7 @@ pub async fn list(
 #[tracing::instrument(skip(pool))]
 pub async fn get(pool: &SqlitePool, id: &str) -> AppResult<MedAssignment> {
     let row = sqlx::query_as::<_, MedAssignmentRow>(
-        "SELECT id, medication_id, pet_id, formulation_id, dose_fraction, liquid_dose_ml, frequency_json, date_from, date_to, optional, created_at, updated_at
+        "SELECT id, medication_id, pet_id, formulation_id, dose_fraction, liquid_dose_ml, frequency_json, date_from, date_to, optional, meal_wait_minutes, created_at, updated_at
          FROM med_assignments WHERE id = ?",
     )
     .bind(id)
@@ -209,7 +211,7 @@ pub async fn active_for_medication_on(
     date: &str,
 ) -> AppResult<Option<MedAssignment>> {
     let rows = sqlx::query_as::<_, MedAssignmentRow>(
-        "SELECT id, medication_id, pet_id, formulation_id, dose_fraction, liquid_dose_ml, frequency_json, date_from, date_to, optional, created_at, updated_at
+        "SELECT id, medication_id, pet_id, formulation_id, dose_fraction, liquid_dose_ml, frequency_json, date_from, date_to, optional, meal_wait_minutes, created_at, updated_at
          FROM med_assignments
          WHERE medication_id = ? AND date_from <= ?
          ORDER BY date_from DESC",
@@ -255,8 +257,8 @@ pub async fn create(pool: &SqlitePool, req: CreateMedAssignment) -> AppResult<Me
     let id = Uuid::new_v4().to_string();
     sqlx::query(
         "INSERT INTO med_assignments
-         (id, medication_id, pet_id, formulation_id, dose_fraction, liquid_dose_ml, frequency_json, date_from, date_to, optional, created_at, updated_at)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+         (id, medication_id, pet_id, formulation_id, dose_fraction, liquid_dose_ml, frequency_json, date_from, date_to, optional, meal_wait_minutes, created_at, updated_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
     )
     .bind(&id)
     .bind(&req.medication_id)
@@ -268,6 +270,7 @@ pub async fn create(pool: &SqlitePool, req: CreateMedAssignment) -> AppResult<Me
     .bind(&req.date_from)
     .bind(&req.date_to)
     .bind(if optional { 1 } else { 0 })
+    .bind(req.meal_wait_minutes)
     .bind(&now)
     .bind(&now)
     .execute(pool)
@@ -347,6 +350,7 @@ pub async fn revise(
             date_from: req.effective_from,
             date_to: req.date_to,
             optional: Some(optional),
+            meal_wait_minutes: req.meal_wait_minutes.or(existing.meal_wait_minutes),
         },
     )
     .await
@@ -386,6 +390,30 @@ pub async fn end(
         .bind(assignment_id)
         .execute(pool)
         .await?;
+    get(pool, assignment_id).await
+}
+
+#[tracing::instrument(skip(pool))]
+pub async fn patch_meal_wait(
+    pool: &SqlitePool,
+    assignment_id: &str,
+    meal_wait_minutes: Option<i32>,
+) -> AppResult<MedAssignment> {
+    let now = chrono::Utc::now().to_rfc3339();
+    let rows = sqlx::query(
+        "UPDATE med_assignments SET meal_wait_minutes = ?, updated_at = ? WHERE id = ?",
+    )
+    .bind(meal_wait_minutes)
+    .bind(&now)
+    .bind(assignment_id)
+    .execute(pool)
+    .await?
+    .rows_affected();
+    if rows == 0 {
+        return Err(AppError::NotFound(format!(
+            "Med assignment {assignment_id} not found"
+        )));
+    }
     get(pool, assignment_id).await
 }
 

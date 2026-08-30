@@ -66,10 +66,12 @@ const meta = {
     canAssign: false,
     deleting: false,
     pausing: false,
+    patchingTimer: false,
     onRevise: () => {},
     onPause: () => {},
     onAssign: () => {},
     onDelete: () => {},
+    onPatchTimer: () => {},
   },
 } satisfies Meta<typeof AssignmentGroupCard>;
 
