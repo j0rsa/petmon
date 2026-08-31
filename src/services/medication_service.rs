@@ -1,8 +1,8 @@
 use crate::domain::medication::{
     assignment_due_on, CreateMedAssignment, CreateMedBundle, CreateMedBundleIntake,
-    CreateMedIntakeRecord, CreateMedication, DailyMedAssignment, EndMedAssignment, MedAssignment,
-    MedAssignmentFilters, MedBundle, MedIntakeRecord, MedIntakeRecordFilters, Medication,
-    ReviseMedAssignment, UpdateMedBundle, UpdateMedication,
+    CreateMedIntakeRecord, CreateMedication, DailyMedAssignment, EditMedAssignment,
+    EndMedAssignment, MedAssignment, MedAssignmentFilters, MedBundle, MedIntakeRecord,
+    MedIntakeRecordFilters, Medication, ReviseMedAssignment, UpdateMedBundle, UpdateMedication,
 };
 use crate::domain::user_settings::UserDisplaySettings;
 use crate::error::{AppError, AppResult};
@@ -89,12 +89,12 @@ pub async fn end_assignment(
     med_assignments::end(pool, id, req, timezone).await
 }
 
-pub async fn patch_assignment_timer(
+pub async fn edit_assignment(
     pool: &SqlitePool,
     id: &str,
-    meal_wait_minutes: Option<i32>,
+    req: EditMedAssignment,
 ) -> AppResult<MedAssignment> {
-    med_assignments::patch_meal_wait(pool, id, meal_wait_minutes).await
+    med_assignments::update_in_place(pool, id, req).await
 }
 
 #[tracing::instrument(skip(pool))]

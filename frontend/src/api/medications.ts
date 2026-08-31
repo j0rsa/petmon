@@ -151,6 +151,20 @@ export interface ReviseMedAssignment {
   meal_wait_minutes?: number | null;
 }
 
+export interface EditMedAssignment {
+  formulation_id?: string;
+  tablet_strength_mg?: number;
+  pill_shape?: PillShape;
+  liquid_concentration_mg_per_ml?: number;
+  dose_fraction?: DoseFraction;
+  liquid_dose_ml?: number;
+  frequency?: MedFrequency;
+  date_from: string;
+  date_to?: string | null;
+  optional?: boolean;
+  meal_wait_minutes?: number | null;
+}
+
 export interface CreateMedIntakeRecord {
   pet_id: string;
   medication_id: string;
@@ -208,8 +222,8 @@ export const medicationsApi = {
   reviseAssignment: (id: string, data: ReviseMedAssignment) =>
     api.post<MedAssignment>(`/health/meds/assignments/${id}/revise`, data),
 
-  patchAssignment: (id: string, data: { meal_wait_minutes: number | null }) =>
-    api.patch<MedAssignment>(`/health/meds/assignments/${id}`, data),
+  editAssignment: (id: string, data: EditMedAssignment) =>
+    api.put<MedAssignment>(`/health/meds/assignments/${id}`, data),
 
   endAssignment: (id: string, data: { ended_on?: string } = {}) =>
     api.post<MedAssignment>(`/health/meds/assignments/${id}/end`, data),

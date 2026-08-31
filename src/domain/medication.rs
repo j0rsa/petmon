@@ -382,6 +382,21 @@ pub struct ReviseMedAssignment {
     pub meal_wait_minutes: Option<i32>,
 }
 
+#[derive(Debug, Deserialize)]
+pub struct EditMedAssignment {
+    pub formulation_id: Option<String>,
+    pub tablet_strength_mg: Option<f64>,
+    pub pill_shape: Option<PillShape>,
+    pub liquid_concentration_mg_per_ml: Option<f64>,
+    pub dose_fraction: Option<DoseFraction>,
+    pub liquid_dose_ml: Option<f64>,
+    pub frequency: Option<MedFrequency>,
+    pub date_from: String,
+    pub date_to: Option<String>,
+    pub optional: Option<bool>,
+    pub meal_wait_minutes: Option<i32>,
+}
+
 #[derive(Debug, Deserialize, Default)]
 pub struct EndMedAssignment {
     pub ended_on: Option<String>,
