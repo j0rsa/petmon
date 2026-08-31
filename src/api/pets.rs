@@ -58,6 +58,7 @@ pub fn configure(cfg: &mut web::ServiceConfig) {
             .service(create_pet)
             .service(get_pet)
             .service(update_pet)
-            .service(delete_pet),
+            .service(delete_pet)
+            .configure(super::pet_settings::configure),
     );
 }
