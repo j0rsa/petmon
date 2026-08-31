@@ -4613,7 +4613,7 @@ async fn shortcuts_bundle_take_creates_records_and_returns_id() {
     assert_eq!(resp.status(), 200);
     let menu: serde_json::Value = test::read_body_json(resp).await;
     let choices = menu["choices"].as_array().unwrap();
-    // Both individual meds should be excluded; the bundle should be present
+    // The bundle should appear in the menu
     let bundle_choice = choices
         .iter()
         .find(|c| c["kind"].as_str() == Some("bundle"));
@@ -4622,12 +4622,12 @@ async fn shortcuts_bundle_take_creates_records_and_returns_id() {
         bundle_choice.unwrap()["bundle_id"].as_str(),
         Some(bundle_id.as_str())
     );
-    // Individual med choices should not appear
+    // Individual member meds should also appear so they can be taken separately
     assert!(
         choices
             .iter()
-            .all(|c| c["kind"].as_str() != Some("scheduled")),
-        "individual scheduled meds should be excluded when in a due bundle"
+            .any(|c| c["kind"].as_str() == Some("scheduled")),
+        "individual scheduled meds should also appear alongside the bundle"
     );
 
     // Take the bundle via the shortcut take-bundle endpoint
