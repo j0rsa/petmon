@@ -725,6 +725,19 @@ export const mockBundleDailyAssignments: DailyMedAssignment[] = [
     assignment: mockMedAssignments[2]!,
     intakes: [],
   },
+  // Non-bundle scheduled med so the "Meds" section always renders in bundle stories
+  {
+    medication: mockMedications[1]!,
+    assignment: {
+      ...mockMedAssignments[1]!,
+      id: 'assign-2-scheduled',
+      optional: false,
+      liquid_dose_ml: 0.5,
+      dose_label: '0.50ml',
+      meal_wait_minutes: null,
+    },
+    intakes: [],
+  },
 ];
 
 export const mockMedBundles: MedBundle[] = [
