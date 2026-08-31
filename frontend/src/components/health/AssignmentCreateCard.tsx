@@ -8,6 +8,7 @@ import { MedScheduleEditor } from './MedScheduleEditor';
 
 interface AssignmentCreateCardProps {
   revising: boolean;
+  editing: boolean;
   medications: Medication[];
   planMedId: string | null;
   onPlanMedIdChange: (id: string | null) => void;
@@ -61,6 +62,7 @@ function OptionalToggle({
 
 export function AssignmentCreateCard({
   revising,
+  editing,
   medications,
   planMedId,
   onPlanMedIdChange,
@@ -91,17 +93,23 @@ export function AssignmentCreateCard({
 }: AssignmentCreateCardProps) {
   const planMed = medications.find((medication) => medication.id === planMedId);
 
+  const title = editing ? 'Edit assignment' : revising ? 'Revise assignment' : 'New assignment';
+  const description = editing
+    ? 'Change any assignment field directly.'
+    : revising
+      ? 'Change the dose or schedule from a date you choose.'
+      : 'Start a course for a registered medication.';
+  const saveLabel = saving ? 'Saving…' : editing ? 'Save changes' : revising ? 'Save revision' : 'Create assignment';
+
   return (
     <article className="plan-entity plan-entity--editing">
       <div className="plan-entity__identity">
-        <h4 className="plan-entity__name">{revising ? 'Revise assignment' : 'New assignment'}</h4>
+        <h4 className="plan-entity__name">{title}</h4>
         <p className="muted-text" style={{ fontSize: '0.85rem', margin: 0 }}>
-          {revising
-            ? 'Change the dose or schedule from a date you choose.'
-            : 'Start a course for a registered medication.'}
+          {description}
         </p>
       </div>
-      {!revising && (
+      {!revising && !editing && (
         <div className="form-row">
           <label htmlFor="plan-medication" style={{ fontSize: '0.82rem' }}>Medication</label>
           <select
@@ -116,7 +124,7 @@ export function AssignmentCreateCard({
           </select>
         </div>
       )}
-      {revising && planMed && (
+      {(revising || editing) && planMed && (
         <p style={{ margin: 0 }}>
           <strong>{planMed.name}</strong>
         </p>
@@ -124,7 +132,7 @@ export function AssignmentCreateCard({
 
       {planMed && (
         <>
-          {revising && planMed.med_type === 'liquid' && formulationLocked && (
+          {(revising || editing) && planMed.med_type === 'liquid' && formulationLocked && (
             <p className="muted-text" style={{ fontSize: '0.82rem', margin: 0 }}>
               Keeping the same bottle concentration.{' '}
               <button
@@ -150,8 +158,8 @@ export function AssignmentCreateCard({
               color={planMed.color}
               value={formulation}
               onChange={onFormulationChange}
-              formulationLocked={revising ? formulationLocked : undefined}
-              onFormulationLockedChange={revising ? onFormulationLockedChange : undefined}
+              formulationLocked={(revising || editing) ? formulationLocked : undefined}
+              onFormulationLockedChange={(revising || editing) ? onFormulationLockedChange : undefined}
               showDose={!planOptional}
               beforeDose={(
                 <OptionalToggle
@@ -165,7 +173,7 @@ export function AssignmentCreateCard({
             <div style={{ display: 'grid', gap: '0.65rem' }}>
               <div
                 className="form-row"
-                style={revising && formulationLocked ? { opacity: 0.55, pointerEvents: 'none' } : undefined}
+                style={(revising || editing) && formulationLocked ? { opacity: 0.55, pointerEvents: 'none' } : undefined}
               >
                 <label htmlFor="liquid-concentration" style={{ fontSize: '0.82rem' }}>
                   Concentration (mg/ml, optional)
@@ -209,7 +217,7 @@ export function AssignmentCreateCard({
               gridTemplateColumns: 'repeat(auto-fit, minmax(10rem, 1fr))',
             }}
           >
-            {revising ? (
+            {revising && !editing ? (
               <div className="form-row">
                 <label htmlFor="plan-revise-from" style={{ fontSize: '0.82rem' }}>Effective from</label>
                 <input
@@ -280,7 +288,7 @@ export function AssignmentCreateCard({
           }
           onClick={onSave}
         >
-          {saving ? 'Saving…' : revising ? 'Save revision' : 'Create assignment'}
+          {saveLabel}
         </button>
         <button type="button" className="button button-secondary" onClick={onCancel}>
           Cancel

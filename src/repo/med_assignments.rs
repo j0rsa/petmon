@@ -1,7 +1,7 @@
 use crate::domain::medication::{
     day_before, hydrate_assignment, CreateMedAssignment, CreateMedFormulation, DoseFraction,
-    EndMedAssignment, MedAssignment, MedAssignmentCore, MedAssignmentFilters, MedFrequency,
-    MedType, ReviseMedAssignment,
+    EditMedAssignment, EndMedAssignment, MedAssignment, MedAssignmentCore, MedAssignmentFilters,
+    MedFrequency, MedType, ReviseMedAssignment,
 };
 use crate::error::{AppError, AppResult};
 use chrono::Utc;
@@ -393,17 +393,59 @@ pub async fn end(
     get(pool, assignment_id).await
 }
 
-#[tracing::instrument(skip(pool))]
-pub async fn patch_meal_wait(
+#[tracing::instrument(skip(pool, req))]
+pub async fn update_in_place(
     pool: &SqlitePool,
     assignment_id: &str,
-    meal_wait_minutes: Option<i32>,
+    req: EditMedAssignment,
 ) -> AppResult<MedAssignment> {
-    let now = chrono::Utc::now().to_rfc3339();
+    let existing = get(pool, assignment_id).await?;
+    let medication = crate::repo::medications::get(pool, &existing.medication_id).await?;
+    let optional = req.optional.unwrap_or(existing.optional);
+    let dose_fraction = if optional {
+        None
+    } else {
+        req.dose_fraction.or(existing.dose_fraction)
+    };
+    let liquid_dose_ml = if optional {
+        None
+    } else {
+        req.liquid_dose_ml.or(existing.liquid_dose_ml)
+    };
+    validate_dose(medication.med_type, dose_fraction, liquid_dose_ml, optional)?;
+    let frequency = req.frequency.unwrap_or(existing.frequency);
+    if !optional {
+        validate_frequency(&frequency)?;
+    }
+    let has_new_formulation = req.tablet_strength_mg.is_some()
+        || req.pill_shape.is_some()
+        || req.liquid_concentration_mg_per_ml.is_some();
+    let formulation_id = if req.formulation_id.is_some() || has_new_formulation {
+        resolve_formulation_id(
+            pool,
+            &existing.medication_id,
+            medication.med_type,
+            req.formulation_id,
+            req.tablet_strength_mg,
+            req.pill_shape,
+            req.liquid_concentration_mg_per_ml,
+        )
+        .await?
+    } else {
+        existing.formulation_id
+    };
+    let now = Utc::now().to_rfc3339();
     let rows = sqlx::query(
-        "UPDATE med_assignments SET meal_wait_minutes = ?, updated_at = ? WHERE id = ?",
+        "UPDATE med_assignments SET formulation_id=?, dose_fraction=?, liquid_dose_ml=?, frequency_json=?, date_from=?, date_to=?, optional=?, meal_wait_minutes=?, updated_at=? WHERE id=?",
     )
-    .bind(meal_wait_minutes)
+    .bind(&formulation_id)
+    .bind(dose_fraction.map(|f| f.as_str().to_string()))
+    .bind(liquid_dose_ml)
+    .bind(frequency.to_json())
+    .bind(&req.date_from)
+    .bind(&req.date_to)
+    .bind(if optional { 1 } else { 0 })
+    .bind(req.meal_wait_minutes)
     .bind(&now)
     .bind(assignment_id)
     .execute(pool)

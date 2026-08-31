@@ -3,6 +3,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import {
   medicationsApi,
   type CreateMedAssignment,
+  type EditMedAssignment,
   type MedAssignment,
   type MedFrequency,
   type ReviseMedAssignment,
@@ -58,6 +59,7 @@ export default function HealthTreatmentPlanPage() {
   const [planOptional, setPlanOptional] = useState(false);
 
   const [reviseId, setReviseId] = useState<string | null>(null);
+  const [editAssignmentId, setEditAssignmentId] = useState<string | null>(null);
   const [reviseFrom, setReviseFrom] = useState(today);
   const [formulationLocked, setFormulationLocked] = useState(true);
   const [planOpen, setPlanOpen] = useState(false);
@@ -202,6 +204,40 @@ export default function HealthTreatmentPlanPage() {
     };
   }
 
+  function buildEditPayload(): EditMedAssignment {
+    const selectedMed = (medsQuery.data ?? []).find((m) => m.id === planMedId);
+    const base = {
+      ...buildPlanBase(),
+      date_from: planFrom,
+    };
+
+    if (selectedMed?.med_type === 'liquid') {
+      return {
+        ...base,
+        liquid_dose_ml: planOptional ? undefined : parseDecimal(liquidDoseMl),
+        liquid_concentration_mg_per_ml: liquidConcentration.trim()
+          ? parseDecimal(liquidConcentration)
+          : undefined,
+        ...(reuseFormulationId && formulationLocked ? { formulation_id: reuseFormulationId } : {}),
+      };
+    }
+
+    const strength = parseDecimal(formulation.tabletStrengthMg);
+    if (reuseFormulationId && formulationLocked) {
+      return {
+        ...base,
+        formulation_id: reuseFormulationId,
+        dose_fraction: planOptional ? undefined : formulation.doseFraction,
+      };
+    }
+    return {
+      ...base,
+      tablet_strength_mg: strength,
+      pill_shape: formulation.pillShape,
+      dose_fraction: planOptional ? undefined : formulation.doseFraction,
+    };
+  }
+
   const createPlanMutation = useMutation({
     mutationFn: () => medicationsApi.createAssignment(buildCreatePayload()),
     onSuccess: () => {
@@ -230,10 +266,14 @@ export default function HealthTreatmentPlanPage() {
     onSuccess: invalidate,
   });
 
-  const patchTimerMutation = useMutation({
-    mutationFn: ({ id, minutes }: { id: string; minutes: number | null }) =>
-      medicationsApi.patchAssignment(id, { meal_wait_minutes: minutes }),
-    onSuccess: invalidate,
+  const editAssignmentMutation = useMutation({
+    mutationFn: (assignmentId: string) =>
+      medicationsApi.editAssignment(assignmentId, buildEditPayload()),
+    onSuccess: () => {
+      setEditAssignmentId(null);
+      resetPlanForm();
+      invalidate();
+    },
   });
 
   const deleteMedMutation = useMutation({
@@ -267,8 +307,10 @@ export default function HealthTreatmentPlanPage() {
   function resetPlanForm() {
     createPlanMutation.reset();
     reviseMutation.reset();
+    editAssignmentMutation.reset();
     setPlanMedId(null);
     setReviseId(null);
+    setEditAssignmentId(null);
     setReuseFormulationId(null);
     setFormulationLocked(true);
     setFormulation(defaultFormulationPickerValue);
@@ -349,6 +391,32 @@ export default function HealthTreatmentPlanPage() {
     setPlanTo(assignment.date_to ?? '');
     setPlanMealWait(assignment.meal_wait_minutes != null ? String(assignment.meal_wait_minutes) : '');
     setReviseFrom(today);
+  }
+
+  function startEdit(assignment: MedAssignment) {
+    const medication = medById.get(assignment.medication_id);
+    if (!medication) return;
+    resetPlanForm();
+    setEditAssignmentId(assignment.id);
+    setPlanMedId(medication.id);
+    setPlanFrom(assignment.date_from);
+    setReuseFormulationId(assignment.formulation_id);
+    setFormulationLocked(true);
+    setFormulation({
+      tabletStrengthMg: String(assignment.formulation.tablet_strength_mg ?? '5'),
+      pillShape: assignment.formulation.pill_shape ?? 'round',
+      doseFraction: assignment.dose_fraction ?? 'half',
+    });
+    setLiquidDoseMl(String(assignment.liquid_dose_ml ?? '2.5'));
+    setLiquidConcentration(
+      assignment.formulation.liquid_concentration_mg_per_ml != null
+        ? String(assignment.formulation.liquid_concentration_mg_per_ml)
+        : '',
+    );
+    setPlanFrequency(assignment.frequency);
+    setPlanOptional(assignment.optional);
+    setPlanTo(assignment.date_to ?? '');
+    setPlanMealWait(assignment.meal_wait_minutes != null ? String(assignment.meal_wait_minutes) : '');
   }
 
   function handlePause(assignment: MedAssignment) {
@@ -508,7 +576,7 @@ export default function HealthTreatmentPlanPage() {
             <p className="eyebrow">Schedule</p>
             <h3>Assignments</h3>
           </div>
-          {canWrite && medications.length > 0 && !planOpen && !reviseId && (
+          {canWrite && medications.length > 0 && !planOpen && !reviseId && !editAssignmentId && (
             <button type="button" className="button" onClick={() => startNewAssignment()}>
               + New assignment
             </button>
@@ -519,9 +587,10 @@ export default function HealthTreatmentPlanPage() {
           <div className="loading-state">Loading…</div>
         ) : (
           <div className="plan-entity-list">
-            {(planOpen || reviseId) && canWrite && (
+            {(planOpen || reviseId || editAssignmentId) && canWrite && (
               <AssignmentCreateCard
                 revising={Boolean(reviseId)}
+                editing={Boolean(editAssignmentId)}
                 medications={medications}
                 planMedId={planMedId}
                 onPlanMedIdChange={setPlanMedId}
@@ -545,16 +614,17 @@ export default function HealthTreatmentPlanPage() {
                 onPlanToChange={setPlanTo}
                 mealWaitMinutes={planMealWait}
                 onMealWaitMinutesChange={setPlanMealWait}
-                saving={createPlanMutation.isPending || reviseMutation.isPending}
-                error={createPlanMutation.isError || reviseMutation.isError}
+                saving={createPlanMutation.isPending || reviseMutation.isPending || editAssignmentMutation.isPending}
+                error={createPlanMutation.isError || reviseMutation.isError || editAssignmentMutation.isError}
                 onSave={() => {
-                  if (reviseId) reviseMutation.mutate(reviseId);
+                  if (editAssignmentId) editAssignmentMutation.mutate(editAssignmentId);
+                  else if (reviseId) reviseMutation.mutate(reviseId);
                   else createPlanMutation.mutate();
                 }}
                 onCancel={resetPlanForm}
               />
             )}
-            {assignmentGroups.length === 0 && !planOpen && !reviseId ? (
+            {assignmentGroups.length === 0 && !planOpen && !reviseId && !editAssignmentId ? (
               <p className="muted-text" style={{ fontSize: '0.88rem' }}>
                 No assignments yet.
               </p>
@@ -570,9 +640,9 @@ export default function HealthTreatmentPlanPage() {
                   canAssign={!activeMedicationIds.has(group.medicationId)}
                   deleting={deleteAssignmentMutation.isPending}
                   pausing={endMutation.isPending}
-                  patchingTimer={patchTimerMutation.isPending}
                   onRevise={startRevise}
                   onPause={handlePause}
+                  onEdit={startEdit}
                   onAssign={() => startNewAssignment(group.medicationId)}
                   onDelete={(assignment) => {
                     const medication = medById.get(assignment.medication_id);
@@ -580,7 +650,6 @@ export default function HealthTreatmentPlanPage() {
                       deleteAssignmentMutation.mutate(assignment.id);
                     }
                   }}
-                  onPatchTimer={(id, minutes) => patchTimerMutation.mutate({ id, minutes })}
                 />
               ))
             )}

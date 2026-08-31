@@ -34,6 +34,7 @@ function Playground({ revising = false, initialMedId = null }: PlaygroundProps) 
   return (
     <AssignmentCreateCard
       revising={revising}
+      editing={false}
       medications={mockMedications}
       planMedId={planMedId}
       onPlanMedIdChange={setPlanMedId}
