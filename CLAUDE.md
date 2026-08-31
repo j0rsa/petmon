@@ -2,19 +2,39 @@
 
 ## Change checklists
 
-### Settings: instance vs user
+### Settings: three-tier model
 
-| Layer | Storage | Scope | Examples |
-|-------|---------|-------|----------|
-| **Instance** | `app_settings` | Shared by all users on this deployment | OIDC config, Telegram bot token, VAPID keys |
-| **User** | `user_settings` keyed by `reader_key` | Per authenticated identity | Display format, widget prefs, (future) per-user integrations |
+Petmon has three distinct settings tiers. Before adding any new preference, decide which tier owns it.
 
-User settings API: `GET/POST /api/v1/me/settings/{key}` where `key` is e.g. `display`, `nutrition_calendar`, `cumulative_fluid_chart`, `developer_mode`.
+| Tier | Table | Keyed by | Audience | API path | Examples |
+|------|-------|----------|----------|----------|----------|
+| **System / Instance** | `app_settings` | `key` (string) | Shared by **all users** on this deployment — set by the operator | Internal only (no REST API; set via env or startup migration) | OIDC config, Telegram bot token, VAPID keys, demo mode |
+| **User** | `user_settings` | `reader_key` + `key` | One **authenticated identity** across all their devices and sessions | `GET/POST /api/v1/me/settings/{key}` | Date/time display format, widget visibility toggles, developer mode |
+| **Pet** | `pet_settings` | `pet_id` + `key` | The **pet itself** — today always one owner, but shared across all future co-owners | `GET/POST /api/v1/pets/{pet_id}/settings/{key}` | Medication nudge schedule (`med_nudge`) |
+
+#### Decision guide
+
+Ask these questions in order:
+1. **Does it belong to the server infrastructure, not any user?** → System (`app_settings`).
+2. **Is it a personal UI preference that should differ between two people looking at the same pet?** → User (`user_settings`).
+3. **Is it a configuration that applies to the pet regardless of who is logged in?** → Pet (`pet_settings`).
+
+#### User settings (`user_settings`)
 
 `reader_key` is always the user id (`Identity.subject`):
 - **OIDC:** JWT `sub` — same settings on web, mobile, and API-token sessions.
 - **API token:** `api_tokens.owner_subject` (the minting user's `sub`). Tokens without `owner_subject` cannot authenticate.
 - **DEV_MODE:** `"dev"`.
+
+Known user-setting keys: `display`, `nutrition_calendar`, `cumulative_fluid_chart`, `developer_mode`.
+
+Adding a new user-setting key: add the constant + types to `src/domain/user_settings.rs`, add a match arm in both `get_user_settings` and `update_user_settings` in `src/api/user_settings.rs`, extend `UserSettingsKey` and `UserSettingsMap` in `frontend/src/api/userSettings.ts`.
+
+#### Pet settings (`pet_settings`)
+
+Known pet-setting keys: `med_nudge` (medication nudge schedule — morning/midday/evening slots with `enabled` + `deadline_hour`).
+
+Adding a new pet-setting key: add the constant + types to `src/domain/pet_settings.rs`, add a match arm in `src/api/pet_settings.rs`, extend `PetSettingsKey` and `PetSettingsMap` in `frontend/src/api/petSettings.ts`.
 
 Push subscriptions remain per browser endpoint; notification read state and push ownership follow `reader_key`.
 
