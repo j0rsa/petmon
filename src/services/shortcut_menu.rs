@@ -1,5 +1,5 @@
 use serde::Serialize;
-use std::collections::{HashMap, HashSet};
+use std::collections::HashMap;
 use uuid::Uuid;
 
 use crate::domain::medication::{DailyMedAssignment, MedType, DOSE_FRACTIONS};
@@ -148,7 +148,6 @@ pub async fn med_intake_menu(
         .map(|item| (item.medication.id.clone(), item))
         .collect();
 
-    let mut bundle_member_med_ids: HashSet<String> = HashSet::new();
     let mut bundle_choices: Vec<MedIntakeMenuChoice> = Vec::new();
 
     for bundle in &bundles {
@@ -180,9 +179,6 @@ pub async fn med_intake_menu(
             }
         }
         if all_due {
-            for item in &bundle.items {
-                bundle_member_med_ids.insert(item.medication_id.clone());
-            }
             bundle_choices.push(MedIntakeMenuChoice {
                 label: bundle.name.clone(),
                 medication_id: None,
@@ -198,9 +194,6 @@ pub async fn med_intake_menu(
 
     let mut choices = Vec::new();
     for item in &daily {
-        if bundle_member_med_ids.contains(&item.medication.id) {
-            continue;
-        }
         if !item.assignment.optional
             && !crate::domain::medication::assignment_due_on(&item.assignment, date)
         {

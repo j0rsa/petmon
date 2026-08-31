@@ -614,14 +614,10 @@ export function MedIntakePanel({ petId }: MedIntakePanelProps) {
     })
     .sort((a, b) => a.bundle.name.localeCompare(b.bundle.name));
 
-  const bundleMemberIds = new Set(
-    dueBundles.flatMap(({ members }) => members.map((m) => m.medication.id)),
-  );
-  const individualItems = items.filter((item) => !bundleMemberIds.has(item.medication.id));
-  const scheduledItems = individualItems
+  const scheduledItems = items
     .filter((item) => !item.assignment.optional)
     .sort((a, b) => a.medication.name.localeCompare(b.medication.name));
-  const optionalItems = individualItems
+  const optionalItems = items
     .filter((item) => item.assignment.optional)
     .sort((a, b) => a.medication.name.localeCompare(b.medication.name));
 
