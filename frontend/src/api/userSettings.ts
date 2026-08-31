@@ -1,7 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { api } from './client';
 
-export type UserSettingsKey = 'display' | 'nutrition_calendar' | 'cumulative_fluid_chart' | 'developer_mode' | 'med_nudge';
+export type UserSettingsKey = 'display' | 'nutrition_calendar' | 'cumulative_fluid_chart' | 'developer_mode';
 
 /** @deprecated Use UserSettingsKey */
 export type WidgetSettingsKey = Exclude<UserSettingsKey, 'display'>;
@@ -43,29 +43,11 @@ export interface DeveloperModeSettings {
   enabled: boolean;
 }
 
-export interface NudgeSlot {
-  enabled: boolean;
-  /** Hour of day 0–23 by which the dose should have been logged. */
-  deadline_hour: number;
-}
-
-export interface PetNudgeSchedule {
-  morning: NudgeSlot;
-  midday: NudgeSlot;
-  evening: NudgeSlot;
-}
-
-/** Per-user medication nudge settings, keyed by pet_id. */
-export interface MedNudgeSettings {
-  pets: Record<string, PetNudgeSchedule>;
-}
-
 export type UserSettingsMap = {
   display: UserDisplaySettings;
   nutrition_calendar: NutritionCalendarSettings;
   cumulative_fluid_chart: CumulativeFluidChartSettings;
   developer_mode: DeveloperModeSettings;
-  med_nudge: MedNudgeSettings;
 };
 
 export const DEFAULT_USER_DISPLAY_SETTINGS: UserDisplaySettings = {
@@ -99,22 +81,11 @@ export const DEFAULT_DEVELOPER_MODE_SETTINGS: DeveloperModeSettings = {
   enabled: false,
 };
 
-export const DEFAULT_NUDGE_SLOT: NudgeSlot = { enabled: false, deadline_hour: 9 };
-
-export const DEFAULT_PET_NUDGE_SCHEDULE: PetNudgeSchedule = {
-  morning: { enabled: false, deadline_hour: 9 },
-  midday: { enabled: false, deadline_hour: 13 },
-  evening: { enabled: false, deadline_hour: 20 },
-};
-
-export const DEFAULT_MED_NUDGE_SETTINGS: MedNudgeSettings = { pets: {} };
-
 export const USER_SETTINGS_DEFAULTS: UserSettingsMap = {
   display: DEFAULT_USER_DISPLAY_SETTINGS,
   nutrition_calendar: DEFAULT_NUTRITION_CALENDAR_SETTINGS,
   cumulative_fluid_chart: DEFAULT_CUMULATIVE_FLUID_CHART_SETTINGS,
   developer_mode: DEFAULT_DEVELOPER_MODE_SETTINGS,
-  med_nudge: DEFAULT_MED_NUDGE_SETTINGS,
 };
 
 export const userSettingsApi = {

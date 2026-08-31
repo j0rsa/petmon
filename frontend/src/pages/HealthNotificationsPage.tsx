@@ -3,11 +3,10 @@ import { useSelectedPet } from '../context/SelectedPetContext';
 import { usePermissions } from '../context/usePermissions';
 import { NoPetSelected } from '../components/NoPetSelected';
 import {
-  useUserSettings,
-  DEFAULT_PET_NUDGE_SCHEDULE,
+  usePetSettings,
   type PetNudgeSchedule,
   type NudgeSlot,
-} from '../api/userSettings';
+} from '../api/petSettings';
 import { getPushSupportStatus } from '../lib/pushNotifications';
 
 type Slot = 'morning' | 'midday' | 'evening';
@@ -81,21 +80,18 @@ function SlotRow({
   );
 }
 
-/** Compute the dense list of cron-trigger hours from the current settings object. */
-function computeCronHours(s: ReturnType<typeof useUserSettings<'med_nudge'>>['settings']): number[] {
-  const seen = new Set<number>();
-  for (const schedule of Object.values(s.pets)) {
-    for (const slot of [schedule.morning, schedule.midday, schedule.evening]) {
-      if (slot.enabled) seen.add(slot.deadline_hour);
-    }
-  }
-  return Array.from(seen).sort((a, b) => a - b);
+function computeCronHours(s: PetNudgeSchedule): number[] {
+  return [s.morning, s.midday, s.evening]
+    .filter((slot) => slot.enabled)
+    .map((slot) => slot.deadline_hour)
+    .filter((h, i, arr) => arr.indexOf(h) === i)
+    .sort((a, b) => a - b);
 }
 
 export default function HealthNotificationsPage() {
   const { selectedPetId, selectedPet, petsLoading } = useSelectedPet();
   const { canWrite } = usePermissions();
-  const { settings, update, isSaving } = useUserSettings('med_nudge');
+  const { settings, update, isSaving } = usePetSettings(selectedPetId ?? undefined, 'med_nudge');
 
   const [pushStatus, setPushStatus] = useState<string | null>(null);
 
@@ -106,17 +102,11 @@ export default function HealthNotificationsPage() {
   if (petsLoading) return <div className="loading-state">Loading…</div>;
   if (!selectedPetId || !selectedPet) return <NoPetSelected />;
 
-  const petSchedule: PetNudgeSchedule = settings.pets[selectedPetId] ?? DEFAULT_PET_NUDGE_SCHEDULE;
   const cronHours = computeCronHours(settings);
 
   function updateSlot(slot: Slot, updated: NudgeSlot) {
     if (!canWrite) return;
-    update({
-      pets: {
-        ...settings.pets,
-        [selectedPetId!]: { ...petSchedule, [slot]: updated },
-      },
-    });
+    update({ ...settings, [slot]: updated });
   }
 
   const pushWarning = pushStatus != null && pushStatus !== 'subscribed';
@@ -154,7 +144,7 @@ export default function HealthNotificationsPage() {
           <SlotRow
             key={slot}
             slot={slot}
-            value={petSchedule[slot]}
+            value={settings[slot]}
             disabled={!canWrite || isSaving}
             onChange={(updated) => updateSlot(slot, updated)}
           />

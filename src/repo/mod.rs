@@ -13,6 +13,7 @@ pub mod notifications;
 pub mod nutrition_analytics;
 pub mod nutrition_records;
 pub mod nutrition_schedules;
+pub mod pet_settings;
 pub mod pets;
 pub mod push_subscriptions;
 pub mod settings;

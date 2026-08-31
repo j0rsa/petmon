@@ -6,10 +6,9 @@ use crate::auth::identity::Identity;
 use crate::auth::AppState;
 use crate::domain::user_settings::{
     is_known_user_settings_key, CumulativeFluidChartSettings, DeveloperModeSettings,
-    MedNudgeSettings, NutritionCalendarSettings, UpdateCumulativeFluidChartSettings,
-    UpdateDeveloperModeSettings, UpdateNutritionCalendarSettings, UpdateUserDisplaySettings,
-    UserDisplaySettings, CUMULATIVE_FLUID_CHART_KEY, DEVELOPER_MODE_KEY, DISPLAY_KEY,
-    MED_NUDGE_KEY, NUTRITION_CALENDAR_KEY,
+    NutritionCalendarSettings, UpdateCumulativeFluidChartSettings, UpdateDeveloperModeSettings,
+    UpdateNutritionCalendarSettings, UpdateUserDisplaySettings, UserDisplaySettings,
+    CUMULATIVE_FLUID_CHART_KEY, DEVELOPER_MODE_KEY, DISPLAY_KEY, NUTRITION_CALENDAR_KEY,
 };
 use crate::error::{AppError, AppResult};
 use crate::repo::user_settings;
@@ -54,11 +53,6 @@ pub async fn get_user_settings(
         }
         DEVELOPER_MODE_KEY => {
             let settings: DeveloperModeSettings =
-                user_settings::get(&state.pool, &reader_key, &key).await?;
-            serde_json::to_value(settings).map_err(|e| AppError::Internal(e.to_string()))?
-        }
-        MED_NUDGE_KEY => {
-            let settings: MedNudgeSettings =
                 user_settings::get(&state.pool, &reader_key, &key).await?;
             serde_json::to_value(settings).map_err(|e| AppError::Internal(e.to_string()))?
         }
@@ -126,12 +120,6 @@ pub async fn update_user_settings(
             let merged = update.apply(existing);
             user_settings::upsert(&state.pool, &reader_key, &key, &merged).await?;
             serde_json::to_value(merged).map_err(|e| AppError::Internal(e.to_string()))?
-        }
-        MED_NUDGE_KEY => {
-            let settings: MedNudgeSettings = serde_json::from_value(body.into_inner())
-                .map_err(|e| AppError::BadRequest(format!("invalid med nudge settings: {e}")))?;
-            user_settings::upsert(&state.pool, &reader_key, &key, &settings).await?;
-            serde_json::to_value(&settings).map_err(|e| AppError::Internal(e.to_string()))?
         }
         _ => unreachable!(),
     };
