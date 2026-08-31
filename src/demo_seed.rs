@@ -6,7 +6,7 @@ use uuid::Uuid;
 use crate::domain::elimination::{CreateEliminationRecord, EliminationEventType};
 use crate::domain::medication::{
     CreateMedAssignment, CreateMedIntakeRecord, CreateMedication, DoseFraction, MedFrequency,
-    MedFrequencyUnit, MedType, PillShape,
+    MedFrequencyUnit, MedType, Medication, PillShape,
 };
 use crate::domain::nutrition_record::{CreateNutritionRecord, NutritionRecord};
 use crate::domain::nutrition_schedule::CreateNutritionSchedule;
@@ -16,7 +16,7 @@ use crate::domain::species::PetSpecies;
 use crate::domain::weight::CreateWeightRecord;
 use crate::error::AppResult;
 use crate::repo::{
-    day_notes, elimination_records, med_assignments, med_intake_records, medications,
+    day_notes, elimination_records, med_assignments, med_bundles, med_intake_records, medications,
     nutrition_records, nutrition_schedules, pets, weight_records,
 };
 
@@ -796,6 +796,10 @@ async fn seed_medications(pool: &SqlitePool, demo_pets: &[Pet]) -> AppResult<usi
         .iter()
         .find(|pet| pet.id.to_string() == REX_ID)
         .expect("rex seeded");
+    let pepper = demo_pets
+        .iter()
+        .find(|pet| pet.id.to_string() == PEPPER_ID)
+        .expect("pepper seeded");
     let today = Utc::now().date_naive();
     let date_from = (today - Duration::days(DEMO_DAYS))
         .format("%Y-%m-%d")
@@ -870,7 +874,7 @@ async fn seed_medications(pool: &SqlitePool, demo_pets: &[Pet]) -> AppResult<usi
                 every: 1,
                 unit: MedFrequencyUnit::Days,
             }),
-            date_from,
+            date_from: date_from.clone(),
             date_to: None,
             optional: Some(true),
             meal_wait_minutes: None,
@@ -896,7 +900,173 @@ async fn seed_medications(pool: &SqlitePool, demo_pets: &[Pet]) -> AppResult<usi
     )
     .await?;
 
-    Ok(2)
+    // ── Pepper's medications ──────────────────────────────────────────────────
+    // Three daily scheduled pills + one optional liquid, with two of the
+    // scheduled meds joined in a bundle.
+
+    let meloxicam: Medication = medications::create(
+        pool,
+        CreateMedication {
+            pet_id: pepper.id.to_string(),
+            name: "Meloxicam".to_string(),
+            med_type: MedType::Pill,
+            color: Some("#6366f1".to_string()),
+            emoji: Some("💊".to_string()),
+            description: Some("Anti-inflammatory; give with food.".to_string()),
+        },
+    )
+    .await?;
+
+    med_assignments::create(
+        pool,
+        CreateMedAssignment {
+            medication_id: meloxicam.id.clone(),
+            formulation_id: None,
+            tablet_strength_mg: Some(1.0),
+            pill_shape: Some(PillShape::Round),
+            liquid_concentration_mg_per_ml: None,
+            dose_fraction: Some(DoseFraction::Quarter),
+            liquid_dose_ml: None,
+            frequency: Some(MedFrequency {
+                morning: 1,
+                midday: 0,
+                evening: 0,
+                every: 1,
+                unit: MedFrequencyUnit::Days,
+            }),
+            date_from: date_from.clone(),
+            date_to: None,
+            optional: Some(false),
+            meal_wait_minutes: Some(30),
+        },
+    )
+    .await?;
+
+    let enrofloxacin: Medication = medications::create(
+        pool,
+        CreateMedication {
+            pet_id: pepper.id.to_string(),
+            name: "Enrofloxacin".to_string(),
+            med_type: MedType::Pill,
+            color: Some("#f59e0b".to_string()),
+            emoji: Some("🔬".to_string()),
+            description: Some("Antibiotic; complete the full course.".to_string()),
+        },
+    )
+    .await?;
+
+    med_assignments::create(
+        pool,
+        CreateMedAssignment {
+            medication_id: enrofloxacin.id.clone(),
+            formulation_id: None,
+            tablet_strength_mg: Some(15.0),
+            pill_shape: Some(PillShape::Oval),
+            liquid_concentration_mg_per_ml: None,
+            dose_fraction: Some(DoseFraction::Eighth),
+            liquid_dose_ml: None,
+            frequency: Some(MedFrequency {
+                morning: 1,
+                midday: 0,
+                evening: 1,
+                every: 1,
+                unit: MedFrequencyUnit::Days,
+            }),
+            date_from: date_from.clone(),
+            date_to: None,
+            optional: Some(false),
+            meal_wait_minutes: None,
+        },
+    )
+    .await?;
+
+    let fluconazole: Medication = medications::create(
+        pool,
+        CreateMedication {
+            pet_id: pepper.id.to_string(),
+            name: "Fluconazole".to_string(),
+            med_type: MedType::Pill,
+            color: Some("#10b981".to_string()),
+            emoji: Some("🌿".to_string()),
+            description: Some("Antifungal; administer every morning.".to_string()),
+        },
+    )
+    .await?;
+
+    med_assignments::create(
+        pool,
+        CreateMedAssignment {
+            medication_id: fluconazole.id.clone(),
+            formulation_id: None,
+            tablet_strength_mg: Some(50.0),
+            pill_shape: Some(PillShape::Capsule),
+            liquid_concentration_mg_per_ml: None,
+            dose_fraction: Some(DoseFraction::Sixteenth),
+            liquid_dose_ml: None,
+            frequency: Some(MedFrequency {
+                morning: 1,
+                midday: 0,
+                evening: 0,
+                every: 1,
+                unit: MedFrequencyUnit::Days,
+            }),
+            date_from: date_from.clone(),
+            date_to: None,
+            optional: Some(false),
+            meal_wait_minutes: None,
+        },
+    )
+    .await?;
+
+    // Optional liquid — vitamin supplement as-needed
+    let vitamins: Medication = medications::create(
+        pool,
+        CreateMedication {
+            pet_id: pepper.id.to_string(),
+            name: "Vitamin drops".to_string(),
+            med_type: MedType::Liquid,
+            color: Some("#f43f5e".to_string()),
+            emoji: Some("✨".to_string()),
+            description: Some("Water-soluble vitamin supplement; add to water dish.".to_string()),
+        },
+    )
+    .await?;
+
+    med_assignments::create(
+        pool,
+        CreateMedAssignment {
+            medication_id: vitamins.id.clone(),
+            formulation_id: None,
+            tablet_strength_mg: None,
+            pill_shape: None,
+            liquid_concentration_mg_per_ml: Some(50.0),
+            dose_fraction: None,
+            liquid_dose_ml: None,
+            frequency: Some(MedFrequency {
+                morning: 1,
+                midday: 0,
+                evening: 0,
+                every: 1,
+                unit: MedFrequencyUnit::Days,
+            }),
+            date_from,
+            date_to: None,
+            optional: Some(true),
+            meal_wait_minutes: None,
+        },
+    )
+    .await?;
+
+    // Bundle: Meloxicam + Enrofloxacin (taken together with morning meal)
+    med_bundles::create(
+        pool,
+        pepper.id,
+        "Morning meds".to_string(),
+        &[meloxicam, enrofloxacin],
+    )
+    .await?;
+
+    Ok(6)
 }
 
 #[cfg(test)]
@@ -927,7 +1097,7 @@ mod tests {
         assert!(summary.weight_records > 0);
         assert_eq!(summary.day_notes, 4);
         assert_eq!(summary.schedules, 3);
-        assert_eq!(summary.medications, 2);
+        assert_eq!(summary.medications, 6);
 
         let pets = pets::list_pets(&pool).await.expect("pets");
         assert_eq!(pets.len(), 4);
@@ -938,10 +1108,25 @@ mod tests {
             .await
             .expect("rex meds");
         assert_eq!(rex_meds.len(), 2);
-        let today = Utc::now().date_naive().format("%Y-%m-%d").to_string();
-        let daily = crate::services::medication_service::daily_assignments(&pool, rex_id, &today)
+
+        let pepper_id = Uuid::parse_str(PEPPER_ID).unwrap();
+        let pepper_meds = medications::list_by_pet(&pool, pepper_id)
             .await
-            .expect("rex daily meds");
-        assert_eq!(daily.len(), 2);
+            .expect("pepper meds");
+        assert_eq!(pepper_meds.len(), 4);
+
+        let today = Utc::now().date_naive().format("%Y-%m-%d").to_string();
+        let pepper_daily =
+            crate::services::medication_service::daily_assignments(&pool, pepper_id, &today)
+                .await
+                .expect("pepper daily meds");
+        // 3 scheduled + 1 optional
+        assert_eq!(pepper_daily.len(), 4);
+
+        let pepper_bundles = crate::repo::med_bundles::list_by_pet(&pool, pepper_id)
+            .await
+            .expect("pepper bundles");
+        assert_eq!(pepper_bundles.len(), 1);
+        assert_eq!(pepper_bundles[0].items.len(), 2);
     }
 }
