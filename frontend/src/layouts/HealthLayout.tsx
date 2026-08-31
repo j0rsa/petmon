@@ -7,6 +7,7 @@ const JOURNAL_PATH = '/health';
 const tabs = [
   { to: '/health', label: 'Overview' },
   { to: '/health/treatment-plan', label: 'Treatment plan' },
+  { to: '/health/notifications', label: 'Notifications' },
 ];
 
 export function HealthLayout() {
