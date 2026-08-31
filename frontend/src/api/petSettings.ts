@@ -42,6 +42,20 @@ export function petSettingsQueryKey(petId: string, key: PetSettingsKey) {
   return ['pet-settings', petId, key] as const;
 }
 
+/**
+ * Deep-merge API response with defaults so a partial or empty response
+ * never causes `undefined` slot properties at render time.
+ */
+function mergeWithDefaults(data: unknown, defaults: PetNudgeSchedule): PetNudgeSchedule {
+  if (!data || typeof data !== 'object') return defaults;
+  const d = data as Partial<PetNudgeSchedule>;
+  return {
+    morning: d.morning ? { ...defaults.morning, ...d.morning } : defaults.morning,
+    midday: d.midday ? { ...defaults.midday, ...d.midday } : defaults.midday,
+    evening: d.evening ? { ...defaults.evening, ...d.evening } : defaults.evening,
+  };
+}
+
 export function usePetSettings<K extends PetSettingsKey>(petId: string | undefined, key: K) {
   const queryClient = useQueryClient();
   const queryKey = petId ? petSettingsQueryKey(petId, key) : (['pet-settings-disabled'] as const);
@@ -60,7 +74,11 @@ export function usePetSettings<K extends PetSettingsKey>(petId: string | undefin
     },
   });
 
-  const settings = query.data ?? PET_SETTINGS_DEFAULTS[key];
+  // Deep-merge with defaults so a partial/empty API response never crashes the UI.
+  const settings = mergeWithDefaults(
+    query.data,
+    PET_SETTINGS_DEFAULTS[key] as PetNudgeSchedule,
+  ) as PetSettingsMap[K];
 
   return {
     settings,

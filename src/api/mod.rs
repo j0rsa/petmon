@@ -33,7 +33,6 @@ pub fn configure(cfg: &mut web::ServiceConfig) {
             .configure(notifications::configure)
             .configure(push::configure)
             .configure(settings::configure)
-            .configure(user_settings::configure)
-            .configure(pet_settings::configure),
+            .configure(user_settings::configure),
     );
 }

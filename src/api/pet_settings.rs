@@ -8,7 +8,7 @@ use crate::domain::pet_settings::{is_known_pet_settings_key, PetNudgeSchedule, M
 use crate::error::{AppError, AppResult};
 use crate::repo::pet_settings;
 
-#[get("/{pet_id}/settings/{key}")]
+#[get("/{id}/settings/{key}")]
 #[require_scope("api_read")]
 pub async fn get_pet_settings(
     state: web::Data<AppState>,
@@ -31,7 +31,7 @@ pub async fn get_pet_settings(
     Ok(HttpResponse::Ok().json(value))
 }
 
-#[post("/{pet_id}/settings/{key}")]
+#[post("/{id}/settings/{key}")]
 #[require_scope("api_write")]
 pub async fn update_pet_settings(
     state: web::Data<AppState>,
