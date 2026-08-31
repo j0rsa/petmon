@@ -16,6 +16,7 @@ import SchedulesPage from './pages/SchedulesPage';
 import { HealthLayout } from './layouts/HealthLayout';
 import HealthPage from './pages/HealthPage';
 import HealthTreatmentPlanPage from './pages/HealthTreatmentPlanPage';
+import HealthNotificationsPage from './pages/HealthNotificationsPage';
 import SettingsPage from './pages/SettingsPage';
 import AuthCallbackPage from './pages/AuthCallbackPage';
 
@@ -53,6 +54,7 @@ export default function App() {
           <Route path="/health" element={<HealthLayout />}>
             <Route index element={<HealthPage />} />
             <Route path="treatment-plan" element={<HealthTreatmentPlanPage />} />
+            <Route path="notifications" element={<HealthNotificationsPage />} />
           </Route>
           <Route path="/pets" element={<PetsPage />} />
           <Route path="/pets/:id" element={<PetInfoPage />} />

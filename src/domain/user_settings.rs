@@ -6,6 +6,7 @@ pub const DISPLAY_KEY: &str = "display";
 pub const NUTRITION_CALENDAR_KEY: &str = "nutrition_calendar";
 pub const CUMULATIVE_FLUID_CHART_KEY: &str = "cumulative_fluid_chart";
 pub const DEVELOPER_MODE_KEY: &str = "developer_mode";
+pub const MED_NUDGE_KEY: &str = "med_nudge";
 
 /// Per-user display preferences (global UI formatting, page toggles).
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -206,9 +207,43 @@ impl UpdateDeveloperModeSettings {
     }
 }
 
+/// A single time-of-day nudge slot. Uses an hour (0–23) to keep the scheduler
+/// to at most 24 distinct cron buckets per day.
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+pub struct NudgeSlot {
+    #[serde(default)]
+    pub enabled: bool,
+    /// Hour of day (0–23) by which the dose should have been logged.
+    /// If enabled and no doses are logged by this hour, a push is sent.
+    #[serde(default)]
+    pub deadline_hour: u8,
+}
+
+/// Per-pet daily nudge schedule stored inside `MedNudgeSettings`.
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+pub struct PetNudgeSchedule {
+    #[serde(default)]
+    pub morning: NudgeSlot,
+    #[serde(default)]
+    pub midday: NudgeSlot,
+    #[serde(default)]
+    pub evening: NudgeSlot,
+}
+
+/// Per-user medication nudge preferences — a map of pet_id → daily schedule.
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+pub struct MedNudgeSettings {
+    #[serde(default)]
+    pub pets: std::collections::HashMap<String, PetNudgeSchedule>,
+}
+
 pub fn is_known_user_settings_key(key: &str) -> bool {
     matches!(
         key,
-        DISPLAY_KEY | NUTRITION_CALENDAR_KEY | CUMULATIVE_FLUID_CHART_KEY | DEVELOPER_MODE_KEY
+        DISPLAY_KEY
+            | NUTRITION_CALENDAR_KEY
+            | CUMULATIVE_FLUID_CHART_KEY
+            | DEVELOPER_MODE_KEY
+            | MED_NUDGE_KEY
     )
 }
