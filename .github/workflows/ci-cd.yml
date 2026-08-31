@@ -549,6 +549,10 @@ jobs:
             echo "::warning::Renovate trigger is rate limited; continuing CI."
             exit 0
           fi
+          if [ "${status}" = "409" ]; then
+            echo "::warning::Renovate trigger returned 409 (run already in progress); continuing CI."
+            exit 0
+          fi
           if [ "${status}" -lt 200 ] || [ "${status}" -ge 300 ]; then
             echo "::error::Renovate trigger failed with HTTP ${status}."
             exit 1
