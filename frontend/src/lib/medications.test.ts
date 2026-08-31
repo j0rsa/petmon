@@ -109,6 +109,7 @@ describe('groupAssignmentsByMedication', () => {
     dose_label: '½ × 5mg',
     frequency: { morning: 1, midday: 0, evening: 1, every: 1, unit: 'days' as const },
     optional: false,
+    meal_wait_minutes: null,
     updated_at: '2026-01-01T00:00:00Z',
   };
 
@@ -192,6 +193,7 @@ describe('consecutiveCourse', () => {
     dose_label: '½ × 5mg',
     frequency: { morning: 1, midday: 0, evening: 1, every: 1, unit: 'days' as const },
     optional: false,
+    meal_wait_minutes: null,
     updated_at: '2026-01-01T00:00:00Z',
   };
 
@@ -306,6 +308,7 @@ describe('medication bundles', () => {
     dose_label: '½ × 5mg',
     frequency: { morning: 1, midday: 0, evening: 0, every: 1, unit: 'days' as const },
     optional: false,
+    meal_wait_minutes: null,
     date_from: '2026-08-01',
     date_to: null,
     created_at: '2026-08-01T00:00:00Z',
@@ -342,6 +345,7 @@ describe('medication bundles', () => {
             med_type: 'pill',
             color: '#6366f1',
             emoji: null,
+            description: null,
             created_at: '2026-01-01T00:00:00Z',
             updated_at: '2026-01-01T00:00:00Z',
           },
@@ -355,6 +359,7 @@ describe('medication bundles', () => {
             med_type: 'pill',
             color: '#22c55e',
             emoji: null,
+            description: null,
             created_at: '2026-01-01T00:00:00Z',
             updated_at: '2026-01-01T00:00:00Z',
           },
@@ -375,6 +380,7 @@ describe('medication bundles', () => {
       med_type: 'pill' as const,
       color: '#6366f1',
       emoji: '💊',
+      description: null,
       created_at: '2026-01-01T00:00:00Z',
       updated_at: '2026-01-01T00:00:00Z',
     };
@@ -448,6 +454,7 @@ describe('medication bundles', () => {
           med_type: 'pill',
           color: '#6366f1',
           emoji: '💊',
+          description: null,
           created_at: '2026-01-01T00:00:00Z',
           updated_at: '2026-01-01T00:00:00Z',
         },
@@ -465,6 +472,7 @@ describe('medication bundles', () => {
           med_type: 'pill',
           color: '#22c55e',
           emoji: '🌙',
+          description: null,
           created_at: '2026-01-01T00:00:00Z',
           updated_at: '2026-01-01T00:00:00Z',
         },
