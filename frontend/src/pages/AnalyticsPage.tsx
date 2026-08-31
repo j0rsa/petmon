@@ -1,7 +1,7 @@
 import { useMemo, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import {
-  Bar, BarChart, CartesianGrid, Legend, Line, LineChart,
+  Bar, BarChart, CartesianGrid, DefaultLegendContent, Legend, Line, LineChart,
   ResponsiveContainer, Tooltip, XAxis, YAxis,
 } from 'recharts';
 import { ANALYTICS_CATEGORIES, CATEGORY_COLORS, CATEGORY_LABELS } from '../types';
@@ -31,6 +31,7 @@ function formatDate(iso: string) {
 export default function AnalyticsPage() {
   const { selectedPetId, petsLoading } = useSelectedPet();
   const [period, setPeriod] = useState<PeriodLabel>('30d');
+  const [soloCategory, setSoloCategory] = useState<typeof ANALYTICS_CATEGORIES[number] | null>(null);
 
   const today = localToday();
   const days = PERIODS.find(p => p.label === period)!.days;
@@ -105,6 +106,27 @@ export default function AnalyticsPage() {
       };
     });
   }, [dailyData]);
+
+  const categoryLegendPayload = useMemo(
+    () => ANALYTICS_CATEGORIES.map((cat) => ({
+      value: CATEGORY_LABELS[cat],
+      type: 'square' as const,
+      color: CATEGORY_COLORS[cat],
+      inactive: soloCategory !== null && soloCategory !== cat,
+      dataKey: cat,
+    })),
+    [soloCategory],
+  );
+
+  const visibleCategories = soloCategory !== null
+    ? ANALYTICS_CATEGORIES.filter((c) => c === soloCategory)
+    : ANALYTICS_CATEGORIES;
+
+  function handleCategoryLegendClick(entry: { value?: string }) {
+    const cat = ANALYTICS_CATEGORIES.find((c) => CATEGORY_LABELS[c] === entry.value) ?? null;
+    if (!cat) return;
+    setSoloCategory((current) => (current === cat ? null : cat));
+  }
 
   if (petsLoading) return <div className="loading-state">Loading…</div>;
   if (!selectedPetId) return <NoPetSelected />;
@@ -203,9 +225,19 @@ export default function AnalyticsPage() {
                     labelFormatter={(label) => formatDate(String(label))}
                     contentStyle={{ background: 'var(--surface)', border: '1px solid var(--border-subtle)', borderRadius: 8, fontFamily: 'monospace', fontSize: 12 }}
                   />
-                  <Legend wrapperStyle={{ fontFamily: 'monospace', fontSize: 12 }} />
-                  {ANALYTICS_CATEGORIES.map((cat, i) => (
-                    <Bar key={cat} dataKey={cat} name={CATEGORY_LABELS[cat]} fill={CATEGORY_COLORS[cat]} stackId="day" radius={i === ANALYTICS_CATEGORIES.length - 1 ? [4, 4, 0, 0] : [0, 0, 0, 0]} />
+                  <Legend
+                    className="chart-legend-interactive"
+                    wrapperStyle={{ fontFamily: 'monospace', fontSize: 12 }}
+                    content={(props) => (
+                      <DefaultLegendContent
+                        {...props}
+                        payload={categoryLegendPayload}
+                        onClick={(entry) => handleCategoryLegendClick(entry as { value?: string })}
+                      />
+                    )}
+                  />
+                  {visibleCategories.map((cat, i) => (
+                    <Bar key={cat} dataKey={cat} name={CATEGORY_LABELS[cat]} fill={CATEGORY_COLORS[cat]} stackId="day" radius={i === visibleCategories.length - 1 ? [4, 4, 0, 0] : [0, 0, 0, 0]} />
                   ))}
                 </BarChart>
               </ResponsiveContainer>
