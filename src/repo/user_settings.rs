@@ -27,6 +27,28 @@ pub async fn get<T: DeserializeOwned + Default>(
     }
 }
 
+/// Return all (reader_key, deserialized value) pairs for a given settings key.
+/// Rows that fail to deserialize are silently skipped.
+pub async fn list_all_by_key<T: DeserializeOwned + Default>(
+    pool: &SqlitePool,
+    key: &str,
+) -> AppResult<Vec<(String, T)>> {
+    let rows: Vec<(String, String)> =
+        sqlx::query_as("SELECT reader_key, value_json FROM user_settings WHERE key = ?")
+            .bind(key)
+            .fetch_all(pool)
+            .await?;
+
+    Ok(rows
+        .into_iter()
+        .filter_map(|(reader_key, json)| {
+            serde_json::from_str::<T>(&json)
+                .ok()
+                .map(|v| (reader_key, v))
+        })
+        .collect())
+}
+
 pub async fn upsert<T: Serialize>(
     pool: &SqlitePool,
     reader_key: &str,

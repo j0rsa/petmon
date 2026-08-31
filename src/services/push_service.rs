@@ -438,6 +438,42 @@ pub fn spawn_broadcast(pool: SqlitePool, notification: Notification) {
     });
 }
 
+/// Send a push notification to all subscribed devices for a specific reader.
+/// Silently skips if VAPID is unavailable or the reader has no subscriptions.
+pub async fn send_to_reader(pool: &SqlitePool, reader_key: &str, payload: &PushPayload) {
+    let vapid = match ensure_vapid(pool).await {
+        Ok(cfg) => cfg,
+        Err(e) => {
+            tracing::warn!(error = %e, "send_to_reader: VAPID unavailable");
+            return;
+        }
+    };
+    let subscriptions = match crate::repo::push_subscriptions::list_for_reader(pool, reader_key)
+        .await
+    {
+        Ok(subs) => subs,
+        Err(e) => {
+            tracing::warn!(reader_key, error = %e, "send_to_reader: failed to list subscriptions");
+            return;
+        }
+    };
+    let body = match serde_json::to_vec(payload) {
+        Ok(b) => b,
+        Err(e) => {
+            tracing::error!(error = %e, "send_to_reader: failed to serialize payload");
+            return;
+        }
+    };
+    for sub in subscriptions {
+        match deliver_to_subscription(pool, &vapid, &body, &sub).await {
+            DeliveryOutcome::Sent => {}
+            DeliveryOutcome::Failed { error } => {
+                tracing::warn!(endpoint = %sub.endpoint, %error, "send_to_reader: delivery failed");
+            }
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

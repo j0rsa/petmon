@@ -8,6 +8,7 @@ pub mod elimination_record_service;
 pub mod health_state_service;
 pub mod medication_service;
 pub mod notification_service;
+pub mod nudge_service;
 pub mod nutrition_analytics_service;
 pub mod nutrition_record_service;
 pub mod nutrition_schedule_service;
