@@ -296,7 +296,7 @@ jobs:
       # Linux. Only `shortcuts sign` needs macOS, and the signed file is committed.
       - name: Install Cherri
         run: |
-          curl -fsSL https://github.com/electrikmilk/cherri/releases/download/v2.3.0/cherri_linux-x86_64.zip -o /tmp/cherri.zip
+          curl -fsSL --retry 3 --retry-delay 5 https://github.com/electrikmilk/cherri/releases/download/v2.3.0/cherri_linux-x86_64.zip -o /tmp/cherri.zip
           unzip -o /tmp/cherri.zip -d /usr/local/bin cherri
           chmod +x /usr/local/bin/cherri
 
