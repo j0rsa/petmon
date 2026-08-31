@@ -135,6 +135,43 @@ Medication accent color and emoji live on the medication identity, not on assign
 
 Treatment plan UI: known medications, assignments, and bundles are card lists, not HTML tables. Medications have a view state and an explicit Edit mode for name/color/emoji. Assignments are grouped by medication — the current course is the card, earlier paused/ended courses collapse under it. Assignment cards show how long the current uninterrupted course has run: from the first assignment after the last pause through today (if active) or through the latest end date. Press + New assignment to open the create form at the top of the Assignments list (Revise uses the same card). Bundles join two or more scheduled (not optional) assignments; press + New bundle to open the create form at the top of the Bundles list. The form lists current scheduled medications that are not already in a bundle. Bundles appear on Health as a Take now row when every member is due. Today's meds splits bundles and individual meds into labeled groups. Card actions sit on the header row, right-aligned on desktop; they wrap below the title on narrow screens. **Exception:** the Today's meds shortcut import icon (iOS only) stays on the header row at the card's right edge at *every* width, and `.med-intake-heading.section-heading` deliberately overrides the below-640px stacking to keep it there. It is a card action, never markup nested next to the `<h3>`. UI tests for this page (and new UI in general) cover desktop and 360×700; `assertHeaderActionPlacement` in `frontend/src/stories/viewport.tsx` checks the placement at both sizes.
 
+## Target devices and viewport specifications
+
+These are the primary client devices to check for usability. All UI work must be verified at the corresponding CSS viewport widths; Storybook stories use `asNarrowStory` / `withDeviceInsets()` to simulate the smallest breakpoints.
+
+### Mobile devices
+
+| Device | Screen | Orientation | CSS viewport (w × h) | DPR | Safe area notes |
+|--------|--------|-------------|----------------------|-----|-----------------|
+| **Samsung Galaxy Z Flip 4** | Main (6.7" unfolded) | Portrait | 393 × 960 px ¹ | 2.75 | Punch-hole camera top; use `env(safe-area-inset-*)` |
+| Samsung Galaxy Z Flip 4 | Main (6.7" unfolded) | Landscape | 960 × 393 px ¹ | 2.75 | — |
+| Samsung Galaxy Z Flip 4 | Cover (1.9" external) | Portrait | ~130 × 65 px ² | ~4 | Web browsers do not run on the cover screen |
+| **iPhone 16 Pro** | 6.3" Super Retina XDR | Portrait | 402 × 874 px | 3 | Dynamic Island top ≈ 59 pt; home indicator ≈ 34 pt |
+| iPhone 16 Pro | 6.3" Super Retina XDR | Landscape | 874 × 402 px | 3 | Side safe areas apply |
+| **iPhone 15 Pro Max** | 6.7" Super Retina XDR | Portrait | 430 × 932 px | 3 | Dynamic Island top ≈ 59 pt; home indicator ≈ 34 pt |
+| iPhone 15 Pro Max | 6.7" Super Retina XDR | Landscape | 932 × 430 px | 3 | Side safe areas apply |
+
+**Notes:**
+
+¹ Galaxy Z Flip 4 main screen physical resolution is **1080 × 2640 px** @ 425 ppi. Chrome on Android reports DPR ≈ 2.75, yielding a CSS viewport of ~393 × 960 px in portrait. Some profiling tools report DPR 3 (→ 360 × 880 px); treat 360 px as the safe minimum width for this device. The exact reported value can differ between Chrome and Samsung Internet.
+
+² The cover/external screen (1.9", 512 × 260 physical px) is used exclusively for Samsung's Flex Window widgets — standard web browsers do not render on it. No web viewport testing is required for the cover screen.
+
+Safe area insets on iOS should always be handled via CSS `env(safe-area-inset-top/right/bottom/left)` — never hardcoded. The `withDeviceInsets()` Storybook decorator simulates these values in tests. Top insets for Dynamic Island models are approximately **59 pt** (status bar + island) and the home indicator bottom reserve is **34 pt**.
+
+The app ships as a PWA with `viewport-fit=cover` and `apple-mobile-web-app-status-bar-style: black-translucent`, so the full display area (including behind the status bar and home indicator) is used. The `--safe-top` / `--safe-bottom` CSS variables in `frontend/src/index.css` own this offset — never read `env(safe-area-inset-*)` directly outside those definitions.
+
+### Desktop viewports
+
+| Target | CSS viewport width | Notes |
+|--------|--------------------|-------|
+| Narrow desktop / large tablet | 800 px | Minimum breakpoint for "desktop" layouts |
+| Standard desktop | 1400 px | Comfortable multi-column layout width |
+
+Desktop heights are not fixed test targets — designs must reflow to any height. Use `min-height: 100dvh` (with `100vh` fallback) for full-height containers.
+
+---
+
 ## Terminology: BE vs FE split
 
 The app uses two vocabulary layers that must never bleed into each other:

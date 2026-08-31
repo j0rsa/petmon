@@ -65,6 +65,8 @@ async fn main() -> anyhow::Result<()> {
         chrono_tz::UTC
     });
 
+    services::nudge_service::spawn(pool.clone(), timezone);
+
     let med_intake_shortcut_icloud_url =
         services::shortcut_publish::resolve_med_intake_icloud_url();
 

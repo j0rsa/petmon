@@ -81,6 +81,17 @@ function SlotRow({
   );
 }
 
+/** Compute the dense list of cron-trigger hours from the current settings object. */
+function computeCronHours(s: ReturnType<typeof useUserSettings<'med_nudge'>>['settings']): number[] {
+  const seen = new Set<number>();
+  for (const schedule of Object.values(s.pets)) {
+    for (const slot of [schedule.morning, schedule.midday, schedule.evening]) {
+      if (slot.enabled) seen.add(slot.deadline_hour);
+    }
+  }
+  return Array.from(seen).sort((a, b) => a - b);
+}
+
 export default function HealthNotificationsPage() {
   const { selectedPetId, selectedPet, petsLoading } = useSelectedPet();
   const { canWrite } = usePermissions();
@@ -96,6 +107,7 @@ export default function HealthNotificationsPage() {
   if (!selectedPetId || !selectedPet) return <NoPetSelected />;
 
   const petSchedule: PetNudgeSchedule = settings.pets[selectedPetId] ?? DEFAULT_PET_NUDGE_SCHEDULE;
+  const cronHours = computeCronHours(settings);
 
   function updateSlot(slot: Slot, updated: NudgeSlot) {
     if (!canWrite) return;
@@ -153,10 +165,30 @@ export default function HealthNotificationsPage() {
         <p className="muted-text" style={{ fontSize: '0.8rem', marginTop: '0.5rem' }}>Saving…</p>
       )}
 
-      <p className="muted-text" style={{ fontSize: '0.78rem', marginTop: '1.25rem', lineHeight: 1.5 }}>
-        Changes are saved immediately. Each enabled slot fires one check per hour at the selected
-        time — if no doses were logged for that part of the day, a push notification is sent.
-        Scheduled sending requires the nudge scheduler to be deployed.
+      {cronHours.length > 0 && (
+        <div
+          style={{
+            marginTop: '1.25rem',
+            padding: '0.6rem 0.85rem',
+            borderRadius: 8,
+            background: 'var(--surface-muted)',
+            fontSize: '0.82rem',
+          }}
+        >
+          <strong>Server checks at:</strong>{' '}
+          {cronHours.map((h) => hourLabel(h)).join(', ')}
+          <p className="muted-text" style={{ margin: '0.25rem 0 0', fontSize: '0.78rem' }}>
+            The server runs a nudge check at the top of each of these hours.
+            If any doses from passed slots remain untaken, a push is sent.
+          </p>
+        </div>
+      )}
+
+      <p className="muted-text" style={{ fontSize: '0.78rem', marginTop: '1rem', lineHeight: 1.5 }}>
+        Changes are saved immediately. At each scheduled hour the server finds
+        all doses that should have been taken by then but haven&apos;t been, and
+        sends: &ldquo;Don&apos;t forget to give &lt;meds&gt; to &lt;pet&gt; in
+        time&rdquo;.
       </p>
     </section>
   );

@@ -82,6 +82,20 @@ pub async fn list_all(pool: &SqlitePool) -> AppResult<Vec<PushSubscriptionRow>> 
     Ok(rows)
 }
 
+pub async fn list_for_reader(
+    pool: &SqlitePool,
+    reader_key: &str,
+) -> AppResult<Vec<PushSubscriptionRow>> {
+    let rows = sqlx::query_as::<_, PushSubscriptionRow>(
+        "SELECT id, endpoint, p256dh, auth, reader_key, user_agent, created_at, last_success_at, last_attempt_at \
+         FROM push_subscriptions WHERE reader_key = ? ORDER BY created_at ASC",
+    )
+    .bind(reader_key)
+    .fetch_all(pool)
+    .await?;
+    Ok(rows)
+}
+
 #[tracing::instrument(skip(pool))]
 pub async fn record_attempt(pool: &SqlitePool, endpoint: &str) -> AppResult<()> {
     let now = Utc::now().to_rfc3339();
