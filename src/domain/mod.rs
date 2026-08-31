@@ -8,6 +8,7 @@ pub mod nutrition_record;
 pub mod nutrition_schedule;
 pub mod nutrition_status;
 pub mod pet;
+pub mod pet_settings;
 pub mod pet_status;
 pub mod pillar;
 pub mod push;
