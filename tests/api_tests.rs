@@ -5,7 +5,16 @@ use sha2::{Digest, Sha256};
 use sqlx::SqlitePool;
 
 async fn setup_pool() -> SqlitePool {
-    let pool = SqlitePool::connect("sqlite::memory:").await.unwrap();
+    use sqlx::sqlite::SqliteConnectOptions;
+    use std::str::FromStr;
+    let options = SqliteConnectOptions::from_str("sqlite::memory:")
+        .unwrap()
+        .foreign_keys(true);
+    let pool = sqlx::sqlite::SqlitePoolOptions::new()
+        .max_connections(1) // single connection so in-memory DB is shared
+        .connect_with(options)
+        .await
+        .unwrap();
     sqlx::migrate!("./migrations").run(&pool).await.unwrap();
     pool
 }
@@ -4655,4 +4664,50 @@ async fn shortcuts_bundle_take_creates_records_and_returns_id() {
         .to_request();
     let resp = test::call_service(&app, req).await;
     assert_eq!(resp.status(), 400, "backdating param must be rejected");
+}
+
+#[actix_web::test]
+async fn pet_settings_nudge_roundtrip() {
+    let pool = setup_pool().await;
+    let state = web::Data::new(AppState::new(pool, true, None, None));
+    let app = build_app!(state);
+
+    // Create a pet (its id will be a freshly generated UUID)
+    let req = test::TestRequest::post()
+        .uri("/api/v1/pets")
+        .insert_header(("Authorization", "Bearer dev"))
+        .set_json(serde_json::json!({ "name": "TestBird", "species": "parrot" }))
+        .to_request();
+    let resp = test::call_service(&app, req).await;
+    assert_eq!(resp.status(), 201);
+    let pet: serde_json::Value = test::read_body_json(resp).await;
+    let pet_id = pet["id"].as_str().unwrap().to_string();
+
+    // POST med_nudge settings — exercises the FK path
+    let req = test::TestRequest::post()
+        .uri(&format!("/api/v1/pets/{pet_id}/settings/med_nudge"))
+        .insert_header(("Authorization", "Bearer dev"))
+        .set_json(serde_json::json!({
+            "morning": { "enabled": true, "deadline_hour": 9 },
+            "midday":  { "enabled": false, "deadline_hour": 0 },
+            "evening": { "enabled": false, "deadline_hour": 0 }
+        }))
+        .to_request();
+    let resp = test::call_service(&app, req).await;
+    assert_eq!(
+        resp.status(),
+        200,
+        "body: {:?}",
+        test::read_body(resp).await
+    );
+
+    // GET it back
+    let req = test::TestRequest::get()
+        .uri(&format!("/api/v1/pets/{pet_id}/settings/med_nudge"))
+        .insert_header(("Authorization", "Bearer dev"))
+        .to_request();
+    let resp = test::call_service(&app, req).await;
+    assert_eq!(resp.status(), 200);
+    let body: serde_json::Value = test::read_body_json(resp).await;
+    assert_eq!(body["morning"]["enabled"], true);
 }
