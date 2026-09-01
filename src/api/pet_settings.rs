@@ -39,7 +39,11 @@ pub async fn update_pet_settings(
     body: web::Json<Value>,
 ) -> AppResult<HttpResponse> {
     let (pet_id_str, key) = path.into_inner();
-    Uuid::parse_str(&pet_id_str).map_err(|_| AppError::BadRequest("invalid pet_id".into()))?;
+    let pet_id =
+        Uuid::parse_str(&pet_id_str).map_err(|_| AppError::BadRequest("invalid pet_id".into()))?;
+    crate::repo::pets::get_pet(&state.pool, pet_id)
+        .await
+        .map_err(|_| AppError::NotFound(format!("Pet {pet_id_str} not found")))?;
     if !is_known_pet_settings_key(&key) {
         return Err(AppError::NotFound(format!(
             "unknown pet settings key '{key}'"
