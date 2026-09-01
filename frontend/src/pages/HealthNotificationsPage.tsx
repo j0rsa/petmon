@@ -91,7 +91,10 @@ function computeCronHours(s: PetNudgeSchedule): number[] {
 export default function HealthNotificationsPage() {
   const { selectedPetId, selectedPet, petsLoading } = useSelectedPet();
   const { canWrite } = usePermissions();
-  const { settings, update, isSaving } = usePetSettings(selectedPetId ?? undefined, 'med_nudge');
+  // Use selectedPet?.id (not selectedPetId) so the query only fires once the
+  // pet is confirmed to exist in the current session — avoids FK failures when
+  // localStorage holds a stale ID from a different instance.
+  const { settings, update, isSaving } = usePetSettings(selectedPet?.id, 'med_nudge');
 
   const [pushStatus, setPushStatus] = useState<string | null>(null);
 
