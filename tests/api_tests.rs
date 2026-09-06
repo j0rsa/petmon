@@ -3201,7 +3201,10 @@ async fn mcp_initialize_negotiates_protocol_and_instructions() {
     .await;
     assert_eq!(resp.status(), 200);
     let body: serde_json::Value = test::read_body_json(resp).await;
-    assert_eq!(body["result"]["protocolVersion"].as_str(), Some("2025-06-18"));
+    assert_eq!(
+        body["result"]["protocolVersion"].as_str(),
+        Some("2025-06-18")
+    );
     let instructions = body["result"]["instructions"]
         .as_str()
         .expect("instructions");
@@ -3236,7 +3239,10 @@ async fn mcp_tools_call_includes_core_schema() {
     assert_eq!(body["result"]["_meta"]["coreSchema"], 1);
     let structured = &body["result"]["structuredContent"];
     assert!(structured["output"].is_string());
-    assert_eq!(structured["semanticResult"]["type"].as_str(), Some("Response"));
+    assert_eq!(
+        structured["semanticResult"]["type"].as_str(),
+        Some("Response")
+    );
     assert!(structured["semanticResult"]["text"].is_string());
 }
 
