@@ -3153,11 +3153,120 @@ async fn mcp_prompts_list_returns_recommended_prompts() {
     assert_eq!(resp.status(), 200);
     let body: serde_json::Value = test::read_body_json(resp).await;
     let prompts = body["result"]["prompts"].as_array().expect("prompts array");
-    assert_eq!(prompts.len(), 6);
+    assert_eq!(prompts.len(), 9);
     let names: Vec<_> = prompts.iter().filter_map(|p| p["name"].as_str()).collect();
     assert!(names.contains(&"daily-summary"));
     assert!(names.contains(&"health-check"));
     assert!(names.contains(&"vet-handoff"));
+    assert!(names.contains(&"household-overview"));
+    let arg_free: Vec<_> = prompts
+        .iter()
+        .filter(|p| {
+            p.get("arguments")
+                .and_then(|a| a.as_array())
+                .is_some_and(|a| a.is_empty())
+        })
+        .filter_map(|p| p["name"].as_str())
+        .collect();
+    assert!(arg_free.contains(&"household-overview"));
+    assert!(arg_free.contains(&"household-nutrition"));
+    assert!(arg_free.contains(&"household-toileting"));
+}
+
+/// initialize negotiates protocol version and returns server instructions.
+#[actix_web::test]
+async fn mcp_initialize_negotiates_protocol_and_instructions() {
+    let pool = setup_pool().await;
+    let raw = "pm_api_mcp_init_00000000000000000000000000000000000000000000000000000";
+    seed_token(&pool, raw, "mcp").await;
+    let state = web::Data::new(AppState::new(pool, false, None, None));
+    let app = build_full_app!(state);
+    let resp = test::call_service(
+        &app,
+        test::TestRequest::post()
+            .uri("/mcp")
+            .insert_header(("Authorization", format!("Bearer {raw}")))
+            .set_json(serde_json::json!({
+                "jsonrpc": "2.0",
+                "id": 1,
+                "method": "initialize",
+                "params": {
+                    "protocolVersion": "2025-06-18",
+                    "capabilities": {},
+                    "clientInfo": { "name": "pebble-index", "version": "1.0" }
+                }
+            }))
+            .to_request(),
+    )
+    .await;
+    assert_eq!(resp.status(), 200);
+    let body: serde_json::Value = test::read_body_json(resp).await;
+    assert_eq!(body["result"]["protocolVersion"].as_str(), Some("2025-06-18"));
+    let instructions = body["result"]["instructions"]
+        .as_str()
+        .expect("instructions");
+    assert!(instructions.contains("petmon"));
+    assert!(instructions.contains("pets.list"));
+}
+
+/// tools/call includes Pebble Index coreSchema structured content.
+#[actix_web::test]
+async fn mcp_tools_call_includes_core_schema() {
+    let pool = setup_pool().await;
+    let raw = "pm_api_mcp_core_0000000000000000000000000000000000000000000000000000";
+    seed_token(&pool, raw, "mcp").await;
+    let state = web::Data::new(AppState::new(pool, true, None, None));
+    let app = build_full_app!(state);
+    let resp = test::call_service(
+        &app,
+        test::TestRequest::post()
+            .uri("/mcp")
+            .insert_header(("Authorization", format!("Bearer {raw}")))
+            .set_json(serde_json::json!({
+                "jsonrpc": "2.0",
+                "id": 1,
+                "method": "tools/call",
+                "params": { "name": "pets.list", "arguments": {} }
+            }))
+            .to_request(),
+    )
+    .await;
+    assert_eq!(resp.status(), 200);
+    let body: serde_json::Value = test::read_body_json(resp).await;
+    assert_eq!(body["result"]["_meta"]["coreSchema"], 1);
+    let structured = &body["result"]["structuredContent"];
+    assert!(structured["output"].is_string());
+    assert_eq!(structured["semanticResult"]["type"].as_str(), Some("Response"));
+    assert!(structured["semanticResult"]["text"].is_string());
+}
+
+#[actix_web::test]
+async fn mcp_prompts_get_renders_household_template_without_args() {
+    let pool = setup_pool().await;
+    let raw = "pm_api_mcp_house_000000000000000000000000000000000000000000000000000";
+    seed_token(&pool, raw, "mcp").await;
+    let state = web::Data::new(AppState::new(pool, false, None, None));
+    let app = build_full_app!(state);
+    let resp = test::call_service(
+        &app,
+        test::TestRequest::post()
+            .uri("/mcp")
+            .insert_header(("Authorization", format!("Bearer {raw}")))
+            .set_json(serde_json::json!({
+                "jsonrpc": "2.0",
+                "id": 1,
+                "method": "prompts/get",
+                "params": { "name": "household-overview" }
+            }))
+            .to_request(),
+    )
+    .await;
+    assert_eq!(resp.status(), 200);
+    let body: serde_json::Value = test::read_body_json(resp).await;
+    let text = body["result"]["messages"][0]["content"]["text"]
+        .as_str()
+        .expect("prompt text");
+    assert!(text.contains("pets.list"));
 }
 
 #[actix_web::test]

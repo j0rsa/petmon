@@ -130,6 +130,9 @@ Tool names use **dots** for namespacing (`weight.records.create`) per the MCP 20
 | `health-check` | Weight trend and recent wellbeing check-ins |
 | `log-intake` | Log water, liquids, or food for a pet |
 | `vet-handoff` | Structured brief for a vet visit (default 14-day lookback) |
+| `household-overview` | Daily snapshot for **all** pets (no arguments — Pebble Index) |
+| `household-nutrition` | Nutrition on-track for **all** pets (no arguments) |
+| `household-toileting` | Toileting today for **all** pets (no arguments) |
 
 **Individual tools:**
 
@@ -232,6 +235,20 @@ curl -sS -X POST "https://<your-petmon-host>/mcp" \
 ```
 
 You should get `HTTP 200` with `content-type: application/json`. If you see HTML instead, fix the URL or proxy before retrying in Cursor.
+
+### Pebble Index 01
+
+In the Pebble app, add an HTTP MCP server with **Streamable HTTP** (not legacy SSE), URL ending in `/mcp`, and Authorization `Bearer pm_api_…` (token must include the `mcp` scope).
+
+**Arg-free prompts** (selectable in the Index app — prompts with arguments are hidden):
+
+| Prompt | Purpose |
+|--------|---------|
+| `household-overview` | Daily snapshot for every pet |
+| `household-nutrition` | Nutrition on-track for every pet |
+| `household-toileting` | Today's toileting for every pet |
+
+Tool results include Pebble `coreSchema` metadata so answers can render in the Index feed. The server negotiates protocol version `2025-06-18` and returns caregiver instructions on `initialize`.
 
 ## Home Assistant
 

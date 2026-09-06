@@ -143,6 +143,46 @@ Using petmon MCP tools, prepare a vet/caregiver handoff brief for \"{pet_name}\"
    - Nutrition: average daily fluid/food intake vs schedule
 4. Use clear headings; flag concerns explicitly; suitable to copy into a message for a vet.",
     },
+    // Arg-free prompts for voice clients (e.g. Pebble Index) that only expose prompts with no arguments.
+    PromptDef {
+        name: "household-overview",
+        description: "Daily snapshot for every pet in petmon (no pet name required).",
+        arguments: &[],
+        template: "\
+Using petmon MCP tools, prepare a caregiver-friendly daily summary for every pet:
+
+1. Call pets.list.
+2. For each pet, call pets.nutrition-context, pets.elimination-context, and pets.health-context.
+3. Summarize per pet in plain language (not clinical jargon):
+   - Nutrition: on-track status and anything notable in the weekly trend
+   - Toileting: today's wee/poop/vomit counts; unusual 7-day trends
+   - Health: latest weight and trend; recent wellbeing check-ins
+4. Keep each pet's section short; flag anything worth watching.",
+    },
+    PromptDef {
+        name: "household-nutrition",
+        description: "Nutrition on-track check for every pet (no pet name required).",
+        arguments: &[],
+        template: "\
+Using petmon MCP tools, check nutrition for every pet:
+
+1. Call pets.list.
+2. For each pet, call nutrition.on-track (or pets.nutrition-context if you need today's records).
+3. Answer for a pet owner: Is each pet on track right now? How far ahead or behind the liquid schedule?
+Use casual terms (wet food, water, liquids) in your reply.",
+    },
+    PromptDef {
+        name: "household-toileting",
+        description: "Today's toileting summary for every pet (no pet name required).",
+        arguments: &[],
+        template: "\
+Using petmon MCP tools, check toileting for every pet:
+
+1. Call pets.list.
+2. For each pet, call pets.elimination-context.
+3. Summarize today's wee, poop, vomit, and nothing counts. Note anything unusual in the 7-day trend.
+Use casual terms (wee, poop, vomit) in your reply — not urination/defecation.",
+    },
 ];
 
 fn find_prompt(name: &str) -> Option<&'static PromptDef> {

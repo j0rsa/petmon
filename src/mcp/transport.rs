@@ -88,18 +88,11 @@ pub async fn mcp_handler(
 
     // Resource methods are handled separately from tool dispatch
     let result = match req.method.as_str() {
-        "initialize" => Ok(serde_json::json!({
-            "protocolVersion": "2024-11-05",
-            "capabilities": {
-                "tools": {},
-                "resources": {},
-                "prompts": {}
-            },
-            "serverInfo": {
-                "name": "petmon",
-                "version": env!("CARGO_PKG_VERSION")
-            }
-        })),
+        "initialize" => {
+            let params = req.params.as_ref();
+            let protocol_version = super::protocol::negotiate_protocol_version(params)?;
+            Ok(super::protocol::initialize_result(&protocol_version))
+        }
         "notifications/initialized" => Ok(serde_json::json!(null)),
         "ping" => Ok(serde_json::json!({})),
         "prompts/list" => Ok(super::prompts::prompt_list()),
@@ -125,12 +118,7 @@ pub async fn mcp_handler(
                     let arguments = params.get("arguments").cloned().map(Some).unwrap_or(None);
                     super::tools::dispatch(&state.pool, name, arguments, state.timezone)
                         .await
-                        .map(|content| {
-                            serde_json::json!({
-                                "content": [{ "type": "text", "text": content.to_string() }],
-                                "isError": false
-                            })
-                        })
+                        .map(|content| super::protocol::tool_call_result(content.to_string()))
                 }
             }
         }
