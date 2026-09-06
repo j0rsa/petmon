@@ -258,6 +258,69 @@ async fn mcp_endpoint_requires_auth() {
     assert_eq!(resp.status(), 401, "POST /mcp must require auth");
 }
 
+/// GET /mcp must not fall through to the SPA (text/html). Streamable HTTP clients
+/// probe with Accept: text/event-stream after initialize.
+#[actix_web::test]
+async fn mcp_get_returns_method_not_allowed_not_html() {
+    let pool = setup_pool().await;
+    let raw = "pm_api_mcp_get_00000000000000000000000000000000000000000000000000000";
+    seed_token(&pool, raw, "mcp").await;
+    let state = web::Data::new(AppState::new(pool, false, None, None));
+    let app = build_full_app!(state);
+
+    let resp = test::call_service(
+        &app,
+        test::TestRequest::get()
+            .uri("/mcp")
+            .insert_header(("Authorization", format!("Bearer {raw}")))
+            .insert_header(("Accept", "text/event-stream"))
+            .to_request(),
+    )
+    .await;
+    assert_eq!(resp.status(), 405, "GET /mcp must not return SPA HTML");
+    let ct = resp
+        .headers()
+        .get("content-type")
+        .and_then(|v| v.to_str().ok())
+        .unwrap_or("");
+    assert!(
+        ct.contains("application/json"),
+        "GET /mcp must return JSON error, got content-type {ct:?}"
+    );
+    assert!(
+        !ct.contains("text/html"),
+        "GET /mcp must not return HTML (SPA fallback)"
+    );
+}
+
+/// MCP notifications (no response body) use HTTP 202 per Streamable HTTP.
+#[actix_web::test]
+async fn mcp_notification_returns_202_accepted() {
+    let pool = setup_pool().await;
+    let raw = "pm_api_mcp_notif_000000000000000000000000000000000000000000000000000";
+    seed_token(&pool, raw, "mcp").await;
+    let state = web::Data::new(AppState::new(pool, false, None, None));
+    let app = build_full_app!(state);
+
+    let resp = test::call_service(
+        &app,
+        test::TestRequest::post()
+            .uri("/mcp")
+            .insert_header(("Authorization", format!("Bearer {raw}")))
+            .insert_header(("Accept", "application/json, text/event-stream"))
+            .set_json(serde_json::json!({
+                "jsonrpc": "2.0",
+                "method": "notifications/initialized",
+                "params": {}
+            }))
+            .to_request(),
+    )
+    .await;
+    assert_eq!(resp.status(), 202, "notifications must return 202 Accepted");
+    let body = test::read_body(resp).await;
+    assert!(body.is_empty(), "notification response must have no body");
+}
+
 /// tools/list must advertise MCP 2025-11-25 compliant names (no `/`).
 #[actix_web::test]
 async fn mcp_tools_list_names_have_no_slashes() {
@@ -3090,11 +3153,159 @@ async fn mcp_prompts_list_returns_recommended_prompts() {
     assert_eq!(resp.status(), 200);
     let body: serde_json::Value = test::read_body_json(resp).await;
     let prompts = body["result"]["prompts"].as_array().expect("prompts array");
-    assert_eq!(prompts.len(), 6);
+    assert_eq!(prompts.len(), 9);
     let names: Vec<_> = prompts.iter().filter_map(|p| p["name"].as_str()).collect();
     assert!(names.contains(&"daily-summary"));
     assert!(names.contains(&"health-check"));
     assert!(names.contains(&"vet-handoff"));
+    assert!(names.contains(&"household-overview"));
+    let arg_free: Vec<_> = prompts
+        .iter()
+        .filter(|p| {
+            p.get("arguments")
+                .and_then(|a| a.as_array())
+                .is_some_and(|a| a.is_empty())
+        })
+        .filter_map(|p| p["name"].as_str())
+        .collect();
+    assert!(arg_free.contains(&"household-overview"));
+    assert!(arg_free.contains(&"household-nutrition"));
+    assert!(arg_free.contains(&"household-toileting"));
+}
+
+/// initialize negotiates protocol version and returns server instructions.
+#[actix_web::test]
+async fn mcp_initialize_negotiates_protocol_and_instructions() {
+    let pool = setup_pool().await;
+    let raw = "pm_api_mcp_init_00000000000000000000000000000000000000000000000000000";
+    seed_token(&pool, raw, "mcp").await;
+    let state = web::Data::new(AppState::new(pool, false, None, None));
+    let app = build_full_app!(state);
+    let resp = test::call_service(
+        &app,
+        test::TestRequest::post()
+            .uri("/mcp")
+            .insert_header(("Authorization", format!("Bearer {raw}")))
+            .set_json(serde_json::json!({
+                "jsonrpc": "2.0",
+                "id": 1,
+                "method": "initialize",
+                "params": {
+                    "protocolVersion": "2025-06-18",
+                    "capabilities": {},
+                    "clientInfo": { "name": "pebble-index", "version": "1.0" }
+                }
+            }))
+            .to_request(),
+    )
+    .await;
+    assert_eq!(resp.status(), 200);
+    let body: serde_json::Value = test::read_body_json(resp).await;
+    assert_eq!(
+        body["result"]["protocolVersion"].as_str(),
+        Some("2025-06-18")
+    );
+    let instructions = body["result"]["instructions"]
+        .as_str()
+        .expect("instructions");
+    assert!(instructions.contains("petmon"));
+    assert!(instructions.contains("pets.list"));
+}
+
+#[actix_web::test]
+async fn mcp_initialize_accepts_2025_11_25_protocol() {
+    let pool = setup_pool().await;
+    let raw = "pm_api_mcp_init1125_000000000000000000000000000000000000000000000000";
+    seed_token(&pool, raw, "mcp").await;
+    let state = web::Data::new(AppState::new(pool, false, None, None));
+    let app = build_full_app!(state);
+    let resp = test::call_service(
+        &app,
+        test::TestRequest::post()
+            .uri("/mcp")
+            .insert_header(("Authorization", format!("Bearer {raw}")))
+            .set_json(serde_json::json!({
+                "jsonrpc": "2.0",
+                "id": 1,
+                "method": "initialize",
+                "params": {
+                    "protocolVersion": "2025-11-25",
+                    "capabilities": {},
+                    "clientInfo": { "name": "pebble-index", "version": "1.0" }
+                }
+            }))
+            .to_request(),
+    )
+    .await;
+    assert_eq!(resp.status(), 200);
+    let body: serde_json::Value = test::read_body_json(resp).await;
+    assert_eq!(
+        body["result"]["protocolVersion"].as_str(),
+        Some("2025-11-25")
+    );
+}
+
+/// tools/call includes Pebble Index coreSchema structured content.
+#[actix_web::test]
+async fn mcp_tools_call_includes_core_schema() {
+    let pool = setup_pool().await;
+    let raw = "pm_api_mcp_core_0000000000000000000000000000000000000000000000000000";
+    seed_token(&pool, raw, "mcp").await;
+    let state = web::Data::new(AppState::new(pool, true, None, None));
+    let app = build_full_app!(state);
+    let resp = test::call_service(
+        &app,
+        test::TestRequest::post()
+            .uri("/mcp")
+            .insert_header(("Authorization", format!("Bearer {raw}")))
+            .set_json(serde_json::json!({
+                "jsonrpc": "2.0",
+                "id": 1,
+                "method": "tools/call",
+                "params": { "name": "pets.list", "arguments": {} }
+            }))
+            .to_request(),
+    )
+    .await;
+    assert_eq!(resp.status(), 200);
+    let body: serde_json::Value = test::read_body_json(resp).await;
+    assert_eq!(body["result"]["_meta"]["coreSchema"], 1);
+    let structured = &body["result"]["structuredContent"];
+    assert!(structured["output"].is_string());
+    assert_eq!(
+        structured["semanticResult"]["type"].as_str(),
+        Some("Response")
+    );
+    assert!(structured["semanticResult"]["text"].is_string());
+}
+
+#[actix_web::test]
+async fn mcp_prompts_get_renders_household_template_without_args() {
+    let pool = setup_pool().await;
+    let raw = "pm_api_mcp_house_000000000000000000000000000000000000000000000000000";
+    seed_token(&pool, raw, "mcp").await;
+    let state = web::Data::new(AppState::new(pool, false, None, None));
+    let app = build_full_app!(state);
+    let resp = test::call_service(
+        &app,
+        test::TestRequest::post()
+            .uri("/mcp")
+            .insert_header(("Authorization", format!("Bearer {raw}")))
+            .set_json(serde_json::json!({
+                "jsonrpc": "2.0",
+                "id": 1,
+                "method": "prompts/get",
+                "params": { "name": "household-overview" }
+            }))
+            .to_request(),
+    )
+    .await;
+    assert_eq!(resp.status(), 200);
+    let body: serde_json::Value = test::read_body_json(resp).await;
+    let text = body["result"]["messages"][0]["content"]["text"]
+        .as_str()
+        .expect("prompt text");
+    assert!(text.contains("pets.list"));
 }
 
 #[actix_web::test]

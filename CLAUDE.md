@@ -107,10 +107,11 @@ Mobile decimal fields often show a comma (`,`) instead of a dot (`.`). **Never u
 **Do not** use `Number.parseFloat` directly on raw input strings.
 
 ### Touching anything
-- **Cargo version** — bump `version` in `Cargo.toml` following semver. **Always bump on every change, no exceptions:**
+- **Cargo version — one bump per PR.** Bump `version` in `Cargo.toml` (and the matching `petmon` entry in `Cargo.lock`) **once** for the whole branch/PR, following semver:
   - patch (`0.x.y+1`) for bug fixes, minor UI tweaks, refactors
   - minor (`0.x+1.0`) for new features or new API endpoints
-  - **Skip the bump only** if the version was already changed since the last push to `main` (check with `git log origin/main..HEAD -- Cargo.toml`). If that command returns a commit, the version was already bumped — don't bump again.
+- **Before bumping**, run `git log origin/main..HEAD -- Cargo.toml`. If that returns any commit, the version was **already bumped on this branch — do not bump again**, even on follow-up commits in the same PR.
+- **When to bump:** on the first commit that needs a release, or amend the existing version commit if the branch has not merged yet. Never stack `0.21.1` → `0.21.2` across multiple commits in one PR.
 
 ---
 

@@ -130,6 +130,9 @@ Tool names use **dots** for namespacing (`weight.records.create`) per the MCP 20
 | `health-check` | Weight trend and recent wellbeing check-ins |
 | `log-intake` | Log water, liquids, or food for a pet |
 | `vet-handoff` | Structured brief for a vet visit (default 14-day lookback) |
+| `household-overview` | Daily snapshot for **all** pets (no arguments — Pebble Index) |
+| `household-nutrition` | Nutrition on-track for **all** pets (no arguments) |
+| `household-toileting` | Toileting today for **all** pets (no arguments) |
 
 **Individual tools:**
 
@@ -193,6 +196,59 @@ petmon uses HTTP transport (JSON-RPC over a single `POST /mcp` endpoint). Add it
    - *"What does Clover weigh and is the trend stable?"*
 
 For local development use `http://localhost:8080/mcp` as the URL.
+
+### Connecting Cursor (or other Streamable HTTP clients)
+
+petmon is a **stateless** MCP server: every call is `POST /mcp` with a JSON-RPC body. It does not host a long-lived SSE stream (GET returns `405 Method Not Allowed`).
+
+Use this in `~/.cursor/mcp.json`:
+
+```json
+{
+  "mcpServers": {
+    "petmon": {
+      "url": "https://<your-petmon-host>/mcp",
+      "headers": {
+        "Authorization": "Bearer pm_api_<your-api-token>"
+      }
+    }
+  }
+}
+```
+
+**Common connection errors:**
+
+| Symptom | Likely cause |
+|---------|----------------|
+| `Expected Content-Type text/event-stream but was text/html` | Wrong URL (missing `/mcp`), or a reverse proxy routing only `/api` to the backend. The client opened GET on a path that returned the SPA HTML shell. |
+| `401 Unauthorized` | Missing or invalid `Authorization: Bearer pm_api_…` header. |
+| `403 Forbidden` | Token lacks the `mcp` scope — create a token with **MCP** enabled in Settings → API tokens. |
+
+Verify with curl (replace host and token):
+
+```bash
+curl -sS -X POST "https://<your-petmon-host>/mcp" \
+  -H "Authorization: Bearer pm_api_<token>" \
+  -H "Content-Type: application/json" \
+  -H "Accept: application/json, text/event-stream" \
+  -d '{"jsonrpc":"2.0","id":1,"method":"tools/list","params":{}}'
+```
+
+You should get `HTTP 200` with `content-type: application/json`. If you see HTML instead, fix the URL or proxy before retrying in Cursor.
+
+### Pebble Index 01
+
+In the Pebble app, add an HTTP MCP server with **Streamable HTTP** (not legacy SSE), URL ending in `/mcp`, and Authorization `Bearer pm_api_…` (token must include the `mcp` scope).
+
+**Arg-free prompts** (selectable in the Index app — prompts with arguments are hidden):
+
+| Prompt | Purpose |
+|--------|---------|
+| `household-overview` | Daily snapshot for every pet |
+| `household-nutrition` | Nutrition on-track for every pet |
+| `household-toileting` | Today's toileting for every pet |
+
+Tool results include Pebble `coreSchema` metadata so answers can render in the Index feed. The server negotiates protocol version `2025-06-18` and returns caregiver instructions on `initialize`.
 
 ## Home Assistant
 
