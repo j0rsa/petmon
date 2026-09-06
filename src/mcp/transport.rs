@@ -1,4 +1,4 @@
-use actix_web::{post, web, HttpResponse};
+use actix_web::{get, post, web, HttpResponse};
 use petmon_macros::require_scope;
 use serde::{Deserialize, Serialize};
 
@@ -53,6 +53,17 @@ impl McpResponse {
             }),
         }
     }
+}
+
+/// Streamable HTTP clients may probe with GET expecting an SSE stream. petmon is
+/// stateless POST-only; return 405 so clients do not fall through to the SPA.
+#[get("")]
+#[require_scope("mcp")]
+pub async fn mcp_get_handler() -> AppResult<HttpResponse> {
+    Ok(HttpResponse::MethodNotAllowed().json(serde_json::json!({
+        "error": "METHOD_NOT_ALLOWED",
+        "message": "This MCP endpoint is stateless. Send JSON-RPC requests via POST."
+    })))
 }
 
 #[post("")]
@@ -144,7 +155,12 @@ pub async fn mcp_handler(
     };
 
     Ok(match result {
-        Ok(result) => HttpResponse::Ok().json(McpResponse::ok(id, result)),
+        Ok(result) => {
+            if req.method.starts_with("notifications/") {
+                return Ok(HttpResponse::Accepted().finish());
+            }
+            HttpResponse::Ok().json(McpResponse::ok(id, result))
+        }
         Err(e) => {
             let (code, msg) = match e {
                 crate::error::AppError::NotFound(m) => (-32001, m),
@@ -160,5 +176,5 @@ pub async fn mcp_handler(
 }
 
 pub fn configure(cfg: &mut web::ServiceConfig) {
-    cfg.service(mcp_handler);
+    cfg.service(mcp_get_handler).service(mcp_handler);
 }

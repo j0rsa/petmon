@@ -258,6 +258,69 @@ async fn mcp_endpoint_requires_auth() {
     assert_eq!(resp.status(), 401, "POST /mcp must require auth");
 }
 
+/// GET /mcp must not fall through to the SPA (text/html). Streamable HTTP clients
+/// probe with Accept: text/event-stream after initialize.
+#[actix_web::test]
+async fn mcp_get_returns_method_not_allowed_not_html() {
+    let pool = setup_pool().await;
+    let raw = "pm_api_mcp_get_00000000000000000000000000000000000000000000000000000";
+    seed_token(&pool, raw, "mcp").await;
+    let state = web::Data::new(AppState::new(pool, false, None, None));
+    let app = build_full_app!(state);
+
+    let resp = test::call_service(
+        &app,
+        test::TestRequest::get()
+            .uri("/mcp")
+            .insert_header(("Authorization", format!("Bearer {raw}")))
+            .insert_header(("Accept", "text/event-stream"))
+            .to_request(),
+    )
+    .await;
+    assert_eq!(resp.status(), 405, "GET /mcp must not return SPA HTML");
+    let ct = resp
+        .headers()
+        .get("content-type")
+        .and_then(|v| v.to_str().ok())
+        .unwrap_or("");
+    assert!(
+        ct.contains("application/json"),
+        "GET /mcp must return JSON error, got content-type {ct:?}"
+    );
+    assert!(
+        !ct.contains("text/html"),
+        "GET /mcp must not return HTML (SPA fallback)"
+    );
+}
+
+/// MCP notifications (no response body) use HTTP 202 per Streamable HTTP.
+#[actix_web::test]
+async fn mcp_notification_returns_202_accepted() {
+    let pool = setup_pool().await;
+    let raw = "pm_api_mcp_notif_000000000000000000000000000000000000000000000000000";
+    seed_token(&pool, raw, "mcp").await;
+    let state = web::Data::new(AppState::new(pool, false, None, None));
+    let app = build_full_app!(state);
+
+    let resp = test::call_service(
+        &app,
+        test::TestRequest::post()
+            .uri("/mcp")
+            .insert_header(("Authorization", format!("Bearer {raw}")))
+            .insert_header(("Accept", "application/json, text/event-stream"))
+            .set_json(serde_json::json!({
+                "jsonrpc": "2.0",
+                "method": "notifications/initialized",
+                "params": {}
+            }))
+            .to_request(),
+    )
+    .await;
+    assert_eq!(resp.status(), 202, "notifications must return 202 Accepted");
+    let body = test::read_body(resp).await;
+    assert!(body.is_empty(), "notification response must have no body");
+}
+
 /// tools/list must advertise MCP 2025-11-25 compliant names (no `/`).
 #[actix_web::test]
 async fn mcp_tools_list_names_have_no_slashes() {

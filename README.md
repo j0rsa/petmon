@@ -194,6 +194,45 @@ petmon uses HTTP transport (JSON-RPC over a single `POST /mcp` endpoint). Add it
 
 For local development use `http://localhost:8080/mcp` as the URL.
 
+### Connecting Cursor (or other Streamable HTTP clients)
+
+petmon is a **stateless** MCP server: every call is `POST /mcp` with a JSON-RPC body. It does not host a long-lived SSE stream (GET returns `405 Method Not Allowed`).
+
+Use this in `~/.cursor/mcp.json`:
+
+```json
+{
+  "mcpServers": {
+    "petmon": {
+      "url": "https://<your-petmon-host>/mcp",
+      "headers": {
+        "Authorization": "Bearer pm_api_<your-api-token>"
+      }
+    }
+  }
+}
+```
+
+**Common connection errors:**
+
+| Symptom | Likely cause |
+|---------|----------------|
+| `Expected Content-Type text/event-stream but was text/html` | Wrong URL (missing `/mcp`), or a reverse proxy routing only `/api` to the backend. The client opened GET on a path that returned the SPA HTML shell. |
+| `401 Unauthorized` | Missing or invalid `Authorization: Bearer pm_api_…` header. |
+| `403 Forbidden` | Token lacks the `mcp` scope — create a token with **MCP** enabled in Settings → API tokens. |
+
+Verify with curl (replace host and token):
+
+```bash
+curl -sS -X POST "https://<your-petmon-host>/mcp" \
+  -H "Authorization: Bearer pm_api_<token>" \
+  -H "Content-Type: application/json" \
+  -H "Accept: application/json, text/event-stream" \
+  -d '{"jsonrpc":"2.0","id":1,"method":"tools/list","params":{}}'
+```
+
+You should get `HTTP 200` with `content-type: application/json`. If you see HTML instead, fix the URL or proxy before retrying in Cursor.
+
 ## Home Assistant
 
 petmon can receive toileting records (and combined weight measurements) directly from Home Assistant automations and scripts via REST commands. See **[HOMEASSISTANT.md](HOMEASSISTANT.md)** for a complete setup guide including `rest_command` definitions, example automations, and a dashboard button card.
