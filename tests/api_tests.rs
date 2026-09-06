@@ -3212,6 +3212,39 @@ async fn mcp_initialize_negotiates_protocol_and_instructions() {
     assert!(instructions.contains("pets.list"));
 }
 
+#[actix_web::test]
+async fn mcp_initialize_accepts_2025_11_25_protocol() {
+    let pool = setup_pool().await;
+    let raw = "pm_api_mcp_init1125_000000000000000000000000000000000000000000000000";
+    seed_token(&pool, raw, "mcp").await;
+    let state = web::Data::new(AppState::new(pool, false, None, None));
+    let app = build_full_app!(state);
+    let resp = test::call_service(
+        &app,
+        test::TestRequest::post()
+            .uri("/mcp")
+            .insert_header(("Authorization", format!("Bearer {raw}")))
+            .set_json(serde_json::json!({
+                "jsonrpc": "2.0",
+                "id": 1,
+                "method": "initialize",
+                "params": {
+                    "protocolVersion": "2025-11-25",
+                    "capabilities": {},
+                    "clientInfo": { "name": "pebble-index", "version": "1.0" }
+                }
+            }))
+            .to_request(),
+    )
+    .await;
+    assert_eq!(resp.status(), 200);
+    let body: serde_json::Value = test::read_body_json(resp).await;
+    assert_eq!(
+        body["result"]["protocolVersion"].as_str(),
+        Some("2025-11-25")
+    );
+}
+
 /// tools/call includes Pebble Index coreSchema structured content.
 #[actix_web::test]
 async fn mcp_tools_call_includes_core_schema() {

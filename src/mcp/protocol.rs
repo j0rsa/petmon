@@ -2,8 +2,9 @@ use serde_json::{json, Value};
 
 use crate::error::{AppError, AppResult};
 
-/// Protocol versions understood by handshake-era clients (e.g. Pebble Index 01).
-pub const SUPPORTED_PROTOCOL_VERSIONS: &[&str] = &["2025-06-18", "2025-03-26", "2024-11-05"];
+/// Protocol versions understood by handshake-era and Streamable HTTP clients (e.g. Pebble Index 01).
+pub const SUPPORTED_PROTOCOL_VERSIONS: &[&str] =
+    &["2025-11-25", "2025-06-18", "2025-03-26", "2024-11-05"];
 
 const DEFAULT_PROTOCOL_VERSION: &str = "2024-11-05";
 
@@ -73,6 +74,15 @@ mod tests {
         assert_eq!(
             negotiate_protocol_version(Some(&params)).unwrap(),
             "2025-06-18"
+        );
+    }
+
+    #[test]
+    fn negotiate_accepts_streamable_http_protocol() {
+        let params = json!({ "protocolVersion": "2025-11-25" });
+        assert_eq!(
+            negotiate_protocol_version(Some(&params)).unwrap(),
+            "2025-11-25"
         );
     }
 
