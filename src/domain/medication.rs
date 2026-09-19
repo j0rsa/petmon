@@ -415,10 +415,6 @@ pub struct MedIntakeRecord {
     pub effective_dose_mg: Option<f64>,
     pub dose_label: String,
     pub occurred_at: String,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub occurred_at_utc: Option<String>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub source_timezone: Option<String>,
     pub local_date: String,
     pub taken: bool,
     pub note: Option<String>,
@@ -629,8 +625,6 @@ pub fn hydrate_intake(
         effective_dose_mg,
         dose_label,
         occurred_at: intake.occurred_at,
-        occurred_at_utc: intake.occurred_at_utc,
-        source_timezone: intake.source_timezone,
         local_date: intake.local_date,
         taken: intake.taken,
         note: intake.note,
@@ -645,8 +639,6 @@ pub fn hydrate_intake(
 
 #[derive(Debug, Clone)]
 pub struct MedIntakeCore {
-    pub occurred_at_utc: Option<String>,
-    pub source_timezone: Option<String>,
     pub id: String,
     pub pet_id: Uuid,
     pub medication_id: String,

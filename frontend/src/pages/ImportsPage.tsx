@@ -7,11 +7,14 @@ import { dedupeCreateRecords, parseTelegramNutritionLog, toCreateNutritionRecord
 import { CATEGORY_LABELS } from '../types';
 import type { CreateNutritionRecord } from '../types';
 import { usePermissions } from '../context/usePermissions';
+import { useResourceTime } from '../context/useResourceTime';
 
 export default function ImportsPage() {
   const queryClient = useQueryClient();
   const { selectedPetId, selectedPet, petsLoading } = useSelectedPet();
   const { canWrite } = usePermissions();
+  const { timeZone, toCivil } = useResourceTime();
+  const [previewError, setPreviewError] = useState('');
   const [rawText, setRawText] = useState('');
   const [previewRecords, setPreviewRecords] = useState<CreateNutritionRecord[] | null>(null);
 
@@ -19,7 +22,7 @@ export default function ImportsPage() {
     if (!previewRecords) return null;
     const byDate = new Map<string, CreateNutritionRecord[]>();
     for (const record of previewRecords) {
-      const date = record.local_date ?? record.occurred_at.slice(0, 10);
+      const date = record.local_date!; // Telegram imports always carry an independent journal date.
       byDate.set(date, [...(byDate.get(date) ?? []), record]);
     }
     return {
@@ -42,9 +45,15 @@ export default function ImportsPage() {
 
   function handlePreview() {
     if (!selectedPetId) return;
-    const parsed = parseTelegramNutritionLog(rawText);
-    const records = dedupeCreateRecords(toCreateNutritionRecords(parsed, selectedPetId));
-    setPreviewRecords(records);
+    setPreviewError('');
+    setPreviewRecords(null);
+    try {
+      const parsed = parseTelegramNutritionLog(rawText);
+      const records = dedupeCreateRecords(toCreateNutritionRecords(parsed, selectedPetId, timeZone));
+      setPreviewRecords(records);
+    } catch (error) {
+      setPreviewError(error instanceof Error ? error.message : 'Unable to resolve imported times.');
+    }
   }
 
   if (petsLoading) {
@@ -67,6 +76,7 @@ export default function ImportsPage() {
     <div className="page-stack">
       <section className="panel">
         <p className="muted-text">Importing for {selectedPet?.name ?? 'selected pet'}.</p>
+        <p className="muted-text">Times without an offset use {timeZone}. For a repeated daylight-saving time, include an offset in the header, for example <code>02:30:00 +01:00</code>.</p>
         <div className="form-grid">
           <div className="form-row form-row-full">
             <label htmlFor="import-text">Telegram log</label>
@@ -92,6 +102,7 @@ export default function ImportsPage() {
             </button>
           </div>
         </div>
+        {previewError && <div className="error-state" role="alert">{previewError}</div>}
         {commitMutation.isError && (
           <div className="error-state">{commitMutation.error instanceof Error ? commitMutation.error.message : 'Unable to import records.'}</div>
         )}
@@ -117,7 +128,7 @@ export default function ImportsPage() {
                   <ul>
                     {records.map((record, index) => (
                       <li key={`${date}-${index}`}>
-                        {record.occurred_at.slice(11, 16)} — {CATEGORY_LABELS[record.category] ?? record.category} — {record.amount} {record.unit ?? ''}
+                        {record.occurred_at && toCivil(record.occurred_at).slice(11, 16)} — {CATEGORY_LABELS[record.category] ?? record.category} — {record.amount} {record.unit ?? ''}
                       </li>
                     ))}
                   </ul>

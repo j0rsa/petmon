@@ -1,4 +1,6 @@
 import { useMemo } from 'react';
+import { useResourceTime } from '../context/useResourceTime';
+import { instantToCivil } from '../lib/resourceTime';
 import { Bar, BarChart, CartesianGrid, Legend, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
 import type { EliminationEventType, EliminationRecord } from '../api/elimination';
 
@@ -35,12 +37,13 @@ interface EliminationDayChartProps {
 }
 
 export function EliminationDayChart({ records }: EliminationDayChartProps) {
+  const { timeZone } = useResourceTime(records[0]?.pet_id);
   const { chartData, presentTypes } = useMemo(() => {
     const data = [...records]
       .sort((a, b) => a.occurred_at.localeCompare(b.occurred_at))
       .map((record) => {
         const point: Record<string, number | string> = {
-          label: record.occurred_at.slice(11, 16),
+          label: instantToCivil(record.occurred_at, timeZone).slice(11, 16),
         };
         for (const key of CHART_KEYS) {
           point[key] = 0;
@@ -51,7 +54,7 @@ export function EliminationDayChart({ records }: EliminationDayChartProps) {
 
     const present = CHART_KEYS.filter((key) => data.some((point) => (point[key] as number) > 0));
     return { chartData: data, presentTypes: present };
-  }, [records]);
+  }, [records, timeZone]);
 
   if (chartData.length === 0) {
     return null;

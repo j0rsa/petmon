@@ -275,9 +275,22 @@ DATABASE_URL=sqlite:/data/petmon.db ./petmon admin revoke '<subject>'
 
 The CLI runs migrations and the requested command without starting workers or requiring a configured OIDC provider. Revoking the last administrator is refused; grant a replacement first. `INSTANCE_ADMIN_SUBJECTS` can bootstrap comma-separated subjects once. Successful bootstrap or a CLI grant consumes a durable initialization marker, so restarting with an old environment value does not restore revoked grants. Later grants use the CLI.
 
-Interactive administrator sessions receive live administrative capability. API tokens require both a current administrator grant for their owner and an explicitly requested `instance_admin` scope; `all` grants ordinary REST/MCP access only. Role revocation applies to subsequent requests. Global token administration lives under `/api/v1/admin/api-tokens`, and `/auth/me` reports `roles` and effective `capabilities` for the current credential.
+Interactive administrator sessions use their live administrator role. Administrative API tokens require both a current administrator grant for their owner and the literal `all` scope. The combined `api_read`, `api_write`, and `mcp` scopes grant ordinary access only. Role revocation applies to subsequent requests. Global token administration lives under `/api/v1/admin/api-tokens`, and `/auth/me` reports `roles`, `scopes`, and credential `kind`.
 
-`mcp` enables both care reads and writes through the MCP endpoint; adding `api_read` does not make that MCP access read-only. It does not grant REST token-management access. Token creation, scope changes and reactivation enforce permission attenuation, so a write-only credential cannot mint or reactivate an `all` credential. Empty requested scope lists are rejected.
+`mcp` enables both care reads and writes through the MCP endpoint; adding `api_read` does not make that MCP access read-only. It does not grant REST token-management access. Token creation, scope changes and reactivation cannot exceed the calling credential's authority. Only a literal `all` API token can delegate `all`; ordinary combined scopes and legacy empty scopes cannot. Empty requested scope lists are rejected.
+
+### Record timestamp upgrade (0.26)
+
+Record `occurred_at` / `measured_at` fields now contain a single UTC RFC3339 instant. API inputs require an explicit offset (`Z` or `±HH:MM`); timezone-less timestamps are rejected. The frontend renders these instants in the pet's effective timezone. Journal `local_date` remains an independent date, not a UTC date.
+
+Back up an existing database and stop writers before upgrading. Startup refuses legacy record timestamps until an operator explicitly converts them using the timezone in which they were originally recorded:
+
+```bash
+DATABASE_URL=sqlite:/data/petmon.db ./petmon migrate-record-times --timezone Europe/Berlin
+DATABASE_URL=sqlite:/data/petmon.db ./petmon migrate-record-times --timezone Europe/Berlin --apply
+```
+
+The first command is a dry run. Ambiguous/nonexistent daylight-saving times and invalid values must be corrected before the atomic conversion can proceed; journal dates are preserved. If historical records used different timezones, resolve those rows explicitly before applying a single-zone migration. Update API clients together with this release.
 
 ### OIDC provider setup
 

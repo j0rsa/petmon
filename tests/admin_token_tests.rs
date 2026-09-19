@@ -1,4 +1,4 @@
-use actix_web::{http::StatusCode, test, web, App};
+use actix_web::{dev::Service, http::StatusCode, test, web, App, HttpMessage};
 use petmon::{
     api,
     auth::{
@@ -69,7 +69,6 @@ async fn tokens_cannot_widen_scopes_or_assume_ownership() {
     for body in [
         json!({"scopes":["all"]}),
         json!({"scopes":["mcp"]}),
-        json!({"scopes":["instance_admin"]}),
         json!({}),
     ] {
         let req = test::TestRequest::post()
@@ -124,14 +123,14 @@ async fn tokens_cannot_widen_scopes_or_assume_ownership() {
 }
 
 #[actix_web::test]
-async fn role_and_explicit_capability_are_both_required_and_revocation_is_live() {
+async fn role_and_literal_all_are_both_required_and_revocation_is_live() {
     let pool = pool().await;
     instance_admins::grant(&pool, "alice").await.unwrap();
     instance_admins::grant(&pool, "recovery").await.unwrap();
-    let (_, ordinary) = token(&pool, "alice", &["all"]).await;
+    let (_, ordinary) = token(&pool, "alice", &["api_read", "api_write", "mcp"]).await;
     let (_, legacy) = token(&pool, "alice", &[]).await;
-    let (_, admin_token) = token(&pool, "alice", &["all", "instance_admin"]).await;
-    let (_, forged_role) = token(&pool, "bob", &["all", "instance_admin"]).await;
+    let (_, admin_token) = token(&pool, "alice", &["all"]).await;
+    let (_, forged_role) = token(&pool, "bob", &["all"]).await;
     let app = app!(pool);
     for raw in [&ordinary, &legacy, &forged_role] {
         for uri in [
@@ -155,10 +154,9 @@ async fn role_and_explicit_capability_are_both_required_and_revocation_is_live()
         .to_request();
     let me: serde_json::Value = test::call_and_read_body_json(&app, req).await;
     assert_eq!(me["roles"], json!(["instance_admin"]));
-    assert!(!me["capabilities"]
-        .as_array()
-        .unwrap()
-        .contains(&json!("instance_admin")));
+    assert!(me.get("capabilities").is_none());
+    assert_eq!(me["kind"], "api_token");
+    assert_eq!(me["scopes"], json!(["api_read", "api_write", "mcp"]));
     let req = test::TestRequest::get()
         .uri("/api/v1/admin/api-tokens")
         .insert_header(("Authorization", format!("Bearer {admin_token}")))
@@ -238,10 +236,10 @@ async fn oidc_roles_respect_ordinary_scopes_and_no_scope_alias_enables_admin() {
         token_created_by: None,
         owner_subject: None,
     };
-    assert_eq!(
-        admin::effective_capabilities(&pool, &oidc).await.unwrap(),
-        vec!["api_read", "instance_admin"]
-    );
+    assert!(admin::require_instance_admin(&pool, &oidc).await.is_ok());
+    assert!(oidc.has_scope("api_read"));
+    assert!(!oidc.has_scope("api_write"));
+    assert!(!oidc.has_scope("instance_admin"));
     assert!(
         admin::attenuate_scopes(&pool, &oidc, Some(vec!["all".into()]))
             .await
@@ -258,11 +256,14 @@ async fn oidc_roles_respect_ordinary_scopes_and_no_scope_alias_enables_admin() {
 async fn administration_is_explicit_and_preserves_bot_secrets() {
     let pool = pool().await;
     instance_admins::grant(&pool, "alice").await.unwrap();
-    let (_, raw) = token(&pool, "alice", &["all", "instance_admin"]).await;
+    let (_, raw) = token(&pool, "alice", &["all"]).await;
     let app = app!(pool);
     for (body, expected) in [
-        (json!({}), false),
-        (json!({"scopes":["all","instance_admin"]}), true),
+        (json!({}), json!(["all"])),
+        (
+            json!({"scopes":["api_read","api_write","mcp"]}),
+            json!(["api_read", "api_write", "mcp"]),
+        ),
     ] {
         let req = test::TestRequest::post()
             .uri("/api/v1/api-tokens")
@@ -270,14 +271,17 @@ async fn administration_is_explicit_and_preserves_bot_secrets() {
             .set_json(body)
             .to_request();
         let created: serde_json::Value = test::call_and_read_body_json(&app, req).await;
-        assert_eq!(
-            created["scopes"]
-                .as_array()
-                .unwrap()
-                .contains(&json!("instance_admin")),
-            expected
-        );
+        assert_eq!(created["scopes"], expected);
     }
+    let req = test::TestRequest::post()
+        .uri("/api/v1/api-tokens")
+        .insert_header(("Authorization", format!("Bearer {raw}")))
+        .set_json(json!({"scopes":["all","instance_admin"]}))
+        .to_request();
+    assert_eq!(
+        test::call_service(&app, req).await.status(),
+        StatusCode::BAD_REQUEST
+    );
     for body in [
         json!({"enabled":true,"bot_token":"123:secret"}),
         json!({"enabled":false}),
@@ -296,7 +300,7 @@ async fn administration_is_explicit_and_preserves_bot_secrets() {
             .await
             .unwrap();
     assert_eq!(stored.bot_token.as_deref(), Some("123:secret"));
-    let (_, read_admin) = token(&pool, "alice", &["api_read", "instance_admin"]).await;
+    let (_, read_admin) = token(&pool, "alice", &["api_read"]).await;
     let req = test::TestRequest::post()
         .uri("/api/v1/settings/telegram")
         .insert_header(("Authorization", format!("Bearer {read_admin}")))
@@ -343,4 +347,144 @@ async fn activation_cannot_bypass_attenuation_or_a_concurrent_scope_change() {
         test::call_service(&app, req).await.status(),
         StatusCode::NO_CONTENT
     );
+}
+
+#[actix_web::test]
+async fn ordinary_full_tokens_cannot_acquire_all_even_before_a_future_role_grant() {
+    let pool = pool().await;
+    let state = AppState::new(pool.clone(), false, None, None);
+    let app = app!(pool);
+    for scopes in [vec!["api_read", "api_write", "mcp"], vec![]] {
+        let (id, raw) = token(&pool, "alice", &scopes).await;
+        let (inactive_id, _) = token(&pool, "alice", &["all"]).await;
+        api_tokens::deactivate(&pool, &inactive_id).await.unwrap();
+        for has_role in [false, true] {
+            if has_role {
+                instance_admins::grant(&pool, "alice").await.unwrap();
+            }
+            for body in [json!({"scopes":["all"]}), json!({})] {
+                let req = test::TestRequest::post()
+                    .uri("/api/v1/api-tokens")
+                    .insert_header(("Authorization", format!("Bearer {raw}")))
+                    .set_json(body)
+                    .to_request();
+                assert_eq!(
+                    test::call_service(&app, req).await.status(),
+                    StatusCode::FORBIDDEN
+                );
+            }
+            let req = test::TestRequest::patch()
+                .uri(&format!("/api/v1/api-tokens/{id}/scopes"))
+                .insert_header(("Authorization", format!("Bearer {raw}")))
+                .set_json(json!({"scopes":["all"]}))
+                .to_request();
+            assert_eq!(
+                test::call_service(&app, req).await.status(),
+                StatusCode::FORBIDDEN
+            );
+            let req = test::TestRequest::post()
+                .uri(&format!("/api/v1/api-tokens/{inactive_id}/activate"))
+                .insert_header(("Authorization", format!("Bearer {raw}")))
+                .to_request();
+            assert_eq!(
+                test::call_service(&app, req).await.status(),
+                StatusCode::FORBIDDEN
+            );
+            let identity = Identity {
+                subject: "alice".into(),
+                email: None,
+                name: None,
+                kind: IdentityKind::ApiToken {
+                    token_id: id.clone(),
+                },
+                scopes: scopes.iter().map(|s| s.to_string()).collect(),
+                token_created_by: None,
+                owner_subject: Some("alice".into()),
+            };
+            for tool in ["api-tokens.scopes.update", "api-tokens/scopes/update"] {
+                let result = petmon::mcp::tools::dispatch(
+                    &state.context(identity.clone()),
+                    tool,
+                    Some(json!({"id":id,"scopes":["all"]})),
+                    chrono_tz::UTC,
+                )
+                .await;
+                assert!(matches!(result, Err(petmon::error::AppError::Forbidden(_))));
+            }
+        }
+        // An empty legacy credential has only ordinary authority, so an
+        // ordinary-full caller can safely reactivate it without gaining admin.
+        let (legacy_id, _) = token(&pool, "alice", &[]).await;
+        api_tokens::deactivate(&pool, &legacy_id).await.unwrap();
+        let req = test::TestRequest::post()
+            .uri(&format!("/api/v1/api-tokens/{legacy_id}/activate"))
+            .insert_header(("Authorization", format!("Bearer {raw}")))
+            .to_request();
+        assert_eq!(
+            test::call_service(&app, req).await.status(),
+            StatusCode::NO_CONTENT
+        );
+        instance_admins::grant(&pool, "recovery").await.unwrap();
+        instance_admins::revoke(&pool, "alice").await.unwrap();
+    }
+}
+
+#[actix_web::test]
+async fn interactive_administration_requires_live_role_and_endpoint_scope() {
+    let pool = pool().await;
+    instance_admins::grant(&pool, "alice").await.unwrap();
+    for (subject, scopes, expected_read, expected_write) in [
+        (
+            "alice",
+            vec!["api_read"],
+            StatusCode::OK,
+            StatusCode::FORBIDDEN,
+        ),
+        (
+            "alice",
+            vec!["api_write"],
+            StatusCode::FORBIDDEN,
+            StatusCode::OK,
+        ),
+        (
+            "bob",
+            vec!["all"],
+            StatusCode::FORBIDDEN,
+            StatusCode::FORBIDDEN,
+        ),
+    ] {
+        let identity = Identity {
+            subject: subject.into(),
+            email: None,
+            name: None,
+            kind: IdentityKind::Oidc,
+            scopes: scopes.iter().map(|s| s.to_string()).collect(),
+            token_created_by: None,
+            owner_subject: None,
+        };
+        let app = test::init_service(
+            App::new()
+                .app_data(web::Data::new(AppState::new(
+                    pool.clone(),
+                    false,
+                    None,
+                    None,
+                )))
+                .wrap_fn(move |req, srv| {
+                    req.extensions_mut().insert(identity.clone());
+                    srv.call(req)
+                })
+                .service(web::scope("/api/v1").configure(api::settings::configure)),
+        )
+        .await;
+        let req = test::TestRequest::get()
+            .uri("/api/v1/settings/telegram")
+            .to_request();
+        assert_eq!(test::call_service(&app, req).await.status(), expected_read);
+        let req = test::TestRequest::post()
+            .uri("/api/v1/settings/telegram")
+            .set_json(json!({"enabled":false}))
+            .to_request();
+        assert_eq!(test::call_service(&app, req).await.status(), expected_write);
+    }
 }

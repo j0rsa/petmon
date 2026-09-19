@@ -37,7 +37,7 @@ Worker entry points are `nudge_service::spawn_with_context`, `feeding_nudge_serv
 
 Provide a trusted authentication/identity adapter for an embedding application while retaining the default OSS OIDC, API-token and DEV_MODE behavior. It must resolve a canonical actor consistently for REST, MCP, Shortcuts, API-token owners and per-user reader/settings keys. Do not key identity by a display name or token alias. The adapter is registered by trusted startup code, never chosen from caller-provided headers/body fields.
 
-Introduce an explicit request/service context carrying actor, effective credential capabilities, resource policy and runtime settings resolution. Shared application services are the authorization boundary; a new transport must not bypass checks by calling a pool-only service. Internal maintenance/worker operations use explicit trusted context with a clearly bounded purpose. Low-level repositories remain persistence primitives.
+Introduce an explicit request/service context carrying actor, credential scopes, resource policy and runtime settings resolution. Shared application services are the authorization boundary; a new transport must not bypass checks by calling a pool-only service. Internal maintenance/worker operations use explicit trusted context with a clearly bounded purpose. Low-level repositories remain persistence primitives.
 
 Generic resource actions include `View`, `WriteRecords`, `WriteProfile`, `ManageIntegrations`, `Create`, `Delete` and `ChangeStatus`. A mixed-field update requires all applicable actions. The default standalone policy allows existing shared-pet access after scope checks; an embedder can supply a restrictive policy. Make the default explicit at standalone composition, so an embedding application can require its own policy at startup.
 
@@ -60,25 +60,24 @@ The embedding lifecycle resolves/authorizes its destination and runs public pet 
 
 The caller owns transaction commit/rollback and any application-specific retry/idempotency key. Run outbound messages only after commit. Regression tests verify rollback when related creation fails and guarded deletion uses the same transaction.
 
-## Credential capabilities and instance administrator
+## Credential scopes and instance administrator
 
-Scopes describe capabilities, not a numeric ordering:
+Scopes describe access, not a numeric ordering:
 
 | Scope | Meaning |
 |---|---|
 | `api_read` | Ordinary REST reads |
 | `api_write` | Ordinary REST writes, including permission to request token creation |
 | `mcp` | MCP endpoint and both read/write care operations through it |
-| `all` | Ordinary REST read/write and MCP capabilities |
-| `instance_admin` | Explicit operational capability, usable only with a live server-side administrator grant |
+| `all` | REST read/write and MCP access; administrative token access only with a live server-side administrator role |
 
-`mcp` does not grant REST token-management access. `api_read` alongside `mcp` does not make MCP read-only. Resource authorization still applies to every operation. New admin capability must not be inferred from ordinary `all` or legacy empty-scope semantics; read/write requirements of admin endpoints remain explicit.
+`mcp` does not grant REST token-management access. `api_read` alongside `mcp` does not make MCP read-only. Resource authorization still applies to every operation. API-token administration requires literal `all` plus the owner's current `instance_admin` role; combining the three ordinary scopes or using legacy empty scopes does not qualify. Interactive sessions require the live role and the endpoint's read/write scope.
 
-For token creation or scope updates, normalize requested scopes to effective capabilities and require them to be a subset of the calling credential's capabilities, constrained by the actor's current roles. `api_write`/`all` enables the creation endpoint but does not authorize minting stronger credentials. An `api_write`-only token cannot mint `mcp` or `all`. Missing/empty scope input must not widen authority; define a safe default or reject it for restricted callers. API token owners are always set server-side. Check attenuation on scope update as well as create, including attempts to edit the current credential.
+Token creation, scope changes and reactivation cannot exceed the calling credential's authority. `api_write`/`all` enables creation but not stronger credentials. Only a literal `all` API token can delegate `all`; the combined ordinary scopes cannot, even when its owner is not yet an administrator. This prevents escalation through a future role grant. Omitted scopes request `all` and must pass the same checks; empty requested lists are invalid. API token owners are always set server-side. Include attempts to edit the current credential in attenuation checks.
 
-Ordinary token list/revoke/activate/delete/update operations are owner-scoped. Admin endpoints can inspect/revoke instance credentials after role and capability checks. Administrative token issuance requires an explicit request from an authorized administrator credential; regular device/MCP tokens do not acquire it automatically. Revoked administrator grants take effect on subsequent requests.
+Ordinary token list/revoke/activate/delete/update operations are owner-scoped. Admin endpoints can inspect/revoke instance credentials after role and scope checks. An `all` token follows its owner's live administrator role; regular device/MCP tokens never acquire administrative access. Revoked administrator grants take effect on subsequent requests.
 
-Add shared instance-admin storage keyed by the resolved actor, CLI list/grant/revoke and documented bootstrap/recovery. `GET /auth/me` exposes role plus effective capabilities so frontend controls reflect the current credential, not just the user's role. DEV_MODE may grant admin for local development, but authorization tests must also exercise real non-admin and restricted-token identities.
+Shared instance-admin storage is keyed by the resolved actor, with CLI list/grant/revoke and documented bootstrap/recovery. `GET /auth/me` exposes `roles`, `scopes` and credential `kind`, without a separate capabilities model. Frontend controls check both the role and credential authority. DEV_MODE may grant admin for local development, but authorization tests must also exercise real non-admin and restricted-token identities.
 
 Instance settings (OIDC, Telegram bot configuration, sensitive VAPID management) require admin permission. Public VAPID configuration needed to subscribe remains available to ordinary authorized users. Personal settings and push/device controls stay personal. Shared Settings components gate queries as well as rendered sections. Record administrative actions without secrets.
 
@@ -100,13 +99,13 @@ Treat integration configuration as a separate policy action from ordinary profil
 
 ## Effective timezone and UTC instants
 
-Expose a per-resource effective-timezone resolver; the OSS implementation returns the instance timezone. APIs, MCP, Shortcuts and workers use the same resolver for real-time records, due dates, reminder slots, nutrition status and journal boundaries. Do not make custom timezone support a worker-only wrapper.
+Expose a per-resource effective-timezone resolver; the OSS implementation returns the instance timezone. APIs, MCP, Shortcuts and workers use the same resolver for real-time records, due dates, reminder slots, nutrition status and journal boundaries. Standalone `/info.timezone` supplies the same zone to the frontend before mounting care forms; embedded frontends supply ready per-resource zones. Do not make custom timezone support a worker-only wrapper.
 
-Canonical record instants are stored in additive UTC fields with the source timezone; existing civil timestamp fields remain compatibility snapshots for current forms/charts and API consumers. Date-only fields and recurring wall-clock schedules retain their civil semantics: birthdays, journal dates and treatment dates are not timestamps to convert blindly. Preserve explicit backdating and historical journal dates. Existing rows with unknown historical timezone are not silently reinterpreted; backfill requires an explicitly supplied historical timezone and rejects unresolved ambiguous/nonexistent times. See the record-time helper and migration rather than amending released migrations.
+Each record stores one UTC RFC3339 instant in `occurred_at` (or weight's `measured_at`), normalized to fixed nanosecond precision and a `Z` suffix for lexical SQL ordering. No parallel UTC fields, source timezone or civil snapshot are stored. APIs require explicit-offset RFC3339 input; frontend forms resolve local civil input in the resource timezone, reject DST gaps and ask which instant a repeated hour means. Existing clients must update with this release.
 
-Migration `026_record_instants.sql` adds `occurred_at_utc` and `source_timezone` to nutrition, elimination, health-state and medication-intake records; weight uses `measured_at_utc` and `source_timezone`. New writes populate them. Legacy API records omit absent canonical fields. RFC 3339 input carries an explicit instant; naive local input is resolved in the effective resource timezone and ambiguous/nonexistent DST times are rejected. Supply an explicit offset for a repeated local hour.
+Date-only fields and recurring wall-clock schedules retain their civil semantics: birthdays, `local_date` journal days and treatment dates are not timestamps to convert blindly. Editing a journal date alone does not move the instant. Display and chart hours use the current effective resource timezone, while elapsed durations and cutoffs use UTC. A timezone change can change the displayed clock time without rewriting the journal day.
 
-`record_time::backfill_legacy(&pool, historical_timezone, apply)` is a library migration helper, not an automatic startup migration or CLI command. Run with `apply = false` to inspect its candidates/issues report. With `apply = true`, it applies the prepared updates transactionally only when there are no issues; correct invalid/ambiguous legacy inputs first. Civil timestamps and date-only fields remain unchanged. Chart/history projections continue to use the stored civil snapshots; canonical fields provide absolute ordering without reinterpreting historical journal days.
+Startup refuses legacy/noncanonical record timestamps. Back up the database and stop writers, then run `petmon migrate-record-times --timezone TZ` for a dry run and repeat with `--apply` to convert atomically. The library helper is `record_time::backfill_legacy(&pool, historical_timezone, apply)`. Invalid/ambiguous/nonexistent civil timestamps block the whole conversion; resolve them with explicit offsets first. Mixed historical timezones need explicit per-row correction, not a guessed global zone. Existing journal dates are preserved. Migration `026_record_instants.sql` records migration metadata rather than adding duplicate timestamp columns. Embedders must use the same startup gate; released migrations are unchanged.
 
 Provide clock/context injection for deterministic midnight, timezone and DST tests. Keep dedupe semantics stable across restart and timezone changes. Standalone instance-time behavior remains the default. Shortcut menu/take request formats and real-time-only restrictions do not change; server-side resolution supplies the effective timezone.
 
@@ -127,7 +126,7 @@ Provide explicit, typed composition points for:
 - Selection persistence strategy and account-change cleanup.
 - Pet creation action, including any embedder-required context.
 - Per-resource effective permissions, including profile, integration and status actions.
-- Identity/session integration and effective admin Settings capabilities.
+- Identity/session integration and role/scope-aware admin Settings controls.
 
 Intersect scope and resource permissions; an extension must not broaden a credential. Pending permissions are not permission to mutate. Permissions take the actual resource ID, not only ambient selection, so direct links work correctly. Query keys and invalidation contracts account for identity changes and custom collection context; cancel obsolete requests that could repopulate stale state.
 
@@ -151,7 +150,7 @@ Optional `ApplicationExtensions.timezone(petId)` supplies an already-resolved IA
 | Notifications list/count/read/read-all/dismiss | Injected `NotificationBackend`, including nullable/deleted resources |
 | Classification-failure notifications and reminder workers | Same injected notification backend; audiences resolved when delivering |
 | Push subscription create/update/test/delete | Ownership or original-browser-key proof for transfer; no endpoint-only impersonation |
-| OIDC/Telegram settings, tokens and admin tokens | Live administrator capability or owner scope; token attenuation on every authority-changing operation |
+| OIDC/Telegram settings, tokens and admin tokens | Live administrator role plus credential scope, or owner-scoped token management; token attenuation on every authority-changing operation |
 | MCP tools/resources and direct legacy method aliases | Shared context/services plus normalized registry override; token-scope management separately requires `api_write` |
 
 When extending the application:

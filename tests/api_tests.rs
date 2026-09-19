@@ -699,6 +699,7 @@ async fn app_info_is_public() {
         "response must contain version field"
     );
     assert_eq!(body.get("demo_mode").and_then(|v| v.as_bool()), Some(false));
+    assert_eq!(body["timezone"], "UTC");
 }
 
 #[actix_web::test]
@@ -709,7 +710,7 @@ async fn app_info_reports_demo_mode() {
         false,
         None,
         None,
-        chrono_tz::UTC,
+        chrono_tz::Asia::Tokyo,
         true,
         None,
     ));
@@ -720,6 +721,7 @@ async fn app_info_reports_demo_mode() {
     assert_eq!(resp.status(), 200);
     let body: serde_json::Value = test::read_body_json(resp).await;
     assert_eq!(body.get("demo_mode").and_then(|v| v.as_bool()), Some(true));
+    assert_eq!(body["timezone"], "Asia/Tokyo");
 }
 
 #[actix_web::test]
@@ -822,9 +824,7 @@ async fn pets_crud() {
 
 // ── Nutrition records ─────────────────────────────────────────────────────────
 
-/// When `occurred_at` is omitted the server uses the configured timezone,
-/// not the OS timezone or UTC. The resulting string must be naive (no Z/offset)
-/// and must match the wall-clock time in that timezone.
+/// The server stores now as UTC while deriving the journal day in the configured zone.
 #[actix_web::test]
 async fn nutrition_record_default_occurred_at_uses_configured_timezone() {
     // Use Tokyo (UTC+9) — far enough from UTC that the hour differs detectably.
@@ -841,11 +841,7 @@ async fn nutrition_record_default_occurred_at_uses_configured_timezone() {
     let app = build_app!(state);
     let pet_id = api_create_pet!(&app, "TzTest");
 
-    // Record the expected time window in Tokyo before and after the request.
-    let before = chrono::Utc::now()
-        .with_timezone(&"Asia/Tokyo".parse::<chrono_tz::Tz>().unwrap())
-        .format("%Y-%m-%dT%H:%M:%S")
-        .to_string();
+    let before = chrono::Utc::now();
 
     let req = test::TestRequest::post()
         .uri("/api/v1/nutrition/records")
@@ -861,28 +857,27 @@ async fn nutrition_record_default_occurred_at_uses_configured_timezone() {
     let body: serde_json::Value = test::read_body_json(resp).await;
     assert_eq!(status, 201, "create failed: {body}");
 
-    let after = chrono::Utc::now()
-        .with_timezone(&"Asia/Tokyo".parse::<chrono_tz::Tz>().unwrap())
-        .format("%Y-%m-%dT%H:%M:%S")
-        .to_string();
+    let after = chrono::Utc::now();
 
     let occurred_at = body["occurred_at"].as_str().expect("occurred_at missing");
-    // Must be naive — no Z or offset
+    let instant = petmon::record_time::parse_instant(occurred_at).unwrap();
+    assert_eq!(occurred_at, petmon::record_time::format_utc(instant));
     assert!(
-        !occurred_at.ends_with('Z') && !occurred_at.contains('+'),
-        "occurred_at '{occurred_at}' must be naive (no Z or +offset)"
+        instant >= before && instant <= after,
+        "occurred_at '{occurred_at}' must preserve the actual instant"
     );
-    // Must fall within the Tokyo time window captured around the request
-    assert!(
-        occurred_at >= before.as_str() && occurred_at <= after.as_str(),
-        "occurred_at '{occurred_at}' must be within Tokyo time window [{before}, {after}]"
+    assert_eq!(
+        body["local_date"],
+        instant
+            .with_timezone(&chrono_tz::Asia::Tokyo)
+            .date_naive()
+            .to_string()
     );
 }
 
-/// When `occurred_at` is omitted the server must store a naive local datetime —
-/// no UTC offset (`Z` or `+HH:MM`) appended.
+/// Omitted timestamps use canonical UTC with fixed nanosecond precision.
 #[actix_web::test]
-async fn nutrition_record_default_occurred_at_is_naive_local() {
+async fn nutrition_record_default_occurred_at_is_canonical_utc() {
     let (app, state) = build_dev_app!();
     let _ = state; // keep state alive
     let pet_id = api_create_pet!(&app, "TimezoneTest");
@@ -902,14 +897,9 @@ async fn nutrition_record_default_occurred_at_is_naive_local() {
     assert_eq!(status, 201, "create record failed: {body}");
 
     let occurred_at = body["occurred_at"].as_str().expect("occurred_at missing");
-    assert!(
-        !occurred_at.ends_with('Z') && !occurred_at.contains('+'),
-        "occurred_at '{occurred_at}' must be a naive local datetime (no Z or +offset)"
-    );
-    assert!(
-        occurred_at.len() >= 19,
-        "occurred_at '{occurred_at}' too short to be a valid datetime"
-    );
+    let instant = petmon::record_time::parse_instant(occurred_at).unwrap();
+    assert_eq!(occurred_at, petmon::record_time::format_utc(instant));
+    assert_eq!(occurred_at.len(), 30);
 }
 
 /// When `occurred_at` is supplied explicitly it must be stored exactly as sent.
@@ -919,7 +909,7 @@ async fn nutrition_record_explicit_occurred_at_is_preserved() {
     let _ = state;
     let pet_id = api_create_pet!(&app, "ExplicitTime");
 
-    let occurred_at = "2026-03-15T09:30:00";
+    let occurred_at = "2026-03-15T09:30:00.000000000Z";
     let req = test::TestRequest::post()
         .uri("/api/v1/nutrition/records")
         .set_json(serde_json::json!({
@@ -941,33 +931,46 @@ async fn nutrition_record_explicit_occurred_at_is_preserved() {
     );
 }
 
-/// `local_date` must equal the date portion of `occurred_at`.
+/// The default journal day is derived in the pet's zone, independently of UTC's date.
 #[actix_web::test]
-async fn nutrition_record_local_date_matches_occurred_at_date() {
-    let (app, state) = build_dev_app!();
-    let _ = state;
+async fn nutrition_record_local_date_uses_timezone_and_preserves_explicit_journal_day() {
+    let pool = setup_pool().await;
+    let state = web::Data::new(AppState::new_with_tz(
+        pool,
+        true,
+        None,
+        None,
+        chrono_tz::Asia::Tokyo,
+        false,
+        None,
+    ));
+    let app = build_app!(state);
     let pet_id = api_create_pet!(&app, "LocalDateTest");
 
-    let occurred_at = "2026-06-18T23:55:00";
-    let req = test::TestRequest::post()
-        .uri("/api/v1/nutrition/records")
-        .set_json(serde_json::json!({
-            "pet_id": pet_id,
-            "category": "liquids",
-            "amount": 30,
-            "unit": "ml",
-            "occurred_at": occurred_at
-        }))
-        .to_request();
-    let resp = test::call_service(&app, req).await;
-    let status = resp.status();
-    let body: serde_json::Value = test::read_body_json(resp).await;
-    assert_eq!(status, 201, "create record failed: {body}");
-    assert_eq!(
-        body["local_date"].as_str(),
-        Some("2026-06-18"),
-        "local_date must equal the date component of occurred_at"
-    );
+    let occurred_at = "2026-06-19T08:55:00+09:00";
+    for (journal_day, expected_day) in [(None, "2026-06-19"), (Some("2026-06-17"), "2026-06-17")] {
+        let req = test::TestRequest::post()
+            .uri("/api/v1/nutrition/records")
+            .set_json(serde_json::json!({
+                "pet_id": pet_id,
+                "category": "liquids",
+                "amount": 30,
+                "unit": "ml",
+                "occurred_at": occurred_at,
+                "local_date": journal_day
+            }))
+            .to_request();
+        let resp = test::call_service(&app, req).await;
+        let status = resp.status();
+        let body: serde_json::Value = test::read_body_json(resp).await;
+        assert_eq!(status, 201, "create record failed: {body}");
+        assert_eq!(
+            body["local_date"].as_str(),
+            Some(expected_day),
+            "journal date must remain independent of the stored UTC date"
+        );
+        assert_eq!(body["occurred_at"], "2026-06-18T23:55:00.000000000Z");
+    }
 }
 
 /// Full nutrition record CRUD: create → read → update → list → delete.
@@ -986,7 +989,7 @@ async fn nutrition_record_crud() {
             "amount": 75,
             "unit": "g",
             "note": "chicken pate",
-            "occurred_at": "2026-06-01T08:00:00",
+            "occurred_at": "2026-06-01T08:00:00.000000000Z",
             "local_date": "2026-06-01"
         }))
         .to_request();
@@ -1072,7 +1075,7 @@ async fn nutrition_record_patch_clears_note_when_null() {
             "amount": 75,
             "unit": "g",
             "note": "original note",
-            "occurred_at": "2026-06-01T08:00:00",
+            "occurred_at": "2026-06-01T08:00:00.000000000Z",
             "local_date": "2026-06-01"
         }))
         .to_request();
@@ -1124,7 +1127,7 @@ async fn elimination_record_patch_clears_note_when_null() {
             "pet_id": pet_id,
             "event_type": "urination",
             "note": "original note",
-            "occurred_at": "2026-06-01T09:00:00",
+            "occurred_at": "2026-06-01T09:00:00.000000000Z",
             "local_date": "2026-06-01"
         }))
         .to_request();
@@ -1276,9 +1279,9 @@ async fn nutrition_status_as_of_timestamp() {
     let schedule_id = schedule["id"].as_str().unwrap();
 
     for (time, category, amount) in [
-        ("2026-07-18T08:30:00", "liquids", 60.0),
-        ("2026-07-18T11:00:00", "water", 20.0),
-        ("2026-07-18T15:00:00", "liquids", 999.0),
+        ("2026-07-18T08:30:00.000000000Z", "liquids", 60.0),
+        ("2026-07-18T11:00:00.000000000Z", "water", 20.0),
+        ("2026-07-18T15:00:00.000000000Z", "liquids", 999.0),
     ] {
         let req = test::TestRequest::post()
             .uri("/api/v1/nutrition/records")
@@ -1297,7 +1300,7 @@ async fn nutrition_status_as_of_timestamp() {
 
     let req = test::TestRequest::get()
         .uri(&format!(
-            "/api/v1/nutrition/status?pet_id={pet_id}&ts=2026-07-18T13:00:00"
+            "/api/v1/nutrition/status?pet_id={pet_id}&ts=2026-07-18T13:00:00.000000000Z"
         ))
         .to_request();
     let resp = test::call_service(&app, req).await;
@@ -1305,7 +1308,10 @@ async fn nutrition_status_as_of_timestamp() {
     let body: serde_json::Value = test::read_body_json(resp).await;
 
     assert_eq!(body["local_date"].as_str(), Some("2026-07-18"));
-    assert_eq!(body["as_of"].as_str(), Some("2026-07-18T13:00:00"));
+    assert_eq!(
+        petmon::record_time::parse_instant(body["as_of"].as_str().unwrap()).unwrap(),
+        petmon::record_time::parse_instant("2026-07-18T13:00:00.000000000Z").unwrap()
+    );
     assert_eq!(body["on_track"].as_bool(), Some(false));
     assert_eq!(body["intake"]["liquids_ml"].as_f64(), Some(60.0));
     assert_eq!(body["intake"]["water_ml"].as_f64(), Some(20.0));
@@ -1371,7 +1377,7 @@ async fn mcp_nutrition_on_track_returns_summary() {
             "category": "liquids",
             "amount": 120,
             "unit": "ml",
-            "occurred_at": "2026-07-18T09:00:00",
+            "occurred_at": "2026-07-18T09:00:00.000000000Z",
             "local_date": "2026-07-18"
         }))
         .to_request();
@@ -1390,7 +1396,7 @@ async fn mcp_nutrition_on_track_returns_summary() {
                     "name": "nutrition.on-track",
                     "arguments": {
                         "pet_id": pet_id,
-                        "ts": "2026-07-18T09:30:00"
+                        "ts": "2026-07-18T09:30:00.000000000Z"
                     }
                 }
             }))
@@ -1419,7 +1425,7 @@ async fn elimination_record_with_weight_creates_both_records() {
     let _ = state;
     let pet_id = api_create_pet!(&app, "ComboTest");
 
-    let occurred_at = "2026-06-01T10:00:00";
+    let occurred_at = "2026-06-01T10:00:00.000000000Z";
     let req = test::TestRequest::post()
         .uri("/api/v1/elimination/records/with-weight")
         .set_json(serde_json::json!({
@@ -1510,10 +1516,8 @@ async fn elimination_record_omitted_occurred_at_keeps_local_date() {
         occurred_at.starts_with("2026-06-01T"),
         "occurred_at '{occurred_at}' should stay on the journal day"
     );
-    assert!(
-        !occurred_at.ends_with('Z') && !occurred_at.contains('+'),
-        "occurred_at '{occurred_at}' must be naive (no Z or +offset)"
-    );
+    let instant = petmon::record_time::parse_instant(occurred_at).unwrap();
+    assert_eq!(occurred_at, petmon::record_time::format_utc(instant));
 }
 
 /// General elimination records with duration are auto-tagged on the backend when enabled.
@@ -1533,22 +1537,40 @@ async fn elimination_auto_categorize_by_duration() {
             pet_id,
             event_type,
             duration,
-            format!("2026-06-01T{hour:02}:00:00")
+            format!("2026-06-01T{hour:02}:00:00.000000000Z")
         );
     }
 
     api_enable_elimination_auto_categorize!(&app, pet_id);
 
-    let body = api_create_elimination!(&app, pet_id, "general", 48, "2026-06-02T08:30:00");
+    let body = api_create_elimination!(
+        &app,
+        pet_id,
+        "general",
+        48,
+        "2026-06-02T08:30:00.000000000Z"
+    );
     assert_eq!(body["event_type"].as_str(), Some("urination"));
     assert_eq!(body["is_auto_categorized"].as_bool(), Some(true));
     let auto_id = body["id"].as_str().unwrap().to_string();
 
-    let body = api_create_elimination!(&app, pet_id, "general", 122, "2026-06-02T10:30:00");
+    let body = api_create_elimination!(
+        &app,
+        pet_id,
+        "general",
+        122,
+        "2026-06-02T10:30:00.000000000Z"
+    );
     assert_eq!(body["event_type"].as_str(), Some("defecation"));
     assert_eq!(body["is_auto_categorized"].as_bool(), Some(true));
 
-    let manual = api_create_elimination!(&app, pet_id, "urination", 45, "2026-06-02T11:00:00");
+    let manual = api_create_elimination!(
+        &app,
+        pet_id,
+        "urination",
+        45,
+        "2026-06-02T11:00:00.000000000Z"
+    );
     assert_eq!(manual["is_auto_categorized"].as_bool(), Some(false));
 
     let req = test::TestRequest::patch()
@@ -1561,7 +1583,13 @@ async fn elimination_auto_categorize_by_duration() {
     assert_eq!(updated["event_type"].as_str(), Some("defecation"));
     assert_eq!(updated["is_auto_categorized"].as_bool(), Some(false));
 
-    let body = api_create_elimination!(&app, pet_id, "general", 30, "2026-06-02T12:00:00");
+    let body = api_create_elimination!(
+        &app,
+        pet_id,
+        "general",
+        30,
+        "2026-06-02T12:00:00.000000000Z"
+    );
     assert_eq!(body["event_type"].as_str(), Some("general"));
     assert_eq!(body["is_auto_categorized"].as_bool(), Some(false));
     let record_id = body["id"].as_str().unwrap().to_string();
@@ -1612,7 +1640,13 @@ async fn elimination_auto_categorize_by_duration() {
     let resp = test::call_service(&app, req).await;
     assert_eq!(resp.status(), 200);
 
-    let body = api_create_elimination!(&app, pet_id, "general", 47, "2026-06-02T14:00:00");
+    let body = api_create_elimination!(
+        &app,
+        pet_id,
+        "general",
+        47,
+        "2026-06-02T14:00:00.000000000Z"
+    );
     assert_eq!(body["event_type"].as_str(), Some("general"));
     assert_eq!(body["is_auto_categorized"].as_bool(), Some(false));
 }
@@ -1622,9 +1656,27 @@ async fn elimination_duration_profile_returns_buckets() {
     let (app, _state) = build_dev_app!();
     let pet_id = api_create_pet!(&app, "DurationProfile");
 
-    api_create_elimination!(&app, pet_id, "urination", 40, "2026-06-01T08:00:00");
-    api_create_elimination!(&app, pet_id, "urination", 60, "2026-06-01T09:00:00");
-    api_create_elimination!(&app, pet_id, "defecation", 100, "2026-06-01T10:00:00");
+    api_create_elimination!(
+        &app,
+        pet_id,
+        "urination",
+        40,
+        "2026-06-01T08:00:00.000000000Z"
+    );
+    api_create_elimination!(
+        &app,
+        pet_id,
+        "urination",
+        60,
+        "2026-06-01T09:00:00.000000000Z"
+    );
+    api_create_elimination!(
+        &app,
+        pet_id,
+        "defecation",
+        100,
+        "2026-06-01T10:00:00.000000000Z"
+    );
 
     let req = test::TestRequest::get()
         .uri(&format!(
@@ -1647,21 +1699,21 @@ async fn elimination_duration_profile_returns_buckets() {
 async fn elimination_classifier_rolling_window_disambiguates_overlap() {
     let (app, _state) = build_dev_app!();
     let pet_id = api_create_pet!(&app, "ContextCat");
-    let today = chrono::Local::now().date_naive();
+    let today = chrono::Utc::now().date_naive();
     let d = |n: i64| {
         (today - chrono::Duration::days(n))
             .format("%Y-%m-%d")
             .to_string()
     };
     for (event_type, duration, occurred) in [
-        ("urination", 44, format!("{}T08:00:00", d(6))),
-        ("urination", 46, format!("{}T08:00:00", d(5))),
-        ("urination", 45, format!("{}T08:00:00", d(4))),
-        ("urination", 47, format!("{}T08:00:00", d(3))),
-        ("defecation", 118, format!("{}T10:00:00", d(6))),
-        ("defecation", 122, format!("{}T10:00:00", d(5))),
-        ("defecation", 120, format!("{}T10:00:00", d(4))),
-        ("defecation", 119, format!("{}T10:00:00", d(3))),
+        ("urination", 44, format!("{}T08:00:00.000000000Z", d(6))),
+        ("urination", 46, format!("{}T08:00:00.000000000Z", d(5))),
+        ("urination", 45, format!("{}T08:00:00.000000000Z", d(4))),
+        ("urination", 47, format!("{}T08:00:00.000000000Z", d(3))),
+        ("defecation", 118, format!("{}T10:00:00.000000000Z", d(6))),
+        ("defecation", 122, format!("{}T10:00:00.000000000Z", d(5))),
+        ("defecation", 120, format!("{}T10:00:00.000000000Z", d(4))),
+        ("defecation", 119, format!("{}T10:00:00.000000000Z", d(3))),
     ] {
         api_create_elimination!(&app, pet_id, event_type, duration, occurred.as_str());
     }
@@ -1677,10 +1729,10 @@ async fn elimination_classifier_rolling_window_disambiguates_overlap() {
     let retrain: serde_json::Value = test::read_body_json(resp).await;
     assert_eq!(retrain["trained"].as_bool(), Some(true));
 
-    let defecation_ts = format!("{}T23:00:00", d(1));
+    let defecation_ts = format!("{}T23:00:00.000000000Z", d(1));
     api_create_elimination!(&app, pet_id, "defecation", 120, defecation_ts.as_str());
 
-    let general_ts = format!("{}T01:00:00", d(0));
+    let general_ts = format!("{}T01:00:00.000000000Z", d(0));
     let body = api_create_elimination!(&app, pet_id, "general", 55, general_ts.as_str());
     assert_eq!(
         body["event_type"].as_str(),
@@ -1700,21 +1752,21 @@ async fn elimination_classifier_rolling_window_disambiguates_overlap() {
 async fn elimination_classifier_status_and_retrain() {
     let (app, _state) = build_dev_app!();
     let pet_id = api_create_pet!(&app, "ClassifierStatus");
-    let today = chrono::Local::now().date_naive();
+    let today = chrono::Utc::now().date_naive();
     let d = |n: i64| {
         (today - chrono::Duration::days(n))
             .format("%Y-%m-%d")
             .to_string()
     };
     for (event_type, duration, occurred) in [
-        ("urination", 44, format!("{}T08:00:00", d(6))),
-        ("urination", 46, format!("{}T08:00:00", d(5))),
-        ("urination", 45, format!("{}T08:00:00", d(4))),
-        ("urination", 47, format!("{}T08:00:00", d(3))),
-        ("defecation", 118, format!("{}T10:00:00", d(6))),
-        ("defecation", 122, format!("{}T10:00:00", d(5))),
-        ("defecation", 120, format!("{}T10:00:00", d(4))),
-        ("defecation", 119, format!("{}T10:00:00", d(3))),
+        ("urination", 44, format!("{}T08:00:00.000000000Z", d(6))),
+        ("urination", 46, format!("{}T08:00:00.000000000Z", d(5))),
+        ("urination", 45, format!("{}T08:00:00.000000000Z", d(4))),
+        ("urination", 47, format!("{}T08:00:00.000000000Z", d(3))),
+        ("defecation", 118, format!("{}T10:00:00.000000000Z", d(6))),
+        ("defecation", 122, format!("{}T10:00:00.000000000Z", d(5))),
+        ("defecation", 120, format!("{}T10:00:00.000000000Z", d(4))),
+        ("defecation", 119, format!("{}T10:00:00.000000000Z", d(3))),
     ] {
         api_create_elimination!(&app, pet_id, event_type, duration, occurred.as_str());
     }
@@ -1748,12 +1800,42 @@ async fn notifications_are_global_with_per_reader_read_state() {
     let (app, _state) = build_dev_app!();
     let pet_id = api_create_pet!(&app, "NotifyPet");
     api_enable_elimination_auto_categorize!(&app, pet_id);
-    api_create_elimination!(&app, pet_id, "urination", 40, "2026-06-01T08:00:00");
-    api_create_elimination!(&app, pet_id, "urination", 42, "2026-06-01T09:00:00");
-    api_create_elimination!(&app, pet_id, "defecation", 100, "2026-06-01T10:00:00");
-    api_create_elimination!(&app, pet_id, "defecation", 105, "2026-06-01T11:00:00");
+    api_create_elimination!(
+        &app,
+        pet_id,
+        "urination",
+        40,
+        "2026-06-01T08:00:00.000000000Z"
+    );
+    api_create_elimination!(
+        &app,
+        pet_id,
+        "urination",
+        42,
+        "2026-06-01T09:00:00.000000000Z"
+    );
+    api_create_elimination!(
+        &app,
+        pet_id,
+        "defecation",
+        100,
+        "2026-06-01T10:00:00.000000000Z"
+    );
+    api_create_elimination!(
+        &app,
+        pet_id,
+        "defecation",
+        105,
+        "2026-06-01T11:00:00.000000000Z"
+    );
 
-    api_create_elimination!(&app, pet_id, "general", 60, "2026-06-02T12:00:00");
+    api_create_elimination!(
+        &app,
+        pet_id,
+        "general",
+        60,
+        "2026-06-02T12:00:00.000000000Z"
+    );
 
     let req = test::TestRequest::get()
         .uri("/api/v1/notifications")
@@ -1859,7 +1941,7 @@ async fn push_subscribe_and_test_endpoints_work() {
 
     let req = test::TestRequest::post()
         .uri("/api/v1/push/test")
-        .set_json(&serde_json::json!({
+        .set_json(serde_json::json!({
             "endpoint": "https://push.example.test/device/abc"
         }))
         .to_request();
@@ -1877,7 +1959,7 @@ async fn push_subscribe_and_test_endpoints_work() {
     // Unknown endpoint is rejected (does not silently fan out).
     let req = test::TestRequest::post()
         .uri("/api/v1/push/test")
-        .set_json(&serde_json::json!({
+        .set_json(serde_json::json!({
             "endpoint": "https://push.example.test/device/missing"
         }))
         .to_request();
@@ -1886,7 +1968,7 @@ async fn push_subscribe_and_test_endpoints_work() {
 
     let req = test::TestRequest::post()
         .uri("/api/v1/push/unsubscribe")
-        .set_json(&serde_json::json!({ "endpoint": "https://push.example.test/device/abc" }))
+        .set_json(serde_json::json!({ "endpoint": "https://push.example.test/device/abc" }))
         .to_request();
     let resp = test::call_service(&app, req).await;
     assert_eq!(resp.status(), 204);
@@ -2383,7 +2465,7 @@ async fn elimination_range_summary_includes_per_type_avg_duration() {
                 "pet_id": pet_id,
                 "event_type": event_type,
                 "duration_seconds": duration_seconds,
-                "occurred_at": format!("{local_date}T09:00:00"),
+                "occurred_at": format!("{local_date}T09:00:00.000000000Z"),
                 "local_date": local_date,
             }))
             .to_request();
@@ -2430,7 +2512,7 @@ async fn elimination_no_output_tracked_in_analytics() {
                 "pet_id": pet_id,
                 "event_type": event_type,
                 "duration_seconds": duration_seconds,
-                "occurred_at": format!("{local_date}T09:00:00"),
+                "occurred_at": format!("{local_date}T09:00:00.000000000Z"),
                 "local_date": local_date,
             }))
             .to_request();
@@ -2520,7 +2602,7 @@ async fn weight_list_defaults_to_last_ten_without_date_filter() {
             .uri("/api/v1/health/weight")
             .set_json(serde_json::json!({
                 "pet_id": pet_id,
-                "measured_at": format!("2026-06-15T{:02}:00:00", hour),
+                "measured_at": format!("2026-06-15T{:02}:00:00.000000000Z", hour),
                 "weight_kg": 4.0 + (hour as f64 * 0.01),
             }))
             .to_request();
@@ -2538,11 +2620,11 @@ async fn weight_list_defaults_to_last_ten_without_date_filter() {
     assert_eq!(records.len(), 10);
     assert_eq!(
         records[0]["measured_at"].as_str(),
-        Some("2026-06-15T11:00:00")
+        Some("2026-06-15T11:00:00.000000000Z")
     );
     assert_eq!(
         records[9]["measured_at"].as_str(),
-        Some("2026-06-15T02:00:00")
+        Some("2026-06-15T02:00:00.000000000Z")
     );
 
     let req = test::TestRequest::get()
@@ -2568,7 +2650,7 @@ async fn weight_summary_daily_aggregates_multiple_records_per_day() {
             .uri("/api/v1/health/weight")
             .set_json(serde_json::json!({
                 "pet_id": pet_id,
-                "measured_at": format!("2026-06-15T{time}"),
+                "measured_at": format!("2026-06-15T{time}.000000000Z"),
                 "weight_kg": kg,
             }))
             .to_request();
@@ -2613,7 +2695,7 @@ async fn weight_summary_weekly_aggregates_across_week() {
             .uri("/api/v1/health/weight")
             .set_json(serde_json::json!({
                 "pet_id": pet_id,
-                "measured_at": format!("{date}T09:00:00"),
+                "measured_at": format!("{date}T09:00:00.000000000Z"),
                 "weight_kg": kg,
             }))
             .to_request();
@@ -2660,7 +2742,7 @@ async fn weight_summary_monthly_aggregates_across_month() {
             .uri("/api/v1/health/weight")
             .set_json(serde_json::json!({
                 "pet_id": pet_id,
-                "measured_at": format!("{date}T09:00:00"),
+                "measured_at": format!("{date}T09:00:00.000000000Z"),
                 "weight_kg": kg,
             }))
             .to_request();
@@ -2708,7 +2790,7 @@ async fn weight_summary_raw_returns_one_bucket_per_record() {
             .uri("/api/v1/health/weight")
             .set_json(serde_json::json!({
                 "pet_id": pet_id,
-                "measured_at": format!("2026-06-20T{time}"),
+                "measured_at": format!("2026-06-20T{time}.000000000Z"),
                 "weight_kg": kg,
             }))
             .to_request();
@@ -2751,7 +2833,7 @@ async fn weight_create_normalizes_note_tags() {
     for (i, (note, expected)) in cases.iter().enumerate() {
         let mut body = serde_json::json!({
             "pet_id": pet_id,
-            "measured_at": format!("2026-06-15T{:02}:00:00", i),
+            "measured_at": format!("2026-06-15T{:02}:00:00.000000000Z", i),
             "weight_kg": 4.2,
         });
         if !note.is_null() {
@@ -2777,7 +2859,7 @@ async fn weight_patch_updates_note() {
         .uri("/api/v1/health/weight")
         .set_json(serde_json::json!({
             "pet_id": pet_id,
-            "measured_at": "2026-06-15T09:00:00",
+            "measured_at": "2026-06-15T09:00:00.000000000Z",
             "weight_kg": 4.2,
             "note": "Morning weigh-in"
         }))
@@ -2808,9 +2890,9 @@ async fn weight_note_tag_migration_rewrites_existing_notes() {
     sqlx::query(
         "INSERT INTO weight_records (id, pet_id, measured_at, local_date, weight_kg, note, source_type, created_at)
          VALUES
-           ('w-petkit', ?, '2026-06-01T09:00:00', '2026-06-01', 4.2, 'Petkit toileting', 'manual', '2026-06-01T09:00:00'),
-           ('w-plain', ?, '2026-06-01T10:00:00', '2026-06-01', 4.1, 'Morning weigh-in', 'manual', '2026-06-01T10:00:00'),
-           ('w-empty', ?, '2026-06-01T11:00:00', '2026-06-01', 4.0, NULL, 'manual', '2026-06-01T11:00:00')",
+           ('w-petkit', ?, '2026-06-01T09:00:00.000000000Z', '2026-06-01', 4.2, 'Petkit toileting', 'manual', '2026-06-01T09:00:00.000000000Z'),
+           ('w-plain', ?, '2026-06-01T10:00:00.000000000Z', '2026-06-01', 4.1, 'Morning weigh-in', 'manual', '2026-06-01T10:00:00.000000000Z'),
+           ('w-empty', ?, '2026-06-01T11:00:00.000000000Z', '2026-06-01', 4.0, NULL, 'manual', '2026-06-01T11:00:00.000000000Z')",
     )
     .bind(pet_uuid)
     .bind(pet_uuid)
@@ -2868,7 +2950,7 @@ async fn weight_summary_group_by_tag_splits_series() {
             .uri("/api/v1/health/weight")
             .set_json(serde_json::json!({
                 "pet_id": pet_id,
-                "measured_at": format!("2026-06-15T{time}"),
+                "measured_at": format!("2026-06-15T{time}.000000000Z"),
                 "weight_kg": kg,
                 "note": note,
             }))
@@ -2924,7 +3006,7 @@ async fn weight_tags_and_include_filter() {
             .uri("/api/v1/health/weight")
             .set_json(serde_json::json!({
                 "pet_id": pet_id,
-                "measured_at": format!("2026-06-15T{:02}:00:00", i),
+                "measured_at": format!("2026-06-15T{:02}:00:00.000000000Z", i),
                 "weight_kg": kg,
                 "note": note,
             }))
@@ -2976,7 +3058,7 @@ async fn health_state_records_crud() {
         .set_json(serde_json::json!({
             "pet_id": pet_id,
             "level": "ok",
-            "occurred_at": "2026-06-15T10:00:00",
+            "occurred_at": "2026-06-15T10:00:00.000000000Z",
             "note": "Seemed fine after breakfast"
         }))
         .to_request();
@@ -3026,7 +3108,7 @@ async fn health_state_list_defaults_to_last_ten_without_date_filter() {
             .set_json(serde_json::json!({
                 "pet_id": pet_id,
                 "level": "ok",
-                "occurred_at": format!("2026-06-15T{:02}:00:00", hour)
+                "occurred_at": format!("2026-06-15T{:02}:00:00.000000000Z", hour)
             }))
             .to_request();
         let resp = test::call_service(&app, req).await;
@@ -3043,11 +3125,11 @@ async fn health_state_list_defaults_to_last_ten_without_date_filter() {
     assert_eq!(records.len(), 10);
     assert_eq!(
         records[0]["occurred_at"].as_str(),
-        Some("2026-06-15T11:00:00")
+        Some("2026-06-15T11:00:00.000000000Z")
     );
     assert_eq!(
         records[9]["occurred_at"].as_str(),
-        Some("2026-06-15T02:00:00")
+        Some("2026-06-15T02:00:00.000000000Z")
     );
 
     let req = test::TestRequest::get()
@@ -3975,7 +4057,7 @@ async fn med_intake_explicit_occurred_at_is_preserved() {
     let assign: serde_json::Value = test::read_body_json(resp).await;
     let assign_id = assign["id"].as_str().unwrap();
 
-    let occurred_at = "2026-08-10T07:45:00";
+    let occurred_at = "2026-08-10T07:45:00.000000000Z";
     let req = test::TestRequest::post()
         .uri("/api/v1/health/meds/intake")
         .set_json(serde_json::json!({
@@ -4402,7 +4484,7 @@ async fn medication_bundles_create_take_now_and_delete_with_medication() {
     let req = test::TestRequest::post()
         .uri(&format!("/api/v1/health/meds/bundles/{triple_id}/intake"))
         .set_json(serde_json::json!({
-            "occurred_at": "2026-08-20T08:15:00",
+            "occurred_at": "2026-08-20T08:15:00.000000000Z",
             "local_date": "2026-08-20"
         }))
         .to_request();
@@ -4413,7 +4495,7 @@ async fn medication_bundles_create_take_now_and_delete_with_medication() {
     assert_eq!(delayed.len(), 3);
     assert_eq!(
         delayed[0]["occurred_at"].as_str(),
-        Some("2026-08-20T08:15:00")
+        Some("2026-08-20T08:15:00.000000000Z")
     );
     assert_eq!(delayed[0]["local_date"].as_str(), Some("2026-08-20"));
     for intake in delayed {
@@ -4988,9 +5070,9 @@ async fn shortcuts_med_intake_take_is_realtime_only() {
     // quietly dropped, so a drifted generator fails loudly instead of filing a
     // dose that looks backdated but landed on today.
     for rejected in [
-        "occurred_at=2026-03-15T08:30:00",
+        "occurred_at=2026-03-15T08:30:00.000000000Z",
         "local_date=2026-03-15",
-        "occured_at=2026-03-15T08:30:00", // typo in a hand-written call
+        "occured_at=2026-03-15T08:30:00.000000000Z", // typo in a hand-written call
     ] {
         let req = test::TestRequest::post()
             .uri(&format!("{take_base}&{rejected}"))
@@ -5198,7 +5280,7 @@ async fn shortcuts_bundle_take_creates_records_and_returns_id() {
     // Unknown params must be rejected (real-time only)
     let req = test::TestRequest::post()
         .uri(&format!(
-            "/api/v1/shortcuts/meds/intake/take-bundle?pet_id={pet_id}&bundle_id={bundle_id}&occurred_at=2026-03-15T08:30:00"
+            "/api/v1/shortcuts/meds/intake/take-bundle?pet_id={pet_id}&bundle_id={bundle_id}&occurred_at=2026-03-15T08:30:00.000000000Z"
         ))
         .to_request();
     let resp = test::call_service(&app, req).await;
@@ -5464,7 +5546,7 @@ async fn feeding_nudge_skips_when_ahead_of_chart_schedule_at_feeding_time() {
             "category": "liquids",
             "amount": 30,
             "unit": "ml",
-            "occurred_at": "2026-07-18T13:50:00",
+            "occurred_at": "2026-07-18T13:50:00.000000000Z",
             "local_date": "2026-07-18"
         }))
         .to_request();
@@ -5518,7 +5600,7 @@ async fn feeding_nudge_skips_when_intake_meets_due_or_notify_off() {
             "category": "liquids",
             "amount": 50,
             "unit": "ml",
-            "occurred_at": "2026-07-18T07:30:00",
+            "occurred_at": "2026-07-18T07:30:00.000000000Z",
             "local_date": "2026-07-18"
         }))
         .to_request();
@@ -5647,7 +5729,7 @@ async fn feeding_nudge_liquid_counts_wet_food_fluid() {
             "category": "liquids",
             "amount": 120,
             "unit": "ml",
-            "occurred_at": "2026-07-18T07:30:00",
+            "occurred_at": "2026-07-18T07:30:00.000000000Z",
             "local_date": "2026-07-18"
         }),
         serde_json::json!({
@@ -5655,7 +5737,7 @@ async fn feeding_nudge_liquid_counts_wet_food_fluid() {
             "category": "wet_food",
             "amount": 100,
             "unit": "g",
-            "occurred_at": "2026-07-18T07:45:00",
+            "occurred_at": "2026-07-18T07:45:00.000000000Z",
             "local_date": "2026-07-18"
         }),
     ] {

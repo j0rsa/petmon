@@ -68,11 +68,59 @@ pub async fn best_fluid_day(
     pet_id: Option<Uuid>,
     exclude_date: &str,
 ) -> AppResult<Option<BestFluidDay>> {
-    nutrition_analytics::best_fluid_day_scoped(
+    let Some(day) = nutrition_analytics::best_fluid_day_records_scoped(
         pool,
         pet_id,
         exclude_date,
         &pool.visibility(pet_id).await?,
     )
-    .await
+    .await?
+    else {
+        return Ok(None);
+    };
+    let mut timezones = HashMap::new();
+    let mut by_time = std::collections::BTreeMap::<String, (f64, f64)>::new();
+    for record in day.records {
+        let timezone = match timezones.get(&record.pet_id) {
+            Some(timezone) => *timezone,
+            None => {
+                let timezone = pool.timezone(record.pet_id).await?;
+                timezones.insert(record.pet_id, timezone);
+                timezone
+            }
+        };
+        use crate::domain::nutrition_record::NutritionCategory;
+        let (fluid, liquid) = match record.category {
+            NutritionCategory::Water | NutritionCategory::Liquids => (record.amount, record.amount),
+            NutritionCategory::WetFood => (record.amount * 0.77, 0.0),
+            NutritionCategory::DryFood => (0.0, 0.0),
+        };
+        if fluid == 0.0 {
+            continue;
+        }
+        let time = crate::record_time::local_datetime(&record.occurred_at, timezone)?
+            .format("%H:%M")
+            .to_string();
+        let entry = by_time.entry(time).or_default();
+        entry.0 += fluid;
+        entry.1 += liquid;
+    }
+    let (mut fluid, mut liquids) = (0.0, 0.0);
+    let curve = by_time
+        .into_iter()
+        .map(|(time, amounts)| {
+            fluid += amounts.0;
+            liquids += amounts.1;
+            crate::domain::analytics::FluidCurvePoint {
+                time,
+                cumulative_fluid_ml: (fluid * 10.0).round() / 10.0,
+                cumulative_liquids_ml: (liquids * 10.0).round() / 10.0,
+            }
+        })
+        .collect();
+    Ok(Some(BestFluidDay {
+        local_date: day.local_date,
+        total_fluid_ml: day.total_fluid_ml,
+        curve,
+    }))
 }

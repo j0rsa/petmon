@@ -1,4 +1,5 @@
 import { useResourceTime } from '../../context/useResourceTime';
+import { useRecordTimestamp } from '../../hooks/useRecordTimestamp';
 import { useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { healthStateApi, type CreateHealthStateRecord, type HealthStateRecord } from '../../api/healthState';
@@ -29,7 +30,7 @@ export function HealthStatePanel({ petId }: HealthStatePanelProps) {
   const queryClient = useQueryClient();
   const { canWrite } = usePermissions(petId);
   const formatDate = useFormatDate();
-  const formatTime = useFormatTime();
+  const formatTime = useFormatTime(petId);
 
   const [period, setPeriod] = useState<PeriodLabel>('30d');
   const { today, nowLocalDateTimeString } = useResourceTime(petId);
@@ -56,6 +57,7 @@ export function HealthStatePanel({ petId }: HealthStatePanelProps) {
   const [level, setLevel] = useState<HealthStateLevel | null>(null);
   const [noteInput, setNoteInput] = useState('');
   const [occurredAt, setOccurredAt] = useState(() => nowLocalDateTimeString());
+  const timestamp = useRecordTimestamp(occurredAt, petId);
 
   const addMutation = useMutation({
     mutationFn: (payload: CreateHealthStateRecord) => healthStateApi.create(payload),
@@ -81,12 +83,12 @@ export function HealthStatePanel({ petId }: HealthStatePanelProps) {
   const chartBuckets = buildHealthStateSummary(chartQuery.data ?? [], granularity);
 
   function handleAdd() {
-    if (!level) return;
+    if (!level || !timestamp.valid) return;
     addMutation.mutate({
       pet_id: petId,
       level,
       note: noteInput.trim() || undefined,
-      occurred_at: occurredAt ? `${occurredAt}:00` : undefined,
+      occurred_at: timestamp.utc,
     });
   }
 
@@ -152,6 +154,7 @@ export function HealthStatePanel({ petId }: HealthStatePanelProps) {
                   value={occurredAt}
                   onChange={(e) => setOccurredAt(e.target.value)}
                 />
+                {timestamp.feedback}
               </div>
               <div className="form-row">
                 <label>Note (optional)</label>

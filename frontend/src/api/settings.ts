@@ -1,4 +1,5 @@
 import { api } from './client';
+import { canDelegateAll, effectiveScopes, type MeResponse } from './me';
 
 export interface OidcConfigPublic {
   enabled: boolean;
@@ -31,13 +32,14 @@ export interface UpdateTelegramConfig {
   bot_token?: string | null;
 }
 
-export type ApiTokenScope = 'all' | 'api_read' | 'api_write' | 'mcp' | 'instance_admin';
-export const API_TOKEN_SCOPES: ApiTokenScope[] = ['all', 'api_read', 'api_write', 'mcp', 'instance_admin'];
+export type ApiTokenScope = 'all' | 'api_read' | 'api_write' | 'mcp';
+export const API_TOKEN_SCOPES: ApiTokenScope[] = ['all', 'api_read', 'api_write', 'mcp'];
 
-export function allowedTokenScopes(capabilities: Set<string>): ApiTokenScope[] {
+export function allowedTokenScopes(me: MeResponse | undefined): ApiTokenScope[] {
+  const scopes = effectiveScopes(me);
   return API_TOKEN_SCOPES.filter((scope) => scope === 'all'
-    ? ['api_read', 'api_write', 'mcp'].every((capability) => capabilities.has(capability))
-    : capabilities.has(scope));
+    ? canDelegateAll(me)
+    : scopes.has(scope));
 }
 
 export interface ApiTokenPublic {

@@ -34,13 +34,17 @@ const eliminationDeepLinkDate = '2024-06-15';
 const eliminationDeepLinkHash = '#record-elim-01';
 
 const withNotificationDeepLinkData: Decorator = (Story) => {
+  // Layout owns an inner SelectedPetProvider too; seed its browser selection so
+  // an earlier pet-switch story cannot redirect this deep link to another pet.
+  localStorage.setItem('petmon-selected-pet-id', mockPetId);
+  useEffect(() => () => localStorage.removeItem('petmon-selected-pet-id'), []);
   const client = new QueryClient({
     defaultOptions: {
       queries: { retry: false, staleTime: Infinity, refetchOnMount: false, refetchOnWindowFocus: false },
     },
   });
   client.setQueryData(['pets'], mockPets);
-  client.setQueryData(['me'], { subject: 'dev', email: null, name: 'Dev', display_name: 'Dev', kind: 'dev', scopes: [] });
+  client.setQueryData(['me'], { subject: 'dev', email: null, name: 'Dev', display_name: 'Dev', kind: 'dev', scopes: [], roles: ['instance_admin'] });
   client.setQueryData(['app-info'], mockAppInfo);
   client.setQueryData(['user-settings', 'display'], mockDisplaySettings);
   client.setQueryData(['user-settings', 'nutrition_calendar'], mockNutritionCalendarSettings);

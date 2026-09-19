@@ -70,7 +70,7 @@ paths:
       tags:
         - Authentication
       summary: Get current user identity
-      description: Returns the canonical actor, live roles, and effective capabilities of the current credential. Use capabilities rather than roles alone to enable privileged controls.
+      description: Returns the canonical actor, live user roles, raw credential scopes, and authentication kind. Administration requires the live instance_admin role and the endpoint's read/write scope; API-token sessions additionally require literal all in their scopes. Roles alone do not authorize token administration.
       responses:
         '200':
           description: Current user information
@@ -690,8 +690,9 @@ paths:
         - Settings
       summary: Get OIDC configuration
       x-required-scope: api_read
-      x-required-capabilities: [api_read, instance_admin]
-      description: Retrieve the current OIDC configuration (client secret is never exposed). Requires effective instance_admin capability backed by a live administrator grant.
+      x-required-role: instance_admin
+      x-api-token-admin-scope: all
+      description: Retrieve the current OIDC configuration (client secret is never exposed). Requires the live instance_admin user role and the endpoint read/write scope. API-token sessions additionally require literal all in their scopes.
       responses:
         '200':
           description: OIDC configuration
@@ -709,8 +710,9 @@ paths:
         - Settings
       summary: Update OIDC configuration
       x-required-scope: api_write
-      x-required-capabilities: [api_write, instance_admin]
-      description: Update OIDC settings. Omitting client_secret keeps the existing value. Requires effective instance_admin capability backed by a live administrator grant.
+      x-required-role: instance_admin
+      x-api-token-admin-scope: all
+      description: Update OIDC settings. Omitting client_secret keeps the existing value. Requires the live instance_admin user role and the endpoint read/write scope. API-token sessions additionally require literal all in their scopes.
       requestBody:
         required: true
         content:
@@ -737,8 +739,9 @@ paths:
         - Settings
       summary: Get Telegram configuration
       x-required-scope: api_read
-      x-required-capabilities: [api_read, instance_admin]
-      description: Retrieve the current Telegram configuration (bot token is never exposed). Requires effective instance_admin capability backed by a live administrator grant.
+      x-required-role: instance_admin
+      x-api-token-admin-scope: all
+      description: Retrieve the current Telegram configuration (bot token is never exposed). Requires the live instance_admin user role and the endpoint read/write scope. API-token sessions additionally require literal all in their scopes.
       responses:
         '200':
           description: Telegram configuration
@@ -756,8 +759,9 @@ paths:
         - Settings
       summary: Update Telegram configuration
       x-required-scope: api_write
-      x-required-capabilities: [api_write, instance_admin]
-      description: Update Telegram settings. Omitting bot_token keeps the existing value. Requires effective instance_admin capability backed by a live administrator grant.
+      x-required-role: instance_admin
+      x-api-token-admin-scope: all
+      description: Update Telegram settings. Omitting bot_token keeps the existing value. Requires the live instance_admin user role and the endpoint read/write scope. API-token sessions additionally require literal all in their scopes.
       requestBody:
         required: true
         content:
@@ -806,12 +810,14 @@ paths:
       x-required-scope: api_write
       description: |
         Create a token owned by the authenticated canonical actor. OIDC, API-token and trusted
-        embedding sessions may use this endpoint with api_write capability. Owner and creator
-        are set server-side. Requested effective capabilities must be a subset of the caller's
-        current credential capabilities, constrained by live roles. Omitted scopes request
-        ordinary all access and are rejected when that would broaden authority; empty scopes
-        are invalid. instance_admin must be explicitly requested and requires current
-        administrator authority. The raw token is returned only once.
+        embedding sessions may use this endpoint with api_write scope. Owner and creator
+        are set server-side. Requested authority must be no greater than the caller's.
+        Omitted scopes request all and are rejected when that would broaden authority;
+        empty scopes are invalid. API-token callers may grant all only if their current
+        token literally contains all, even when the owner is not currently an administrator.
+        Combining api_read, api_write and mcp never permits granting all. Interactive
+        sessions may grant all when they have all three ordinary permissions. The live
+        instance_admin user role is never a token scope. The raw token is returned only once.
       requestBody:
         required: true
         content:
@@ -838,7 +844,7 @@ paths:
         - API Tokens
       summary: Activate API token
       x-required-scope: api_write
-      description: Re-activate a token owned by the authenticated canonical actor. The token's effective capabilities must be a subset of the current credential's authority. Foreign and missing token IDs return 404.
+      description: Re-activate a token owned by the authenticated canonical actor only within the current credential's authority. An API-token caller may reactivate an all token only with literal all in its own scopes, regardless of current user roles. A legacy empty scope set has ordinary read/write/MCP authority, never administrator authority. Foreign and missing token IDs return 404; concurrent scope changes reject activation with 400.
       parameters:
         - name: id
           in: path
@@ -849,6 +855,8 @@ paths:
       responses:
         '204':
           description: API token activated
+        '400':
+          $ref: '#/components/responses/BadRequest'
         '403':
           $ref: '#/components/responses/Forbidden'
         '401':
@@ -886,7 +894,7 @@ paths:
         - API Tokens
       summary: Update token scopes
       x-required-scope: api_write
-      description: Replace scopes on a token owned by the authenticated canonical actor. Requested effective capabilities must be a subset of the current credential's authority, including when updating the current token. Empty scopes are invalid. Foreign and missing token IDs return 404. instance_admin additionally requires a live administrator grant and explicit credential authority.
+      description: Replace scopes on an owned token with no greater authority than the current credential, including when updating the current token. API-token callers may grant all only if their current scopes literally contain all; the ordinary read/write/MCP combination and legacy empty scopes cannot grant all, even before a future administrator role grant. Empty scopes and unknown scopes are invalid. Foreign and missing token IDs return 404.
       parameters:
         - name: id
           in: path
@@ -943,8 +951,9 @@ paths:
       tags: [API Tokens]
       summary: Inspect API tokens across the instance
       x-required-scope: api_read
-      x-required-capabilities: [api_read, instance_admin]
-      description: Requires effective instance_admin capability backed by a live server-side administrator grant. Returns operational metadata and canonical owners, never token hashes or raw secrets. The inspection is audited.
+      x-required-role: instance_admin
+      x-api-token-admin-scope: all
+      description: Requires the live instance_admin user role and the endpoint read/write scope. API-token sessions additionally require literal all in their scopes. Returns operational metadata and canonical owners, never token hashes or raw secrets. The inspection is audited.
       responses:
         '200':
           description: Instance credentials
@@ -964,8 +973,9 @@ paths:
       tags: [API Tokens]
       summary: Revoke an instance API token
       x-required-scope: api_write
-      x-required-capabilities: [api_write, instance_admin]
-      description: Deactivate a credential regardless of owner. Requires effective instance_admin capability and a live administrator grant. The operation is audited.
+      x-required-role: instance_admin
+      x-api-token-admin-scope: all
+      description: Deactivate a credential regardless of owner. Requires the live instance_admin user role and the endpoint read/write scope. API-token sessions additionally require literal all in their scopes. The operation is audited.
       parameters:
         - name: id
           in: path
@@ -986,8 +996,9 @@ paths:
       tags: [API Tokens]
       summary: Permanently delete an inactive instance API token
       x-required-scope: api_write
-      x-required-capabilities: [api_write, instance_admin]
-      description: Delete an inactive credential regardless of owner. Requires effective instance_admin capability and a live administrator grant. Active tokens must be revoked first. The operation is audited.
+      x-required-role: instance_admin
+      x-api-token-admin-scope: all
+      description: Delete an inactive credential regardless of owner. Requires the live instance_admin user role and the endpoint read/write scope. API-token sessions additionally require literal all in their scopes. Active tokens must be revoked first. The operation is audited.
       parameters:
         - name: id
           in: path
@@ -1830,7 +1841,7 @@ paths:
       summary: Pause an assignment by setting its end date
       description: >
         Sets `date_to` so the assignment is no longer active after `ended_on`.
-        Defaults to yesterday in the server timezone (not due today).
+        Defaults to yesterday in the pet's effective timezone (not due today).
       x-required-scope: api_write
       parameters:
         - name: id
@@ -2104,8 +2115,8 @@ paths:
         Records a real-time intake for the medication identified by `pet_id`,
         `medication_id`, and `assignment_id` (all from the menu choice).
 
-        **Real-time only.** The dose is always stamped with the server's current
-        local time, exactly like a Take now from the web UI, so the Telegram
+        **Real-time only.** The dose is always stamped with the current UTC instant,
+        with its journal day resolved in the pet's timezone, exactly like Take now from the web UI, so the Telegram
         `#pills` line carries no timestamp. There is no way to backdate through
         this endpoint — use `POST /health/meds/intake` for that. Unknown query
         params (including `occurred_at` / `local_date`) are rejected with `400`
@@ -2576,8 +2587,8 @@ paths:
       x-required-scope: api_read
       description: |
         Returns cumulative nutrition intake and liquid schedule expectations for a pet as of a point in time.
-        When `ts` is omitted, the server uses the current time in the configured timezone.
-        Cumulative intake includes only records on the local date of `ts` whose `occurred_at` is at or before `ts`.
+        When `ts` is omitted, the server uses the current instant. The pet's effective timezone determines the journal day and schedule projection.
+        Cumulative intake includes only records with that journal date whose UTC `occurred_at` instant is at or before `ts`.
         Schedule expectations use the active liquid schedule and step up at each scheduled feeding time, matching the cumulative fluid chart.
       parameters:
         - name: pet_id
@@ -2590,10 +2601,9 @@ paths:
         - name: ts
           in: query
           required: false
-          description: As-of timestamp for cumulative intake and schedule projection. RFC3339 or naive local `YYYY-MM-DDTHH:MM:SS`. Defaults to now.
+          description: As-of RFC3339 instant with an explicit offset or Z. Naive timestamps are rejected. Defaults to now; the pet's effective timezone determines the schedule projection and journal day.
           schema:
-            type: string
-            format: date-time
+            $ref: '#/components/schemas/RecordTimestampInput'
       responses:
         '200':
           description: Nutrition status with cumulative intake and schedule expectations
@@ -2753,19 +2763,24 @@ components:
       scheme: bearer
       description: |
         Bearer authentication with either:
-        - OIDC JWT token (format: standard JWT) — full access, no scope restrictions
+        - OIDC JWT token (format: standard JWT) — ordinary access subject to any configured group restrictions
         - API token with `pm_api_` prefix — access controlled by the token's scope set
 
         **API token scopes:**
         | Scope | Access granted |
         |---|---|
-        | `all` | Full access — equivalent to OIDC |
-        | `api_read` | All GET endpoints |
-        | `api_write` | All POST / PATCH / DELETE endpoints |
-        | `mcp` | MCP tool endpoint (`/mcp`) |
+        | `all` | Ordinary REST and MCP access; permits administration only with the owner's live instance_admin role |
+        | `api_read` | Ordinary REST reads |
+        | `api_write` | Ordinary REST mutations and attenuated credential management |
+        | `mcp` | MCP endpoint (`/mcp`), including care reads and writes; no REST or credential-management permission by itself |
 
         A token may hold multiple scopes (e.g. `["api_read", "mcp"]`).
         The scope required by each endpoint is shown in the `x-required-scope` field.
+        Administrator endpoints also require the live instance_admin user role; API-token
+        sessions must additionally contain literal all. The three ordinary scopes combined,
+        or a legacy empty scope set, never confer administrator authority or permission to
+        mint/update/reactivate an all token. Interactive sessions need the live role and
+        endpoint read/write scope. Resource policy applies independently of scopes and roles.
 
   responses:
     BadRequest:
@@ -2799,7 +2814,7 @@ components:
   schemas:
     AppInfo:
       type: object
-      required: [version, base_version, edition, features, git_sha, demo_mode]
+      required: [version, base_version, edition, features, git_sha, demo_mode, timezone]
       properties:
         version:
           type: string
@@ -2822,6 +2837,10 @@ components:
         demo_mode:
           type: boolean
           description: True when the server started with DEMO_MODE (demo seed + UI banner).
+        timezone:
+          type: string
+          description: Standalone instance IANA timezone used for forms, displays and workers. Embedded applications resolve effective resource timezones separately.
+          example: Europe/Berlin
         med_intake_shortcut_icloud_url:
           type: string
           description: iCloud share link for the med-intake Apple Shortcut (iPhone import). Omitted when unset.
@@ -2901,18 +2920,12 @@ components:
         scopes:
           type: array
           items:
-            type: string
-          description: Credential scope labels. Legacy empty scopes imply ordinary all access, never administrative token authority. Use capabilities for effective authorization.
+            $ref: '#/components/schemas/ApiTokenScope'
+          description: Raw credential scopes. Legacy empty scopes allow ordinary REST/MCP access, never administrative API-token authority. An API-token session needs literal all plus the live instance_admin role for administration.
         roles:
           type: array
           items: { type: string }
-          description: Current server-side roles. instance_admin indicates a live administrator grant, independently of this credential's effective administrative authority.
-        capabilities:
-          type: array
-          items:
-            type: string
-            enum: [api_read, api_write, mcp, instance_admin]
-          description: Normalized effective capabilities of this credential constrained by current roles. mcp enables read and write care operations through MCP; it does not grant REST api_write or token-management access. instance_admin is effective only with current credential authority and a live grant.
+          description: Current server-side user roles. instance_admin indicates a live administrator grant, independently of the credential's scopes. DEV_MODE's trusted development identity is an administrator.
         token_created_by:
           type: string
           nullable: true
@@ -2923,7 +2936,6 @@ components:
         - kind
         - scopes
         - roles
-        - capabilities
 
     PetSpecies:
       type: string
@@ -3243,16 +3255,11 @@ components:
           format: uuid
           description: Pet UUID
         occurred_at:
-          type: string
-          description: Resource-local civil timestamp compatibility snapshot, without an offset. Use occurred_at_utc for the canonical instant.
-        occurred_at_utc:
           $ref: '#/components/schemas/CanonicalRecordInstant'
-        source_timezone:
-          $ref: '#/components/schemas/RecordSourceTimezone'
         local_date:
           type: string
           format: date
-          description: Local date of the occurrence
+          description: Independent civil journal date; defaults to the occurrence's calendar day in the pet's effective timezone.
         category:
           $ref: '#/components/schemas/NutritionCategory'
         amount:
@@ -3305,7 +3312,7 @@ components:
           type: string
           format: date
           nullable: true
-          description: Local date (auto-derived if not provided)
+          description: Independent civil journal date, preserved if provided; otherwise derived from the instant in the pet's effective timezone.
         category:
           $ref: '#/components/schemas/NutritionCategory'
         amount:
@@ -3551,7 +3558,8 @@ components:
           description: Local calendar date used for intake records
         as_of:
           type: string
-          description: Timestamp used for cumulative intake and schedule projection (YYYY-MM-DDTHH:MM:SS in configured timezone)
+          format: date-time
+          description: RFC3339 instant with an explicit offset used for cumulative intake and schedule projection. The pet's effective timezone determines local_date and schedule times.
         on_track:
           type: boolean
           nullable: true
@@ -3967,28 +3975,27 @@ components:
       type: string
       format: date-time
       readOnly: true
-      description: Canonical UTC instant normalized to RFC3339 with a Z suffix and optional fractional seconds. Omitted for legacy records until an explicit historical-timezone backfill succeeds. Unrelated record edits preserve this instant and the original source timezone.
-      example: '2026-09-19T12:30:00Z'
-
-    RecordSourceTimezone:
-      type: string
-      readOnly: true
-      description: IANA effective resource timezone used to resolve the instant and its civil snapshot. Omitted for legacy rows until an explicit historical-timezone backfill succeeds.
-      example: Europe/Berlin
+      pattern: '^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{9}Z$'
+      description: The record's sole timestamp, normalized to UTC RFC3339 with exactly nine fractional digits and a Z suffix. local_date is an independent civil journal date. Existing legacy timestamps must be explicitly migrated with a declared historical timezone before startup; legacy naive rows are not served as a second timestamp representation.
+      example: '2026-09-19T12:30:00.000000000Z'
 
     RecordTimestampInput:
       type: string
-      description: Explicit RFC3339 instant with offset, or naive YYYY-MM-DDTHH:MM:SS[.fraction] interpreted in the effective resource timezone. Naive daylight-saving gaps and folds return 400; provide an explicit offset to disambiguate. Canonical UTC and resource-local compatibility snapshots are computed server-side; an explicitly supplied local_date is preserved as a civil journal date.
-      examples: ['2026-09-19T14:30:00+02:00', '2026-09-19T14:30:00']
+      format: date-time
+      description: RFC3339 instant with an explicit UTC offset or Z; naive or blank timestamps return 400. Inputs normalize to fixed-nanosecond UTC Z output without changing the instant. An explicit local_date remains an independent civil journal date; otherwise the pet's effective timezone determines it. For create requests, omitting the timestamp uses now, or the current local time of day on a supplied historical journal date; an ambiguous or nonexistent synthesized local time returns 400 and requires an explicit instant.
+      examples: ['2026-09-19T14:30:00+02:00', '2026-09-19T12:30:00.000000000Z']
 
     ApiTokenScope:
       type: string
-      enum: [all, api_read, api_write, mcp, instance_admin]
+      enum: [all, api_read, api_write, mcp]
       description: |
         api_read and api_write enable ordinary REST reads and writes; api_write permits
         attenuated token creation. mcp enables both read and write care operations through
-        MCP, without enabling REST credential management. all combines those three ordinary
-        capabilities. instance_admin is separate and additionally requires a live grant.
+        MCP, without enabling REST credential management. all includes those ordinary
+        permissions and additionally permits administration when the owner's live
+        instance_admin user role is present. instance_admin is not a valid token scope.
+        Only a token with literal all may mint/update/reactivate another all token;
+        combining ordinary scopes never substitutes for literal all, even without a role.
         Resource policy applies independently to every care operation.
 
     ApiTokenAdminPublic:
@@ -4020,7 +4027,7 @@ components:
           type: array
           items:
             $ref: '#/components/schemas/ApiTokenScope'
-          description: Credential scope labels; effective capabilities also depend on the owner's current roles.
+          description: Raw credential scopes. Administration requires literal all and the owner's live instance_admin role; empty legacy scopes grant ordinary access only.
         created_by:
           type: string
           nullable: true
@@ -4056,7 +4063,7 @@ components:
           description: Raw token value (only shown at creation)
         scopes:
           type: array
-          items: { type: string }
+          items: { $ref: '#/components/schemas/ApiTokenScope' }
           description: Granted scopes
         created_at:
           type: string
@@ -4079,9 +4086,9 @@ components:
           type: array
           items:
             type: string
-            enum: [all, api_read, api_write, mcp, instance_admin]
+            enum: [all, api_read, api_write, mcp]
           minItems: 1
-          description: "Explicit requested scopes. Omitted input requests [all] only if within caller authority; otherwise 403. Empty arrays are invalid. Administrative scope is never added implicitly."
+          description: "Requested scopes. Omitted input requests [all] only if within caller authority; otherwise 403. API-token callers require literal all to grant all. Interactive callers may grant all with all three ordinary permissions. Empty arrays and instance_admin are invalid."
 
     UpdateApiTokenScopes:
       type: object
@@ -4091,9 +4098,9 @@ components:
           type: array
           items:
             type: string
-            enum: [all, api_read, api_write, mcp, instance_admin]
+            enum: [all, api_read, api_write, mcp]
           minItems: 1
-          description: New scope set, subject to the same capability attenuation and live administrator checks as creation.
+          description: New scope set, subject to the same authority attenuation as creation. API-token callers cannot grant all without literal all in their current scopes, regardless of live roles.
 
     EliminationEventType:
       type: string
@@ -4114,13 +4121,7 @@ components:
           type: string
           format: uuid
         occurred_at:
-          type: string
-          description: Resource-local civil timestamp compatibility snapshot, without an offset. Use occurred_at_utc for the canonical instant.
-        occurred_at_utc:
           $ref: '#/components/schemas/CanonicalRecordInstant'
-        source_timezone:
-          $ref: '#/components/schemas/RecordSourceTimezone'
-          description: Naive local datetime (RFC3339, no Z suffix)
         local_date:
           type: string
           format: date
@@ -4561,12 +4562,7 @@ components:
           type: string
           format: uuid
         measured_at:
-          type: string
-          description: Resource-local civil timestamp compatibility snapshot, without an offset. Use measured_at_utc for the canonical instant.
-        measured_at_utc:
           $ref: '#/components/schemas/CanonicalRecordInstant'
-        source_timezone:
-          $ref: '#/components/schemas/RecordSourceTimezone'
         local_date:
           type: string
           format: date
@@ -4643,12 +4639,7 @@ components:
           type: string
           format: uuid
         occurred_at:
-          type: string
-          description: Resource-local civil timestamp compatibility snapshot, without an offset. Use occurred_at_utc for the canonical instant.
-        occurred_at_utc:
           $ref: '#/components/schemas/CanonicalRecordInstant'
-        source_timezone:
-          $ref: '#/components/schemas/RecordSourceTimezone'
         local_date:
           type: string
           format: date
@@ -4895,7 +4886,7 @@ components:
         ended_on:
           type: string
           format: date
-          description: Last active date. Defaults to yesterday in the server timezone.
+          description: Last active date. Defaults to yesterday in the pet's effective timezone.
 
     MedIntakeShortcutMenu:
       type: object
@@ -4970,12 +4961,7 @@ components:
         effective_dose_mg: { type: number, nullable: true }
         dose_label: { type: string }
         occurred_at:
-          type: string
-          description: Resource-local civil timestamp compatibility snapshot, without an offset. Use occurred_at_utc for the canonical instant.
-        occurred_at_utc:
           $ref: '#/components/schemas/CanonicalRecordInstant'
-        source_timezone:
-          $ref: '#/components/schemas/RecordSourceTimezone'
         local_date: { type: string, format: date }
         taken: { type: boolean }
         note: { type: string, nullable: true }
@@ -5008,7 +4994,7 @@ components:
           format: date
           description: >
             Calendar day the intake counts toward (assignment due/active checks).
-            Defaults to the date portion of occurred_at. Providing this or occurred_at
+            Defaults to the instant's calendar day in the pet's effective timezone. Explicit dates are preserved independently of the UTC date. Providing this or occurred_at
             marks a delayed Telegram entry.
         note: { type: string }
         source_type: { type: string }

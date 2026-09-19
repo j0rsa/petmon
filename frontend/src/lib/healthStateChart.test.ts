@@ -10,12 +10,12 @@ import {
 const baseRecord = (overrides: Partial<HealthStateRecord>): HealthStateRecord => ({
   id: 'hs-test',
   pet_id: '550e8400-e29b-41d4-a716-446655440000',
-  occurred_at: '2024-06-15T10:00:00',
+  occurred_at: '2024-06-15T10:00:00Z',
   local_date: '2024-06-15',
   level: 'ok',
   note: null,
   source_type: 'manual',
-  created_at: '2024-06-15T10:00:00',
+  created_at: '2024-06-15T10:00:00Z',
   ...overrides,
 });
 
@@ -40,8 +40,8 @@ describe('median', () => {
 describe('buildHealthStateSummary', () => {
   it('aggregates multiple entries on the same day to a median score', () => {
     const records = [
-      baseRecord({ id: '1', level: 'terrible', occurred_at: '2024-06-15T09:00:00' }),
-      baseRecord({ id: '2', level: 'amazing', occurred_at: '2024-06-15T18:00:00' }),
+      baseRecord({ id: '1', level: 'terrible', occurred_at: '2024-06-15T09:00:00Z' }),
+      baseRecord({ id: '2', level: 'amazing', occurred_at: '2024-06-15T18:00:00Z' }),
     ];
 
     const buckets = buildHealthStateSummary(records, 'daily');

@@ -8,7 +8,7 @@ use chrono_tz::Tz;
 use sqlx::SqlitePool;
 use uuid::Uuid;
 
-const RECORD_COLUMNS: &str = "id, pet_id, occurred_at, occurred_at_utc, source_timezone, local_date, event_type, subtype, duration_seconds, note, source_type, is_auto_categorized, auto_categorize_confidence, created_at, updated_at";
+const RECORD_COLUMNS: &str = "id, pet_id, occurred_at, local_date, event_type, subtype, duration_seconds, note, source_type, is_auto_categorized, auto_categorize_confidence, created_at, updated_at";
 
 #[tracing::instrument(skip(pool, filters))]
 pub async fn list(
@@ -100,7 +100,7 @@ pub async fn create(
         timezone,
         Utc::now(),
     )?;
-    let occurred_at = time.civil;
+    let occurred_at = time.utc;
     let local_date = time.local_date;
     let id = Uuid::new_v4().to_string();
     let source_type = req.source_type.unwrap_or_else(|| "manual".to_string());
@@ -108,13 +108,11 @@ pub async fn create(
         .map_err(|_| AppError::BadRequest(format!("invalid pet_id: {}", req.pet_id)))?;
 
     sqlx::query(
-        "INSERT INTO elimination_records (id, pet_id, occurred_at, occurred_at_utc, source_timezone, local_date, event_type, subtype, duration_seconds, note, source_type, is_auto_categorized, auto_categorize_confidence, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+        "INSERT INTO elimination_records (id, pet_id, occurred_at, local_date, event_type, subtype, duration_seconds, note, source_type, is_auto_categorized, auto_categorize_confidence, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
     )
     .bind(&id)
     .bind(pet_id)
     .bind(&occurred_at)
-    .bind(&time.utc)
-    .bind(&time.timezone)
     .bind(&local_date)
     .bind(req.event_type)
     .bind(&req.subtype)
@@ -148,9 +146,7 @@ pub async fn update(
             timezone,
             Utc::now(),
         )?;
-        record.occurred_at = time.civil;
-        record.occurred_at_utc = Some(time.utc);
-        record.source_timezone = Some(time.timezone);
+        record.occurred_at = time.utc;
     }
     if let Some(local_date) = req.local_date {
         record.local_date = local_date;
@@ -172,11 +168,9 @@ pub async fn update(
     record.updated_at = now;
 
     sqlx::query(
-        "UPDATE elimination_records SET occurred_at=?, occurred_at_utc=?, source_timezone=?, local_date=?, event_type=?, subtype=?, duration_seconds=?, note=?, is_auto_categorized=?, auto_categorize_confidence=?, updated_at=? WHERE id=?",
+        "UPDATE elimination_records SET occurred_at=?, local_date=?, event_type=?, subtype=?, duration_seconds=?, note=?, is_auto_categorized=?, auto_categorize_confidence=?, updated_at=? WHERE id=?",
     )
     .bind(&record.occurred_at)
-    .bind(&record.occurred_at_utc)
-    .bind(&record.source_timezone)
     .bind(&record.local_date)
     .bind(record.event_type)
     .bind(&record.subtype)

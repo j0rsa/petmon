@@ -1,28 +1,31 @@
 import { describe, expect, it } from 'vitest';
-import { effectiveCapabilities } from './usePermissions';
+import { effectiveScopes, hasInstanceAdminAccess } from '../api/me';
 import { allowedTokenScopes } from '../api/settings';
 import type { MeResponse } from '../api/me';
 
-const me: MeResponse = { subject: 'user', email: null, name: null, display_name: 'User', kind: 'api_token', scopes: [] };
+const me: MeResponse = { subject: 'user', email: null, name: null, display_name: 'User', kind: 'api_token', scopes: [], roles: ['instance_admin'] };
 
-describe('credential capability boundaries', () => {
-  it('denies pending identity and never infers administrative authority from all or legacy empty scopes', () => {
-    expect([...effectiveCapabilities(undefined)]).toEqual([]);
-    expect(effectiveCapabilities(me).has('instance_admin')).toBe(false);
-    expect(effectiveCapabilities({ ...me, scopes: ['all'], roles: ['instance_admin'] }).has('instance_admin')).toBe(false);
+describe('credential scope and role boundaries', () => {
+  it('denies pending identity and requires a live role plus literal all for token administration', () => {
+    expect([...effectiveScopes(undefined)]).toEqual([]);
+    expect(hasInstanceAdminAccess(me)).toBe(false);
+    expect(hasInstanceAdminAccess({ ...me, scopes: ['api_read', 'api_write', 'mcp'] })).toBe(false);
+    expect(hasInstanceAdminAccess({ ...me, scopes: ['all'] })).toBe(true);
   });
-  it('uses effective server capabilities rather than roles or token scope labels', () => {
-    expect([...effectiveCapabilities({ ...me, scopes: ['all', 'instance_admin'], roles: ['instance_admin'], capabilities: ['api_read'] })]).toEqual(['api_read']);
+  it('requires a live role and permits interactive admin sessions', () => {
+    expect(hasInstanceAdminAccess({ ...me, scopes: ['all'], roles: [] })).toBe(false);
+    expect(hasInstanceAdminAccess({ ...me, kind: 'oidc' })).toBe(true);
   });
   it('keeps MCP independent of ordinary REST reads and writes', () => {
-    const caps = effectiveCapabilities({ ...me, scopes: ['api_read', 'mcp'] });
+    const caps = effectiveScopes({ ...me, scopes: ['api_read', 'mcp'] });
     expect(caps.has('mcp')).toBe(true);
     expect(caps.has('api_write')).toBe(false);
-    expect(allowedTokenScopes(caps)).toEqual(['api_read', 'mcp']);
+    expect(allowedTokenScopes({ ...me, scopes: ['api_read', 'mcp'] })).toEqual(['api_read', 'mcp']);
   });
-  it('only offers scopes whose normalized capabilities the caller holds', () => {
-    expect(allowedTokenScopes(new Set(['api_write']))).toEqual(['api_write']);
-    expect(allowedTokenScopes(new Set(['api_read', 'api_write', 'mcp']))).toEqual(['all', 'api_read', 'api_write', 'mcp']);
-    expect(allowedTokenScopes(new Set(['api_read', 'instance_admin']))).toEqual(['api_read', 'instance_admin']);
+  it('never promotes narrow or legacy empty token scopes into all', () => {
+    expect(allowedTokenScopes({ ...me, scopes: ['api_write'] })).toEqual(['api_write']);
+    expect(allowedTokenScopes({ ...me, scopes: ['api_read', 'api_write', 'mcp'] })).toEqual(['api_read', 'api_write', 'mcp']);
+    expect(allowedTokenScopes(me)).toEqual(['api_read', 'api_write', 'mcp']);
+    expect(allowedTokenScopes({ ...me, scopes: ['all'] })).toEqual(['all', 'api_read', 'api_write', 'mcp']);
   });
 });

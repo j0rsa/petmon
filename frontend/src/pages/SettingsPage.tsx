@@ -9,7 +9,8 @@ import { deriveDeviceAlias, storeToken } from '../lib/auth';
 import { clearPwaCachesAndReload, isPwaCacheSupported } from '../lib/pwaCache';
 import { getPushSupportStatus, isPushSupported, sendTestPushNotification, watchNotificationPermission } from '../lib/pushNotifications';
 import { TagInput } from '../components/TagInput';
-import { effectiveCapabilities, usePermissions } from '../context/usePermissions';
+import { usePermissions } from '../context/usePermissions';
+import { effectiveScopes } from '../api/me';
 import { useApplicationExtensions, useSessionMe } from '../context/ApplicationExtensions';
 
 export default function SettingsPage() {
@@ -587,10 +588,10 @@ function ApiTokensSection() {
   const active = useRef(true);
   useEffect(() => { active.current = true; return () => { active.current = false; }; }, []);
   const { data: me } = useSessionMe();
-  const capabilities = effectiveCapabilities(me);
-  const canWrite = capabilities.has('api_write');
-  const allowedScopes = allowedTokenScopes(capabilities);
-  const { data: tokens, isLoading } = useQuery({ queryKey: ['api-tokens'], queryFn: settingsApi.listTokens, enabled: capabilities.has('api_read') });
+  const scopes = effectiveScopes(me);
+  const canWrite = scopes.has('api_write');
+  const allowedScopes = allowedTokenScopes(me);
+  const { data: tokens, isLoading } = useQuery({ queryKey: ['api-tokens'], queryFn: settingsApi.listTokens, enabled: scopes.has('api_read') });
 
   const [alias, setAlias] = useState('');
   const [newScopes, setNewScopes] = useState<ApiTokenScope[]>([]);
@@ -622,7 +623,7 @@ function ApiTokensSection() {
   });
 
   const rememberMutation = useMutation({
-    mutationFn: () => settingsApi.createToken({ alias: deviceAlias || undefined, scopes: allowedScopes.filter((scope) => scope !== 'instance_admin' && scope !== 'all') }),
+    mutationFn: () => settingsApi.createToken({ alias: deviceAlias || undefined, scopes: allowedScopes.filter((scope) => scope !== 'all') }),
     onSuccess: async (created) => {
       if (!active.current) return;
       if (extensions?.session) await extensions.session.installApiToken?.(created.token);

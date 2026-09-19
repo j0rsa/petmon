@@ -1,8 +1,9 @@
 use crate::domain::elimination::EliminationEventType;
 use crate::domain::elimination_classifier::{ClassifierBaselines, DurationDist, FeatureContext};
+use crate::embedding::ServiceContext;
 use crate::error::AppResult;
 use crate::repo::{elimination_analytics, elimination_records};
-use chrono::{Duration, NaiveDate, NaiveDateTime, Timelike};
+use chrono::{DateTime, Duration, NaiveDate, Timelike, Utc};
 use sqlx::SqlitePool;
 use uuid::Uuid;
 
@@ -11,22 +12,22 @@ const TRAINING_WINDOW_DAYS: i64 = 90;
 #[derive(Debug, Clone)]
 struct PriorRecord {
     event_type: EliminationEventType,
-    occurred_at: NaiveDateTime,
+    occurred_at: DateTime<Utc>,
 }
 
-pub fn parse_occurred_at(occurred_at: &str) -> Option<NaiveDateTime> {
-    NaiveDateTime::parse_from_str(occurred_at, "%Y-%m-%dT%H:%M:%S").ok()
+pub fn parse_occurred_at(occurred_at: &str) -> Option<DateTime<Utc>> {
+    crate::record_time::parse_instant(occurred_at).ok()
 }
 
-fn window_start(at: NaiveDateTime, hours: i64) -> NaiveDateTime {
+fn window_start(at: DateTime<Utc>, hours: i64) -> DateTime<Utc> {
     at - Duration::hours(hours)
 }
 
-fn format_occurred_at(at: NaiveDateTime) -> String {
-    at.format("%Y-%m-%dT%H:%M:%S").to_string()
+fn format_occurred_at(at: DateTime<Utc>) -> String {
+    crate::record_time::format_utc(at)
 }
 
-fn minutes_between(earlier: NaiveDateTime, later: NaiveDateTime) -> f32 {
+fn minutes_between(earlier: DateTime<Utc>, later: DateTime<Utc>) -> f32 {
     later.signed_duration_since(earlier).num_seconds().max(0) as f32 / 60.0
 }
 
@@ -130,25 +131,25 @@ fn duration_dist(values: &[f64]) -> Option<DurationDist> {
 
 fn build_from_prior(
     duration_seconds: i64,
-    occurred_at: NaiveDateTime,
+    occurred_at: DateTime<Utc>,
     prior: &[PriorRecord],
     baselines: &ClassifierBaselines,
+    timezone: chrono_tz::Tz,
 ) -> FeatureContext {
-    let at_str = format_occurred_at(occurred_at);
-    let start_24h = format_occurred_at(window_start(occurred_at, 24));
-    let start_48h = format_occurred_at(window_start(occurred_at, 48));
+    let start_24h = window_start(occurred_at, 24);
+    let start_48h = window_start(occurred_at, 48);
 
     let mut wee_24h = 0;
     let mut poop_24h = 0;
     let mut wee_48h = 0;
     let mut poop_48h = 0;
-    let mut last_wee: Option<NaiveDateTime> = None;
-    let mut last_poop: Option<NaiveDateTime> = None;
-    let mut last_any: Option<NaiveDateTime> = None;
+    let mut last_wee: Option<DateTime<Utc>> = None;
+    let mut last_poop: Option<DateTime<Utc>> = None;
+    let mut last_any: Option<DateTime<Utc>> = None;
 
     for record in prior {
-        let ts = record.occurred_at.format("%Y-%m-%dT%H:%M:%S").to_string();
-        if ts >= at_str {
+        let ts = record.occurred_at;
+        if ts >= occurred_at {
             continue;
         }
         if ts >= start_48h {
@@ -173,7 +174,8 @@ fn build_from_prior(
         last_any = Some(record.occurred_at);
     }
 
-    let hour_of_day = occurred_at.hour() as f32 + occurred_at.minute() as f32 / 60.0;
+    let local = occurred_at.with_timezone(&timezone);
+    let hour_of_day = local.hour() as f32 + local.minute() as f32 / 60.0;
 
     FeatureContext {
         duration_seconds: duration_seconds as f64,
@@ -197,14 +199,15 @@ fn build_from_prior(
 }
 
 pub(crate) async fn build_feature_context(
-    pool: &SqlitePool,
+    pool: &ServiceContext,
     pet_id: Uuid,
     occurred_at: &str,
     duration_seconds: i64,
 ) -> AppResult<FeatureContext> {
     let at = parse_occurred_at(occurred_at)
         .ok_or_else(|| crate::error::AppError::BadRequest("invalid occurred_at".to_string()))?;
-    let as_of = at.date();
+    let timezone = pool.timezone(pet_id).await?;
+    let as_of = at.with_timezone(&timezone).date_naive();
     let baselines = compute_baselines(pool, pet_id, as_of).await?;
 
     let before = format_occurred_at(at);
@@ -221,12 +224,18 @@ pub(crate) async fn build_feature_context(
         })
         .collect();
 
-    Ok(build_from_prior(duration_seconds, at, &prior, &baselines))
+    Ok(build_from_prior(
+        duration_seconds,
+        at,
+        &prior,
+        &baselines,
+        timezone,
+    ))
 }
 
 /// Build context for a training row using only records that occurred strictly before it.
 pub(crate) async fn build_feature_context_for_training(
-    pool: &SqlitePool,
+    pool: &ServiceContext,
     pet_id: Uuid,
     occurred_at: &str,
     duration_seconds: i64,
@@ -247,7 +256,13 @@ pub(crate) async fn build_feature_context_for_training(
             })
         })
         .collect();
-    Ok(build_from_prior(duration_seconds, at, &prior, baselines))
+    Ok(build_from_prior(
+        duration_seconds,
+        at,
+        &prior,
+        baselines,
+        pool.timezone(pet_id).await?,
+    ))
 }
 
 #[cfg(test)]
@@ -277,27 +292,33 @@ mod tests {
 
     #[test]
     fn rolling_24h_counts_ignore_midnight_boundary() {
-        let at = NaiveDateTime::parse_from_str("2026-06-02T01:00:00", "%Y-%m-%dT%H:%M:%S").unwrap();
+        let at = parse_occurred_at("2026-06-02T01:00:00Z").unwrap();
         let prior = vec![
             PriorRecord {
                 event_type: EliminationEventType::Defecation,
-                occurred_at: NaiveDateTime::parse_from_str(
-                    "2026-06-01T23:00:00",
-                    "%Y-%m-%dT%H:%M:%S",
-                )
-                .unwrap(),
+                occurred_at: parse_occurred_at("2026-06-01T23:00:00Z").unwrap(),
             },
             PriorRecord {
                 event_type: EliminationEventType::Urination,
-                occurred_at: NaiveDateTime::parse_from_str(
-                    "2026-06-02T00:30:00",
-                    "%Y-%m-%dT%H:%M:%S",
-                )
-                .unwrap(),
+                occurred_at: parse_occurred_at("2026-06-02T00:30:00Z").unwrap(),
             },
         ];
-        let ctx = build_from_prior(55, at, &prior, &baselines());
+        let ctx = build_from_prior(55, at, &prior, &baselines(), chrono_tz::Asia::Tokyo);
         assert_eq!(ctx.poop_count_24h_before, 1);
         assert_eq!(ctx.wee_count_24h_before, 1);
+        assert_eq!(ctx.hour_of_day, 10.0);
+    }
+
+    #[test]
+    fn repeated_dst_hour_uses_elapsed_time_and_local_hour() {
+        let at = parse_occurred_at("2026-10-25T02:35:00+01:00").unwrap();
+        let prior = [PriorRecord {
+            event_type: EliminationEventType::Urination,
+            occurred_at: parse_occurred_at("2026-10-25T02:45:00+02:00").unwrap(),
+        }];
+        let ctx = build_from_prior(55, at, &prior, &baselines(), chrono_tz::Europe::Berlin);
+        assert_eq!(ctx.minutes_since_last_wee, Some(50.0));
+        assert_eq!(ctx.wee_count_24h_before, 1);
+        assert!((ctx.hour_of_day - (2.0 + 35.0 / 60.0)).abs() < 0.001);
     }
 }

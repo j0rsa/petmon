@@ -51,20 +51,20 @@ export const mockPets: Pet[] = [
 // liquids total: 12+13+12+13+12+15+17 = 94 ml
 // wet_food total: 15+16+17+13+12+16+20 = 109 g  → fluid from food ≈ 84 ml  → total ~178 ml
 export const mockNutritionRecords: NutritionRecord[] = [
-  { id: 'rec-01', pet_id: mockPetId, occurred_at: '2024-06-15T03:12:00', local_date: '2024-06-15', category: 'liquids',  amount: 12, unit: 'ml', source_type: 'telegram', created_at: '2024-06-15T03:12:00', updated_at: '2024-06-15T03:12:00' },
-  { id: 'rec-02', pet_id: mockPetId, occurred_at: '2024-06-15T03:13:00', local_date: '2024-06-15', category: 'wet_food', amount: 15, unit: 'g',  note: 'chicken pate', source_type: 'telegram', created_at: '2024-06-15T03:13:00', updated_at: '2024-06-15T03:13:00' },
-  { id: 'rec-03', pet_id: mockPetId, occurred_at: '2024-06-15T05:40:00', local_date: '2024-06-15', category: 'liquids',  amount: 13, unit: 'ml', source_type: 'telegram', created_at: '2024-06-15T05:40:00', updated_at: '2024-06-15T05:40:00' },
-  { id: 'rec-04', pet_id: mockPetId, occurred_at: '2024-06-15T05:40:00', local_date: '2024-06-15', category: 'wet_food', amount: 16, unit: 'g',  source_type: 'telegram', created_at: '2024-06-15T05:40:00', updated_at: '2024-06-15T05:40:00' },
-  { id: 'rec-05', pet_id: mockPetId, occurred_at: '2024-06-15T08:16:00', local_date: '2024-06-15', category: 'liquids',  amount: 12, unit: 'ml', source_type: 'telegram', created_at: '2024-06-15T08:16:00', updated_at: '2024-06-15T08:16:00' },
-  { id: 'rec-06', pet_id: mockPetId, occurred_at: '2024-06-15T08:16:00', local_date: '2024-06-15', category: 'wet_food', amount: 17, unit: 'g',  source_type: 'telegram', created_at: '2024-06-15T08:16:00', updated_at: '2024-06-15T08:16:00' },
-  { id: 'rec-07', pet_id: mockPetId, occurred_at: '2024-06-15T10:45:00', local_date: '2024-06-15', category: 'liquids',  amount: 13, unit: 'ml', source_type: 'telegram', created_at: '2024-06-15T10:45:00', updated_at: '2024-06-15T10:45:00' },
-  { id: 'rec-08', pet_id: mockPetId, occurred_at: '2024-06-15T10:45:00', local_date: '2024-06-15', category: 'wet_food', amount: 13, unit: 'g',  source_type: 'telegram', created_at: '2024-06-15T10:45:00', updated_at: '2024-06-15T10:45:00' },
-  { id: 'rec-09', pet_id: mockPetId, occurred_at: '2024-06-15T15:13:00', local_date: '2024-06-15', category: 'liquids',  amount: 12, unit: 'ml', source_type: 'telegram', created_at: '2024-06-15T15:13:00', updated_at: '2024-06-15T15:13:00' },
-  { id: 'rec-10', pet_id: mockPetId, occurred_at: '2024-06-15T15:13:00', local_date: '2024-06-15', category: 'wet_food', amount: 12, unit: 'g',  source_type: 'telegram', created_at: '2024-06-15T15:13:00', updated_at: '2024-06-15T15:13:00' },
-  { id: 'rec-11', pet_id: mockPetId, occurred_at: '2024-06-15T16:11:00', local_date: '2024-06-15', category: 'liquids',  amount: 15, unit: 'ml', source_type: 'telegram', created_at: '2024-06-15T16:11:00', updated_at: '2024-06-15T16:11:00' },
-  { id: 'rec-12', pet_id: mockPetId, occurred_at: '2024-06-15T19:11:00', local_date: '2024-06-15', category: 'wet_food', amount: 16, unit: 'g',  source_type: 'telegram', created_at: '2024-06-15T19:11:00', updated_at: '2024-06-15T19:11:00' },
-  { id: 'rec-13', pet_id: mockPetId, occurred_at: '2024-06-15T21:05:00', local_date: '2024-06-15', category: 'liquids',  amount: 17, unit: 'ml', source_type: 'telegram', created_at: '2024-06-15T21:05:00', updated_at: '2024-06-15T21:05:00' },
-  { id: 'rec-14', pet_id: mockPetId, occurred_at: '2024-06-15T21:05:00', local_date: '2024-06-15', category: 'wet_food', amount: 20, unit: 'g',  source_type: 'telegram', created_at: '2024-06-15T21:05:00', updated_at: '2024-06-15T21:05:00' },
+  { id: 'rec-01', pet_id: mockPetId, occurred_at: '2024-06-15T03:12:00Z', local_date: '2024-06-15', category: 'liquids',  amount: 12, unit: 'ml', source_type: 'telegram', created_at: '2024-06-15T03:12:00Z', updated_at: '2024-06-15T03:12:00Z' },
+  { id: 'rec-02', pet_id: mockPetId, occurred_at: '2024-06-15T03:13:00Z', local_date: '2024-06-15', category: 'wet_food', amount: 15, unit: 'g',  note: 'chicken pate', source_type: 'telegram', created_at: '2024-06-15T03:13:00Z', updated_at: '2024-06-15T03:13:00Z' },
+  { id: 'rec-03', pet_id: mockPetId, occurred_at: '2024-06-15T05:40:00Z', local_date: '2024-06-15', category: 'liquids',  amount: 13, unit: 'ml', source_type: 'telegram', created_at: '2024-06-15T05:40:00Z', updated_at: '2024-06-15T05:40:00Z' },
+  { id: 'rec-04', pet_id: mockPetId, occurred_at: '2024-06-15T05:40:00Z', local_date: '2024-06-15', category: 'wet_food', amount: 16, unit: 'g',  source_type: 'telegram', created_at: '2024-06-15T05:40:00Z', updated_at: '2024-06-15T05:40:00Z' },
+  { id: 'rec-05', pet_id: mockPetId, occurred_at: '2024-06-15T08:16:00Z', local_date: '2024-06-15', category: 'liquids',  amount: 12, unit: 'ml', source_type: 'telegram', created_at: '2024-06-15T08:16:00Z', updated_at: '2024-06-15T08:16:00Z' },
+  { id: 'rec-06', pet_id: mockPetId, occurred_at: '2024-06-15T08:16:00Z', local_date: '2024-06-15', category: 'wet_food', amount: 17, unit: 'g',  source_type: 'telegram', created_at: '2024-06-15T08:16:00Z', updated_at: '2024-06-15T08:16:00Z' },
+  { id: 'rec-07', pet_id: mockPetId, occurred_at: '2024-06-15T10:45:00Z', local_date: '2024-06-15', category: 'liquids',  amount: 13, unit: 'ml', source_type: 'telegram', created_at: '2024-06-15T10:45:00Z', updated_at: '2024-06-15T10:45:00Z' },
+  { id: 'rec-08', pet_id: mockPetId, occurred_at: '2024-06-15T10:45:00Z', local_date: '2024-06-15', category: 'wet_food', amount: 13, unit: 'g',  source_type: 'telegram', created_at: '2024-06-15T10:45:00Z', updated_at: '2024-06-15T10:45:00Z' },
+  { id: 'rec-09', pet_id: mockPetId, occurred_at: '2024-06-15T15:13:00Z', local_date: '2024-06-15', category: 'liquids',  amount: 12, unit: 'ml', source_type: 'telegram', created_at: '2024-06-15T15:13:00Z', updated_at: '2024-06-15T15:13:00Z' },
+  { id: 'rec-10', pet_id: mockPetId, occurred_at: '2024-06-15T15:13:00Z', local_date: '2024-06-15', category: 'wet_food', amount: 12, unit: 'g',  source_type: 'telegram', created_at: '2024-06-15T15:13:00Z', updated_at: '2024-06-15T15:13:00Z' },
+  { id: 'rec-11', pet_id: mockPetId, occurred_at: '2024-06-15T16:11:00Z', local_date: '2024-06-15', category: 'liquids',  amount: 15, unit: 'ml', source_type: 'telegram', created_at: '2024-06-15T16:11:00Z', updated_at: '2024-06-15T16:11:00Z' },
+  { id: 'rec-12', pet_id: mockPetId, occurred_at: '2024-06-15T19:11:00Z', local_date: '2024-06-15', category: 'wet_food', amount: 16, unit: 'g',  source_type: 'telegram', created_at: '2024-06-15T19:11:00Z', updated_at: '2024-06-15T19:11:00Z' },
+  { id: 'rec-13', pet_id: mockPetId, occurred_at: '2024-06-15T21:05:00Z', local_date: '2024-06-15', category: 'liquids',  amount: 17, unit: 'ml', source_type: 'telegram', created_at: '2024-06-15T21:05:00Z', updated_at: '2024-06-15T21:05:00Z' },
+  { id: 'rec-14', pet_id: mockPetId, occurred_at: '2024-06-15T21:05:00Z', local_date: '2024-06-15', category: 'wet_food', amount: 20, unit: 'g',  source_type: 'telegram', created_at: '2024-06-15T21:05:00Z', updated_at: '2024-06-15T21:05:00Z' },
 ];
 
 export const mockDaySummary: NutritionDaySummary = {
@@ -96,7 +96,7 @@ function mockFluidRecord(
   amount: number,
   petId = mockPetId,
 ): NutritionRecord {
-  const occurredAt = `${localDate}T${time}:00`;
+  const occurredAt = `${localDate}T${time}:00Z`;
   return {
     id,
     pet_id: petId,
@@ -246,6 +246,7 @@ export const mockBestFluidDay: BestFluidDay = {
 // ── App info fixture ──────────────────────────────────────────────────────────
 
 export const mockAppInfo: AppInfo = {
+  timezone: 'UTC',
   version: '0.0.0-storybook',
   git_sha: 'abc1234',
   demo_mode: false,
@@ -336,29 +337,29 @@ const elim_date = '2024-06-15';
 
 export const mockEliminationRecords: EliminationRecord[] = [
   {
-    id: 'elim-01', pet_id: mockPetId, occurred_at: `${elim_date}T06:15:00`, local_date: elim_date,
+    id: 'elim-01', pet_id: mockPetId, occurred_at: `${elim_date}T06:15:00Z`, local_date: elim_date,
     event_type: 'urination', subtype: null, duration_seconds: 45, note: null,
-    source_type: 'manual', is_auto_categorized: false, auto_categorize_confidence: null, created_at: `${elim_date}T06:15:00`, updated_at: `${elim_date}T06:15:00`,
+    source_type: 'manual', is_auto_categorized: false, auto_categorize_confidence: null, created_at: `${elim_date}T06:15:00Z`, updated_at: `${elim_date}T06:15:00Z`,
   },
   {
-    id: 'elim-02', pet_id: mockPetId, occurred_at: `${elim_date}T08:30:00`, local_date: elim_date,
+    id: 'elim-02', pet_id: mockPetId, occurred_at: `${elim_date}T08:30:00Z`, local_date: elim_date,
     event_type: 'defecation', subtype: 'normal', duration_seconds: 90, note: 'Normal stool',
-    source_type: 'manual', is_auto_categorized: false, auto_categorize_confidence: null, created_at: `${elim_date}T08:30:00`, updated_at: `${elim_date}T08:30:00`,
+    source_type: 'manual', is_auto_categorized: false, auto_categorize_confidence: null, created_at: `${elim_date}T08:30:00Z`, updated_at: `${elim_date}T08:30:00Z`,
   },
   {
-    id: 'elim-03', pet_id: mockPetId, occurred_at: `${elim_date}T11:00:00`, local_date: elim_date,
+    id: 'elim-03', pet_id: mockPetId, occurred_at: `${elim_date}T11:00:00Z`, local_date: elim_date,
     event_type: 'urination', subtype: null, duration_seconds: 60, note: null,
-    source_type: 'manual', is_auto_categorized: false, auto_categorize_confidence: null, created_at: `${elim_date}T11:00:00`, updated_at: `${elim_date}T11:00:00`,
+    source_type: 'manual', is_auto_categorized: false, auto_categorize_confidence: null, created_at: `${elim_date}T11:00:00Z`, updated_at: `${elim_date}T11:00:00Z`,
   },
   {
-    id: 'elim-04', pet_id: mockPetId, occurred_at: `${elim_date}T14:45:00`, local_date: elim_date,
+    id: 'elim-04', pet_id: mockPetId, occurred_at: `${elim_date}T14:45:00Z`, local_date: elim_date,
     event_type: 'vomit', subtype: 'bile', duration_seconds: 20, note: 'Yellow bile, small amount',
-    source_type: 'manual', is_auto_categorized: false, auto_categorize_confidence: null, created_at: `${elim_date}T14:45:00`, updated_at: `${elim_date}T14:45:00`,
+    source_type: 'manual', is_auto_categorized: false, auto_categorize_confidence: null, created_at: `${elim_date}T14:45:00Z`, updated_at: `${elim_date}T14:45:00Z`,
   },
   {
-    id: 'elim-05', pet_id: mockPetId, occurred_at: `${elim_date}T19:20:00`, local_date: elim_date,
+    id: 'elim-05', pet_id: mockPetId, occurred_at: `${elim_date}T19:20:00Z`, local_date: elim_date,
     event_type: 'urination', subtype: null, duration_seconds: 55, note: null,
-    source_type: 'manual', is_auto_categorized: false, auto_categorize_confidence: null, created_at: `${elim_date}T19:20:00`, updated_at: `${elim_date}T19:20:00`,
+    source_type: 'manual', is_auto_categorized: false, auto_categorize_confidence: null, created_at: `${elim_date}T19:20:00Z`, updated_at: `${elim_date}T19:20:00Z`,
   },
 ];
 
@@ -514,34 +515,34 @@ export const mockNotifications: NotificationItem[] = [
 
 export const mockWeightRecords: WeightRecord[] = [
   {
-    id: 'wt-01', pet_id: mockPetId, measured_at: '2024-06-01T09:00:00', local_date: '2024-06-01',
+    id: 'wt-01', pet_id: mockPetId, measured_at: '2024-06-01T09:00:00Z', local_date: '2024-06-01',
     weight_kg: 4.2, note: '#manual Morning weigh-in', source_type: 'manual',
-    created_at: '2024-06-01T09:00:00',
+    created_at: '2024-06-01T09:00:00Z',
   },
   {
-    id: 'wt-02', pet_id: mockPetId, measured_at: '2024-06-08T09:00:00', local_date: '2024-06-08',
+    id: 'wt-02', pet_id: mockPetId, measured_at: '2024-06-08T09:00:00Z', local_date: '2024-06-08',
     weight_kg: 4.15, note: '#manual', source_type: 'manual',
-    created_at: '2024-06-08T09:00:00',
+    created_at: '2024-06-08T09:00:00Z',
   },
   {
-    id: 'wt-03', pet_id: mockPetId, measured_at: '2024-06-15T09:00:00', local_date: '2024-06-15',
+    id: 'wt-03', pet_id: mockPetId, measured_at: '2024-06-15T09:00:00Z', local_date: '2024-06-15',
     weight_kg: 4.18, note: '#manual Post vet visit', source_type: 'manual',
-    created_at: '2024-06-15T09:00:00',
+    created_at: '2024-06-15T09:00:00Z',
   },
   {
-    id: 'wt-04', pet_id: mockPetId, measured_at: '2024-06-15T17:30:00', local_date: '2024-06-15',
+    id: 'wt-04', pet_id: mockPetId, measured_at: '2024-06-15T17:30:00Z', local_date: '2024-06-15',
     weight_kg: 4.22, note: '#Petkit toileting', source_type: 'manual',
-    created_at: '2024-06-15T17:30:00',
+    created_at: '2024-06-15T17:30:00Z',
   },
   {
-    id: 'wt-05', pet_id: mockPetId, measured_at: '2024-06-15T13:17:00', local_date: '2024-06-15',
+    id: 'wt-05', pet_id: mockPetId, measured_at: '2024-06-15T13:17:00Z', local_date: '2024-06-15',
     weight_kg: 4.73, note: '#Petkit toileting', source_type: 'manual',
-    created_at: '2024-06-15T13:17:00',
+    created_at: '2024-06-15T13:17:00Z',
   },
   {
-    id: 'wt-06', pet_id: mockPetId, measured_at: '2024-06-15T09:51:00', local_date: '2024-06-15',
+    id: 'wt-06', pet_id: mockPetId, measured_at: '2024-06-15T09:51:00Z', local_date: '2024-06-15',
     weight_kg: 4.72, note: '#Petkit toileting', source_type: 'manual',
-    created_at: '2024-06-15T09:51:00',
+    created_at: '2024-06-15T09:51:00Z',
   },
 ];
 
@@ -626,7 +627,7 @@ function mockHealthStateRecord(
   note: string | null,
 ): HealthStateRecord {
   const local_date = shiftDate(localToday(), -daysAgo);
-  const occurred_at = `${local_date}T${time}`;
+  const occurred_at = `${local_date}T${time}Z`;
   return {
     id,
     pet_id: mockPetId,
@@ -787,12 +788,12 @@ export const mockDailyMedAssignments: DailyMedAssignment[] = [
       effective_dose_fraction: 'half',
       effective_dose_mg: 2.5,
       dose_label: mockMedAssignments[0]!.dose_label,
-      occurred_at: `${todayStr}T08:05:00`,
+      occurred_at: `${todayStr}T08:05:00Z`,
       local_date: todayStr,
       taken: true,
       note: null,
       source_type: 'manual',
-      created_at: `${todayStr}T08:05:00`,
+      created_at: `${todayStr}T08:05:00Z`,
     }],
   },
   {

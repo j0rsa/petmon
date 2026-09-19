@@ -82,7 +82,6 @@ pub async fn run_feeding_nudge_check_at(
         };
         let now_local = now.with_timezone(&timezone);
         let local_date = now_local.format("%Y-%m-%d").to_string();
-        let as_of = now_local.format("%Y-%m-%dT%H:%M:%S").to_string();
         let at_minutes = now_local.hour() as i32 * 60 + now_local.minute() as i32;
         let windows = parse_schedule_windows(&schedule.rules_json);
         let due_now = due_windows(&windows, now_local);
@@ -110,7 +109,7 @@ pub async fn run_feeding_nudge_check_at(
                 continue;
             }
         };
-        let intake = match nutrition_status_service::accumulate_intake(&records, &as_of, now) {
+        let intake = match nutrition_status_service::accumulate_intake(&records, now) {
             Ok(intake) => intake,
             Err(error) => {
                 tracing::warn!(%error, pet_id = %schedule.pet_id, "feeding intake cutoff failed; pet skipped");

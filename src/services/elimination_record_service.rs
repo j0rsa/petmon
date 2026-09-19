@@ -72,7 +72,7 @@ pub async fn create(
         pet_id,
         req.event_type,
         req.duration_seconds,
-        &occurred_at.civil,
+        &occurred_at.utc,
     )
     .await?;
 

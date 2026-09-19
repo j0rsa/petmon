@@ -2,6 +2,7 @@ import type { Preview, Decorator } from '@storybook/react-vite';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import '../src/index.css';
 import { STORYBOOK_VIEWPORTS } from '../src/stories/viewport';
+import { InstanceTimezoneContext } from '../src/context/InstanceTimezoneContext';
 
 // Block all /api/v1/ calls in Storybook — components should use seeded QueryClient data.
 // If a query fires despite seeded data (cache miss, key mismatch, etc.) it gets a clean
@@ -28,10 +29,10 @@ const withQueryClient: Decorator = (Story) => {
     },
   });
   // Seed identity so NavBar's /auth/me query never hits the network
-  client.setQueryData(['me'], { subject: 'dev', email: null, name: 'Dev', display_name: 'Dev', kind: 'dev', scopes: [], roles: ['instance_admin'], capabilities: ['api_read', 'api_write', 'mcp', 'instance_admin'] });
+  client.setQueryData(['me'], { subject: 'dev', email: null, name: 'Dev', display_name: 'Dev', kind: 'dev', scopes: [], roles: ['instance_admin'] });
   return (
     <QueryClientProvider client={client}>
-      <Story />
+      <InstanceTimezoneContext.Provider value="UTC"><Story /></InstanceTimezoneContext.Provider>
     </QueryClientProvider>
   );
 };

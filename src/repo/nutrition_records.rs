@@ -5,7 +5,7 @@ use crate::error::{AppError, AppResult};
 use chrono::Utc;
 use sqlx::SqlitePool;
 
-const RECORD_SELECT: &str = "SELECT id, pet_id, occurred_at, occurred_at_utc, source_timezone, local_date, category, amount, unit, note, source_type, telegram_message_id, telegram_chat_id, telegram_thread_id, telegram_bot_id, created_at, updated_at FROM nutrition_records";
+const RECORD_SELECT: &str = "SELECT id, pet_id, occurred_at, local_date, category, amount, unit, note, source_type, telegram_message_id, telegram_chat_id, telegram_thread_id, telegram_bot_id, created_at, updated_at FROM nutrition_records";
 
 #[tracing::instrument(skip(pool, filters))]
 pub async fn list_records(
@@ -79,16 +79,16 @@ pub async fn get_record(pool: &SqlitePool, id: &str) -> AppResult<NutritionRecor
 #[tracing::instrument(skip(pool, record), fields(id = %record.id, pet_id = %record.pet_id, category = %record.category))]
 pub async fn create_record(
     pool: &SqlitePool,
-    record: NutritionRecord,
+    mut record: NutritionRecord,
 ) -> AppResult<NutritionRecord> {
+    record.occurred_at =
+        crate::record_time::format_utc(crate::record_time::parse_instant(&record.occurred_at)?);
     sqlx::query(
-        "INSERT INTO nutrition_records (id, pet_id, occurred_at, occurred_at_utc, source_timezone, local_date, category, amount, unit, note, source_type, telegram_message_id, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+        "INSERT INTO nutrition_records (id, pet_id, occurred_at, local_date, category, amount, unit, note, source_type, telegram_message_id, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
     )
     .bind(&record.id)
     .bind(record.pet_id)
     .bind(&record.occurred_at)
-    .bind(&record.occurred_at_utc)
-    .bind(&record.source_timezone)
     .bind(&record.local_date)
     .bind(record.category)
     .bind(record.amount)
@@ -119,9 +119,7 @@ pub async fn update_record(
             timezone,
             Utc::now(),
         )?;
-        record.occurred_at = time.civil;
-        record.occurred_at_utc = Some(time.utc);
-        record.source_timezone = Some(time.timezone);
+        record.occurred_at = time.utc;
     }
     if let Some(local_date) = req.local_date {
         record.local_date = local_date;
@@ -140,11 +138,9 @@ pub async fn update_record(
     }
     record.updated_at = now;
     sqlx::query(
-        "UPDATE nutrition_records SET occurred_at=?, occurred_at_utc=?, source_timezone=?, local_date=?, category=?, amount=?, unit=?, note=?, updated_at=? WHERE id=?",
+        "UPDATE nutrition_records SET occurred_at=?, local_date=?, category=?, amount=?, unit=?, note=?, updated_at=? WHERE id=?",
     )
     .bind(&record.occurred_at)
-    .bind(&record.occurred_at_utc)
-    .bind(&record.source_timezone)
     .bind(&record.local_date)
     .bind(record.category)
     .bind(record.amount)
@@ -204,18 +200,20 @@ pub async fn delete_record(pool: &SqlitePool, id: &str) -> AppResult<()> {
 #[tracing::instrument(skip(pool, records), fields(count = records.len()))]
 pub async fn create_records_batch(
     pool: &SqlitePool,
-    records: Vec<NutritionRecord>,
+    mut records: Vec<NutritionRecord>,
 ) -> AppResult<Vec<NutritionRecord>> {
+    for record in &mut records {
+        record.occurred_at =
+            crate::record_time::format_utc(crate::record_time::parse_instant(&record.occurred_at)?);
+    }
     let mut tx = pool.begin().await?;
     for record in &records {
         sqlx::query(
-            "INSERT INTO nutrition_records (id, pet_id, occurred_at, occurred_at_utc, source_timezone, local_date, category, amount, unit, note, source_type, telegram_message_id, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+            "INSERT INTO nutrition_records (id, pet_id, occurred_at, local_date, category, amount, unit, note, source_type, telegram_message_id, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
         )
         .bind(&record.id)
         .bind(record.pet_id)
         .bind(&record.occurred_at)
-    .bind(&record.occurred_at_utc)
-    .bind(&record.source_timezone)
         .bind(&record.local_date)
         .bind(record.category)
         .bind(record.amount)

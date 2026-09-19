@@ -289,7 +289,7 @@ pub async fn create_intake(
     let delayed = intake_is_delayed(&req.occurred_at, &req.local_date);
     let mut req = req;
     if req.occurred_at.is_none() {
-        req.occurred_at = Some(pool.local_timestamp(timezone, req.local_date.as_deref()));
+        req.occurred_at = Some(pool.record_timestamp(timezone, req.local_date.as_deref())?);
     }
     pets::get_pet(
         pool,

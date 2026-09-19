@@ -1,4 +1,5 @@
 import { localToday } from './dates';
+import { instantToCivil } from './resourceTime';
 import type { FluidCurvePoint, NutritionRecord, NutritionSchedule } from '../types';
 import type { CumulativeFluidChartSettings } from '../api/userSettings';
 
@@ -62,8 +63,8 @@ function pad(value: number) {
   return value.toString().padStart(2, '0');
 }
 
-export function timeLabelFromOccurredAt(occurredAt: string) {
-  return occurredAt.slice(11, 16);
+export function timeLabelFromOccurredAt(occurredAt: string, timeZone?: string) {
+  return instantToCivil(occurredAt, timeZone).slice(11, 16);
 }
 
 export function timeToRefMs(time: string) {
@@ -92,9 +93,9 @@ function fluidFromRecord(record: NutritionRecord) {
   return { liquids: 0, foodFluid: 0 };
 }
 
-function buildStepCurve(records: NutritionRecord[]) {
+function buildStepCurve(records: NutritionRecord[], timeZone?: string) {
   const sorted = [...records].sort((left, right) => left.occurred_at.localeCompare(right.occurred_at));
-  const times = [...new Set(sorted.map((record) => timeLabelFromOccurredAt(record.occurred_at)))].sort();
+  const times = [...new Set(sorted.map((record) => timeLabelFromOccurredAt(record.occurred_at, timeZone)))].sort();
 
   let cumLiquids = 0;
   let cumFood = 0;
@@ -108,7 +109,7 @@ function buildStepCurve(records: NutritionRecord[]) {
   points.push({ x: leadIn, liquids: 0, foodFluid: 0, total: 0 });
 
   for (const time of times) {
-    const atTime = sorted.filter((record) => timeLabelFromOccurredAt(record.occurred_at) === time);
+    const atTime = sorted.filter((record) => timeLabelFromOccurredAt(record.occurred_at, timeZone) === time);
     for (const record of atTime) {
       const contribution = fluidFromRecord(record);
       cumLiquids += contribution.liquids;
@@ -266,8 +267,9 @@ export function buildCumulativeFluidChart(
   schedules: NutritionSchedule[],
   bestDayCurvePoints?: FluidCurvePoint[],
   bestDayDate?: string,
+  timeZone?: string,
 ) {
-  const dayCurve = buildStepCurve(records);
+  const dayCurve = buildStepCurve(records, timeZone);
   const bestDayCurve = bestDayCurvePoints ? bestDayCurvesFromApi(bestDayCurvePoints) : [];
 
   const scheduleWindows = liquidScheduleWindowsFromSchedules(schedules);

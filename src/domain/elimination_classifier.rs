@@ -1,5 +1,8 @@
 use serde::{Deserialize, Serialize};
 
+/// Version 2 uses UTC elapsed durations and resource-local hour/day features.
+pub const CURRENT_MODEL_VERSION: u32 = 2;
+
 /// Snapshot of elimination context at prediction time (rolling windows, not calendar day).
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct FeatureContext {

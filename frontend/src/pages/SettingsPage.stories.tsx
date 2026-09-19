@@ -4,7 +4,7 @@ import { withSettings } from '../stories/decorators';
 import { mockCreatedToken } from '../stories/fixtures';
 import type { ApiTokenCreated } from '../api/settings';
 import SettingsPage from './SettingsPage';
-import { expect, within } from 'storybook/test';
+import { expect, userEvent, within } from 'storybook/test';
 import { asNarrowStory } from '../stories/viewport';
 
 const meta = {
@@ -40,7 +40,7 @@ export const PersonalSettingsOnly: Story = {
 export const PersonalSettingsOnlyNarrow = asNarrowStory(PersonalSettingsOnly);
 
 export const AdministratorWithReadOnlyCredential: Story = {
-  decorators: [withSettings({ capabilities: ['api_read'], usingApiToken: true })],
+  decorators: [withSettings({ scopes: ['api_read'], usingApiToken: true })],
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement);
     await expect(canvas.queryByRole('heading', { name: 'Telegram' })).not.toBeInTheDocument();
@@ -50,6 +50,22 @@ export const AdministratorWithReadOnlyCredential: Story = {
   },
 };
 export const AdministratorWithReadOnlyCredentialNarrow = asNarrowStory(AdministratorWithReadOnlyCredential);
+
+export const AdministratorWithNarrowScopes: Story = {
+  decorators: [withSettings({ scopes: ['api_read', 'api_write', 'mcp'], usingApiToken: true })],
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    await expect(canvas.queryByRole('heading', { name: 'Instance API tokens' })).not.toBeInTheDocument();
+    await expect(canvas.queryByRole('heading', { name: 'Telegram' })).not.toBeInTheDocument();
+    const scopeInput = canvas.getByPlaceholderText('Add scope…');
+    await userEvent.click(scopeInput);
+    const picker = within(scopeInput.closest('.tag-input') as HTMLElement);
+    await expect(picker.queryByText('all')).not.toBeInTheDocument();
+    await expect(picker.queryByText('instance_admin')).not.toBeInTheDocument();
+    await expect(picker.getByText('api_write')).toBeInTheDocument();
+  },
+};
+export const AdministratorWithNarrowScopesNarrow = asNarrowStory(AdministratorWithNarrowScopes);
 
 /** Fresh install — nothing set up yet. */
 export const BlankSlate: Story = {

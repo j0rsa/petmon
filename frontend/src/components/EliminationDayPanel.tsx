@@ -14,7 +14,7 @@ import {
 } from '../api/elimination';
 import { TimeInput } from './TimeInput';
 import { EliminationDayChart } from './EliminationDayChart';
-import { isoFromDateAndTime } from '../lib/time';
+import { useRecordTimestamp } from '../hooks/useRecordTimestamp';
 import { useFormatTime, useFormatDate } from '../context/useDisplaySettings';
 import { useScrollToHash } from '../hooks/useScrollToHash';
 import { formatDurationMmss, normalizeDurationInput, parseDurationToSecs } from '../lib/duration';
@@ -206,6 +206,7 @@ const AddRow = forwardRef<AddRowHandle, AddRowProps>(function AddRow(
   ref,
 ) {
   const [time, setTime] = useState('');
+  const timestamp = useRecordTimestamp(time ? `${date}T${time}` : '', petId);
   const [eventType, setEventType] = useState<EliminationEventType>('urination');
   const [subtype, setSubtype] = useState('');
   const [duration, setDuration] = useState('');
@@ -224,10 +225,10 @@ const AddRow = forwardRef<AddRowHandle, AddRowProps>(function AddRow(
   }));
 
   function handleAdd() {
-    if (controlsDisabled) return;
+    if (controlsDisabled || !timestamp.valid) return;
     onSave({
       pet_id: petId,
-      occurred_at: time ? isoFromDateAndTime(date, time) : undefined,
+      occurred_at: timestamp.utc,
       local_date: date,
       event_type: eventType,
       subtype: subtype || null,
@@ -248,6 +249,7 @@ const AddRow = forwardRef<AddRowHandle, AddRowProps>(function AddRow(
       <div className="form-row">
         <label>Time</label>
         <TimeInput value={time} onChange={setTime} variant="form" />
+        {timestamp.feedback}
       </div>
       <div className="form-row">
         <label>Type</label>
@@ -335,9 +337,12 @@ function RecordRow({
   canWrite,
   onEditingChange,
 }: RecordRowProps) {
-  const formatTime = useFormatTime();
+  const formatTime = useFormatTime(record.pet_id);
+  const { toCivil } = useResourceTime(record.pet_id);
+  const recordCivil = toCivil(record.occurred_at);
   const [editing, setEditing] = useState(false);
   const [time, setTime] = useState('');
+  const timestamp = useRecordTimestamp(time ? `${recordCivil.slice(0, 10)}T${time}` : '', record.pet_id, record.occurred_at);
   const [eventType, setEventType] = useState<EliminationEventType>('general');
   const [subtype, setSubtype] = useState('');
   const [duration, setDuration] = useState('');
@@ -351,7 +356,7 @@ function RecordRow({
   }
 
   function startEdit() {
-    setTime(record.occurred_at.slice(11, 16));
+    setTime(recordCivil.slice(11, 16));
     setEventType(record.event_type);
     setSubtype(record.subtype ?? '');
     setDuration(record.duration_seconds != null ? formatDurationMmss(record.duration_seconds) : '');
@@ -360,8 +365,9 @@ function RecordRow({
   }
 
   function commitEdit() {
+    if (!timestamp.valid) return;
     onSave(record.id, {
-      ...(time ? { occurred_at: isoFromDateAndTime(record.local_date, time), local_date: record.local_date } : {}),
+      ...(time ? { occurred_at: timestamp.utc, local_date: record.local_date } : {}),
       event_type: eventType,
       subtype: subtype || null,
       duration_seconds: parseDurationToSecs(duration),
@@ -377,6 +383,7 @@ function RecordRow({
           <div className="form-row">
             <label>Time</label>
             <TimeInput value={time} onChange={setTime} variant="form" autoFocus />
+            {timestamp.feedback}
           </div>
           <div className="form-row">
             <label>Type</label>

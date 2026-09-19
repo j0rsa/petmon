@@ -12,7 +12,7 @@ import { CumulativeFluidChart } from './CumulativeFluidChart';
 import { IntakeBarsChart } from './IntakeBarsChart';
 import { NutritionAddForm, type NutritionAddFormHandle } from './NutritionAddForm';
 import { TimeInput } from './TimeInput';
-import { isoFromDateAndTime, timeFromIso } from '../lib/time';
+import { useRecordTimestamp } from '../hooks/useRecordTimestamp';
 import { shiftDate } from '../lib/dates';
 import { useDisplaySettings, useFormatDate, useFormatTime } from '../context/useDisplaySettings';
 import { exportTelegramLog } from '../lib/exportTelegramLog';
@@ -63,10 +63,13 @@ interface RecordRowProps {
 }
 
 function RecordRow({ record, viewDate, onSave, onDelete, saving, savingPaused, deleting, deletingPaused, canWrite, defaultEditing = false }: RecordRowProps) {
-  const formatTime = useFormatTime();
+  const formatTime = useFormatTime(record.pet_id);
+  const { toCivil } = useResourceTime(record.pet_id);
+  const recordCivil = toCivil(record.occurred_at);
   const [editing, setEditing] = useState(defaultEditing);
   const [committing, setCommitting] = useState(false);
-  const [time, setTime] = useState(() => (defaultEditing ? timeFromIso(record.occurred_at) : ''));
+  const [time, setTime] = useState(() => (defaultEditing ? recordCivil.slice(11, 16) : ''));
+  const timestamp = useRecordTimestamp(`${recordCivil.slice(0, 10)}T${time}`, record.pet_id, record.occurred_at);
   const [category, setCategory] = useState(() => (defaultEditing ? record.category : ''));
   const [amount, setAmount] = useState(() => (defaultEditing ? String(record.amount) : ''));
   const [note, setNote] = useState(() => (defaultEditing ? (record.note ?? '') : ''));
@@ -79,7 +82,7 @@ function RecordRow({ record, viewDate, onSave, onDelete, saving, savingPaused, d
   }, [saving]);
 
   function startEdit() {
-    setTime(timeFromIso(record.occurred_at));
+    setTime(recordCivil.slice(11, 16));
     setCategory(record.category);
     setAmount(String(record.amount));
     setNote(record.note ?? '');
@@ -88,7 +91,7 @@ function RecordRow({ record, viewDate, onSave, onDelete, saving, savingPaused, d
 
   function buildPayload(localDate: string): UpdateNutritionRecord {
     return {
-      occurred_at: isoFromDateAndTime(localDate, time),
+      occurred_at: timestamp.utc,
       local_date: localDate,
       category,
       amount: parseDecimal(amount),
@@ -98,14 +101,14 @@ function RecordRow({ record, viewDate, onSave, onDelete, saving, savingPaused, d
   }
 
   function commitEdit() {
-    if (committing || saving) return;
+    if (committing || saving || !timestamp.utc) return;
     setCommitting(true);
     onSave(record.id, buildPayload(record.local_date));
     setEditing(false);
   }
 
   function commitMoveDate(offset: number) {
-    if (committing || saving) return;
+    if (committing || saving || !timestamp.utc) return;
     setCommitting(true);
     onSave(record.id, buildPayload(shiftDate(viewDate, offset)));
     setEditing(false);
@@ -120,6 +123,7 @@ function RecordRow({ record, viewDate, onSave, onDelete, saving, savingPaused, d
           <div className="form-row">
             <label>Time</label>
             <TimeInput value={time} onChange={setTime} variant="form" autoFocus />
+            {timestamp.feedback}
           </div>
           <div className="form-row">
             <label>Category</label>
@@ -487,7 +491,8 @@ function MetricIcon({ color, children }: { color: string; children: React.ReactN
 
 function ExportPanel({ records }: { records: NutritionRecord[] }) {
   const [copied, setCopied] = useState(false);
-  const text = exportTelegramLog(records);
+  const { timeZone } = useResourceTime(records[0]?.pet_id);
+  const text = exportTelegramLog(records, timeZone);
 
   function handleCopy() {
     navigator.clipboard.writeText(text).then(() => {

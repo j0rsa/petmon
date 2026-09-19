@@ -152,17 +152,17 @@ pub async fn activate_token(
     let caller = identity(&req)?;
     let id = path.into_inner();
     let token = api_tokens::get_owned(&state.pool, &id, &caller.subject).await?;
-    let scopes = token.scopes_vec();
-    crate::auth::admin::attenuate_scopes(
-        &state.pool,
-        &caller,
-        if scopes.is_empty() {
-            None
-        } else {
-            Some(scopes)
-        },
-    )
-    .await?;
+    let mut scopes = token.scopes_vec();
+    // Legacy empty scopes confer ordinary full access, not literal `all`'s
+    // eligibility for administration. Compare the actual authority, while the
+    // activation CAS below still checks the original stored scopes.
+    if scopes.is_empty() {
+        scopes = ["api_read", "api_write", "mcp"]
+            .into_iter()
+            .map(str::to_owned)
+            .collect();
+    }
+    crate::auth::admin::attenuate_scopes(&state.pool, &caller, Some(scopes)).await?;
     api_tokens::activate_owned(&state.pool, &id, &caller.subject, &token.scopes).await?;
     audit(&caller, "token.activate", &id);
     Ok(HttpResponse::NoContent().finish())

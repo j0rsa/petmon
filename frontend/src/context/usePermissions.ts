@@ -1,7 +1,7 @@
 import { useQuery } from '@tanstack/react-query';
 import { useApplicationExtensions, useSessionMe, type ResourcePermissions } from './ApplicationExtensions';
 import { useOptionalSelectedPet } from './SelectedPetContext';
-import type { MeResponse } from '../api/me';
+import { effectiveScopes, hasInstanceAdminAccess } from '../api/me';
 
 export interface Permissions {
   /** True once identity and resource permission checks have settled. */
@@ -19,15 +19,6 @@ export interface Permissions {
   canChangeStatus: boolean;
   canAdminRead: boolean;
   canAdminWrite: boolean;
-}
-
-export function effectiveCapabilities(me: MeResponse | undefined): Set<string> {
-  if (!me) return new Set();
-  if (me.capabilities) return new Set(me.capabilities);
-  const scopes = new Set(me.scopes);
-  // Compatibility for older servers; administrative capability is never inferred.
-  if (me.scopes.length === 0 || scopes.has('all') || me.kind === 'dev') return new Set(['api_read', 'api_write', 'mcp']);
-  return new Set([...scopes].filter((scope) => scope !== 'instance_admin'));
 }
 
 const standalone: ResourcePermissions = { view: true, writeRecords: true, writeProfile: true, manageIntegrations: true, create: true, delete: true, changeStatus: true };
@@ -48,20 +39,20 @@ export function usePermissions(petId?: string | null): Permissions {
     retry: false,
   });
   const resource = extensions ? (policy.isError ? undefined : policy.data) : standalone;
-  const caps = effectiveCapabilities(me);
-  const read = caps.has('api_read');
-  const write = caps.has('api_write');
+  const scopes = effectiveScopes(me);
+  const read = scopes.has('api_read');
+  const write = scopes.has('api_write');
   return {
     loaded: identity.isError || (!!me && (!extensions || policy.isFetched)),
     canRead: read && !!resource?.view,
     canWrite: write && !!resource?.writeRecords,
-    canMcp: caps.has('mcp'),
+    canMcp: scopes.has('mcp'),
     canCreate: write && !!resource?.create,
     canDelete: write && !!resource?.delete,
     canWriteProfile: write && !!resource?.writeProfile,
     canManageIntegrations: write && !!resource?.manageIntegrations,
     canChangeStatus: write && !!resource?.changeStatus,
-    canAdminRead: read && caps.has('instance_admin'),
-    canAdminWrite: write && caps.has('instance_admin'),
+    canAdminRead: read && hasInstanceAdminAccess(me),
+    canAdminWrite: write && hasInstanceAdminAccess(me),
   };
 }

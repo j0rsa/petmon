@@ -5,18 +5,15 @@ export function localToday(): string {
 }
 
 export function shiftDate(date: string, offset: number): string {
-  const value = new Date(`${date}T00:00:00`);
-  value.setDate(value.getDate() + offset);
-  const y = value.getFullYear();
-  const m = String(value.getMonth() + 1).padStart(2, '0');
-  const d = String(value.getDate()).padStart(2, '0');
-  return `${y}-${m}-${d}`;
+  const value = new Date(`${date}T00:00:00Z`);
+  value.setUTCDate(value.getUTCDate() + offset);
+  return value.toISOString().slice(0, 10);
 }
 
 /** Inclusive calendar-day count. `2026-08-01` → `2026-08-01` is 1 day. */
 export function daysInclusive(from: string, to: string): number {
-  const start = new Date(`${from}T00:00:00`);
-  const end = new Date(`${to}T00:00:00`);
+  const start = new Date(`${from}T00:00:00Z`);
+  const end = new Date(`${to}T00:00:00Z`);
   return Math.round((end.getTime() - start.getTime()) / 86_400_000) + 1;
 }
 

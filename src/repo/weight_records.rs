@@ -64,7 +64,7 @@ async fn list_sql(
     let order_desc = !has_date_range;
 
     let mut query = String::from(
-        "SELECT id, pet_id, measured_at, measured_at_utc, source_timezone, local_date, weight_kg, note, source_type, created_at FROM weight_records WHERE 1=1",
+        "SELECT id, pet_id, measured_at, local_date, weight_kg, note, source_type, created_at FROM weight_records WHERE 1=1",
     );
 
     if effective.pet_id.is_some() {
@@ -122,7 +122,7 @@ pub async fn list_tags(pool: &SqlitePool, pet_id: &str) -> AppResult<Vec<WeightT
 #[tracing::instrument(skip(pool))]
 pub async fn get(pool: &SqlitePool, id: &str) -> AppResult<WeightRecord> {
     sqlx::query_as::<_, WeightRecord>(
-        "SELECT id, pet_id, measured_at, measured_at_utc, source_timezone, local_date, weight_kg, note, source_type, created_at FROM weight_records WHERE id = ?",
+        "SELECT id, pet_id, measured_at, local_date, weight_kg, note, source_type, created_at FROM weight_records WHERE id = ?",
     )
     .bind(id)
     .fetch_optional(pool)
@@ -143,7 +143,7 @@ pub async fn create(
         timezone,
         Utc::now(),
     )?;
-    let measured_at = time.civil;
+    let measured_at = time.utc;
     let local_date = time.local_date;
     let id = Uuid::new_v4().to_string();
     let source_type = req.source_type.unwrap_or_else(|| "manual".to_string());
@@ -152,13 +152,11 @@ pub async fn create(
     let note = normalize_weight_note(req.note.as_deref());
 
     sqlx::query(
-        "INSERT INTO weight_records (id, pet_id, measured_at, measured_at_utc, source_timezone, local_date, weight_kg, note, source_type, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+        "INSERT INTO weight_records (id, pet_id, measured_at, local_date, weight_kg, note, source_type, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
     )
     .bind(&id)
     .bind(pet_id)
     .bind(&measured_at)
-    .bind(&time.utc)
-    .bind(&time.timezone)
     .bind(&local_date)
     .bind(req.weight_kg)
     .bind(&note)
@@ -182,7 +180,7 @@ pub async fn stats(
 
     // Latest record overall for this pet
     let latest = sqlx::query_as::<_, WeightRecord>(
-        "SELECT id, pet_id, measured_at, measured_at_utc, source_timezone, local_date, weight_kg, note, source_type, created_at
+        "SELECT id, pet_id, measured_at, local_date, weight_kg, note, source_type, created_at
          FROM weight_records WHERE pet_id = ? ORDER BY measured_at DESC LIMIT 1",
     )
     .bind(pet_uuid)

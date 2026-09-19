@@ -11,9 +11,10 @@ struct ClassifierRow {
 
 pub async fn get(pool: &SqlitePool, pet_id: Uuid) -> AppResult<Option<EliminationClassifierModel>> {
     let row = sqlx::query_as::<_, ClassifierRow>(
-        "SELECT model_json FROM elimination_classifiers WHERE pet_id = ?",
+        "SELECT model_json FROM elimination_classifiers WHERE pet_id = ? AND model_version = ?",
     )
     .bind(pet_id)
+    .bind(crate::domain::elimination_classifier::CURRENT_MODEL_VERSION as i64)
     .fetch_optional(pool)
     .await?;
 

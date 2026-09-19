@@ -13,8 +13,6 @@ struct HealthStateRow {
     id: String,
     pet_id: Uuid,
     occurred_at: String,
-    occurred_at_utc: Option<String>,
-    source_timezone: Option<String>,
     local_date: String,
     note: Option<String>,
     payload_json: String,
@@ -33,8 +31,6 @@ fn row_to_record(row: HealthStateRow) -> AppResult<HealthStateRecord> {
         id: row.id,
         pet_id: row.pet_id,
         occurred_at: row.occurred_at,
-        occurred_at_utc: row.occurred_at_utc,
-        source_timezone: row.source_timezone,
         local_date: row.local_date,
         level: payload.level,
         note: row.note,
@@ -70,7 +66,7 @@ pub async fn list_scoped(
     effective.limit = limit;
 
     let mut query = String::from(
-        "SELECT id, pet_id, occurred_at, occurred_at_utc, source_timezone, local_date, note, payload_json, source_type, created_at
+        "SELECT id, pet_id, occurred_at, local_date, note, payload_json, source_type, created_at
          FROM health_records WHERE record_type = ?",
     );
 
@@ -118,7 +114,7 @@ pub async fn list_scoped(
 #[tracing::instrument(skip(pool))]
 pub async fn get(pool: &SqlitePool, id: &str) -> AppResult<HealthStateRecord> {
     let row = sqlx::query_as::<_, HealthStateRow>(
-        "SELECT id, pet_id, occurred_at, occurred_at_utc, source_timezone, local_date, note, payload_json, source_type, created_at
+        "SELECT id, pet_id, occurred_at, local_date, note, payload_json, source_type, created_at
          FROM health_records WHERE id = ? AND record_type = ?",
     )
     .bind(id)
@@ -143,7 +139,7 @@ pub async fn create(
         timezone,
         Utc::now(),
     )?;
-    let occurred_at = time.civil;
+    let occurred_at = time.utc;
     let local_date = time.local_date;
     let id = Uuid::new_v4().to_string();
     let source_type = req.source_type.unwrap_or_else(|| "manual".to_string());
@@ -155,15 +151,11 @@ pub async fn create(
         })?;
 
     sqlx::query(
-        "INSERT INTO health_records
-         (id, pet_id, occurred_at, occurred_at_utc, source_timezone, local_date, record_type, note, payload_json, source_type, created_at, updated_at)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+        "INSERT INTO health_records (id, pet_id, occurred_at, local_date, record_type, note, payload_json, source_type, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
     )
     .bind(&id)
     .bind(pet_id)
     .bind(&occurred_at)
-    .bind(&time.utc)
-    .bind(&time.timezone)
     .bind(&local_date)
     .bind(RECORD_TYPE)
     .bind(&req.note)

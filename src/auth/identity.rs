@@ -62,16 +62,10 @@ impl Identity {
     /// - Dev identities always pass.
     /// - OIDC and API token identities with an empty scopes set have ordinary full access.
     /// - Otherwise scopes must contain `"all"` or `required_scope`.
-    /// - Administrator scope is a credential eligibility check only; use the
-    ///   live role check in `auth::admin` before authorizing administration.
+    /// - Roles are separate from scopes; administration uses `auth::admin`.
     pub fn has_scope(&self, required_scope: &str) -> bool {
-        // This is only the credential half of administrator authorization. The
-        // live role must additionally be checked with auth::admin.
-        if required_scope == "instance_admin" {
-            return match self.kind {
-                IdentityKind::Dev | IdentityKind::Oidc => true,
-                IdentityKind::ApiToken { .. } => self.scopes.contains("instance_admin"),
-            };
+        if !crate::domain::settings::is_valid_scope(required_scope) {
+            return false;
         }
         match self.kind {
             IdentityKind::Dev => true,
@@ -81,16 +75,6 @@ impl Identity {
                     || self.scopes.contains(required_scope)
             }
         }
-    }
-
-    /// Ordinary transport capabilities. MCP includes care reads and writes on
-    /// that transport, but does not enable ordinary REST endpoints.
-    pub fn ordinary_capabilities(&self) -> Vec<String> {
-        ["api_read", "api_write", "mcp"]
-            .into_iter()
-            .filter(|scope| self.has_scope(scope))
-            .map(str::to_owned)
-            .collect()
     }
 }
 

@@ -176,7 +176,7 @@ fn attempt_failed(reason: AutoCategorizeFailureReason) -> AutoCategorizeAttempt 
 }
 
 pub(crate) async fn attempt_auto_categorize(
-    pool: &SqlitePool,
+    pool: &crate::embedding::ServiceContext,
     pet_id: Uuid,
     event_type: EliminationEventType,
     duration_seconds: Option<i64>,

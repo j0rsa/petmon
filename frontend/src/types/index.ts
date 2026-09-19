@@ -40,8 +40,6 @@ export interface NutritionRecord {
   id: string;
   pet_id: string;
   occurred_at: string;
-  occurred_at_utc?: string | null;
-  source_timezone?: string | null;
   local_date: string;
   category: string;
   amount: number;
@@ -54,7 +52,8 @@ export interface NutritionRecord {
 
 export interface CreateNutritionRecord {
   pet_id: string;
-  occurred_at: string;
+  /** Offset-bearing RFC3339 instant; omitted uses the server clock. */
+  occurred_at?: string;
   local_date?: string;
   category: string;
   amount: number;

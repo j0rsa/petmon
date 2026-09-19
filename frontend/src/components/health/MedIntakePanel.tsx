@@ -26,7 +26,7 @@ import { parseDecimal } from '../../lib/numbers';
 import { isDoseSupported } from '../../lib/pillDoseCuts';
 import { medIntakeShortcutLinkProps } from '../../lib/medIntakeShortcut';
 import { showMedIntakeShortcutLink } from '../../lib/medIntakePlatform';
-import { isoFromDateAndTime } from '../../lib/time';
+import { useRecordTimestamp } from '../../hooks/useRecordTimestamp';
 import { infoApi } from '../../api/info';
 import { usePermissions } from '../../context/usePermissions';
 import { useFormatTime } from '../../context/useDisplaySettings';
@@ -53,7 +53,7 @@ function DailyMedRow({
   panelDate: string;
   onLogged: () => void;
 }) {
-  const formatTime = useFormatTime();
+  const formatTime = useFormatTime(petId);
   const { medication, assignment } = item;
   const { nowTimeString } = useResourceTime(petId);
   const expected = expectedDoseCount(assignment.frequency);
@@ -62,6 +62,7 @@ function DailyMedRow({
   const [intakeDate, setIntakeDate] = useState(panelDate);
   const [intakeLocalDate, setIntakeLocalDate] = useState(panelDate);
   const [intakeTime, setIntakeTime] = useState(nowTimeString);
+  const timestamp = useRecordTimestamp(`${intakeDate}T${intakeTime}`, petId);
   const [doseFraction, setDoseFraction] = useState<DoseFraction>('whole');
   const [liquidDoseMl, setLiquidDoseMl] = useState('');
   const [curlCopied, setCurlCopied] = useState(false);
@@ -87,7 +88,7 @@ function DailyMedRow({
   function intakeTiming() {
     return {
       local_date: intakeLocalDate,
-      occurred_at: isoFromDateAndTime(intakeDate, intakeTime),
+      occurred_at: timestamp.utc,
     };
   }
 
@@ -124,6 +125,7 @@ function DailyMedRow({
   }
 
   function confirmIntake() {
+    if (intakeMode === 'record' && !timestamp.utc) return;
     const timing = intakeMode === 'record' ? intakeTiming() : {};
     if (assignment.optional) {
       if (medication.med_type === 'pill') {
@@ -157,6 +159,7 @@ function DailyMedRow({
     : undefined;
 
   function handleCopyCurl() {
+    if (intakeMode === 'record' && !timestamp.utc) return;
     const timing = intakeMode === 'record' ? intakeTiming() : {};
     const curl = buildMedIntakeCurl(petId, item, timing, optionalOverrides);
     navigator.clipboard.writeText(curl).then(() => {
@@ -297,6 +300,7 @@ function DailyMedRow({
                   value={intakeTime}
                   onChange={setIntakeTime}
                 />
+                {timestamp.feedback}
               </div>
               <div className="form-row" style={{ flex: '0 0 auto', marginLeft: '0.5rem' }}>
                 <label style={{ fontSize: '0.78rem' }}>Credit date</label>
@@ -384,11 +388,12 @@ function BundleTakeRow({
   onLogged: () => void;
 }) {
   const { nowTimeString } = useResourceTime(bundle.pet_id);
-  const formatTime = useFormatTime();
+  const formatTime = useFormatTime(bundle.pet_id);
   const [intakeMode, setIntakeMode] = useState<'record' | null>(null);
   const [intakeDate, setIntakeDate] = useState(panelDate);
   const [intakeLocalDate, setIntakeLocalDate] = useState(panelDate);
   const [intakeTime, setIntakeTime] = useState(nowTimeString);
+  const timestamp = useRecordTimestamp(`${intakeDate}T${intakeTime}`, bundle.pet_id);
 
   const takeMutation = useMutation({
     mutationFn: (payload: CreateMedBundleIntake) =>
@@ -420,9 +425,10 @@ function BundleTakeRow({
   }
 
   function confirmRecord() {
+    if (!timestamp.utc) return;
     takeMutation.mutate({
       local_date: intakeLocalDate,
-      occurred_at: isoFromDateAndTime(intakeDate, intakeTime),
+      occurred_at: timestamp.utc,
     }, {
       onSuccess: resetIntakePrompt,
     });
@@ -543,6 +549,7 @@ function BundleTakeRow({
                 value={intakeTime}
                 onChange={setIntakeTime}
               />
+              {timestamp.feedback}
             </div>
             <div className="form-row" style={{ flex: '0 0 auto', marginLeft: '0.5rem' }}>
               <label style={{ fontSize: '0.78rem' }}>Credit date</label>

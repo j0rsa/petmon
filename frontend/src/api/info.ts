@@ -1,6 +1,7 @@
 import { api } from './client';
 
 export interface AppInfo {
+  timezone: string;
   version: string;
   base_version?: string;
   edition?: string;

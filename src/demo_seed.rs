@@ -632,7 +632,7 @@ fn elim_event(
     subtype: Option<&str>,
     duration_seconds: Option<i64>,
 ) -> CreateEliminationRecord {
-    let occurred_at = format!("{local_date}T{hour:02}:{minute:02}:00");
+    let occurred_at = format!("{local_date}T{hour:02}:{minute:02}:00Z");
     CreateEliminationRecord {
         pet_id: pet_id.to_string(),
         occurred_at: Some(occurred_at),
@@ -664,7 +664,7 @@ async fn insert_weight(
         pool,
         CreateWeightRecord {
             pet_id: pet_id.to_string(),
-            measured_at: Some(format!("{local_date}T{time}")),
+            measured_at: Some(format!("{local_date}T{time}Z")),
             local_date: Some(local_date.to_string()),
             weight_kg,
             note: note.map(str::to_string),
@@ -958,7 +958,7 @@ async fn seed_medications(pool: &SqlitePool, demo_pets: &[Pet]) -> AppResult<usi
             dose_fraction_override: None,
             liquid_dose_ml_override: None,
             taken: Some(true),
-            occurred_at: Some(format!("{local_date}T07:30:00")),
+            occurred_at: Some(format!("{local_date}T07:30:00Z")),
             local_date: Some(local_date),
             note: None,
             source_type: Some("manual".to_string()),
@@ -1158,6 +1158,9 @@ mod tests {
         db::run_migrations(&pool).await.expect("migrate");
 
         let summary = run(&pool, true).await.expect("seed");
+        crate::record_time::ensure_canonical(&pool)
+            .await
+            .expect("all demo instants are UTC");
         assert_eq!(summary.pets, 4);
         assert!(summary.nutrition_records > 100);
         assert!(summary.elimination_records > 50);
