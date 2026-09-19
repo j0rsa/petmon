@@ -1,3 +1,4 @@
+import { useResourceTime } from '../context/useResourceTime';
 import { useMemo, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import {
@@ -19,7 +20,7 @@ import { MedColorSwatch } from '../components/health/MedColorSwatch';
 import { type FormulationPickerValue } from '../components/health/FormulationPicker';
 import { useSelectedPet } from '../context/SelectedPetContext';
 import { usePermissions } from '../context/usePermissions';
-import { localToday, shiftDate } from '../lib/dates';
+import { shiftDate } from '../lib/dates';
 import {
   assignmentDeleteErrorMessage,
   assignmentStatus,
@@ -38,7 +39,7 @@ export default function HealthTreatmentPlanPage() {
   const queryClient = useQueryClient();
   const { selectedPetId, selectedPet, petsLoading } = useSelectedPet();
   const { canWrite } = usePermissions();
-  const today = localToday();
+  const { today } = useResourceTime();
 
   const [showCreateMed, setShowCreateMed] = useState(false);
   const [medName, setMedName] = useState('');

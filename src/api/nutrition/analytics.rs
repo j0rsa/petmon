@@ -20,8 +20,9 @@ pub async fn daily_totals(
     state: web::Data<AppState>,
     query: web::Query<AnalyticsQuery>,
 ) -> AppResult<HttpResponse> {
+    let context = state.request_context(&_scope_req)?;
     let totals = nutrition_analytics_service::daily_totals(
-        &state.pool,
+        &context,
         &query.date_from,
         &query.date_to,
         query.pet_id,
@@ -37,8 +38,9 @@ pub async fn range_summary(
     state: web::Data<AppState>,
     query: web::Query<AnalyticsQuery>,
 ) -> AppResult<HttpResponse> {
+    let context = state.request_context(&_scope_req)?;
     let summary = nutrition_analytics_service::range_summary(
-        &state.pool,
+        &context,
         &query.date_from,
         &query.date_to,
         query.pet_id,
@@ -60,8 +62,9 @@ pub async fn best_fluid_day(
     state: web::Data<AppState>,
     query: web::Query<BestFluidDayQuery>,
 ) -> AppResult<HttpResponse> {
+    let context = state.request_context(&_scope_req)?;
     let result =
-        nutrition_analytics_service::best_fluid_day(&state.pool, query.pet_id, &query.exclude_date)
+        nutrition_analytics_service::best_fluid_day(&context, query.pet_id, &query.exclude_date)
             .await?;
     Ok(HttpResponse::Ok().json(result))
 }

@@ -1,6 +1,5 @@
 import { NavLink } from 'react-router-dom';
-import { useQuery } from '@tanstack/react-query';
-import { meApi } from '../api/me';
+import { useApplicationExtensions, useSessionMe } from '../context/ApplicationExtensions';
 import { performSignOut } from '../lib/signOut';
 import { PawPrint, Utensils, HeartPulse } from 'lucide-react';
 import { PILLARS, type MonitoringPillar } from '../types/pillars';
@@ -19,6 +18,7 @@ const utilityLinks = [
 ];
 
 export function NavBar() {
+  const extensions = useApplicationExtensions();
   return (
     <nav className="sidebar-nav">
       <NavLink to="/" end className={({ isActive }) => `nav-link${isActive ? ' active' : ''}`}>
@@ -42,7 +42,7 @@ export function NavBar() {
 
       <div className="nav-section">
         <span className="nav-section-label">Manage</span>
-        {utilityLinks.map((link) => (
+        {[...utilityLinks, ...(extensions?.navigation ?? [])].map((link) => (
           <NavLink key={link.to} to={link.to} className={({ isActive }) => `nav-link${isActive ? ' active' : ''}`}>
             {link.label}
           </NavLink>
@@ -55,19 +55,15 @@ export function NavBar() {
 }
 
 export function SidebarUserChip() {
-  const { data: me } = useQuery({
-    queryKey: ['me'],
-    queryFn: meApi.get,
-    staleTime: 5 * 60 * 1000,
-    retry: false,
-  });
+  const { data: me } = useSessionMe();
+  const extensions = useApplicationExtensions();
 
   if (!me) return null;
 
   const sessionKind = me.kind as 'oidc' | 'api_token' | 'dev';
 
   function handleSignOut() {
-    void performSignOut(sessionKind);
+    void (extensions?.session ? extensions.session.signOut() : performSignOut(sessionKind));
   }
 
   return (

@@ -1,7 +1,9 @@
 import { useEffect } from 'react';
+import { useApplicationExtensions } from '../context/ApplicationExtensions';
 import { Outlet } from 'react-router-dom';
 import { Calendars } from 'lucide-react';
-import { SelectedPetProvider } from '../context/SelectedPetContext';
+import { SelectedPetProvider, useSelectedPet } from '../context/SelectedPetContext';
+import { DisplaySettingsProvider } from '../context/DisplaySettingsProvider';
 import { NavBar, SidebarUserChip } from './NavBar';
 import { NotificationCenter } from './NotificationCenter';
 import { SidebarPetPicker } from './SidebarPetPicker';
@@ -16,6 +18,7 @@ import {
 } from '../lib/viewportChrome';
 
 export function Layout() {
+  const extensions = useApplicationExtensions();
   usePushNotifications();
   useScrollToTopOnNavigate();
   useEffect(() => {
@@ -26,7 +29,7 @@ export function Layout() {
     syncViewportChrome();
   }, []);
   return (
-    <SelectedPetProvider>
+    <DisplaySettingsProvider><SelectedPetProvider>
       <NotificationCenter />
       <DemoBanner />
       <div className="app-shell">
@@ -36,16 +39,23 @@ export function Layout() {
             petmon
           </span>
           <SidebarPetPicker />
+          {extensions?.chrome?.sidebar}
           <NavBar />
           <SidebarUserChip />
         </aside>
         <main className="content">
-          <Outlet />
+          {extensions?.chrome?.beforeContent}
+          <PetContent />
         </main>
       </div>
       {/* Outside .app-shell so iOS PWA fixed positioning is not tied to the grid
           scroll container (notification deep-links scroll the page heavily). */}
       <BottomNav />
-    </SelectedPetProvider>
+    </SelectedPetProvider></DisplaySettingsProvider>
   );
+}
+
+function PetContent() {
+  const { selectedPet } = useSelectedPet();
+  return <Outlet key={selectedPet?.id ?? 'no-pet'} />;
 }

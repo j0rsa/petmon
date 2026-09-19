@@ -21,18 +21,28 @@ use actix_web::web;
 pub fn configure(cfg: &mut web::ServiceConfig) {
     cfg.service(
         web::scope("/api/v1")
-            .configure(auth::configure_public)
-            .configure(auth::configure_protected)
-            .configure(health::configure)
-            .configure(pets::configure)
-            .configure(nutrition::configure)
-            .configure(elimination::configure)
-            .configure(weight::configure)
-            .configure(days::configure)
-            .configure(notes::configure)
-            .configure(notifications::configure)
-            .configure(push::configure)
-            .configure(settings::configure)
-            .configure(user_settings::configure),
+            .wrap(crate::middleware::auth::RequireAuth)
+            .configure(configure_full),
     );
+}
+
+/// Register the complete API inside an authenticated scope. Embedders can append
+/// routes to that same scope; `configure` supplies the standalone scope wrapper.
+pub fn configure_full(cfg: &mut web::ServiceConfig) {
+    auth::configure_public(cfg);
+    auth::configure_protected(cfg);
+    health::configure(cfg);
+    info::configure(cfg);
+    pets::configure(cfg);
+    nutrition::configure(cfg);
+    elimination::configure(cfg);
+    weight::configure(cfg);
+    days::configure(cfg);
+    notes::configure(cfg);
+    notifications::configure(cfg);
+    push::configure(cfg);
+    settings::configure(cfg);
+    settings::configure_api_tokens(cfg);
+    user_settings::configure(cfg);
+    shortcuts::configure(cfg);
 }

@@ -1,3 +1,4 @@
+import { useResourceTime } from '../context/useResourceTime';
 import { Link } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { daysApi } from '../api/days';
@@ -9,13 +10,13 @@ import { NoPetSelected } from '../components/NoPetSelected';
 import { OverviewQuickLog } from '../components/OverviewQuickLog';
 import { useSelectedPet } from '../context/SelectedPetContext';
 import { usePermissions } from '../context/usePermissions';
-import { localToday, shiftDate } from '../lib/dates';
+import { shiftDate } from '../lib/dates';
 import { useFormatDate } from '../context/useDisplaySettings';
 import { highlightFromSummary, totalKnownFluidMl } from '../lib/nutritionMetrics';
 import { WET_FOOD_FLUID_RATIO } from '../lib/cumulativeFluid';
 
 export default function OverviewPage() {
-  const today = localToday();
+  const { today } = useResourceTime();
   const formatDate = useFormatDate();
   const { selectedPetId, selectedPet, petsLoading } = useSelectedPet();
   const { canWrite } = usePermissions();

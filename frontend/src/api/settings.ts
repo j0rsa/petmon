@@ -31,8 +31,14 @@ export interface UpdateTelegramConfig {
   bot_token?: string | null;
 }
 
-export type ApiTokenScope = 'all' | 'api_read' | 'api_write' | 'mcp';
-export const API_TOKEN_SCOPES: ApiTokenScope[] = ['all', 'api_read', 'api_write', 'mcp'];
+export type ApiTokenScope = 'all' | 'api_read' | 'api_write' | 'mcp' | 'instance_admin';
+export const API_TOKEN_SCOPES: ApiTokenScope[] = ['all', 'api_read', 'api_write', 'mcp', 'instance_admin'];
+
+export function allowedTokenScopes(capabilities: Set<string>): ApiTokenScope[] {
+  return API_TOKEN_SCOPES.filter((scope) => scope === 'all'
+    ? ['api_read', 'api_write', 'mcp'].every((capability) => capabilities.has(capability))
+    : capabilities.has(scope));
+}
 
 export interface ApiTokenPublic {
   id: string;
@@ -53,6 +59,10 @@ export interface ApiTokenCreated {
   created_at: string;
 }
 
+export interface ApiTokenAdminPublic extends ApiTokenPublic {
+  owner_subject: string | null;
+}
+
 export interface CreateApiToken {
   alias?: string;
   scopes?: ApiTokenScope[];
@@ -68,6 +78,8 @@ export const settingsApi = {
   getTelegram: () => api.get<TelegramConfigPublic>('/settings/telegram'),
   updateTelegram: (body: UpdateTelegramConfig) => api.post<TelegramConfigPublic>('/settings/telegram', body),
   listTokens: () => api.get<ApiTokenPublic[]>('/api-tokens'),
+  listInstanceTokens: () => api.get<ApiTokenAdminPublic[]>('/admin/api-tokens'),
+  revokeInstanceToken: (id: string) => api.delete(`/admin/api-tokens/${id}`),
   createToken: (body: CreateApiToken) => api.post<ApiTokenCreated>('/api-tokens', body),
   activateToken: (id: string) => api.post<void>(`/api-tokens/${id}/activate`, {}),
   deactivateToken: (id: string) => api.delete(`/api-tokens/${id}`),

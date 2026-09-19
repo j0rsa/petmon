@@ -4,13 +4,13 @@ use crate::domain::elimination_classifier::{
     DurationDist, EliminationClassifierModel, EliminationClassifierModelSummary, ExplanationFactor,
     FeatureContext, PredictionExplanation, SignalStrength,
 };
+use crate::embedding::ServiceContext;
 use crate::error::AppResult;
 use crate::repo::{elimination_classifiers, elimination_records, pets};
 use crate::services::elimination_classifier_context::{
     build_feature_context_for_training, compute_baselines,
 };
 use chrono::{Duration, Utc};
-use sqlx::SqlitePool;
 use uuid::Uuid;
 
 pub const FEATURE_DIM: usize = 17;
@@ -223,11 +223,15 @@ fn duration_dist_from_values(values: &[f64]) -> DurationDist {
     }
 }
 
-pub async fn train_classifier(
-    pool: &SqlitePool,
+pub(crate) async fn train_classifier(
+    pool: &ServiceContext,
     pet_id: Uuid,
 ) -> AppResult<Option<EliminationClassifierModel>> {
-    let as_of = Utc::now().date_naive();
+    let as_of = pool
+        .runtime
+        .now()
+        .with_timezone(&pool.timezone(pet_id).await?)
+        .date_naive();
     let date_from = (as_of - Duration::days(TRAINING_WINDOW_DAYS as i64)).to_string();
     let date_to = as_of.to_string();
     let baselines = compute_baselines(pool, pet_id, as_of).await?;
@@ -424,9 +428,18 @@ fn duration_signal_from_z(z_wee: f32, z_poop: f32) -> SignalStrength {
     }
 }
 
-pub async fn get_status(pool: &SqlitePool, pet_id: Uuid) -> AppResult<ClassifierStatus> {
+pub async fn get_status(
+    pool: &crate::embedding::ServiceContext,
+    pet_id: Uuid,
+) -> AppResult<ClassifierStatus> {
+    pool.check(Some(pet_id), crate::embedding::ResourceAction::View)
+        .await?;
     let pet = pets::get_pet(pool, pet_id).await?;
-    let as_of = Utc::now().date_naive();
+    let as_of = pool
+        .runtime
+        .now()
+        .with_timezone(&pool.timezone(pet_id).await?)
+        .date_naive();
     let baselines = compute_baselines(pool, pet_id, as_of).await?;
     let model_row = elimination_classifiers::get(pool, pet_id).await?;
     let (model, fallback_active) = match model_row {
@@ -456,7 +469,12 @@ pub async fn get_status(pool: &SqlitePool, pet_id: Uuid) -> AppResult<Classifier
     })
 }
 
-pub async fn retrain(pool: &SqlitePool, pet_id: Uuid) -> AppResult<ClassifierRetrainResult> {
+pub async fn retrain(
+    pool: &crate::embedding::ServiceContext,
+    pet_id: Uuid,
+) -> AppResult<ClassifierRetrainResult> {
+    pool.check(Some(pet_id), crate::embedding::ResourceAction::WriteProfile)
+        .await?;
     pets::get_pet(pool, pet_id).await?;
     match train_classifier(pool, pet_id).await? {
         Some(model) => {
@@ -485,13 +503,16 @@ pub async fn retrain(pool: &SqlitePool, pet_id: Uuid) -> AppResult<ClassifierRet
     }
 }
 
-pub async fn mark_pending_retrain(pool: &SqlitePool, pet_id: Uuid) -> AppResult<()> {
+pub(crate) async fn mark_pending_retrain(pool: &ServiceContext, pet_id: Uuid) -> AppResult<()> {
     elimination_classifiers::mark_pending_retrain(pool, pet_id).await?;
     let _ = train_classifier(pool, pet_id).await?;
     Ok(())
 }
 
-pub async fn process_pending_retrains(pool: &SqlitePool, limit: i64) -> AppResult<usize> {
+pub(crate) async fn process_pending_retrains(
+    pool: &ServiceContext,
+    limit: i64,
+) -> AppResult<usize> {
     let pet_ids = elimination_classifiers::pending_pet_ids(pool, limit).await?;
     let mut count = 0;
     for pet_id in pet_ids {
@@ -505,7 +526,7 @@ pub async fn process_pending_retrains(pool: &SqlitePool, limit: i64) -> AppResul
     Ok(count)
 }
 
-pub async fn maybe_train_on_enable(pool: &SqlitePool, pet_id: Uuid) -> AppResult<()> {
+pub(crate) async fn maybe_train_on_enable(pool: &ServiceContext, pet_id: Uuid) -> AppResult<()> {
     let _ = train_classifier(pool, pet_id).await?;
     Ok(())
 }

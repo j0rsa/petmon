@@ -191,7 +191,7 @@ async fn seed_nutrition_records(pool: &SqlitePool, demo_pets: &[Pet]) -> AppResu
 
             let records = daily_records_for_pet(pet, date, day_offset);
             for req in records {
-                nutrition_records::create_record(pool, NutritionRecord::new(req, chrono_tz::UTC))
+                nutrition_records::create_record(pool, NutritionRecord::new(req, chrono_tz::UTC)?)
                     .await?;
                 count += 1;
             }
@@ -1203,10 +1203,13 @@ mod tests {
         assert_eq!(pepper_meds.len(), 4);
 
         let today = Utc::now().date_naive().format("%Y-%m-%d").to_string();
-        let pepper_daily =
-            crate::services::medication_service::daily_assignments(&pool, pepper_id, &today)
-                .await
-                .expect("pepper daily meds");
+        let pepper_daily = crate::services::medication_service::daily_assignments(
+            &crate::embedding::ServiceContext::standalone(pool.clone(), chrono_tz::UTC),
+            pepper_id,
+            &today,
+        )
+        .await
+        .expect("pepper daily meds");
         // 3 scheduled + 1 optional
         assert_eq!(pepper_daily.len(), 4);
 

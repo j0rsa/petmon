@@ -46,20 +46,22 @@ struct UnsubscribeRequest {
 #[post("/unsubscribe")]
 #[require_scope("api_write")]
 pub async fn unsubscribe(
+    req: HttpRequest,
     state: web::Data<AppState>,
     body: web::Json<UnsubscribeRequest>,
 ) -> AppResult<HttpResponse> {
-    push_service::unsubscribe(&state.pool, &body.endpoint).await?;
+    push_service::unsubscribe(&state.pool, &reader_key(&req)?, &body.endpoint).await?;
     Ok(HttpResponse::NoContent().finish())
 }
 
 #[post("/test")]
 #[require_scope("api_write")]
 pub async fn send_test(
+    req: HttpRequest,
     state: web::Data<AppState>,
     body: web::Json<PushTestRequest>,
 ) -> AppResult<HttpResponse> {
-    let result = push_service::send_test(&state.pool, &body.endpoint).await?;
+    let result = push_service::send_test(&state.pool, &reader_key(&req)?, &body.endpoint).await?;
     Ok(HttpResponse::Ok().json(result))
 }
 

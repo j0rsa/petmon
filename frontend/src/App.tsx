@@ -1,4 +1,6 @@
 import { Navigate, Route, Routes, useParams } from 'react-router-dom';
+import { useApplicationExtensions, type ApplicationRoute } from './context/ApplicationExtensions';
+import type { ComponentType, ReactNode } from 'react';
 import { AuthGuard } from './components/AuthGuard';
 import { Layout } from './components/Layout';
 import { NutritionLayout } from './layouts/NutritionLayout';
@@ -19,14 +21,16 @@ import HealthNotificationsPage from './pages/HealthNotificationsPage';
 import SettingsPage from './pages/SettingsPage';
 import AuthCallbackPage from './pages/AuthCallbackPage';
 
-export default function App() {
+export default function App({ sessionBoundary: SessionBoundary }: { sessionBoundary?: ComponentType<{ children: ReactNode }> } = {}) {
+  const extensions = useApplicationExtensions();
+  const Guard = extensions?.session?.Guard ?? AuthGuard;
   return (
     <Routes>
       {/* Public — no layout, no auth */}
       <Route path="/auth/callback" element={<AuthCallbackPage />} />
 
-      <Route element={<AuthGuard />}>
-        <Route element={<Layout />}>
+      <Route element={<Guard />}>
+        <Route element={SessionBoundary ? <SessionBoundary><Layout /></SessionBoundary> : <Layout />}>
           <Route path="/" element={<OverviewPage />} />
           <Route path="/nutrition" element={<NutritionLayout />}>
             <Route index element={<NutritionJournalPage />} />
@@ -52,11 +56,17 @@ export default function App() {
           <Route path="/analytics" element={<Navigate to="/nutrition/analytics" replace />} />
           <Route path="/schedules" element={<Navigate to="/nutrition/schedules" replace />} />
           <Route path="/imports" element={<Navigate to="/nutrition/import" replace />} />
+          {extensions?.routes?.map(extensionRoute)}
           <Route path="*" element={<Navigate to="/" replace />} />
         </Route>
       </Route>
     </Routes>
   );
+}
+
+function extensionRoute(route: ApplicationRoute, index: number): React.ReactNode {
+  if (route.index) return <Route key={index} index element={route.element} />;
+  return <Route key={route.path ?? index} path={route.path} element={route.element}>{route.children?.map(extensionRoute)}</Route>;
 }
 
 function DayRedirect() {

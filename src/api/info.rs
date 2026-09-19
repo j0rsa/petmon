@@ -7,7 +7,10 @@ include!(concat!(env!("OUT_DIR"), "/version_info.rs"));
 
 #[derive(Serialize)]
 pub struct AppInfo {
-    pub version: &'static str,
+    pub version: String,
+    pub base_version: &'static str,
+    pub edition: String,
+    pub features: Vec<String>,
     pub git_sha: &'static str,
     pub demo_mode: bool,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -17,7 +20,10 @@ pub struct AppInfo {
 #[get("/info")]
 pub async fn info(state: web::Data<AppState>) -> HttpResponse {
     HttpResponse::Ok().json(AppInfo {
-        version: VERSION,
+        version: state.application_version.clone(),
+        base_version: VERSION,
+        edition: state.edition.clone(),
+        features: state.features.clone(),
         git_sha: GIT_SHA,
         demo_mode: state.demo_mode,
         med_intake_shortcut_icloud_url: state.med_intake_shortcut_icloud_url.clone(),

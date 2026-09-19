@@ -20,28 +20,14 @@ async fn setup_pool() -> SqlitePool {
 }
 
 /// Builds the /api/v1 slice only (used by CRUD tests).
-/// Must stay in sync with the service registration in main.rs.
+/// Uses the same complete API registration as production.
 macro_rules! build_app {
     ($state:expr) => {
         test::init_service(
             App::new().app_data($state.clone()).service(
                 web::scope("/api/v1")
                     .wrap(middleware::auth::RequireAuth)
-                    .configure(api::auth::configure_public)
-                    .configure(api::auth::configure_protected)
-                    .configure(api::health::configure)
-                    .configure(api::pets::configure)
-                    .configure(api::nutrition::configure)
-                    .configure(api::elimination::configure)
-                    .configure(api::weight::configure)
-                    .configure(api::days::configure)
-                    .configure(api::notes::configure)
-                    .configure(api::notifications::configure)
-                    .configure(api::push::configure)
-                    .configure(api::settings::configure)
-                    .configure(api::settings::configure_api_tokens)
-                    .configure(api::user_settings::configure)
-                    .configure(api::shortcuts::configure),
+                    .configure(api::configure_full),
             ),
         )
         .await
@@ -49,8 +35,7 @@ macro_rules! build_app {
 }
 
 /// Builds the full app routing exactly as main.rs does, including MCP and assets.
-/// This macro is the authoritative mirror of main.rs — if a route works here
-/// it will work in production, and divergence is caught by the routing tests below.
+/// Shared route registration prevents production/test routing drift.
 macro_rules! build_full_app {
     ($state:expr) => {
         test::init_service(
@@ -60,22 +45,7 @@ macro_rules! build_full_app {
                 .service(
                     web::scope("/api/v1")
                         .wrap(middleware::auth::RequireAuth)
-                        .configure(api::auth::configure_public)
-                        .configure(api::auth::configure_protected)
-                        .configure(api::health::configure)
-                        .configure(api::info::configure)
-                        .configure(api::pets::configure)
-                        .configure(api::nutrition::configure)
-                        .configure(api::elimination::configure)
-                        .configure(api::weight::configure)
-                        .configure(api::days::configure)
-                        .configure(api::notes::configure)
-                        .configure(api::notifications::configure)
-                        .configure(api::push::configure)
-                        .configure(api::settings::configure)
-                        .configure(api::settings::configure_api_tokens)
-                        .configure(api::user_settings::configure)
-                        .configure(api::shortcuts::configure),
+                        .configure(api::configure_full),
                 )
                 .service(
                     web::scope("/mcp")

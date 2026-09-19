@@ -4,6 +4,8 @@ export interface WeightRecord {
   id: string;
   pet_id: string;
   measured_at: string;
+  measured_at_utc?: string | null;
+  source_timezone?: string | null;
   local_date: string;
   weight_kg: number;
   note: string | null;

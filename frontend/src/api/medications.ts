@@ -79,6 +79,8 @@ export interface MedIntakeRecord {
   effective_dose_mg: number | null;
   dose_label: string;
   occurred_at: string;
+  occurred_at_utc?: string | null;
+  source_timezone?: string | null;
   local_date: string;
   taken: boolean;
   note: string | null;

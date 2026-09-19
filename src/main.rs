@@ -29,12 +29,15 @@ async fn main() -> anyhow::Result<()> {
 
     let pool = db::create_pool(&config).await?;
     db::run_migrations(&pool).await?;
+    if auth::admin::run_cli(&pool, std::env::args().skip(1).collect()).await? {
+        return Ok(());
+    }
+    auth::admin::bootstrap_from_env(&pool).await?;
     tracing::info!(database_url = %config.database_url, "database migrations applied");
 
     services::startup::maybe_seed_demo(&pool, config.demo_mode).await;
     services::startup::sync_oidc_from_env(&pool).await;
     services::startup::cleanup_push_subscriptions(&pool).await;
-    services::elimination_classifier_retrain::spawn(pool.clone());
 
     let dev_mode = std::env::var("DEV_MODE")
         .map(|v| matches!(v.to_lowercase().as_str(), "1" | "true" | "yes"))
@@ -65,9 +68,6 @@ async fn main() -> anyhow::Result<()> {
         chrono_tz::UTC
     });
 
-    services::nudge_service::spawn(pool.clone(), timezone);
-    services::feeding_nudge_service::spawn(pool.clone(), timezone);
-
     let med_intake_shortcut_icloud_url =
         services::shortcut_publish::resolve_med_intake_icloud_url();
 
@@ -80,6 +80,9 @@ async fn main() -> anyhow::Result<()> {
         config.demo_mode,
         med_intake_shortcut_icloud_url,
     ));
+    services::nudge_service::spawn_with_context(state.worker_context("medication reminders"));
+    services::feeding_nudge_service::spawn_with_context(state.worker_context("feeding reminders"));
+    services::elimination_classifier_retrain::spawn(state.worker_context("classifier retraining"));
     let bind_addr = format!("{}:{}", config.host, config.port);
 
     HttpServer::new(move || {
@@ -102,22 +105,7 @@ async fn main() -> anyhow::Result<()> {
             .service(
                 web::scope("/api/v1")
                     .wrap(middleware::auth::RequireAuth)
-                    .configure(api::auth::configure_public)
-                    .configure(api::auth::configure_protected)
-                    .configure(api::health::configure)
-                    .configure(api::info::configure)
-                    .configure(api::pets::configure)
-                    .configure(api::nutrition::configure)
-                    .configure(api::elimination::configure)
-                    .configure(api::weight::configure)
-                    .configure(api::days::configure)
-                    .configure(api::notes::configure)
-                    .configure(api::notifications::configure)
-                    .configure(api::push::configure)
-                    .configure(api::settings::configure)
-                    .configure(api::settings::configure_api_tokens)
-                    .configure(api::user_settings::configure)
-                    .configure(api::shortcuts::configure),
+                    .configure(api::configure_full),
             )
             .service(
                 web::scope("/mcp")

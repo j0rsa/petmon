@@ -18,8 +18,9 @@ pub async fn nutrition_status(
     state: web::Data<AppState>,
     query: web::Query<NutritionStatusQuery>,
 ) -> AppResult<HttpResponse> {
+    let context = state.request_context(&_scope_req)?;
     let status = nutrition_status_service::get_status(
-        &state.pool,
+        &context,
         query.pet_id,
         query.ts.as_deref(),
         state.timezone,

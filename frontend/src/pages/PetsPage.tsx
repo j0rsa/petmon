@@ -1,11 +1,13 @@
 import { useMemo, useState } from 'react';
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { Link } from 'react-router-dom';
 import { petsApi } from '../api/pets';
 import { PetAvatar } from '../components/pet/PetAvatar';
 import { getPetPhoto } from '../lib/petPhotoStorage';
 import { PET_SPECIES, PET_SPECIES_LABELS, PET_STATUSES, PET_STATUS_LABELS, type PetSpecies, type PetStatus } from '../types';
 import { usePermissions } from '../context/usePermissions';
+import { useSelectedPet } from '../context/SelectedPetContext';
+import { useApplicationExtensions } from '../context/ApplicationExtensions';
 
 interface PetFormState {
   name: string;
@@ -32,15 +34,16 @@ function toPayload(form: PetFormState) {
 
 export default function PetsPage() {
   const queryClient = useQueryClient();
-  const { canWrite } = usePermissions();
+  const { canCreate: canWrite } = usePermissions(null);
+  const extensions = useApplicationExtensions();
   const [createForm, setCreateForm] = useState<PetFormState>(emptyForm);
   const [showCreateForm, setShowCreateForm] = useState(false);
 
-  const petsQuery = useQuery({ queryKey: ['pets'], queryFn: petsApi.list });
-  const sortedPets = useMemo(() => [...(petsQuery.data ?? [])].sort((left, right) => left.name.localeCompare(right.name)), [petsQuery.data]);
+  const { pets, petsLoading, petsError } = useSelectedPet();
+  const sortedPets = useMemo(() => [...pets].sort((left, right) => left.name.localeCompare(right.name)), [pets]);
 
   const createMutation = useMutation({
-    mutationFn: () => petsApi.create(toPayload(createForm)),
+    mutationFn: () => (extensions?.pets?.create ?? petsApi.create)(toPayload(createForm)),
     onSuccess: async () => {
       setCreateForm(emptyForm);
       setShowCreateForm(false);
@@ -72,10 +75,10 @@ export default function PetsPage() {
         )}
       </section>
 
-      {petsQuery.isLoading ? (
+      {petsLoading ? (
         <div className="loading-state">Loading pets…</div>
-      ) : petsQuery.isError ? (
-        <div className="error-state">{petsQuery.error instanceof Error ? petsQuery.error.message : 'Unable to load pets.'}</div>
+      ) : petsError ? (
+        <div className="error-state">{petsError.message}</div>
       ) : sortedPets.length === 0 && !showCreateForm ? (
         <div className="empty-state">
           <p>No pets yet.</p>
@@ -107,7 +110,7 @@ export default function PetsPage() {
                 <Link className="button" to={`/pets/${pet.id}`}>
                   Profile
                 </Link>
-                {canWrite && (
+                <PetDeleteControl petId={pet.id}>
                   <button
                     className="button button-danger"
                     type="button"
@@ -120,7 +123,7 @@ export default function PetsPage() {
                   >
                     Delete
                   </button>
-                )}
+                </PetDeleteControl>
               </div>
             </article>
           ))}
@@ -155,6 +158,11 @@ export default function PetsPage() {
       )}
     </div>
   );
+}
+
+function PetDeleteControl({ petId, children }: { petId: string; children: React.ReactNode }) {
+  const { canDelete } = usePermissions(petId);
+  return canDelete ? children : null;
 }
 
 function PetForm({

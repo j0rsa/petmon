@@ -47,6 +47,10 @@ pub struct EliminationRecord {
     pub id: String,
     pub pet_id: Uuid,
     pub occurred_at: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub occurred_at_utc: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub source_timezone: Option<String>,
     pub local_date: String,
     pub event_type: EliminationEventType,
     pub subtype: Option<String>,

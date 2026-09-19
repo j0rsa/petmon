@@ -1,6 +1,6 @@
 use crate::auth::AppState;
 use crate::error::{AppError, AppResult};
-use crate::repo::elimination_records;
+use crate::services::elimination_analytics_service;
 use actix_web::{get, web, HttpResponse};
 use petmon_macros::require_scope;
 use serde::Deserialize;
@@ -17,9 +17,10 @@ pub async fn duration_profile(
     state: web::Data<AppState>,
     query: web::Query<DurationProfileQuery>,
 ) -> AppResult<HttpResponse> {
+    let context = state.request_context(&_scope_req)?;
     let pet_id = Uuid::parse_str(&query.pet_id)
         .map_err(|_| AppError::BadRequest(format!("invalid pet_id: {}", query.pet_id)))?;
-    let profile = elimination_records::duration_profile(&state.pool, pet_id).await?;
+    let profile = elimination_analytics_service::duration_profile(&context, pet_id).await?;
     Ok(HttpResponse::Ok().json(profile))
 }
 

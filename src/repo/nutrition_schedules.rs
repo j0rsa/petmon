@@ -8,12 +8,21 @@ pub async fn list_schedules(
     pool: &SqlitePool,
     pet_id: Option<Uuid>,
 ) -> AppResult<Vec<NutritionSchedule>> {
+    list_schedules_scoped(pool, pet_id, &crate::embedding::PetVisibility::All).await
+}
+
+pub async fn list_schedules_scoped(
+    pool: &SqlitePool,
+    pet_id: Option<Uuid>,
+    visibility: &crate::embedding::PetVisibility,
+) -> AppResult<Vec<NutritionSchedule>> {
     let mut query = String::from(
-        "SELECT id, pet_id, name, active, notify, rules_json, created_at, updated_at FROM nutrition_schedules",
+        "SELECT id, pet_id, name, active, notify, rules_json, created_at, updated_at FROM nutrition_schedules WHERE 1=1",
     );
     if pet_id.is_some() {
-        query.push_str(" WHERE pet_id = ?");
+        query.push_str(" AND pet_id = ?");
     }
+    query.push_str(&format!(" AND {}", visibility.predicate("pet_id")));
     query.push_str(" ORDER BY created_at DESC");
 
     let mut q = sqlx::query_as::<_, NutritionSchedule>(sqlx::AssertSqlSafe(query));

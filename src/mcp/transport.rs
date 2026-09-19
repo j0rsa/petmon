@@ -73,6 +73,7 @@ pub async fn mcp_handler(
     state: web::Data<AppState>,
     body: web::Json<McpRequest>,
 ) -> AppResult<HttpResponse> {
+    let context = state.request_context(&_scope_req)?;
     let req = body.into_inner();
     let id = req.id.clone();
 
@@ -116,7 +117,9 @@ pub async fn mcp_handler(
                 Err(e) => Err(e),
                 Ok(name) => {
                     let arguments = params.get("arguments").cloned().map(Some).unwrap_or(None);
-                    super::tools::dispatch(&state.pool, name, arguments, state.timezone)
+                    state
+                        .mcp_registry
+                        .dispatch(&context, name, arguments)
                         .await
                         .map(|content| super::protocol::tool_call_result(content.to_string()))
                 }
@@ -131,15 +134,18 @@ pub async fn mcp_handler(
                 .and_then(|v| v.as_str())
                 .map(str::to_owned);
             match uri {
-                Some(uri) => {
-                    super::resources::read_resource(&state.pool, &uri, state.timezone).await
-                }
+                Some(uri) => super::resources::read_resource(&context, &uri, state.timezone).await,
                 None => Err(crate::error::AppError::BadRequest(
                     "uri required".to_string(),
                 )),
             }
         }
-        _ => super::tools::dispatch(&state.pool, &req.method, req.params, state.timezone).await,
+        _ => {
+            state
+                .mcp_registry
+                .dispatch(&context, &req.method, req.params)
+                .await
+        }
     };
 
     Ok(match result {

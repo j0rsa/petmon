@@ -55,6 +55,7 @@ const manifestLabels =
 
 // More info at: https://storybook.js.org/docs/next/writing-tests/integrations/vitest-addon
 export default defineConfig({
+  resolve: { dedupe: ['react', 'react-dom', 'react-router-dom', '@tanstack/react-query'] },
   define: {
     __PETMON_BUILD__: JSON.stringify(petmonBuild),
   },

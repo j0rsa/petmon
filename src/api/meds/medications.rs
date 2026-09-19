@@ -17,9 +17,10 @@ pub async fn list_medications(
     state: web::Data<AppState>,
     query: web::Query<MedicationListQuery>,
 ) -> AppResult<HttpResponse> {
+    let context = state.request_context(&_scope_req)?;
     let pet_id = Uuid::parse_str(&query.pet_id)
         .map_err(|_| crate::error::AppError::BadRequest("invalid pet_id".into()))?;
-    let meds = medication_service::list_medications(&state.pool, pet_id).await?;
+    let meds = medication_service::list_medications(&context, pet_id).await?;
     Ok(HttpResponse::Ok().json(meds))
 }
 
@@ -29,7 +30,8 @@ pub async fn get_medication(
     state: web::Data<AppState>,
     id: web::Path<String>,
 ) -> AppResult<HttpResponse> {
-    let med = medication_service::get_medication(&state.pool, &id).await?;
+    let context = state.request_context(&_scope_req)?;
+    let med = medication_service::get_medication(&context, &id).await?;
     Ok(HttpResponse::Ok().json(med))
 }
 
@@ -39,7 +41,8 @@ pub async fn create_medication(
     state: web::Data<AppState>,
     body: web::Json<CreateMedication>,
 ) -> AppResult<HttpResponse> {
-    let med = medication_service::create_medication(&state.pool, body.into_inner()).await?;
+    let context = state.request_context(&_scope_req)?;
+    let med = medication_service::create_medication(&context, body.into_inner()).await?;
     Ok(HttpResponse::Created().json(med))
 }
 
@@ -50,7 +53,8 @@ pub async fn update_medication(
     id: web::Path<String>,
     body: web::Json<UpdateMedication>,
 ) -> AppResult<HttpResponse> {
-    let med = medication_service::update_medication(&state.pool, &id, body.into_inner()).await?;
+    let context = state.request_context(&_scope_req)?;
+    let med = medication_service::update_medication(&context, &id, body.into_inner()).await?;
     Ok(HttpResponse::Ok().json(med))
 }
 
@@ -60,7 +64,8 @@ pub async fn delete_medication(
     state: web::Data<AppState>,
     id: web::Path<String>,
 ) -> AppResult<HttpResponse> {
-    medication_service::delete_medication(&state.pool, &id).await?;
+    let context = state.request_context(&_scope_req)?;
+    medication_service::delete_medication(&context, &id).await?;
     Ok(HttpResponse::NoContent().finish())
 }
 

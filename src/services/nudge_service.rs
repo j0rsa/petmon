@@ -1,3 +1,4 @@
+use crate::embedding::ServiceContext;
 use chrono::{Timelike, Utc};
 use chrono_tz::Tz;
 use sqlx::SqlitePool;
@@ -9,21 +10,20 @@ use crate::error::AppResult;
 use crate::repo::{med_intake_records, pet_settings};
 use crate::services::{medication_service, push_service};
 
-/// Spawn the background nudge scheduler. It wakes at the top of every hour,
-/// calls `run_nudge_check` for that hour, and sleeps again.
+/// Standalone reminder scheduler. It checks local hours on minute ticks, with
+/// persistent once-per-pet/date/deadline delivery keys across restart and DST folds.
 pub fn spawn(pool: SqlitePool, timezone: Tz) {
+    spawn_with_context(ServiceContext::standalone(pool, timezone));
+}
+
+/// Retains the embedder's runtime and notification backend for background work.
+pub fn spawn_with_context(context: ServiceContext) {
     tokio::spawn(async move {
         loop {
-            let now = Utc::now();
-            let secs_into_hour = now.minute() * 60 + now.second();
-            let secs_until_next_hour = 3600u64.saturating_sub(u64::from(secs_into_hour));
-            tokio::time::sleep(std::time::Duration::from_secs(secs_until_next_hour)).await;
-
-            let hour = Utc::now().with_timezone(&timezone).hour() as u8;
-            tracing::debug!(hour, "running nudge check");
-            if let Err(e) = run_nudge_check(&pool, hour, timezone).await {
-                tracing::warn!(error = %e, hour, "nudge check failed");
+            if let Err(e) = run_nudge_check_at(&context, context.runtime.now(), None).await {
+                tracing::warn!(error = %e, "nudge check failed");
             }
+            tokio::time::sleep(std::time::Duration::from_secs(60)).await;
         }
     });
 }
@@ -50,11 +50,19 @@ pub async fn nudge_hours(pool: &SqlitePool) -> AppResult<Vec<u8>> {
 /// should have been taken by now but haven't been, and broadcast a push to all
 /// subscribers.
 pub async fn run_nudge_check(pool: &SqlitePool, hour: u8, timezone: Tz) -> AppResult<()> {
-    let today = Utc::now()
-        .with_timezone(&timezone)
-        .format("%Y-%m-%d")
-        .to_string();
+    run_nudge_check_at(
+        &ServiceContext::standalone(pool.clone(), timezone),
+        Utc::now(),
+        Some(hour),
+    )
+    .await
+}
 
+pub async fn run_nudge_check_at(
+    pool: &ServiceContext,
+    now: chrono::DateTime<Utc>,
+    hour_override: Option<u8>,
+) -> AppResult<()> {
     let all: Vec<(String, PetNudgeSchedule)> =
         pet_settings::list_all_by_key(pool, MED_NUDGE_KEY).await?;
 
@@ -63,6 +71,16 @@ pub async fn run_nudge_check(pool: &SqlitePool, hour: u8, timezone: Tz) -> AppRe
             Ok(id) => id,
             Err(_) => continue,
         };
+        let timezone = match pool.timezone(pet_id).await {
+            Ok(timezone) => timezone,
+            Err(error) => {
+                tracing::warn!(%pet_id, %error, "nudge runtime resolution failed; pet skipped");
+                continue;
+            }
+        };
+        let local_now = now.with_timezone(&timezone);
+        let hour = hour_override.unwrap_or(local_now.hour() as u8);
+        let today = local_now.format("%Y-%m-%d").to_string();
 
         // Which named slots have deadline_hour <= hour and are enabled?
         let passed_slots: Vec<(&'static str, u8)> = [
@@ -90,6 +108,13 @@ pub async fn run_nudge_check(pool: &SqlitePool, hour: u8, timezone: Tz) -> AppRe
         if passed_slots.is_empty() {
             continue;
         }
+        // Catch up after downtime or a skipped DST hour, but do not generate a
+        // fresh reminder every hour for the same missed dose.
+        let due_deadline = passed_slots
+            .iter()
+            .map(|(_, deadline)| *deadline)
+            .max()
+            .unwrap();
 
         let daily = match medication_service::daily_assignments(pool, pet_id, &today).await {
             Ok(d) => d,
@@ -168,12 +193,13 @@ pub async fn run_nudge_check(pool: &SqlitePool, hour: u8, timezone: Tz) -> AppRe
             link_hash: None,
             pet_id: Some(pet_id),
             pet_name: Some(pet_name.clone()),
-            source_kind: None,
-            source_id: None,
-        }
-        .into_row();
+            source_kind: Some("med_nudge".into()),
+            source_id: Some(format!("{pet_id}:{today}:{due_deadline}")),
+        };
 
-        push_service::spawn_broadcast(pool.clone(), notification);
+        if let Some(notification) = pool.notifications.create(pool, notification).await? {
+            push_service::spawn_broadcast_context(pool.clone(), notification);
+        }
     }
 
     Ok(())

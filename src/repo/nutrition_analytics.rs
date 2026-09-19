@@ -13,6 +13,25 @@ pub async fn daily_totals(
     pet_id: Option<Uuid>,
     category: Option<&str>,
 ) -> AppResult<Vec<NutritionDailyTotal>> {
+    daily_totals_scoped(
+        pool,
+        date_from,
+        date_to,
+        pet_id,
+        category,
+        &crate::embedding::PetVisibility::All,
+    )
+    .await
+}
+
+pub async fn daily_totals_scoped(
+    pool: &SqlitePool,
+    date_from: &str,
+    date_to: &str,
+    pet_id: Option<Uuid>,
+    category: Option<&str>,
+    visibility: &crate::embedding::PetVisibility,
+) -> AppResult<Vec<NutritionDailyTotal>> {
     let mut query = String::from(
         "SELECT local_date, pet_id, category, SUM(amount) as total_amount, COUNT(*) as record_count FROM nutrition_records WHERE local_date >= ? AND local_date <= ?",
     );
@@ -22,6 +41,7 @@ pub async fn daily_totals(
     if category.is_some() {
         query.push_str(" AND category = ?");
     }
+    query.push_str(&format!(" AND {}", visibility.predicate("pet_id")));
     query.push_str(" GROUP BY local_date, pet_id, category ORDER BY local_date, category");
 
     let mut q = sqlx::query_as::<_, NutritionDailyTotal>(sqlx::AssertSqlSafe(query))
@@ -47,12 +67,28 @@ pub async fn best_fluid_day(
     pet_id: Option<Uuid>,
     exclude_date: &str,
 ) -> AppResult<Option<BestFluidDay>> {
+    best_fluid_day_scoped(
+        pool,
+        pet_id,
+        exclude_date,
+        &crate::embedding::PetVisibility::All,
+    )
+    .await
+}
+
+pub async fn best_fluid_day_scoped(
+    pool: &SqlitePool,
+    pet_id: Option<Uuid>,
+    exclude_date: &str,
+    visibility: &crate::embedding::PetVisibility,
+) -> AppResult<Option<BestFluidDay>> {
     let mut query = String::from(
         "SELECT local_date, SUM(CASE WHEN category = 'wet_food' THEN amount * 0.77 WHEN category IN ('water', 'liquids') THEN amount ELSE 0 END) AS total_fluid_ml FROM nutrition_records WHERE local_date != ?",
     );
     if pet_id.is_some() {
         query.push_str(" AND pet_id = ?");
     }
+    query.push_str(&format!(" AND {}", visibility.predicate("pet_id")));
     query.push_str(" GROUP BY local_date ORDER BY total_fluid_ml DESC LIMIT 1");
 
     let mut q = sqlx::query_as::<_, BestDayRow>(sqlx::AssertSqlSafe(query)).bind(exclude_date);
@@ -73,7 +109,8 @@ pub async fn best_fluid_day(
                 limit: None,
                 offset: None,
             };
-            let records = nutrition_records::list_records(pool, &filters).await?;
+            let records =
+                nutrition_records::list_records_scoped(pool, &filters, visibility).await?;
 
             // Build a cumulative fluid curve keyed by HH:MM (sorted).
             // Only fluid-contributing categories: water, liquids (direct), wet_food (× 0.77).

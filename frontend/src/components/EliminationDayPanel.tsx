@@ -1,3 +1,4 @@
+import { useResourceTime } from '../context/useResourceTime';
 import { forwardRef, useEffect, useImperativeHandle, useMemo, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { usePermissions } from '../context/usePermissions';
@@ -14,7 +15,6 @@ import {
 import { TimeInput } from './TimeInput';
 import { EliminationDayChart } from './EliminationDayChart';
 import { isoFromDateAndTime } from '../lib/time';
-import { localToday } from '../lib/dates';
 import { useFormatTime, useFormatDate } from '../context/useDisplaySettings';
 import { useScrollToHash } from '../hooks/useScrollToHash';
 import { formatDurationMmss, normalizeDurationInput, parseDurationToSecs } from '../lib/duration';
@@ -486,7 +486,8 @@ interface EliminationDayPanelProps {
 
 export function EliminationDayPanel({ date, petId }: EliminationDayPanelProps) {
   const queryClient = useQueryClient();
-  const { canWrite } = usePermissions();
+  const { canWrite } = usePermissions(petId);
+  const { today } = useResourceTime(petId);
   const [noteDraft, setNoteDraft] = useState('');
   const [editingRecordId, setEditingRecordId] = useState<string | null>(null);
   const addRowRef = useRef<AddRowHandle>(null);
@@ -570,7 +571,7 @@ export function EliminationDayPanel({ date, petId }: EliminationDayPanelProps) {
           <p className="eyebrow">Selected day</p>
           <h3>{formatDate(date)}</h3>
         </div>
-        {date !== localToday() && (
+        {date !== today && (
           <Link to="/elimination" style={{ fontSize: '0.82rem', color: 'var(--text-subtle)' }}>
             ← today
           </Link>

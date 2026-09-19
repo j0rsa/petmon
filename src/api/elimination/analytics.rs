@@ -18,8 +18,9 @@ pub async fn daily_summaries(
     state: web::Data<AppState>,
     query: web::Query<EliminationAnalyticsQuery>,
 ) -> AppResult<HttpResponse> {
-    let summaries = crate::repo::elimination_analytics::daily_summaries(
-        &state.pool,
+    let context = state.request_context(&_scope_req)?;
+    let summaries = elimination_analytics_service::daily_summaries(
+        &context,
         query.pet_id.as_deref(),
         &query.date_from,
         &query.date_to,
@@ -34,8 +35,9 @@ pub async fn range_summary(
     state: web::Data<AppState>,
     query: web::Query<EliminationAnalyticsQuery>,
 ) -> AppResult<HttpResponse> {
+    let context = state.request_context(&_scope_req)?;
     let summary = elimination_analytics_service::range_summary(
-        &state.pool,
+        &context,
         query.pet_id.as_deref(),
         &query.date_from,
         &query.date_to,

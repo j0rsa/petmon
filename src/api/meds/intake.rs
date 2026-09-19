@@ -14,7 +14,8 @@ pub async fn list_intake(
     state: web::Data<AppState>,
     query: web::Query<MedIntakeRecordFilters>,
 ) -> AppResult<HttpResponse> {
-    let records = medication_service::list_intake(&state.pool, query.into_inner()).await?;
+    let context = state.request_context(&_scope_req)?;
+    let records = medication_service::list_intake(&context, query.into_inner()).await?;
     Ok(HttpResponse::Ok().json(records))
 }
 
@@ -25,15 +26,16 @@ pub async fn create_intake(
     state: web::Data<AppState>,
     body: web::Json<CreateMedIntakeRecord>,
 ) -> AppResult<HttpResponse> {
+    let context = state.request_context(&req)?;
     let reader_key = req.extensions().get::<Identity>().map(Identity::reader_key);
     let display = match reader_key {
         Some(reader_key) => {
-            user_settings::get::<UserDisplaySettings>(&state.pool, &reader_key, DISPLAY_KEY).await?
+            user_settings::get::<UserDisplaySettings>(&context, &reader_key, DISPLAY_KEY).await?
         }
         None => UserDisplaySettings::default(),
     };
     let record =
-        medication_service::create_intake(&state.pool, body.into_inner(), state.timezone, display)
+        medication_service::create_intake(&context, body.into_inner(), state.timezone, display)
             .await?;
     Ok(HttpResponse::Created().json(record))
 }
@@ -44,7 +46,8 @@ pub async fn delete_intake(
     state: web::Data<AppState>,
     id: web::Path<String>,
 ) -> AppResult<HttpResponse> {
-    medication_service::delete_intake(&state.pool, &id).await?;
+    let context = state.request_context(&_scope_req)?;
+    medication_service::delete_intake(&context, &id).await?;
     Ok(HttpResponse::NoContent().finish())
 }
 

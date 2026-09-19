@@ -1,3 +1,4 @@
+import { useResourceTime } from '../../context/useResourceTime';
 import { useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { healthStateApi, type CreateHealthStateRecord, type HealthStateRecord } from '../../api/healthState';
@@ -5,7 +6,7 @@ import type { HealthStateLevel } from '../../lib/healthState';
 import { healthStateEmoji, healthStateLabel } from '../../lib/healthState';
 import type { HealthStateGranularity } from '../../lib/healthStateChart';
 import { buildHealthStateSummary } from '../../lib/healthStateChart';
-import { localToday, shiftDate } from '../../lib/dates';
+import { shiftDate } from '../../lib/dates';
 import { useFormatDate, useFormatTime } from '../../context/useDisplaySettings';
 import { usePermissions } from '../../context/usePermissions';
 import { HealthStateChart } from './HealthStateChart';
@@ -20,24 +21,18 @@ const HEALTH_STATE_PERIODS: { label: PeriodLabel; days: number | null; granulari
   { label: 'all', days: null, granularity: 'weekly' },
 ];
 
-function nowLocalDateTimeString(): string {
-  const now = new Date();
-  const pad = (n: number) => String(n).padStart(2, '0');
-  return `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}T${pad(now.getHours())}:${pad(now.getMinutes())}`;
-}
-
 export interface HealthStatePanelProps {
   petId: string;
 }
 
 export function HealthStatePanel({ petId }: HealthStatePanelProps) {
   const queryClient = useQueryClient();
-  const { canWrite } = usePermissions();
+  const { canWrite } = usePermissions(petId);
   const formatDate = useFormatDate();
   const formatTime = useFormatTime();
 
   const [period, setPeriod] = useState<PeriodLabel>('30d');
-  const today = localToday();
+  const { today, nowLocalDateTimeString } = useResourceTime(petId);
   const { days: periodDays, granularity } = HEALTH_STATE_PERIODS.find((p) => p.label === period)!;
   const dateFrom = periodDays != null ? shiftDate(today, -(periodDays - 1)) : undefined;
 

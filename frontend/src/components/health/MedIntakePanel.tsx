@@ -1,3 +1,4 @@
+import { useResourceTime } from '../../context/useResourceTime';
 import { useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Code } from 'lucide-react';
@@ -9,7 +10,6 @@ import {
   type DoseFraction,
   type MedBundle,
 } from '../../api/medications';
-import { localToday } from '../../lib/dates';
 import {
   expectedDoseCount,
   DOSE_FRACTIONS,
@@ -26,7 +26,7 @@ import { parseDecimal } from '../../lib/numbers';
 import { isDoseSupported } from '../../lib/pillDoseCuts';
 import { medIntakeShortcutLinkProps } from '../../lib/medIntakeShortcut';
 import { showMedIntakeShortcutLink } from '../../lib/medIntakePlatform';
-import { isoFromDateAndTime, nowTimeString } from '../../lib/time';
+import { isoFromDateAndTime } from '../../lib/time';
 import { infoApi } from '../../api/info';
 import { usePermissions } from '../../context/usePermissions';
 import { useFormatTime } from '../../context/useDisplaySettings';
@@ -55,6 +55,7 @@ function DailyMedRow({
 }) {
   const formatTime = useFormatTime();
   const { medication, assignment } = item;
+  const { nowTimeString } = useResourceTime(petId);
   const expected = expectedDoseCount(assignment.frequency);
   const status = intakeStatus(item.intakes, expected);
   const [intakeMode, setIntakeMode] = useState<'record' | 'now' | null>(null);
@@ -382,6 +383,7 @@ function BundleTakeRow({
   panelDate: string;
   onLogged: () => void;
 }) {
+  const { nowTimeString } = useResourceTime(bundle.pet_id);
   const formatTime = useFormatTime();
   const [intakeMode, setIntakeMode] = useState<'record' | null>(null);
   const [intakeDate, setIntakeDate] = useState(panelDate);
@@ -577,8 +579,8 @@ function BundleTakeRow({
 
 export function MedIntakePanel({ petId }: MedIntakePanelProps) {
   const queryClient = useQueryClient();
-  const { canWrite } = usePermissions();
-  const today = localToday();
+  const { canWrite } = usePermissions(petId);
+  const { today } = useResourceTime(petId);
   const { settings: developerSettings } = useUserSettings('developer_mode');
 
   const dailyQuery = useQuery({

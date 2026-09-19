@@ -46,9 +46,10 @@ pub async fn med_intake_menu_handler(
     state: web::Data<AppState>,
     query: web::Query<MedIntakeMenuQuery>,
 ) -> AppResult<HttpResponse> {
+    let context = state.request_context(&_scope_req)?;
     let pet_id = Uuid::parse_str(&query.pet_id)
         .map_err(|_| AppError::BadRequest("invalid pet_id".into()))?;
-    let menu = shortcut_menu::med_intake_menu(&state.pool, pet_id, &query.date).await?;
+    let menu = shortcut_menu::med_intake_menu(&context, pet_id, &query.date).await?;
     Ok(HttpResponse::Ok().json(menu))
 }
 
@@ -58,6 +59,7 @@ pub async fn med_intake_take(
     state: web::Data<AppState>,
     query: web::Query<MedIntakeTakeQuery>,
 ) -> AppResult<HttpResponse> {
+    let context = state.request_context(&_scope_req)?;
     let pet_id = Uuid::parse_str(&query.pet_id)
         .map_err(|_| AppError::BadRequest("invalid pet_id".into()))?;
 
@@ -74,7 +76,7 @@ pub async fn med_intake_take(
     // like a take from the web UI. Backdating goes through the normal intake
     // API instead.
     let record = medication_service::create_intake(
-        &state.pool,
+        &context,
         CreateMedIntakeRecord {
             pet_id: pet_id.to_string(),
             medication_id: query.medication_id.clone(),
@@ -115,9 +117,9 @@ pub async fn med_intake_take_bundle(
     state: web::Data<AppState>,
     query: web::Query<MedIntakeTakeBundleQuery>,
 ) -> AppResult<HttpResponse> {
+    let context = state.request_context(&_scope_req)?;
     let pet_id = Uuid::parse_str(&query.pet_id)
         .map_err(|_| AppError::BadRequest("invalid pet_id".into()))?;
-    let _ = pet_id; // validated; bundle_id scopes the operation
     let source_type = query
         .source
         .as_deref()
@@ -125,8 +127,9 @@ pub async fn med_intake_take_bundle(
         .filter(|s| !s.is_empty())
         .unwrap_or("shortcut")
         .to_string();
-    let records = medication_service::create_bundle_intake(
-        &state.pool,
+    let records = medication_service::create_bundle_intake_for_pet(
+        &context,
+        pet_id,
         &query.bundle_id,
         crate::domain::medication::CreateMedBundleIntake {
             occurred_at: None,

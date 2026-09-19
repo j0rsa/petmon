@@ -31,12 +31,30 @@ pub async fn daily_summaries(
     date_from: &str,
     date_to: &str,
 ) -> AppResult<Vec<EliminationDailySummary>> {
+    daily_summaries_scoped(
+        pool,
+        pet_id,
+        date_from,
+        date_to,
+        &crate::embedding::PetVisibility::All,
+    )
+    .await
+}
+
+pub async fn daily_summaries_scoped(
+    pool: &SqlitePool,
+    pet_id: Option<&str>,
+    date_from: &str,
+    date_to: &str,
+    visibility: &crate::embedding::PetVisibility,
+) -> AppResult<Vec<EliminationDailySummary>> {
     let mut query = String::from(
         "SELECT local_date, event_type, COUNT(*) as cnt FROM elimination_records WHERE local_date BETWEEN ? AND ?",
     );
     if pet_id.is_some() {
         query.push_str(" AND pet_id = ?");
     }
+    query.push_str(&format!(" AND {}", visibility.predicate("pet_id")));
     query.push_str(" GROUP BY local_date, event_type ORDER BY local_date");
 
     let mut q = sqlx::query_as::<_, EventTypeCountRow>(sqlx::AssertSqlSafe(query))
@@ -59,6 +77,7 @@ pub async fn daily_summaries(
     if pet_id.is_some() {
         type_dur_query.push_str(" AND pet_id = ?");
     }
+    type_dur_query.push_str(&format!(" AND {}", visibility.predicate("pet_id")));
     type_dur_query.push_str(" GROUP BY local_date, event_type");
 
     let mut tq = sqlx::query_as::<_, AvgDurationByTypeRow>(sqlx::AssertSqlSafe(type_dur_query))

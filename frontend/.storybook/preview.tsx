@@ -28,7 +28,7 @@ const withQueryClient: Decorator = (Story) => {
     },
   });
   // Seed identity so NavBar's /auth/me query never hits the network
-  client.setQueryData(['me'], { subject: 'dev', email: null, name: 'Dev', display_name: 'Dev', kind: 'dev' });
+  client.setQueryData(['me'], { subject: 'dev', email: null, name: 'Dev', display_name: 'Dev', kind: 'dev', scopes: [], roles: ['instance_admin'], capabilities: ['api_read', 'api_write', 'mcp', 'instance_admin'] });
   return (
     <QueryClientProvider client={client}>
       <Story />

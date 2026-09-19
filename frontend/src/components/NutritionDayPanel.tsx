@@ -1,3 +1,4 @@
+import { useResourceTime } from '../context/useResourceTime';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { usePermissions } from '../context/usePermissions';
@@ -12,7 +13,7 @@ import { IntakeBarsChart } from './IntakeBarsChart';
 import { NutritionAddForm, type NutritionAddFormHandle } from './NutritionAddForm';
 import { TimeInput } from './TimeInput';
 import { isoFromDateAndTime, timeFromIso } from '../lib/time';
-import { localToday, shiftDate } from '../lib/dates';
+import { shiftDate } from '../lib/dates';
 import { useDisplaySettings, useFormatDate, useFormatTime } from '../context/useDisplaySettings';
 import { exportTelegramLog } from '../lib/exportTelegramLog';
 import { LiquidsIcon, WaterIcon, WetFoodIcon, TotalFluidIcon } from '../lib/metricIcons';
@@ -240,7 +241,8 @@ interface NutritionDayPanelProps {
 
 export function NutritionDayPanel({ date, petId }: NutritionDayPanelProps) {
   const queryClient = useQueryClient();
-  const { canWrite } = usePermissions();
+  const { canWrite } = usePermissions(petId);
+  const { today, minuteOfDay } = useResourceTime(petId);
   const [noteDraft, setNoteDraft] = useState('');
   const { show_water_card } = useDisplaySettings();
   const addRowRef = useRef<NutritionAddFormHandle>(null);
@@ -317,8 +319,8 @@ export function NutritionDayPanel({ date, petId }: NutritionDayPanelProps) {
   const highlight = summaryQuery.data ? highlightFromSummary(summaryQuery.data) : null;
   const totalFluid = highlight ? totalKnownFluidMl(highlight) : 0;
   const scheduledFluid = useMemo(
-    () => expectedScheduledFluidMl(schedulesQuery.data ?? [], date),
-    [schedulesQuery.data, date],
+    () => expectedScheduledFluidMl(schedulesQuery.data ?? [], date, today, minuteOfDay),
+    [schedulesQuery.data, date, today, minuteOfDay],
   );
   const fluidFromFood = highlight ? Math.round(highlight.wetFood * 0.77) : 0;
 
@@ -338,7 +340,7 @@ export function NutritionDayPanel({ date, petId }: NutritionDayPanelProps) {
           <p className="eyebrow">Selected day</p>
           <h3>{formatDate(date)}</h3>
         </div>
-        {date !== localToday() && (
+        {date !== today && (
           <Link to="/nutrition" style={{ fontSize: '0.82rem', color: 'var(--text-subtle)' }}>
             ← today
           </Link>

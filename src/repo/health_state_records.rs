@@ -13,6 +13,8 @@ struct HealthStateRow {
     id: String,
     pet_id: Uuid,
     occurred_at: String,
+    occurred_at_utc: Option<String>,
+    source_timezone: Option<String>,
     local_date: String,
     note: Option<String>,
     payload_json: String,
@@ -31,6 +33,8 @@ fn row_to_record(row: HealthStateRow) -> AppResult<HealthStateRecord> {
         id: row.id,
         pet_id: row.pet_id,
         occurred_at: row.occurred_at,
+        occurred_at_utc: row.occurred_at_utc,
+        source_timezone: row.source_timezone,
         local_date: row.local_date,
         level: payload.level,
         note: row.note,
@@ -46,6 +50,14 @@ pub async fn list(
     pool: &SqlitePool,
     filters: &HealthStateRecordFilters,
 ) -> AppResult<Vec<HealthStateRecord>> {
+    list_scoped(pool, filters, &crate::embedding::PetVisibility::All).await
+}
+
+pub async fn list_scoped(
+    pool: &SqlitePool,
+    filters: &HealthStateRecordFilters,
+    visibility: &crate::embedding::PetVisibility,
+) -> AppResult<Vec<HealthStateRecord>> {
     let has_date_range = filters.date_from.is_some() || filters.date_to.is_some();
     let limit = filters.limit.or(if has_date_range {
         None
@@ -58,7 +70,7 @@ pub async fn list(
     effective.limit = limit;
 
     let mut query = String::from(
-        "SELECT id, pet_id, occurred_at, local_date, note, payload_json, source_type, created_at
+        "SELECT id, pet_id, occurred_at, occurred_at_utc, source_timezone, local_date, note, payload_json, source_type, created_at
          FROM health_records WHERE record_type = ?",
     );
 
@@ -71,6 +83,7 @@ pub async fn list(
     if effective.date_to.is_some() {
         query.push_str(" AND local_date <= ?");
     }
+    query.push_str(&format!(" AND {}", visibility.predicate("pet_id")));
     query.push_str(if order_desc {
         " ORDER BY occurred_at DESC"
     } else {
@@ -105,7 +118,7 @@ pub async fn list(
 #[tracing::instrument(skip(pool))]
 pub async fn get(pool: &SqlitePool, id: &str) -> AppResult<HealthStateRecord> {
     let row = sqlx::query_as::<_, HealthStateRow>(
-        "SELECT id, pet_id, occurred_at, local_date, note, payload_json, source_type, created_at
+        "SELECT id, pet_id, occurred_at, occurred_at_utc, source_timezone, local_date, note, payload_json, source_type, created_at
          FROM health_records WHERE id = ? AND record_type = ?",
     )
     .bind(id)
@@ -124,15 +137,14 @@ pub async fn create(
     timezone: Tz,
 ) -> AppResult<HealthStateRecord> {
     let now = Utc::now().to_rfc3339();
-    let occurred_at = req.occurred_at.unwrap_or_else(|| {
-        Utc::now()
-            .with_timezone(&timezone)
-            .format("%Y-%m-%dT%H:%M:%S")
-            .to_string()
-    });
-    let local_date = req
-        .local_date
-        .unwrap_or_else(|| occurred_at.split('T').next().unwrap_or("").to_string());
+    let time = crate::record_time::resolve(
+        req.occurred_at.as_deref(),
+        req.local_date.as_deref(),
+        timezone,
+        Utc::now(),
+    )?;
+    let occurred_at = time.civil;
+    let local_date = time.local_date;
     let id = Uuid::new_v4().to_string();
     let source_type = req.source_type.unwrap_or_else(|| "manual".to_string());
     let pet_id = Uuid::parse_str(&req.pet_id)
@@ -144,12 +156,14 @@ pub async fn create(
 
     sqlx::query(
         "INSERT INTO health_records
-         (id, pet_id, occurred_at, local_date, record_type, note, payload_json, source_type, created_at, updated_at)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+         (id, pet_id, occurred_at, occurred_at_utc, source_timezone, local_date, record_type, note, payload_json, source_type, created_at, updated_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
     )
     .bind(&id)
     .bind(pet_id)
     .bind(&occurred_at)
+    .bind(&time.utc)
+    .bind(&time.timezone)
     .bind(&local_date)
     .bind(RECORD_TYPE)
     .bind(&req.note)

@@ -1,18 +1,49 @@
 use crate::domain::elimination::EliminationRangeSummary;
+use crate::embedding::ServiceContext;
 use crate::error::AppResult;
 use crate::repo::elimination_analytics;
-use sqlx::SqlitePool;
 use std::collections::HashMap;
+
+pub async fn daily_summaries(
+    pool: &ServiceContext,
+    pet_id: Option<&str>,
+    date_from: &str,
+    date_to: &str,
+) -> AppResult<Vec<crate::domain::elimination::EliminationDailySummary>> {
+    elimination_analytics::daily_summaries_scoped(
+        pool,
+        pet_id,
+        date_from,
+        date_to,
+        &pool.visibility_str(pet_id).await?,
+    )
+    .await
+}
+
+pub async fn duration_profile(
+    pool: &ServiceContext,
+    pet_id: uuid::Uuid,
+) -> AppResult<crate::domain::elimination::EliminationDurationProfile> {
+    pool.check(Some(pet_id), crate::embedding::ResourceAction::View)
+        .await?;
+    crate::repo::elimination_records::duration_profile(pool, pet_id).await
+}
 
 #[tracing::instrument(skip(pool))]
 pub async fn range_summary(
-    pool: &SqlitePool,
+    pool: &ServiceContext,
     pet_id: Option<&str>,
     date_from: &str,
     date_to: &str,
 ) -> AppResult<EliminationRangeSummary> {
-    let daily_summaries =
-        elimination_analytics::daily_summaries(pool, pet_id, date_from, date_to).await?;
+    let daily_summaries = elimination_analytics::daily_summaries_scoped(
+        pool,
+        pet_id,
+        date_from,
+        date_to,
+        &pool.visibility_str(pet_id).await?,
+    )
+    .await?;
 
     // Compute type_totals
     let mut type_totals: HashMap<String, i64> = HashMap::new();

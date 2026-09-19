@@ -259,9 +259,25 @@ petmon can receive toileting records (and combined weight measurements) directly
 petmon supports two auth methods:
 
 - **OIDC/SSO (PKCE flow)** — the browser exchanges the authorization code directly with the provider. No client secret required. Configure via Settings → OIDC, or via environment variables (`OIDC_ISSUER_URL`, `OIDC_CLIENT_ID`, `OIDC_ENABLED`).
-- **API tokens** — long-lived `pm_api_*` tokens. Can be created by OIDC-authenticated users. Use for MCP, scripts, and "Remember this device" on PWA.
+- **API tokens** — long-lived `pm_api_*` tokens. Authenticated writers can create tokens with permissions no broader than their current credential. Use for MCP, scripts, and "Remember this device" on PWA. Token lists and ordinary token management are scoped to their owner.
 
 `DEV_MODE=true` bypasses all auth for local development.
+
+### Instance administration and upgrading to 0.26
+
+OIDC/Telegram instance settings and global token-management endpoints require an instance administrator. Personal settings, devices and shared-pet care remain available under their ordinary permissions. Existing installations must grant an administrator using the deployment's database:
+
+```bash
+DATABASE_URL=sqlite:/data/petmon.db ./petmon admin grant '<subject-from-auth-me>'
+DATABASE_URL=sqlite:/data/petmon.db ./petmon admin list
+DATABASE_URL=sqlite:/data/petmon.db ./petmon admin revoke '<subject>'
+```
+
+The CLI runs migrations and the requested command without starting workers or requiring a configured OIDC provider. Revoking the last administrator is refused; grant a replacement first. `INSTANCE_ADMIN_SUBJECTS` can bootstrap comma-separated subjects once. Successful bootstrap or a CLI grant consumes a durable initialization marker, so restarting with an old environment value does not restore revoked grants. Later grants use the CLI.
+
+Interactive administrator sessions receive live administrative capability. API tokens require both a current administrator grant for their owner and an explicitly requested `instance_admin` scope; `all` grants ordinary REST/MCP access only. Role revocation applies to subsequent requests. Global token administration lives under `/api/v1/admin/api-tokens`, and `/auth/me` reports `roles` and effective `capabilities` for the current credential.
+
+`mcp` enables both care reads and writes through the MCP endpoint; adding `api_read` does not make that MCP access read-only. It does not grant REST token-management access. Token creation, scope changes and reactivation enforce permission attenuation, so a write-only credential cannot mint or reactivate an `all` credential. Empty requested scope lists are rejected.
 
 ### OIDC provider setup
 
@@ -278,6 +294,7 @@ petmon supports two auth methods:
 | `DATABASE_URL` | `sqlite:petmon.db` | SQLite path |
 | `TIMEZONE` / `TZ` | `UTC` | Local timezone for day bucketing |
 | `DEV_MODE` | `false` | Skip all auth (local dev only) |
+| `INSTANCE_ADMIN_SUBJECTS` | *(unset)* | Comma-separated subjects for one-time administrator bootstrap; subsequent changes use the CLI |
 | `DEMO_MODE` | `false` | On first startup with an empty database (no pets), load demo seed automatically |
 | `MED_INTAKE_SHORTCUT_ICLOUD_URL` | *(unset)* | iCloud share link for med-intake shortcut; overrides `assets/shortcuts/publish.json` |
 | `IMPORT_MAX_BYTES` | `1048576` | Max JSON request body size |
@@ -321,6 +338,8 @@ make run-dev-fe   # → http://localhost:5173
 ```
 
 ## Development
+
+Shared-library and UI extension contracts, including resource policies, runtime resolution, identity adapters and frontend composition, are documented in [Embedding](docs/Embedding.md).
 
 ### Backend
 

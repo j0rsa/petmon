@@ -11,7 +11,8 @@ pub struct Identity {
     /// device alias (so `display_name()` still shows the device).
     pub name: Option<String>,
     pub kind: IdentityKind,
-    /// Granted scopes. Empty means full access (no restriction). HashSet for O(1) lookup.
+    /// Granted scopes. Empty means ordinary full access, never administrator
+    /// authority for API tokens. HashSet for O(1) lookup.
     pub scopes: HashSet<String>,
     /// Creator display name snapshot for the current API token session, if any.
     pub token_created_by: Option<String>,
@@ -59,9 +60,19 @@ impl Identity {
     /// Returns true if this identity is permitted to use `required_scope`.
     ///
     /// - Dev identities always pass.
-    /// - OIDC and API token identities with an empty scopes set have full access.
+    /// - OIDC and API token identities with an empty scopes set have ordinary full access.
     /// - Otherwise scopes must contain `"all"` or `required_scope`.
+    /// - Administrator scope is a credential eligibility check only; use the
+    ///   live role check in `auth::admin` before authorizing administration.
     pub fn has_scope(&self, required_scope: &str) -> bool {
+        // This is only the credential half of administrator authorization. The
+        // live role must additionally be checked with auth::admin.
+        if required_scope == "instance_admin" {
+            return match self.kind {
+                IdentityKind::Dev | IdentityKind::Oidc => true,
+                IdentityKind::ApiToken { .. } => self.scopes.contains("instance_admin"),
+            };
+        }
         match self.kind {
             IdentityKind::Dev => true,
             IdentityKind::Oidc | IdentityKind::ApiToken { .. } => {
@@ -70,6 +81,16 @@ impl Identity {
                     || self.scopes.contains(required_scope)
             }
         }
+    }
+
+    /// Ordinary transport capabilities. MCP includes care reads and writes on
+    /// that transport, but does not enable ordinary REST endpoints.
+    pub fn ordinary_capabilities(&self) -> Vec<String> {
+        ["api_read", "api_write", "mcp"]
+            .into_iter()
+            .filter(|scope| self.has_scope(scope))
+            .map(str::to_owned)
+            .collect()
     }
 }
 

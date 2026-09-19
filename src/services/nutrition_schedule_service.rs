@@ -1,26 +1,35 @@
 use crate::domain::nutrition_schedule::{
     CreateNutritionSchedule, NutritionSchedule, UpdateNutritionSchedule,
 };
+use crate::embedding::{ResourceAction, ServiceContext};
 use crate::error::{AppError, AppResult};
 use crate::repo::{nutrition_schedules, pets};
-use sqlx::SqlitePool;
 use uuid::Uuid;
 
 #[tracing::instrument(skip(pool))]
-pub async fn list(pool: &SqlitePool, pet_id: Option<Uuid>) -> AppResult<Vec<NutritionSchedule>> {
-    nutrition_schedules::list_schedules(pool, pet_id).await
+pub async fn list(
+    pool: &ServiceContext,
+    pet_id: Option<Uuid>,
+) -> AppResult<Vec<NutritionSchedule>> {
+    nutrition_schedules::list_schedules_scoped(pool, pet_id, &pool.visibility(pet_id).await?).await
 }
 
 #[tracing::instrument(skip(pool))]
-pub async fn get(pool: &SqlitePool, id: &str) -> AppResult<NutritionSchedule> {
+pub async fn get(pool: &ServiceContext, id: &str) -> AppResult<NutritionSchedule> {
+    let owner = nutrition_schedules::get_schedule(pool, id).await?;
+    pool.check(Some(owner.pet_id), ResourceAction::View).await?;
+
     nutrition_schedules::get_schedule(pool, id).await
 }
 
 #[tracing::instrument(skip(pool))]
 pub async fn create(
-    pool: &SqlitePool,
+    pool: &ServiceContext,
     req: CreateNutritionSchedule,
 ) -> AppResult<NutritionSchedule> {
+    pool.check(Some(req.pet_id), ResourceAction::WriteProfile)
+        .await?;
+
     if req.name.trim().is_empty() {
         return Err(AppError::Validation {
             field: "name".to_string(),
@@ -34,14 +43,22 @@ pub async fn create(
 
 #[tracing::instrument(skip(pool))]
 pub async fn update(
-    pool: &SqlitePool,
+    pool: &ServiceContext,
     id: &str,
     req: UpdateNutritionSchedule,
 ) -> AppResult<NutritionSchedule> {
+    let owner = nutrition_schedules::get_schedule(pool, id).await?;
+    pool.check(Some(owner.pet_id), ResourceAction::WriteProfile)
+        .await?;
+
     nutrition_schedules::update_schedule(pool, id, req).await
 }
 
 #[tracing::instrument(skip(pool))]
-pub async fn delete(pool: &SqlitePool, id: &str) -> AppResult<()> {
+pub async fn delete(pool: &ServiceContext, id: &str) -> AppResult<()> {
+    let owner = nutrition_schedules::get_schedule(pool, id).await?;
+    pool.check(Some(owner.pet_id), ResourceAction::WriteProfile)
+        .await?;
+
     nutrition_schedules::delete_schedule(pool, id).await
 }

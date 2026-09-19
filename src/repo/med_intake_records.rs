@@ -17,11 +17,16 @@ struct MedIntakeRow {
     dose_fraction_override: Option<String>,
     liquid_dose_ml_override: Option<f64>,
     occurred_at: String,
+    occurred_at_utc: Option<String>,
+    source_timezone: Option<String>,
     local_date: String,
     taken: i64,
     note: Option<String>,
     source_type: String,
     telegram_message_id: Option<i64>,
+    telegram_chat_id: Option<String>,
+    telegram_thread_id: Option<String>,
+    telegram_bot_id: Option<String>,
     created_at: String,
 }
 
@@ -31,7 +36,7 @@ pub async fn list_for_assignment(
     assignment_id: &str,
 ) -> AppResult<Vec<MedIntakeRecord>> {
     let rows = sqlx::query_as::<_, MedIntakeRow>(
-        "SELECT id, pet_id, medication_id, assignment_id, dose_fraction_override, liquid_dose_ml_override, occurred_at, local_date, taken, note, source_type, telegram_message_id, created_at
+        "SELECT id, pet_id, medication_id, assignment_id, dose_fraction_override, liquid_dose_ml_override, occurred_at, occurred_at_utc, source_timezone, local_date, taken, note, source_type, telegram_message_id, telegram_chat_id, telegram_thread_id, telegram_bot_id, created_at
          FROM med_intake_records WHERE assignment_id = ?",
     )
     .bind(assignment_id)
@@ -53,13 +58,19 @@ pub async fn delete_for_assignment(pool: &SqlitePool, assignment_id: &str) -> Ap
     Ok(result.rows_affected())
 }
 
-pub async fn set_telegram_message_id(
+pub async fn set_telegram_delivery(
     pool: &SqlitePool,
     id: &str,
     message_id: i64,
+    chat_id: &str,
+    thread_id: Option<&str>,
+    bot_id: &str,
 ) -> AppResult<()> {
-    let rows = sqlx::query("UPDATE med_intake_records SET telegram_message_id=? WHERE id=?")
+    let rows = sqlx::query("UPDATE med_intake_records SET telegram_message_id=?, telegram_chat_id=?, telegram_thread_id=?, telegram_bot_id=? WHERE id=?")
         .bind(message_id)
+        .bind(chat_id)
+        .bind(thread_id)
+        .bind(bot_id)
         .bind(id)
         .execute(pool)
         .await?
@@ -72,16 +83,44 @@ pub async fn set_telegram_message_id(
     Ok(())
 }
 
-#[tracing::instrument(skip(pool))]
-pub async fn list_by_telegram_message_id(
+/// A bundle shares one delivery; commit every member's reference together.
+pub async fn set_telegram_bundle_delivery(
     pool: &SqlitePool,
+    ids: &[String],
     message_id: i64,
+    chat_id: &str,
+    thread_id: Option<&str>,
+    bot_id: &str,
+) -> AppResult<()> {
+    let mut tx = pool.begin().await?;
+    for id in ids {
+        let rows = sqlx::query("UPDATE med_intake_records SET telegram_message_id=?, telegram_chat_id=?, telegram_thread_id=?, telegram_bot_id=? WHERE id=?")
+            .bind(message_id).bind(chat_id).bind(thread_id).bind(bot_id).bind(id)
+            .execute(&mut *tx).await?.rows_affected();
+        if rows == 0 {
+            return Err(AppError::NotFound(format!(
+                "Med intake record {id} not found"
+            )));
+        }
+    }
+    tx.commit().await?;
+    Ok(())
+}
+
+#[tracing::instrument(skip(pool))]
+pub async fn list_by_telegram_delivery(
+    pool: &SqlitePool,
+    record: &MedIntakeRecord,
 ) -> AppResult<Vec<MedIntakeRecord>> {
     let rows = sqlx::query_as::<_, MedIntakeRow>(
-        "SELECT id, pet_id, medication_id, assignment_id, dose_fraction_override, liquid_dose_ml_override, occurred_at, local_date, taken, note, source_type, telegram_message_id, created_at
-         FROM med_intake_records WHERE telegram_message_id = ? ORDER BY occurred_at, id",
+        "SELECT id, pet_id, medication_id, assignment_id, dose_fraction_override, liquid_dose_ml_override, occurred_at, occurred_at_utc, source_timezone, local_date, taken, note, source_type, telegram_message_id, telegram_chat_id, telegram_thread_id, telegram_bot_id, created_at
+         FROM med_intake_records WHERE pet_id = ? AND telegram_bot_id = ? AND telegram_chat_id = ? AND telegram_message_id = ? AND telegram_thread_id IS ? ORDER BY occurred_at, id",
     )
-    .bind(message_id)
+    .bind(record.pet_id)
+    .bind(&record.telegram_bot_id)
+    .bind(&record.telegram_chat_id)
+    .bind(record.telegram_message_id)
+    .bind(&record.telegram_thread_id)
     .fetch_all(pool)
     .await?;
     let mut out = Vec::with_capacity(rows.len());
@@ -109,11 +148,16 @@ fn row_to_core(row: MedIntakeRow) -> AppResult<MedIntakeCore> {
         dose_fraction_override: parse_dose_fraction(row.dose_fraction_override)?,
         liquid_dose_ml_override: row.liquid_dose_ml_override,
         occurred_at: row.occurred_at,
+        occurred_at_utc: row.occurred_at_utc,
+        source_timezone: row.source_timezone,
         local_date: row.local_date,
         taken: row.taken != 0,
         note: row.note,
         source_type: row.source_type,
         telegram_message_id: row.telegram_message_id,
+        telegram_chat_id: row.telegram_chat_id,
+        telegram_thread_id: row.telegram_thread_id,
+        telegram_bot_id: row.telegram_bot_id,
         created_at: row.created_at,
     })
 }
@@ -154,6 +198,14 @@ pub async fn list(
     pool: &SqlitePool,
     filters: &MedIntakeRecordFilters,
 ) -> AppResult<Vec<MedIntakeRecord>> {
+    list_scoped(pool, filters, &crate::embedding::PetVisibility::All).await
+}
+
+pub async fn list_scoped(
+    pool: &SqlitePool,
+    filters: &MedIntakeRecordFilters,
+    visibility: &crate::embedding::PetVisibility,
+) -> AppResult<Vec<MedIntakeRecord>> {
     let has_date_range = filters.date_from.is_some() || filters.date_to.is_some();
     let limit = filters.limit.or(if has_date_range {
         None
@@ -163,7 +215,7 @@ pub async fn list(
     let order_desc = !has_date_range;
 
     let mut query = String::from(
-        "SELECT id, pet_id, medication_id, assignment_id, dose_fraction_override, liquid_dose_ml_override, occurred_at, local_date, taken, note, source_type, telegram_message_id, created_at
+        "SELECT id, pet_id, medication_id, assignment_id, dose_fraction_override, liquid_dose_ml_override, occurred_at, occurred_at_utc, source_timezone, local_date, taken, note, source_type, telegram_message_id, telegram_chat_id, telegram_thread_id, telegram_bot_id, created_at
          FROM med_intake_records WHERE 1=1",
     );
     if filters.pet_id.is_some() {
@@ -178,6 +230,7 @@ pub async fn list(
     if filters.date_to.is_some() {
         query.push_str(" AND local_date <= ?");
     }
+    query.push_str(&format!(" AND {}", visibility.predicate("pet_id")));
     query.push_str(if order_desc {
         " ORDER BY occurred_at DESC"
     } else {
@@ -217,7 +270,7 @@ pub async fn list(
 #[tracing::instrument(skip(pool))]
 pub async fn get(pool: &SqlitePool, id: &str) -> AppResult<MedIntakeRecord> {
     let row = sqlx::query_as::<_, MedIntakeRow>(
-        "SELECT id, pet_id, medication_id, assignment_id, dose_fraction_override, liquid_dose_ml_override, occurred_at, local_date, taken, note, source_type, telegram_message_id, created_at
+        "SELECT id, pet_id, medication_id, assignment_id, dose_fraction_override, liquid_dose_ml_override, occurred_at, occurred_at_utc, source_timezone, local_date, taken, note, source_type, telegram_message_id, telegram_chat_id, telegram_thread_id, telegram_bot_id, created_at
          FROM med_intake_records WHERE id = ?",
     )
     .bind(id)
@@ -242,15 +295,14 @@ pub async fn create(
         ));
     }
 
-    let occurred_at = req.occurred_at.unwrap_or_else(|| {
-        Utc::now()
-            .with_timezone(&timezone)
-            .format("%Y-%m-%dT%H:%M:%S")
-            .to_string()
-    });
-    let local_date = req
-        .local_date
-        .unwrap_or_else(|| occurred_at.split('T').next().unwrap_or("").to_string());
+    let time = crate::record_time::resolve(
+        req.occurred_at.as_deref(),
+        req.local_date.as_deref(),
+        timezone,
+        Utc::now(),
+    )?;
+    let occurred_at = time.civil;
+    let local_date = time.local_date;
 
     let assignment = if let Some(id) = req.assignment_id {
         let assignment = crate::repo::med_assignments::get(pool, &id).await?;
@@ -328,8 +380,8 @@ pub async fn create(
 
     sqlx::query(
         "INSERT INTO med_intake_records
-         (id, pet_id, medication_id, assignment_id, dose_fraction_override, liquid_dose_ml_override, occurred_at, local_date, taken, note, source_type, telegram_message_id, created_at)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NULL, ?)",
+         (id, pet_id, medication_id, assignment_id, dose_fraction_override, liquid_dose_ml_override, occurred_at, occurred_at_utc, source_timezone, local_date, taken, note, source_type, telegram_message_id, created_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NULL, ?)",
     )
     .bind(&id)
     .bind(pet_id)
@@ -338,6 +390,8 @@ pub async fn create(
     .bind(req.dose_fraction_override.map(|f| f.as_str().to_string()))
     .bind(req.liquid_dose_ml_override)
     .bind(&occurred_at)
+    .bind(&time.utc)
+    .bind(&time.timezone)
     .bind(&local_date)
     .bind(if taken { 1 } else { 0 })
     .bind(&req.note)

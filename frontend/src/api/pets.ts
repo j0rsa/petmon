@@ -12,6 +12,10 @@ export interface PetProfilePayload {
   weight_kg?: number;
   feeding_notes?: string;
   elimination_auto_categorize_by_duration?: boolean;
+  telegram_nutrition_chat_id?: string | null;
+  telegram_nutrition_thread_id?: string | null;
+  telegram_meds_chat_id?: string | null;
+  telegram_meds_thread_id?: string | null;
 }
 
 export const petsApi = {
