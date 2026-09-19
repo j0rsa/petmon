@@ -3,6 +3,7 @@ const VERIFIER_KEY = 'pm_pkce_verifier';
 const STATE_KEY = 'pm_oauth_state';
 const REDIRECT_KEY = 'pm_redirect_after_login';
 const SIGNED_OUT_KEY = 'pm_signed_out';
+export const SESSION_CHANGED_EVENT = 'petmon-session-changed';
 
 // ── Token storage ─────────────────────────────────────────────────────────────
 
@@ -12,10 +13,12 @@ export function getStoredToken(): string | null {
 
 export function storeToken(token: string): void {
   localStorage.setItem(TOKEN_KEY, token);
+  if (typeof window !== 'undefined') window.dispatchEvent(new Event(SESSION_CHANGED_EVENT));
 }
 
 export function clearToken(): void {
   localStorage.removeItem(TOKEN_KEY);
+  if (typeof window !== 'undefined') window.dispatchEvent(new Event(SESSION_CHANGED_EVENT));
 }
 
 /** Set after an explicit sign-out so AuthGuard does not immediately SSO back in. */

@@ -378,6 +378,10 @@ export function withPetInfoPage(petId = mockPetId, withWeights = true, autoTagEn
     const weightDateFrom = shiftDate(localToday(), -29);
     client.setQueryData(['pets'], mockPets.map((p) => (p.id === petData.id ? petData : p)));
     client.setQueryData(['pets', petId], petData);
+    for (const other of mockPets.filter((item) => item.id !== petId)) {
+      client.setQueryData(['pets', other.id], other);
+      client.setQueryData(['weight-records', other.id, weightDateFrom], []);
+    }
     client.setQueryData(['me'], { subject: 'dev', email: null, name: 'Dev', display_name: 'Dev', kind: 'dev', scopes: [] });
     client.setQueryData(['app-info'], mockAppInfo);
     client.setQueryData(
@@ -548,6 +552,8 @@ export function withHealthPage({ petId = mockPetId, loading = false, empty = fal
 const API_TOKEN_STUB = 'pm_api_storybook000000000000000000000000000000000000000000000000000000';
 
 interface WithSettingsOptions {
+  admin?: boolean;
+  capabilities?: string[];
   oidc?: 'empty' | 'configured';
   telegram?: 'empty' | 'configured';
   tokens?: 'empty' | 'populated';
@@ -558,6 +564,8 @@ interface WithSettingsOptions {
 }
 
 export function withSettings({
+  admin = true,
+  capabilities,
   oidc = 'configured',
   telegram = 'configured',
   tokens = 'populated',
@@ -567,6 +575,8 @@ export function withSettings({
 }: WithSettingsOptions = {}): Decorator {
   return function SettingsDecorator(Story) {
     const client = makeMockClient();
+    client.setQueryData(['me'], { subject: 'settings-user', email: null, name: 'User', display_name: 'User', kind: usingApiToken ? 'api_token' : 'oidc', scopes: ['all'], roles: admin ? ['instance_admin'] : [], capabilities: capabilities ?? ['api_read', 'api_write', 'mcp', ...(admin ? ['instance_admin'] : [])] });
+    client.setQueryData(['instance-api-tokens'], []);
 
     // Seed localStorage so SettingsPage's `usingApiToken` branch renders correctly.
     if (usingApiToken) {

@@ -61,6 +61,7 @@ function withMedDataCore({
         },
       });
       client.setQueryData(['pets'], mockPets);
+      client.setQueryData(['me'], { subject: 'dev', email: null, name: 'Dev', display_name: 'Dev', kind: 'dev', scopes: [], roles: ['instance_admin'], capabilities: ['api_read', 'api_write', 'mcp', 'instance_admin'] });
       client.setQueryData(['user-settings', 'developer_mode'], {
         ...mockDeveloperModeSettings,
         enabled: developerMode,

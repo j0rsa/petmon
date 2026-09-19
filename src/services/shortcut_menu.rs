@@ -3,9 +3,9 @@ use std::collections::HashMap;
 use uuid::Uuid;
 
 use crate::domain::medication::{DailyMedAssignment, MedType, DOSE_FRACTIONS};
+use crate::embedding::ServiceContext;
 use crate::error::AppResult;
 use crate::services::medication_service;
-use sqlx::SqlitePool;
 
 #[derive(Debug, Clone, Copy, Serialize, PartialEq, Eq)]
 #[serde(rename_all = "snake_case")]
@@ -135,7 +135,7 @@ fn disambiguate_labels(choices: &mut [MedIntakeMenuChoice]) {
 /// meds are excluded from individual choices. Includes scheduled and optional
 /// individual meds.
 pub async fn med_intake_menu(
-    pool: &SqlitePool,
+    pool: &ServiceContext,
     pet_id: Uuid,
     date: &str,
 ) -> AppResult<MedIntakeMenuResponse> {

@@ -1,26 +1,33 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { ApiError } from '../api/client';
 import { settingsApi } from '../api/settings';
 import type { ApiTokenCreated, ApiTokenPublic, ApiTokenScope, OidcConfigPublic, TelegramConfigPublic } from '../api/settings';
 import { useUserSettings } from '../api/userSettings';
-import { API_TOKEN_SCOPES } from '../api/settings';
-import { deriveDeviceAlias, getStoredToken, storeToken } from '../lib/auth';
+import { allowedTokenScopes } from '../api/settings';
+import { deriveDeviceAlias, storeToken } from '../lib/auth';
 import { clearPwaCachesAndReload, isPwaCacheSupported } from '../lib/pwaCache';
 import { getPushSupportStatus, isPushSupported, sendTestPushNotification, watchNotificationPermission } from '../lib/pushNotifications';
 import { TagInput } from '../components/TagInput';
-import { usePermissions } from '../context/usePermissions';
+import { effectiveCapabilities, usePermissions } from '../context/usePermissions';
+import { useApplicationExtensions, useSessionMe } from '../context/ApplicationExtensions';
 
 export default function SettingsPage() {
+  const { canAdminRead, canAdminWrite } = usePermissions(null);
+  const extensions = useApplicationExtensions();
   return (
     <div className="page-stack">
       <DisplaySection />
       <DeveloperModeSection />
       <PushNotificationsSection />
       <AppCacheSection />
-      <OidcSection />
-      <TelegramSection />
+      {canAdminRead && <fieldset disabled={!canAdminWrite} className="page-stack" style={{ border: 0, padding: 0, margin: 0, minWidth: 0 }}>
+        <OidcSection />
+        <TelegramSection />
+      </fieldset>}
       <ApiTokensSection />
+      {canAdminRead && <InstanceTokensSection canWrite={canAdminWrite} />}
+      {extensions?.chrome?.settings}
     </div>
   );
 }
@@ -558,28 +565,49 @@ function TelegramSection() {
 
 // ── API tokens ────────────────────────────────────────────────────────────────
 
+function InstanceTokensSection({ canWrite }: { canWrite: boolean }) {
+  const client = useQueryClient();
+  const tokens = useQuery({ queryKey: ['instance-api-tokens'], queryFn: settingsApi.listInstanceTokens });
+  const revoke = useMutation({ mutationFn: settingsApi.revokeInstanceToken, onSuccess: () => client.invalidateQueries({ queryKey: ['instance-api-tokens'] }) });
+  return <section className="panel">
+    <h3>Instance API tokens</h3>
+    <p className="muted-text">Operational access to credentials across this instance.</p>
+    {tokens.isPending && <p>Loading tokens…</p>}
+    {(tokens.isError || revoke.isError) && <p className="error-state">Unable to access instance tokens.</p>}
+    {tokens.data?.map((token) => <div key={token.id} className="button-row" style={{ overflowWrap: 'anywhere' }}>
+      <span>{token.alias ?? token.id} · {token.created_by ?? token.owner_subject ?? 'Unknown user'} · {token.active ? 'Active' : 'Inactive'}</span>
+      {canWrite && token.active && <button className="button button-danger" type="button" disabled={revoke.isPending} onClick={() => { if (window.confirm(`Revoke token ${token.alias ?? token.id}?`)) revoke.mutate(token.id); }}>Revoke</button>}
+    </div>)}
+  </section>;
+}
+
 function ApiTokensSection() {
   const queryClient = useQueryClient();
-  const { canWrite } = usePermissions();
-  const { data: tokens, isLoading } = useQuery({ queryKey: ['api-tokens'], queryFn: settingsApi.listTokens });
-  const { data: oidc } = useQuery({ queryKey: ['settings-oidc'], queryFn: settingsApi.getOidc });
+  const extensions = useApplicationExtensions();
+  const active = useRef(true);
+  useEffect(() => { active.current = true; return () => { active.current = false; }; }, []);
+  const { data: me } = useSessionMe();
+  const capabilities = effectiveCapabilities(me);
+  const canWrite = capabilities.has('api_write');
+  const allowedScopes = allowedTokenScopes(capabilities);
+  const { data: tokens, isLoading } = useQuery({ queryKey: ['api-tokens'], queryFn: settingsApi.listTokens, enabled: capabilities.has('api_read') });
 
   const [alias, setAlias] = useState('');
-  const [newScopes, setNewScopes] = useState<ApiTokenScope[]>(['all']);
+  const [newScopes, setNewScopes] = useState<ApiTokenScope[]>([]);
   const [justCreated, setJustCreated] = useState<ApiTokenCreated | null>(null);
   const [copied, setCopied] = useState(false);
   const [deviceAlias, setDeviceAlias] = useState(() => deriveDeviceAlias());
   const [deviceRemembered, setDeviceRemembered] = useState(false);
 
-  const oidcEnabled = oidc?.enabled ?? false;
-  const usingApiToken = getStoredToken()?.startsWith('pm_api_') ?? false;
+  const oidcEnabled = me?.kind === 'oidc';
+  const usingApiToken = me?.kind === 'api_token';
 
   const createMutation = useMutation({
     mutationFn: () => settingsApi.createToken({ alias: alias || undefined, scopes: newScopes }),
     onSuccess: (created) => {
       setJustCreated(created);
       setAlias('');
-      setNewScopes(['all']);
+      setNewScopes([]);
       queryClient.invalidateQueries({ queryKey: ['api-tokens'] });
     },
   });
@@ -587,15 +615,21 @@ function ApiTokensSection() {
   const updateScopesMutation = useMutation({
     mutationFn: ({ id, scopes }: { id: string; scopes: ApiTokenScope[] }) =>
       settingsApi.updateTokenScopes(id, { scopes }),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['api-tokens'] }),
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: ['api-tokens'] });
+      await queryClient.invalidateQueries({ queryKey: ['me'] });
+    },
   });
 
   const rememberMutation = useMutation({
-    mutationFn: () => settingsApi.createToken({ alias: deviceAlias || undefined }),
-    onSuccess: (created) => {
-      storeToken(created.token);
+    mutationFn: () => settingsApi.createToken({ alias: deviceAlias || undefined, scopes: allowedScopes.filter((scope) => scope !== 'instance_admin' && scope !== 'all') }),
+    onSuccess: async (created) => {
+      if (!active.current) return;
+      if (extensions?.session) await extensions.session.installApiToken?.(created.token);
+      else storeToken(created.token);
       setDeviceRemembered(true);
       queryClient.invalidateQueries({ queryKey: ['api-tokens'] });
+      queryClient.invalidateQueries({ queryKey: ['me'] });
     },
   });
 
@@ -632,7 +666,7 @@ function ApiTokensSection() {
       </div>
 
       {/* Remember this device — shown when using OIDC and OIDC is enabled */}
-      {canWrite && oidcEnabled && !usingApiToken && (
+      {canWrite && oidcEnabled && !usingApiToken && (!extensions?.session || extensions.session.installApiToken) && (
         <div style={{ background: 'var(--surface-raised)', border: '1px solid var(--border)', borderRadius: 12, padding: '1rem', display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
           <div>
             <p style={{ fontSize: '0.88rem', fontWeight: 600, marginBottom: '0.25rem' }}>Remember this device</p>
@@ -692,15 +726,8 @@ function ApiTokensSection() {
         </div>
       )}
 
-      {/* OIDC gate warning */}
-      {!oidcEnabled && (
-        <div style={{ background: 'var(--warning-bg)', border: '1px solid var(--warning-border)', borderRadius: 12, padding: '0.75rem 1rem', fontSize: '0.88rem', color: 'var(--text-muted)' }}>
-          API tokens can only be created when OIDC is enabled — the token is linked to the authenticated user who creates it.
-        </div>
-      )}
-
       {/* Create form */}
-      {canWrite && oidcEnabled && (
+      {canWrite && (
         <div className="form-grid">
           <div className="form-row">
             <label>Alias (optional)</label>
@@ -710,7 +737,7 @@ function ApiTokensSection() {
             <label>Scopes</label>
             <TagInput
               value={newScopes}
-              options={API_TOKEN_SCOPES}
+              options={allowedScopes}
               onChange={(v) => setNewScopes(v as ApiTokenScope[])}
               placeholder="Add scope…"
             />
@@ -719,7 +746,7 @@ function ApiTokensSection() {
             <button
               className="button"
               type="button"
-              disabled={createMutation.isPending || newScopes.length === 0}
+              disabled={createMutation.isPending || newScopes.length === 0 || newScopes.some((scope) => !allowedScopes.includes(scope))}
               onClick={() => createMutation.mutate()}
             >
               {createMutation.isPending ? 'Creating…' : '+ Create token'}
@@ -735,13 +762,15 @@ function ApiTokensSection() {
         </div>
       )}
 
+      <p className="muted-text">Tokens can only receive permissions available to this session. MCP enables reading and writing through MCP. Instance administration requires an explicit scope and an active administrator role.</p>
+      {(updateScopesMutation.isError || activateMutation.isError || deactivateMutation.isError || deleteMutation.isError) && <p className="error-state" role="alert">Unable to update this token. Check this session's permissions and try again.</p>}
       {/* Token list */}
       {isLoading ? (
         <div className="loading-state">Loading tokens…</div>
       ) : !tokens?.length ? (
         <div className="empty-state" style={{ textAlign: 'center' }}>No API tokens yet.</div>
       ) : (
-        <table>
+        <div style={{ overflowX: 'auto', maxWidth: '100%' }}><table>
           <thead>
             <tr>
               <th>Alias</th>
@@ -759,6 +788,7 @@ function ApiTokensSection() {
                 key={token.id}
                 token={token}
                 canWrite={canWrite}
+                allowedScopes={allowedScopes}
                 onActivate={() => activateMutation.mutate(token.id)}
                 activating={activateMutation.isPending && activateMutation.variables === token.id}
                 onDeactivate={() => deactivateMutation.mutate(token.id)}
@@ -770,15 +800,16 @@ function ApiTokensSection() {
               />
             ))}
           </tbody>
-        </table>
+        </table></div>
       )}
     </section>
   );
 }
 
-function TokenRow({ token, canWrite, onActivate, activating, onDeactivate, deactivating, onDelete, deleting, onUpdateScopes, updatingScopes }: {
+function TokenRow({ token, canWrite, allowedScopes, onActivate, activating, onDeactivate, deactivating, onDelete, deleting, onUpdateScopes, updatingScopes }: {
   token: ApiTokenPublic;
   canWrite: boolean;
+  allowedScopes: ApiTokenScope[];
   onActivate: () => void;
   activating: boolean;
   onDeactivate: () => void;
@@ -792,12 +823,12 @@ function TokenRow({ token, canWrite, onActivate, activating, onDeactivate, deact
   const [scopesDraft, setScopesDraft] = useState<ApiTokenScope[]>(token.scopes);
 
   function startScopeEdit() {
-    setScopesDraft(token.scopes);
+    setScopesDraft(token.scopes.filter((scope) => allowedScopes.includes(scope)));
     setEditingScopes(true);
   }
 
   function commitScopes() {
-    if (scopesDraft.length === 0) return;
+    if (scopesDraft.length === 0 || scopesDraft.some((scope) => !allowedScopes.includes(scope))) return;
     onUpdateScopes(scopesDraft);
     setEditingScopes(false);
   }
@@ -820,7 +851,7 @@ function TokenRow({ token, canWrite, onActivate, activating, onDeactivate, deact
             <div style={{ flex: 1 }}>
               <TagInput
                 value={scopesDraft}
-                options={API_TOKEN_SCOPES}
+                options={allowedScopes}
                 onChange={(v) => setScopesDraft(v as ApiTokenScope[])}
                 placeholder="Add scope…"
                 disabled={updatingScopes}
@@ -858,6 +889,7 @@ function TokenRow({ token, canWrite, onActivate, activating, onDeactivate, deact
               className="icon-button"
               type="button"
               title="Edit scopes"
+              disabled={!canWrite}
               aria-label="Edit scopes"
               style={{ fontSize: '0.78rem', opacity: 0.6 }}
               onClick={startScopeEdit}
@@ -891,7 +923,8 @@ function TokenRow({ token, canWrite, onActivate, activating, onDeactivate, deact
                   className="button button-secondary"
                   type="button"
                   style={{ padding: '0.3rem 0.75rem', fontSize: '0.82rem' }}
-                  disabled={activating}
+                  disabled={activating || (token.scopes.length ? token.scopes : ['all']).some((scope) => !allowedScopes.includes(scope as ApiTokenScope))}
+                  title="Activation requires authority for every scope on this token"
                   onClick={onActivate}
                 >
                   {activating ? '…' : 'Activate'}

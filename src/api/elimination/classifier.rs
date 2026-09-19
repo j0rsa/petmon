@@ -17,9 +17,10 @@ pub async fn classifier_status(
     state: web::Data<AppState>,
     query: web::Query<ClassifierPetQuery>,
 ) -> AppResult<HttpResponse> {
+    let context = state.request_context(&_scope_req)?;
     let pet_id = Uuid::parse_str(&query.pet_id)
         .map_err(|_| AppError::BadRequest(format!("invalid pet_id: {}", query.pet_id)))?;
-    let status = elimination_classifier::get_status(&state.pool, pet_id).await?;
+    let status = elimination_classifier::get_status(&context, pet_id).await?;
     Ok(HttpResponse::Ok().json(status))
 }
 
@@ -29,9 +30,10 @@ pub async fn classifier_retrain(
     state: web::Data<AppState>,
     query: web::Query<ClassifierPetQuery>,
 ) -> AppResult<HttpResponse> {
+    let context = state.request_context(&_scope_req)?;
     let pet_id = Uuid::parse_str(&query.pet_id)
         .map_err(|_| AppError::BadRequest(format!("invalid pet_id: {}", query.pet_id)))?;
-    let result = elimination_classifier::retrain(&state.pool, pet_id).await?;
+    let result = elimination_classifier::retrain(&context, pet_id).await?;
     Ok(HttpResponse::Ok().json(result))
 }
 

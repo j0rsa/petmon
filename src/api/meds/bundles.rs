@@ -20,9 +20,10 @@ pub async fn list_bundles(
     state: web::Data<AppState>,
     query: web::Query<BundleListQuery>,
 ) -> AppResult<HttpResponse> {
+    let context = state.request_context(&_scope_req)?;
     let pet_id = Uuid::parse_str(&query.pet_id)
         .map_err(|_| AppError::BadRequest("invalid pet_id".into()))?;
-    let bundles = medication_service::list_bundles(&state.pool, pet_id).await?;
+    let bundles = medication_service::list_bundles(&context, pet_id).await?;
     Ok(HttpResponse::Ok().json(bundles))
 }
 
@@ -32,7 +33,8 @@ pub async fn create_bundle(
     state: web::Data<AppState>,
     body: web::Json<CreateMedBundle>,
 ) -> AppResult<HttpResponse> {
-    let bundle = medication_service::create_bundle(&state.pool, body.into_inner()).await?;
+    let context = state.request_context(&_scope_req)?;
+    let bundle = medication_service::create_bundle(&context, body.into_inner()).await?;
     Ok(HttpResponse::Created().json(bundle))
 }
 
@@ -43,7 +45,8 @@ pub async fn update_bundle(
     id: web::Path<String>,
     body: web::Json<UpdateMedBundle>,
 ) -> AppResult<HttpResponse> {
-    let bundle = medication_service::update_bundle(&state.pool, &id, body.into_inner()).await?;
+    let context = state.request_context(&_scope_req)?;
+    let bundle = medication_service::update_bundle(&context, &id, body.into_inner()).await?;
     Ok(HttpResponse::Ok().json(bundle))
 }
 
@@ -53,7 +56,8 @@ pub async fn delete_bundle(
     state: web::Data<AppState>,
     id: web::Path<String>,
 ) -> AppResult<HttpResponse> {
-    medication_service::delete_bundle(&state.pool, &id).await?;
+    let context = state.request_context(&_scope_req)?;
+    medication_service::delete_bundle(&context, &id).await?;
     Ok(HttpResponse::NoContent().finish())
 }
 
@@ -65,15 +69,16 @@ pub async fn create_bundle_intake(
     id: web::Path<String>,
     body: web::Json<CreateMedBundleIntake>,
 ) -> AppResult<HttpResponse> {
+    let context = state.request_context(&req)?;
     let reader_key = req.extensions().get::<Identity>().map(Identity::reader_key);
     let display = match reader_key {
         Some(reader_key) => {
-            user_settings::get::<UserDisplaySettings>(&state.pool, &reader_key, DISPLAY_KEY).await?
+            user_settings::get::<UserDisplaySettings>(&context, &reader_key, DISPLAY_KEY).await?
         }
         None => UserDisplaySettings::default(),
     };
     let records = medication_service::create_bundle_intake(
-        &state.pool,
+        &context,
         &id,
         body.into_inner(),
         state.timezone,

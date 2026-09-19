@@ -1,7 +1,8 @@
 import { useState } from 'react';
 import type { Meta, StoryObj } from '@storybook/react-vite';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { expect, fn, within } from 'storybook/test';
+import { expect, fn, userEvent, within } from 'storybook/test';
+import { asNarrowStory } from '../../stories/viewport';
 import { mockEliminationClassifierStatus, mockPets } from '../../stories/fixtures';
 import { PetInfoForm, petToFormState } from './PetInfoForm';
 
@@ -9,10 +10,14 @@ function PetInfoFormDemo({
   initialPet = mockPets[0],
   photoUrl,
   loading = false,
+  canManageIntegrations = true,
+  canChangeStatus = true,
 }: {
   initialPet?: (typeof mockPets)[number];
   photoUrl?: string;
   loading?: boolean;
+  canManageIntegrations?: boolean;
+  canChangeStatus?: boolean;
 }) {
   const [form, setForm] = useState(petToFormState(initialPet));
   const [photo, setPhoto] = useState(photoUrl);
@@ -24,6 +29,8 @@ function PetInfoFormDemo({
       petId={initialPet.id}
       photoUrl={photo}
       loading={loading}
+      canManageIntegrations={canManageIntegrations}
+      canChangeStatus={canChangeStatus}
       submitLabel="Save profile"
       onSubmit={fn()}
       onCancel={fn()}
@@ -59,6 +66,20 @@ export const EditProfile: Story = {
   },
 };
 
+export const ProfileWithoutIntegrationAuthority: Story = {
+  args: { canManageIntegrations: false, canChangeStatus: false },
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    await userEvent.clear(canvas.getByLabelText('Name'));
+    await userEvent.type(canvas.getByLabelText('Name'), 'Updated name');
+    await expect(canvas.getByLabelText('Name')).toHaveValue('Updated name');
+    await expect(canvas.getByLabelText('Status')).toBeDisabled();
+    for (const field of canvas.getAllByLabelText('Chat ID')) await expect(field).toBeDisabled();
+    await expect(canvas.getByRole('button', { name: 'Copy from Nutrition' })).toBeDisabled();
+  },
+};
+export const ProfileWithoutIntegrationAuthorityNarrow = asNarrowStory(ProfileWithoutIntegrationAuthority);
+
 export const NewPetDefaults: Story = {
   args: {
     initialPet: {
@@ -89,6 +110,7 @@ export const AutoTagEnabled: Story = {
         },
       });
       client.setQueryData(['elimination-classifier-status', mockPets[0].id], mockEliminationClassifierStatus);
+      client.setQueryData(['me'], { subject: 'dev', email: null, name: 'Dev', display_name: 'Dev', kind: 'dev', scopes: [], roles: ['instance_admin'], capabilities: ['api_read', 'api_write', 'mcp', 'instance_admin'] });
       return (
         <QueryClientProvider client={client}>
           <Story />
@@ -107,3 +129,4 @@ export const AutoTagEnabled: Story = {
     await expect(canvas.getByRole('button', { name: 'Retrain now' })).toBeInTheDocument();
   },
 };
+export const AutoTagEnabledNarrow = asNarrowStory(AutoTagEnabled);

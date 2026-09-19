@@ -11,7 +11,8 @@ pub async fn list_records(
     state: web::Data<AppState>,
     query: web::Query<HealthStateRecordFilters>,
 ) -> AppResult<HttpResponse> {
-    let records = health_state_service::list(&state.pool, query.into_inner()).await?;
+    let context = state.request_context(&_scope_req)?;
+    let records = health_state_service::list(&context, query.into_inner()).await?;
     Ok(HttpResponse::Ok().json(records))
 }
 
@@ -21,8 +22,8 @@ pub async fn create_record(
     state: web::Data<AppState>,
     body: web::Json<crate::domain::health_state::CreateHealthStateRecord>,
 ) -> AppResult<HttpResponse> {
-    let record =
-        health_state_service::create(&state.pool, body.into_inner(), state.timezone).await?;
+    let context = state.request_context(&_scope_req)?;
+    let record = health_state_service::create(&context, body.into_inner(), state.timezone).await?;
     Ok(HttpResponse::Created().json(record))
 }
 
@@ -32,7 +33,8 @@ pub async fn delete_record(
     state: web::Data<AppState>,
     id: web::Path<String>,
 ) -> AppResult<HttpResponse> {
-    health_state_service::delete(&state.pool, &id).await?;
+    let context = state.request_context(&_scope_req)?;
+    health_state_service::delete(&context, &id).await?;
     Ok(HttpResponse::NoContent().finish())
 }
 

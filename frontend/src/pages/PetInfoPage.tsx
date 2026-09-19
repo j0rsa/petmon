@@ -1,3 +1,4 @@
+import { useResourceTime } from '../context/useResourceTime';
 import { useEffect, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { usePermissions } from '../context/usePermissions';
@@ -5,7 +6,7 @@ import { Link, useParams } from 'react-router-dom';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 import { petsApi } from '../api/pets';
 import { weightApi } from '../api/weight';
-import { localToday, shiftDate } from '../lib/dates';
+import { shiftDate } from '../lib/dates';
 import { useSelectedPet } from '../context/SelectedPetContext';
 import { PetAvatar } from '../components/pet/PetAvatar';
 import { PetInfoFields } from '../components/pet/PetInfoFields';
@@ -16,9 +17,14 @@ import { PET_SPECIES_LABELS } from '../types';
 
 export default function PetInfoPage() {
   const { id = '' } = useParams();
-  const { setSelectedPetId } = useSelectedPet();
+  return <PetInfoEditor key={id} id={id} />;
+}
+
+function PetInfoEditor({ id }: { id: string }) {
+  const { pets, setSelectedPetId } = useSelectedPet();
   const queryClient = useQueryClient();
-  const { canWrite } = usePermissions();
+  const { loaded, canRead, canWriteProfile, canManageIntegrations, canChangeStatus } = usePermissions(id);
+  const canEdit = canWriteProfile || canManageIntegrations || canChangeStatus;
   const [editing, setEditing] = useState(false);
   const [form, setForm] = useState(petToFormState({ name: '', species: 'cat', status: 'active' }));
   const [photoUrl, setPhotoUrl] = useState<string | undefined>();
@@ -26,14 +32,14 @@ export default function PetInfoPage() {
   const petQuery = useQuery({
     queryKey: ['pets', id],
     queryFn: () => petsApi.get(id),
-    enabled: Boolean(id),
+    enabled: Boolean(id) && canRead,
   });
 
   useEffect(() => {
-    if (id) {
+    if (pets.some((pet) => pet.id === id)) {
       setSelectedPetId(id);
     }
-  }, [id, setSelectedPetId]);
+  }, [id, pets, setSelectedPetId]);
 
   useEffect(() => {
     if (petQuery.data) {
@@ -44,22 +50,33 @@ export default function PetInfoPage() {
   }, [petQuery.data]);
 
   const updateMutation = useMutation({
-    mutationFn: () => petsApi.update(id, formStateToPayload(form)),
+    mutationFn: () => {
+      const { status, telegram_nutrition_chat_id, telegram_nutrition_thread_id, telegram_meds_chat_id, telegram_meds_thread_id, ...profile } = formStateToPayload(form);
+      return petsApi.update(id, {
+        ...(canWriteProfile ? profile : {}),
+        ...(canChangeStatus ? { status } : {}),
+        ...(canManageIntegrations ? { telegram_nutrition_chat_id, telegram_nutrition_thread_id, telegram_meds_chat_id, telegram_meds_thread_id } : {}),
+      });
+    },
     onSuccess: async () => {
       setEditing(false);
       await queryClient.invalidateQueries({ queryKey: ['pets'] });
     },
   });
 
-  const weightDateFrom = shiftDate(localToday(), -29);
-  const weightDateTo = localToday();
+  const { today } = useResourceTime(id);
+  const weightDateFrom = shiftDate(today, -29);
+  const weightDateTo = today;
 
   // 30-day window for chart — read-only; full management is in /health
   const weightsQuery = useQuery({
     queryKey: ['weight-records', id, weightDateFrom],
     queryFn: () => weightApi.list({ pet_id: id, date_from: weightDateFrom, date_to: weightDateTo }),
-    enabled: Boolean(id),
+    enabled: Boolean(id) && canRead,
   });
+
+  if (!loaded) return <div className="loading-state">Checking profile access…</div>;
+  if (!canRead) return <div className="error-state">This session cannot view this pet.</div>;
 
   if (petQuery.isLoading) {
     return <div className="loading-state">Loading pet profile…</div>;
@@ -90,7 +107,7 @@ export default function PetInfoPage() {
           <Link className="button button-secondary" to="/pets">
             All pets
           </Link>
-          {!editing && canWrite && (
+          {!editing && canEdit && (
             <button className="button" type="button" onClick={() => setEditing(true)}>
               Edit profile
             </button>
@@ -98,10 +115,13 @@ export default function PetInfoPage() {
         </div>
       </section>
 
-      {editing ? (
+      {editing && canEdit ? (
         <section className="panel">
           <PetInfoForm
             form={form}
+            canWriteProfile={canWriteProfile}
+            canManageIntegrations={canManageIntegrations}
+            canChangeStatus={canChangeStatus}
             setForm={setForm}
             petId={id}
             photoUrl={photoUrl}

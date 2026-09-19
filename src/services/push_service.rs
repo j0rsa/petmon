@@ -202,11 +202,11 @@ pub async fn subscribe(
     Ok(())
 }
 
-pub async fn unsubscribe(pool: &SqlitePool, endpoint: &str) -> AppResult<()> {
+pub async fn unsubscribe(pool: &SqlitePool, reader_key: &str, endpoint: &str) -> AppResult<()> {
     if endpoint.trim().is_empty() {
         return Err(AppError::BadRequest("endpoint is required".to_string()));
     }
-    push_subscriptions::delete_by_endpoint(pool, endpoint).await?;
+    push_subscriptions::delete_owned(pool, endpoint.trim(), reader_key).await?;
     Ok(())
 }
 
@@ -319,12 +319,22 @@ async fn deliver_to_subscription(
 }
 
 async fn send_payload(
-    pool: &SqlitePool,
+    pool: &crate::embedding::ServiceContext,
     vapid: &VapidConfig,
     payload: &PushPayload,
+    recipients: crate::notification_runtime::Recipients,
+    notification: &Notification,
 ) -> PushTestResult {
     let subscriptions = match push_subscriptions::list_all(pool).await {
-        Ok(rows) => rows,
+        Ok(rows) => match recipients {
+            crate::notification_runtime::Recipients::AllSubscribers => rows,
+            crate::notification_runtime::Recipients::Readers(readers) => {
+                let readers: std::collections::HashSet<_> = readers.into_iter().collect();
+                rows.into_iter()
+                    .filter(|sub| readers.contains(&sub.reader_key))
+                    .collect()
+            }
+        },
         Err(e) => {
             tracing::warn!(error = %e, "failed to list push subscriptions");
             return PushTestResult {
@@ -359,6 +369,11 @@ async fn send_payload(
     let mut failed = 0u32;
 
     for sub in subscriptions {
+        // Earlier endpoints may stall. Re-check live membership and the exact
+        // subscription owner/keys immediately before admitting each delivery.
+        if !delivery_still_authorized(pool, notification, &sub).await {
+            continue;
+        }
         match deliver_to_subscription(pool, vapid, &body, &sub).await {
             DeliveryOutcome::Sent => sent += 1,
             DeliveryOutcome::Failed { .. } => failed += 1,
@@ -372,14 +387,45 @@ async fn send_payload(
     }
 }
 
+async fn delivery_still_authorized(
+    context: &crate::embedding::ServiceContext,
+    notification: &Notification,
+    snapshot: &PushSubscriptionRow,
+) -> bool {
+    let audience = match context
+        .notifications
+        .recipients(context, notification)
+        .await
+    {
+        Ok(audience) => audience,
+        Err(_) => return false,
+    };
+    if let crate::notification_runtime::Recipients::Readers(readers) = audience {
+        if !readers.contains(&snapshot.reader_key) {
+            return false;
+        }
+    }
+    match push_subscriptions::get_by_endpoint(context, &snapshot.endpoint).await {
+        Ok(current) => {
+            current.reader_key == snapshot.reader_key
+                && current.p256dh == snapshot.p256dh
+                && current.auth == snapshot.auth
+        }
+        Err(_) => false,
+    }
+}
+
 /// Send a test notification to a single device subscription (by endpoint).
-pub async fn send_test(pool: &SqlitePool, endpoint: &str) -> AppResult<PushTestResult> {
+pub async fn send_test(
+    pool: &SqlitePool,
+    reader_key: &str,
+    endpoint: &str,
+) -> AppResult<PushTestResult> {
     if endpoint.trim().is_empty() {
         return Err(AppError::BadRequest("endpoint is required".to_string()));
     }
 
-    let vapid = ensure_vapid(pool).await?;
-    let sub = push_subscriptions::get_by_endpoint(pool, endpoint.trim())
+    let sub = push_subscriptions::get_owned(pool, endpoint.trim(), reader_key)
         .await
         .map_err(|e| match e {
             AppError::NotFound(_) => AppError::BadRequest(
@@ -388,6 +434,7 @@ pub async fn send_test(pool: &SqlitePool, endpoint: &str) -> AppResult<PushTestR
             ),
             other => other,
         })?;
+    let vapid = ensure_vapid(pool).await?;
 
     let payload = PushPayload {
         title: "Petmon test notification".to_string(),
@@ -413,7 +460,21 @@ pub async fn send_test(pool: &SqlitePool, endpoint: &str) -> AppResult<PushTestR
     }
 }
 
-pub async fn broadcast_notification(pool: &SqlitePool, notification: &Notification) {
+pub async fn broadcast_notification(
+    pool: &crate::embedding::ServiceContext,
+    notification: &Notification,
+) {
+    let recipients = match pool.notifications.recipients(pool, notification).await {
+        Ok(recipients) => recipients,
+        Err(error) => {
+            tracing::warn!(%error, notification_id = %notification.id, "push audience resolution failed; delivery denied");
+            return;
+        }
+    };
+    if matches!(&recipients, crate::notification_runtime::Recipients::Readers(readers) if readers.is_empty())
+    {
+        return;
+    }
     let vapid = match ensure_vapid(pool).await {
         Ok(cfg) => cfg,
         Err(e) => {
@@ -423,7 +484,7 @@ pub async fn broadcast_notification(pool: &SqlitePool, notification: &Notificati
     };
 
     let payload = payload_from_notification(notification);
-    let result = send_payload(pool, &vapid, &payload).await;
+    let result = send_payload(pool, &vapid, &payload, recipients, notification).await;
     tracing::info!(
         sent = result.sent,
         failed = result.failed,
@@ -432,7 +493,7 @@ pub async fn broadcast_notification(pool: &SqlitePool, notification: &Notificati
     );
 }
 
-pub fn spawn_broadcast(pool: SqlitePool, notification: Notification) {
+pub fn spawn_broadcast_context(pool: crate::embedding::ServiceContext, notification: Notification) {
     tokio::spawn(async move {
         broadcast_notification(&pool, &notification).await;
     });
@@ -477,6 +538,57 @@ pub async fn send_to_reader(pool: &SqlitePool, reader_key: &str, payload: &PushP
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[tokio::test]
+    async fn queued_delivery_rechecks_subscription_owner_and_keys() {
+        let pool = sqlx::sqlite::SqlitePoolOptions::new()
+            .max_connections(1)
+            .connect("sqlite::memory:")
+            .await
+            .unwrap();
+        sqlx::migrate!("./migrations").run(&pool).await.unwrap();
+        let request: PushSubscribeRequest = serde_json::from_value(serde_json::json!({
+            "endpoint": "https://push.example.test/device",
+            "keys": {"p256dh": "browser-key", "auth": "browser-auth"}
+        }))
+        .unwrap();
+        push_subscriptions::upsert(&pool, "alice", &request, None)
+            .await
+            .unwrap();
+        let snapshot = push_subscriptions::get_by_endpoint(&pool, &request.endpoint)
+            .await
+            .unwrap();
+        let context = crate::embedding::ServiceContext::standalone(pool.clone(), chrono_tz::UTC);
+        let event = crate::domain::notification::CreateNotification {
+            kind: "test".into(),
+            title: "test".into(),
+            body: None,
+            link_path: "/".into(),
+            link_hash: None,
+            pet_id: None,
+            pet_name: None,
+            source_kind: None,
+            source_id: None,
+        }
+        .into_row();
+        assert!(delivery_still_authorized(&context, &event, &snapshot).await);
+        // Original-browser-key proof permits account transfer, invalidating queued delivery.
+        push_subscriptions::upsert(&pool, "bob", &request, None)
+            .await
+            .unwrap();
+        assert!(!delivery_still_authorized(&context, &event, &snapshot).await);
+        push_subscriptions::upsert(&pool, "alice", &request, None)
+            .await
+            .unwrap();
+        let rotated: PushSubscribeRequest = serde_json::from_value(serde_json::json!({
+            "endpoint": request.endpoint, "keys": {"p256dh": "new-key", "auth": "new-auth"}
+        }))
+        .unwrap();
+        push_subscriptions::upsert(&pool, "alice", &rotated, None)
+            .await
+            .unwrap();
+        assert!(!delivery_still_authorized(&context, &event, &snapshot).await);
+    }
 
     #[test]
     fn vapid_subject_rejects_localhost_placeholders() {

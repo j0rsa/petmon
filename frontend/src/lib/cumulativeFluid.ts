@@ -71,9 +71,10 @@ export function timeToRefMs(time: string) {
   return new Date(REF_DATE.year, REF_DATE.month, REF_DATE.day, hours, minutes).getTime();
 }
 
-export function nowToRefMs() {
+export function nowToRefMs(currentMinute?: number) {
   const now = new Date();
-  return new Date(REF_DATE.year, REF_DATE.month, REF_DATE.day, now.getHours(), now.getMinutes()).getTime();
+  const minute = currentMinute ?? now.getHours() * 60 + now.getMinutes();
+  return new Date(REF_DATE.year, REF_DATE.month, REF_DATE.day, Math.floor(minute / 60), minute % 60).getTime();
 }
 
 export function formatRefMs(ms: number) {
@@ -184,6 +185,7 @@ export function expectedScheduledFluidMl(
   schedules: NutritionSchedule[],
   focusDate: string,
   today: string = localToday(),
+  currentMinute?: number,
 ): number | null {
   const windows = liquidScheduleWindowsFromSchedules(schedules);
   if (windows.length === 0) return null;
@@ -193,7 +195,7 @@ export function expectedScheduledFluidMl(
   }
 
   const now = new Date();
-  const atMinutes = now.getHours() * 60 + now.getMinutes();
+  const atMinutes = currentMinute ?? now.getHours() * 60 + now.getMinutes();
   return scheduleProjectionAt(windows, atMinutes);
 }
 

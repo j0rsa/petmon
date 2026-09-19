@@ -55,9 +55,14 @@ pub async fn notify_medication_intake(
 
     match post_telegram(&ctx.bot_token, "sendMessage", &payload).await {
         Ok(body) => {
-            if let Some(message_id) = body.pointer("/result/message_id").and_then(|v| v.as_i64()) {
-                if let Err(e) = crate::repo::med_intake_records::set_telegram_message_id(
-                    pool, &record.id, message_id,
+            if let Some((message_id, chat_id, thread_id)) = delivery_coordinates(&ctx, &body) {
+                if let Err(e) = crate::repo::med_intake_records::set_telegram_delivery(
+                    pool,
+                    &record.id,
+                    message_id,
+                    &chat_id,
+                    thread_id.as_deref(),
+                    &ctx.bot_id,
                 )
                 .await
                 {
@@ -83,6 +88,10 @@ pub async fn notify_medication_bundle_intake(
     let Some(first) = records.first() else {
         return;
     };
+    if records.iter().any(|record| record.pet_id != first.pet_id) {
+        tracing::warn!("refusing Telegram bundle spanning multiple pets");
+        return;
+    }
     let Some(ctx) = load_medication_telegram_context(pool, first).await else {
         return;
     };
@@ -99,15 +108,19 @@ pub async fn notify_medication_bundle_intake(
 
     match post_telegram(&ctx.bot_token, "sendMessage", &payload).await {
         Ok(body) => {
-            if let Some(message_id) = body.pointer("/result/message_id").and_then(|v| v.as_i64()) {
-                for record in records {
-                    if let Err(e) = crate::repo::med_intake_records::set_telegram_message_id(
-                        pool, &record.id, message_id,
-                    )
-                    .await
-                    {
-                        tracing::warn!(error = %e, record_id = %record.id, "failed to store medication telegram message id");
-                    }
+            if let Some((message_id, chat_id, thread_id)) = delivery_coordinates(&ctx, &body) {
+                let ids: Vec<String> = records.iter().map(|record| record.id.clone()).collect();
+                if let Err(e) = crate::repo::med_intake_records::set_telegram_bundle_delivery(
+                    pool,
+                    &ids,
+                    message_id,
+                    &chat_id,
+                    thread_id.as_deref(),
+                    &ctx.bot_id,
+                )
+                .await
+                {
+                    tracing::warn!(error = %e, "failed to store medication bundle Telegram delivery");
                 }
             }
             tracing::info!(pet = %ctx.pet_name, count = records.len(), "medication bundle telegram notification sent");
@@ -126,13 +139,19 @@ pub async fn notify_medication_intake_delete(pool: &SqlitePool, record: &MedInta
         tracing::debug!(record_id = %record.id, "no telegram_message_id, skipping medication delete notification");
         return;
     };
-    let Some(ctx) = load_medication_telegram_context(pool, record).await else {
-        return;
-    };
-    let remaining = match crate::repo::med_intake_records::list_by_telegram_message_id(
-        pool, message_id,
+    let Some(ctx) = load_stored_context(
+        pool,
+        record.pet_id,
+        record.telegram_chat_id.as_deref(),
+        record.telegram_thread_id.as_deref(),
+        record.telegram_bot_id.as_deref(),
     )
     .await
+    else {
+        return;
+    };
+    let remaining = match crate::repo::med_intake_records::list_by_telegram_delivery(pool, record)
+        .await
     {
         Ok(records) => records,
         Err(e) => {
@@ -259,9 +278,71 @@ fn format_intake_timestamp(
 
 struct TelegramContext {
     bot_token: String,
+    bot_id: String,
     chat_id: String,
     thread_id: Option<String>,
     pet_name: String,
+}
+
+/// Telegram bot tokens prefix their secret with the stable numeric bot ID.
+/// Store only this public ID; rotating a secret for the same bot remains safe.
+fn bot_id(token: &str) -> Option<String> {
+    let (id, secret) = token.split_once(':')?;
+    if id.is_empty() || !id.bytes().all(|b| b.is_ascii_digit()) || secret.is_empty() {
+        return None;
+    }
+    Some(id.to_owned())
+}
+
+fn delivery_coordinates(
+    ctx: &TelegramContext,
+    response: &serde_json::Value,
+) -> Option<(i64, String, Option<String>)> {
+    let message_id = response.pointer("/result/message_id")?.as_i64()?;
+    // Persist the returned numeric destination, not a mutable @username alias.
+    let chat_id = response.pointer("/result/chat/id")?.as_i64()?.to_string();
+    let thread_id = response
+        .pointer("/result/message_thread_id")
+        .and_then(|id| id.as_i64())
+        .map(|id| id.to_string())
+        .or_else(|| ctx.thread_id.clone());
+    Some((message_id, chat_id, thread_id))
+}
+
+async fn load_stored_context(
+    pool: &SqlitePool,
+    pet_id: uuid::Uuid,
+    chat_id: Option<&str>,
+    thread_id: Option<&str>,
+    stored_bot_id: Option<&str>,
+) -> Option<TelegramContext> {
+    let (Some(chat_id), Some(stored_bot_id)) = (chat_id, stored_bot_id) else {
+        tracing::warn!(%pet_id, "legacy Telegram delivery has no verified original destination; skipping external mutation");
+        return None;
+    };
+    let cfg: TelegramConfig = match settings::get(pool, "telegram").await {
+        Ok(config) => config,
+        Err(error) => {
+            tracing::warn!(%error, "failed to load Telegram config");
+            return None;
+        }
+    };
+    if !cfg.enabled {
+        return None;
+    }
+    let token = cfg.bot_token?;
+    let current_bot_id = bot_id(token.trim())?;
+    if current_bot_id != stored_bot_id {
+        tracing::warn!(%pet_id, "Telegram bot changed; skipping mutation of another bot's delivery");
+        return None;
+    }
+    Some(TelegramContext {
+        bot_token: token.trim().to_owned(),
+        bot_id: current_bot_id,
+        chat_id: chat_id.to_owned(),
+        thread_id: thread_id.map(str::to_owned),
+        pet_name: pet_id.to_string(),
+    })
 }
 
 async fn load_telegram_context(
@@ -306,6 +387,7 @@ async fn load_telegram_context(
     };
 
     Some(TelegramContext {
+        bot_id: bot_id(&bot_token)?,
         bot_token,
         chat_id,
         thread_id: pet.telegram_nutrition_thread_id,
@@ -350,6 +432,7 @@ async fn load_medication_telegram_context(
         }
     };
     Some(TelegramContext {
+        bot_id: bot_id(&bot_token)?,
         bot_token,
         chat_id,
         thread_id: pet.telegram_meds_thread_id,
@@ -374,10 +457,10 @@ async fn post_telegram(
         .json(payload)
         .send()
         .await
-        .map_err(|e| e.to_string())?;
+        .map_err(|e| e.without_url().to_string())?;
 
     let status = resp.status();
-    let body: serde_json::Value = resp.json().await.map_err(|e| e.to_string())?;
+    let body: serde_json::Value = resp.json().await.map_err(|e| e.without_url().to_string())?;
     if status.is_success() && body.get("ok").and_then(|v| v.as_bool()) == Some(true) {
         Ok(body)
     } else {
@@ -401,9 +484,16 @@ pub async fn notify_record(pool: &SqlitePool, record: &NutritionRecord) {
 
     match post_telegram(&ctx.bot_token, "sendMessage", &payload).await {
         Ok(body) => {
-            if let Some(message_id) = body.pointer("/result/message_id").and_then(|v| v.as_i64()) {
-                if let Err(e) =
-                    nutrition_records::set_telegram_message_id(pool, &record.id, message_id).await
+            if let Some((message_id, chat_id, thread_id)) = delivery_coordinates(&ctx, &body) {
+                if let Err(e) = nutrition_records::set_telegram_delivery(
+                    pool,
+                    &record.id,
+                    message_id,
+                    &chat_id,
+                    thread_id.as_deref(),
+                    &ctx.bot_id,
+                )
+                .await
                 {
                     tracing::warn!(error = %e, record_id = %record.id, "failed to store telegram message id");
                 }
@@ -425,7 +515,15 @@ pub async fn notify_record_update(pool: &SqlitePool, record: &NutritionRecord) {
         return;
     };
 
-    let Some(ctx) = load_telegram_context(pool, record).await else {
+    let Some(ctx) = load_stored_context(
+        pool,
+        record.pet_id,
+        record.telegram_chat_id.as_deref(),
+        record.telegram_thread_id.as_deref(),
+        record.telegram_bot_id.as_deref(),
+    )
+    .await
+    else {
         return;
     };
 
@@ -475,7 +573,15 @@ pub async fn notify_record_delete(pool: &SqlitePool, record: &NutritionRecord) {
         return;
     };
 
-    let Some(ctx) = load_telegram_context(pool, record).await else {
+    let Some(ctx) = load_stored_context(
+        pool,
+        record.pet_id,
+        record.telegram_chat_id.as_deref(),
+        record.telegram_thread_id.as_deref(),
+        record.telegram_bot_id.as_deref(),
+    )
+    .await
+    else {
         return;
     };
 
@@ -497,6 +603,140 @@ pub async fn notify_record_delete(pool: &SqlitePool, record: &NutritionRecord) {
 #[cfg(test)]
 mod tests {
     use super::{format_intake_timestamp, format_medication_intake_line, DateFormat, TimeFormat};
+
+    async fn pool() -> sqlx::SqlitePool {
+        let pool = sqlx::sqlite::SqlitePoolOptions::new()
+            .max_connections(1)
+            .connect("sqlite::memory:")
+            .await
+            .unwrap();
+        crate::db::run_migrations(&pool).await.unwrap();
+        pool
+    }
+
+    async fn pet(pool: &sqlx::SqlitePool) -> crate::domain::pet::Pet {
+        let pet = crate::domain::pet::Pet::new(
+            serde_json::from_value(serde_json::json!({"name":"Pet","species":"cat"})).unwrap(),
+        );
+        crate::repo::pets::create_pet(pool, pet).await.unwrap()
+    }
+
+    async fn intake(
+        pool: &sqlx::SqlitePool,
+        pet_id: uuid::Uuid,
+    ) -> crate::domain::medication::MedIntakeRecord {
+        let med = crate::repo::medications::create(
+            pool,
+            serde_json::from_value(
+                serde_json::json!({"pet_id":pet_id,"name":"Dose","med_type":"pill"}),
+            )
+            .unwrap(),
+        )
+        .await
+        .unwrap();
+        let assignment = crate::repo::med_assignments::create(pool, serde_json::from_value(serde_json::json!({"medication_id":med.id,"tablet_strength_mg":10,"pill_shape":"round","dose_fraction":"whole","date_from":"2026-01-01"})).unwrap()).await.unwrap();
+        crate::repo::med_intake_records::create(pool, serde_json::from_value(serde_json::json!({"pet_id":pet_id,"medication_id":med.id,"assignment_id":assignment.id,"occurred_at":"2026-09-19T10:00:00","local_date":"2026-09-19"})).unwrap(), chrono_tz::UTC).await.unwrap()
+    }
+
+    #[tokio::test]
+    async fn shared_message_ids_never_mix_chats_bots_threads_or_pets() {
+        let pool = pool().await;
+        let alice = pet(&pool).await;
+        let bob = pet(&pool).await;
+        let target = intake(&pool, alice.id).await;
+        crate::repo::med_intake_records::set_telegram_delivery(
+            &pool,
+            &target.id,
+            42,
+            "-100",
+            Some("7"),
+            "123",
+        )
+        .await
+        .unwrap();
+        let target = crate::repo::med_intake_records::get(&pool, &target.id)
+            .await
+            .unwrap();
+        for (pet, bot, chat, thread) in [
+            (alice.id, "123", "-200", Some("7")),
+            (bob.id, "123", "-100", Some("7")),
+            (alice.id, "456", "-100", Some("7")),
+            (alice.id, "123", "-100", Some("8")),
+            (alice.id, "123", "-100", None),
+        ] {
+            let record = intake(&pool, pet).await;
+            crate::repo::med_intake_records::set_telegram_delivery(
+                &pool, &record.id, 42, chat, thread, bot,
+            )
+            .await
+            .unwrap();
+        }
+        let own_bundle_member = intake(&pool, alice.id).await;
+        crate::repo::med_intake_records::set_telegram_delivery(
+            &pool,
+            &own_bundle_member.id,
+            42,
+            "-100",
+            Some("7"),
+            "123",
+        )
+        .await
+        .unwrap();
+        crate::repo::med_intake_records::delete(&pool, &target.id)
+            .await
+            .unwrap();
+        let remaining = crate::repo::med_intake_records::list_by_telegram_delivery(&pool, &target)
+            .await
+            .unwrap();
+        assert_eq!(remaining.len(), 1);
+        assert_eq!(remaining[0].id, own_bundle_member.id);
+    }
+
+    #[tokio::test]
+    async fn edits_use_original_destination_and_refuse_unknown_legacy_or_changed_bot() {
+        let pool = pool().await;
+        let pet = pet(&pool).await;
+        crate::repo::settings::upsert(
+            &pool,
+            "telegram",
+            &crate::domain::settings::TelegramConfig {
+                enabled: true,
+                bot_token: Some("123:rotated-secret".into()),
+            },
+        )
+        .await
+        .unwrap();
+        crate::repo::pets::update_pet(
+            &pool,
+            pet.id,
+            serde_json::from_value(
+                serde_json::json!({"telegram_meds_chat_id":"-999","telegram_meds_thread_id":"88"}),
+            )
+            .unwrap(),
+        )
+        .await
+        .unwrap();
+        let ctx = super::load_stored_context(&pool, pet.id, Some("-100"), Some("7"), Some("123"))
+            .await
+            .unwrap();
+        assert_eq!(ctx.chat_id, "-100");
+        assert_eq!(ctx.thread_id.as_deref(), Some("7"));
+        assert!(super::load_stored_context(&pool, pet.id, None, None, None)
+            .await
+            .is_none());
+        assert!(
+            super::load_stored_context(&pool, pet.id, Some("-100"), None, Some("456"))
+                .await
+                .is_none()
+        );
+        let coordinates = super::delivery_coordinates(&ctx, &serde_json::json!({"result":{"message_id":42,"chat":{"id":-100},"message_thread_id":7}})).unwrap();
+        assert_eq!(coordinates, (42, "-100".into(), Some("7".into())));
+        assert!(super::delivery_coordinates(
+            &ctx,
+            &serde_json::json!({"result":{"message_id":42}})
+        )
+        .is_none());
+    }
 
     #[test]
     fn format_intake_timestamp_trims_seconds() {

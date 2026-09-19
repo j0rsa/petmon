@@ -127,7 +127,10 @@ fn classify_by_duration_detailed(
     }
 }
 
-pub async fn load_duration_buckets(pool: &SqlitePool, pet_id: Uuid) -> AppResult<DurationBuckets> {
+pub(crate) async fn load_duration_buckets(
+    pool: &SqlitePool,
+    pet_id: Uuid,
+) -> AppResult<DurationBuckets> {
     let profile = elimination_records::duration_profile(pool, pet_id).await?;
     Ok(DurationBuckets {
         wee: profile.wee.map(|b| DurationBucket {
@@ -172,7 +175,7 @@ fn attempt_failed(reason: AutoCategorizeFailureReason) -> AutoCategorizeAttempt 
     }
 }
 
-pub async fn attempt_auto_categorize(
+pub(crate) async fn attempt_auto_categorize(
     pool: &SqlitePool,
     pet_id: Uuid,
     event_type: EliminationEventType,

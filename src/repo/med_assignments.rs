@@ -161,6 +161,14 @@ pub async fn list(
     pool: &SqlitePool,
     filters: &MedAssignmentFilters,
 ) -> AppResult<Vec<MedAssignment>> {
+    list_scoped(pool, filters, &crate::embedding::PetVisibility::All).await
+}
+
+pub async fn list_scoped(
+    pool: &SqlitePool,
+    filters: &MedAssignmentFilters,
+    visibility: &crate::embedding::PetVisibility,
+) -> AppResult<Vec<MedAssignment>> {
     let mut query = String::from(
         "SELECT id, medication_id, pet_id, formulation_id, dose_fraction, liquid_dose_ml, frequency_json, date_from, date_to, optional, meal_wait_minutes, created_at, updated_at
          FROM med_assignments WHERE 1=1",
@@ -171,6 +179,7 @@ pub async fn list(
     if filters.medication_id.is_some() {
         query.push_str(" AND medication_id = ?");
     }
+    query.push_str(&format!(" AND {}", visibility.predicate("pet_id")));
     query.push_str(" ORDER BY medication_id ASC, date_from DESC");
 
     let mut q = sqlx::query_as::<_, MedAssignmentRow>(sqlx::AssertSqlSafe(query));
@@ -363,12 +372,22 @@ pub async fn end(
     req: EndMedAssignment,
     timezone: Tz,
 ) -> AppResult<MedAssignment> {
-    let existing = get(pool, assignment_id).await?;
     let today = Utc::now()
         .with_timezone(&timezone)
         .date_naive()
         .format("%Y-%m-%d")
         .to_string();
+    end_on(pool, assignment_id, req, &today).await
+}
+
+pub async fn end_on(
+    pool: &SqlitePool,
+    assignment_id: &str,
+    req: EndMedAssignment,
+    today: &str,
+) -> AppResult<MedAssignment> {
+    let existing = get(pool, assignment_id).await?;
+    let today = today.to_owned();
     let ended_on = match req.ended_on {
         Some(date) if !date.trim().is_empty() => date,
         _ => day_before(&today).unwrap_or(today.clone()),

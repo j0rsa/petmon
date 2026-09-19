@@ -1,4 +1,4 @@
-use sqlx::SqlitePool;
+use crate::embedding::ServiceContext;
 use std::time::Duration;
 use tracing::{debug, warn};
 
@@ -6,7 +6,7 @@ const RETRAIN_INTERVAL: Duration = Duration::from_secs(60);
 const RETRAIN_BATCH_LIMIT: i64 = 5;
 
 /// Background worker that retrains pending elimination classifiers.
-pub fn spawn(pool: SqlitePool) {
+pub fn spawn(pool: ServiceContext) {
     tokio::spawn(async move {
         loop {
             tokio::time::sleep(RETRAIN_INTERVAL).await;

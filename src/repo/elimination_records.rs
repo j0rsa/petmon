@@ -8,12 +8,20 @@ use chrono_tz::Tz;
 use sqlx::SqlitePool;
 use uuid::Uuid;
 
-const RECORD_COLUMNS: &str = "id, pet_id, occurred_at, local_date, event_type, subtype, duration_seconds, note, source_type, is_auto_categorized, auto_categorize_confidence, created_at, updated_at";
+const RECORD_COLUMNS: &str = "id, pet_id, occurred_at, occurred_at_utc, source_timezone, local_date, event_type, subtype, duration_seconds, note, source_type, is_auto_categorized, auto_categorize_confidence, created_at, updated_at";
 
 #[tracing::instrument(skip(pool, filters))]
 pub async fn list(
     pool: &SqlitePool,
     filters: &EliminationRecordFilters,
+) -> AppResult<Vec<EliminationRecord>> {
+    list_scoped(pool, filters, &crate::embedding::PetVisibility::All).await
+}
+
+pub async fn list_scoped(
+    pool: &SqlitePool,
+    filters: &EliminationRecordFilters,
+    visibility: &crate::embedding::PetVisibility,
 ) -> AppResult<Vec<EliminationRecord>> {
     let mut query = String::from("SELECT ");
     query.push_str(RECORD_COLUMNS);
@@ -34,6 +42,7 @@ pub async fn list(
     if filters.event_type.is_some() {
         query.push_str(" AND event_type = ?");
     }
+    query.push_str(&format!(" AND {}", visibility.predicate("pet_id")));
     query.push_str(" ORDER BY occurred_at ASC");
     if let Some(limit) = filters.limit {
         query.push_str(&format!(" LIMIT {}", limit.max(0)));
@@ -85,26 +94,27 @@ pub async fn create(
     auto_categorize_confidence: Option<f32>,
 ) -> AppResult<EliminationRecord> {
     let now = Utc::now().to_rfc3339();
-    let occurred_at = req.occurred_at.unwrap_or_else(|| {
-        Utc::now()
-            .with_timezone(&timezone)
-            .format("%Y-%m-%dT%H:%M:%S")
-            .to_string()
-    });
-    let local_date = req
-        .local_date
-        .unwrap_or_else(|| occurred_at.split('T').next().unwrap_or("").to_string());
+    let time = crate::record_time::resolve(
+        req.occurred_at.as_deref(),
+        req.local_date.as_deref(),
+        timezone,
+        Utc::now(),
+    )?;
+    let occurred_at = time.civil;
+    let local_date = time.local_date;
     let id = Uuid::new_v4().to_string();
     let source_type = req.source_type.unwrap_or_else(|| "manual".to_string());
     let pet_id = Uuid::parse_str(&req.pet_id)
         .map_err(|_| AppError::BadRequest(format!("invalid pet_id: {}", req.pet_id)))?;
 
     sqlx::query(
-        "INSERT INTO elimination_records (id, pet_id, occurred_at, local_date, event_type, subtype, duration_seconds, note, source_type, is_auto_categorized, auto_categorize_confidence, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+        "INSERT INTO elimination_records (id, pet_id, occurred_at, occurred_at_utc, source_timezone, local_date, event_type, subtype, duration_seconds, note, source_type, is_auto_categorized, auto_categorize_confidence, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
     )
     .bind(&id)
     .bind(pet_id)
     .bind(&occurred_at)
+    .bind(&time.utc)
+    .bind(&time.timezone)
     .bind(&local_date)
     .bind(req.event_type)
     .bind(&req.subtype)
@@ -126,12 +136,21 @@ pub async fn update(
     pool: &SqlitePool,
     id: &str,
     req: UpdateEliminationRecord,
+    timezone: Tz,
 ) -> AppResult<EliminationRecord> {
     let mut record = get(pool, id).await?;
     let now = Utc::now().to_rfc3339();
 
     if let Some(occurred_at) = req.occurred_at {
-        record.occurred_at = occurred_at;
+        let time = crate::record_time::resolve(
+            Some(&occurred_at),
+            req.local_date.as_deref(),
+            timezone,
+            Utc::now(),
+        )?;
+        record.occurred_at = time.civil;
+        record.occurred_at_utc = Some(time.utc);
+        record.source_timezone = Some(time.timezone);
     }
     if let Some(local_date) = req.local_date {
         record.local_date = local_date;
@@ -153,9 +172,11 @@ pub async fn update(
     record.updated_at = now;
 
     sqlx::query(
-        "UPDATE elimination_records SET occurred_at=?, local_date=?, event_type=?, subtype=?, duration_seconds=?, note=?, is_auto_categorized=?, auto_categorize_confidence=?, updated_at=? WHERE id=?",
+        "UPDATE elimination_records SET occurred_at=?, occurred_at_utc=?, source_timezone=?, local_date=?, event_type=?, subtype=?, duration_seconds=?, note=?, is_auto_categorized=?, auto_categorize_confidence=?, updated_at=? WHERE id=?",
     )
     .bind(&record.occurred_at)
+    .bind(&record.occurred_at_utc)
+    .bind(&record.source_timezone)
     .bind(&record.local_date)
     .bind(record.event_type)
     .bind(&record.subtype)

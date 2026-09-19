@@ -4,6 +4,8 @@ import { withSettings } from '../stories/decorators';
 import { mockCreatedToken } from '../stories/fixtures';
 import type { ApiTokenCreated } from '../api/settings';
 import SettingsPage from './SettingsPage';
+import { expect, within } from 'storybook/test';
+import { asNarrowStory } from '../stories/viewport';
 
 const meta = {
   title: 'Pages/SettingsPage',
@@ -25,6 +27,29 @@ type Story = StoryObj<typeof meta>;
 export const AllConfigured: Story = {
   decorators: [withSettings({ oidc: 'configured', telegram: 'configured', tokens: 'populated' })],
 };
+
+export const PersonalSettingsOnly: Story = {
+  decorators: [withSettings({ admin: false })],
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    await expect(canvas.getByRole('heading', { name: 'API tokens' })).toBeInTheDocument();
+    await expect(canvas.queryByRole('heading', { name: 'Telegram' })).not.toBeInTheDocument();
+    await expect(canvas.queryByRole('heading', { name: 'Instance API tokens' })).not.toBeInTheDocument();
+  },
+};
+export const PersonalSettingsOnlyNarrow = asNarrowStory(PersonalSettingsOnly);
+
+export const AdministratorWithReadOnlyCredential: Story = {
+  decorators: [withSettings({ capabilities: ['api_read'], usingApiToken: true })],
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    await expect(canvas.queryByRole('heading', { name: 'Telegram' })).not.toBeInTheDocument();
+    await expect(canvas.queryByRole('heading', { name: 'Instance API tokens' })).not.toBeInTheDocument();
+    await expect(canvas.queryByRole('button', { name: '+ Create token' })).not.toBeInTheDocument();
+    for (const button of canvas.getAllByRole('button', { name: 'Edit scopes' })) await expect(button).toBeDisabled();
+  },
+};
+export const AdministratorWithReadOnlyCredentialNarrow = asNarrowStory(AdministratorWithReadOnlyCredential);
 
 /** Fresh install — nothing set up yet. */
 export const BlankSlate: Story = {

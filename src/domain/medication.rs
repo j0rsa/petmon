@@ -415,12 +415,22 @@ pub struct MedIntakeRecord {
     pub effective_dose_mg: Option<f64>,
     pub dose_label: String,
     pub occurred_at: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub occurred_at_utc: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub source_timezone: Option<String>,
     pub local_date: String,
     pub taken: bool,
     pub note: Option<String>,
     pub source_type: String,
     #[serde(skip_serializing)]
     pub telegram_message_id: Option<i64>,
+    #[serde(skip)]
+    pub telegram_chat_id: Option<String>,
+    #[serde(skip)]
+    pub telegram_thread_id: Option<String>,
+    #[serde(skip)]
+    pub telegram_bot_id: Option<String>,
     pub created_at: String,
 }
 
@@ -619,17 +629,24 @@ pub fn hydrate_intake(
         effective_dose_mg,
         dose_label,
         occurred_at: intake.occurred_at,
+        occurred_at_utc: intake.occurred_at_utc,
+        source_timezone: intake.source_timezone,
         local_date: intake.local_date,
         taken: intake.taken,
         note: intake.note,
         source_type: intake.source_type,
         telegram_message_id: intake.telegram_message_id,
+        telegram_chat_id: intake.telegram_chat_id,
+        telegram_thread_id: intake.telegram_thread_id,
+        telegram_bot_id: intake.telegram_bot_id,
         created_at: intake.created_at,
     }
 }
 
 #[derive(Debug, Clone)]
 pub struct MedIntakeCore {
+    pub occurred_at_utc: Option<String>,
+    pub source_timezone: Option<String>,
     pub id: String,
     pub pet_id: Uuid,
     pub medication_id: String,
@@ -642,6 +659,9 @@ pub struct MedIntakeCore {
     pub note: Option<String>,
     pub source_type: String,
     pub telegram_message_id: Option<i64>,
+    pub telegram_chat_id: Option<String>,
+    pub telegram_thread_id: Option<String>,
+    pub telegram_bot_id: Option<String>,
     pub created_at: String,
 }
 

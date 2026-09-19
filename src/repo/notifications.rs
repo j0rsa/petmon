@@ -41,6 +41,15 @@ fn map_row(row: NotificationRow) -> (Notification, bool) {
 #[tracing::instrument(skip(pool, req))]
 pub async fn create(pool: &SqlitePool, req: CreateNotification) -> AppResult<Option<Notification>> {
     let notification = req.into_row();
+    let mut tx = pool.begin().await?;
+    if let (Some(kind), Some(id)) = (&notification.source_kind, &notification.source_id) {
+        let claimed = sqlx::query("INSERT OR IGNORE INTO notification_delivery_claims (source_kind, source_id, claimed_at) VALUES (?, ?, ?)")
+            .bind(kind).bind(id).bind(&notification.created_at).execute(&mut *tx).await?.rows_affected();
+        if claimed == 0 {
+            tx.rollback().await?;
+            return Ok(None);
+        }
+    }
     let result = sqlx::query(
         "INSERT OR IGNORE INTO notifications (id, kind, title, body, link_path, link_hash, pet_id, pet_name, source_kind, source_id, created_at) \
          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
@@ -56,8 +65,9 @@ pub async fn create(pool: &SqlitePool, req: CreateNotification) -> AppResult<Opt
     .bind(&notification.source_kind)
     .bind(&notification.source_id)
     .bind(&notification.created_at)
-    .execute(pool)
+    .execute(&mut *tx)
     .await?;
+    tx.commit().await?;
 
     if result.rows_affected() == 0 {
         return Ok(None);

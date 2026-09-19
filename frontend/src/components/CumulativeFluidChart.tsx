@@ -1,4 +1,5 @@
 import { useMemo, useState } from 'react';
+import { useResourceTime } from '../context/useResourceTime';
 import { CartesianGrid, DefaultLegendContent, Legend, Line, LineChart, ReferenceLine, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
 import { useUserWidgetSettings } from '../api/userSettings';
 import {
@@ -69,6 +70,7 @@ interface CumulativeFluidChartProps {
 }
 
 export function CumulativeFluidChart({ records, focusDate, schedules = [], bestDayCurve, bestDayDate }: CumulativeFluidChartProps) {
+  const { minuteOfDay } = useResourceTime();
   const { settings, update } = useUserWidgetSettings('cumulative_fluid_chart');
   const [soloSeriesKey, setSoloSeriesKey] = useState<FluidSeriesKey | null>(null);
 
@@ -94,7 +96,7 @@ export function CumulativeFluidChart({ records, focusDate, schedules = [], bestD
     [exposedSeries, soloSeriesKey, bestDayDate],
   );
 
-  const nowX = nowToRefMs();
+  const nowX = nowToRefMs(minuteOfDay);
 
   if (points.length === 0) {
     return <div className="empty-state compact-empty">No fluid records for {focusDate} in this range.</div>;

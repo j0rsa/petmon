@@ -101,15 +101,18 @@ pub struct MeResponse {
     pub name: Option<String>,
     pub display_name: String,
     pub kind: &'static str,
-    /// Granted scopes. Empty means full access (no restriction).
+    /// Granted scopes. Empty means ordinary full access; use capabilities for
+    /// effective authority, including live administrator permission.
     pub scopes: Vec<String>,
+    pub roles: Vec<String>,
+    pub capabilities: Vec<String>,
     /// Creator display name for the API token session (api_token kind only).
     #[serde(skip_serializing_if = "Option::is_none")]
     pub token_created_by: Option<String>,
 }
 
 #[get("/auth/me")]
-pub async fn me(req: HttpRequest) -> AppResult<HttpResponse> {
+pub async fn me(req: HttpRequest, state: web::Data<AppState>) -> AppResult<HttpResponse> {
     let identity = req
         .extensions()
         .get::<Identity>()
@@ -125,6 +128,13 @@ pub async fn me(req: HttpRequest) -> AppResult<HttpResponse> {
     let mut scopes: Vec<String> = identity.scopes.clone().into_iter().collect();
     scopes.sort();
 
+    let capabilities = crate::auth::admin::effective_capabilities(&state.pool, &identity).await?;
+    let roles = if crate::auth::admin::is_instance_admin(&state.pool, &identity).await? {
+        vec!["instance_admin".to_owned()]
+    } else {
+        vec![]
+    };
+
     Ok(HttpResponse::Ok().json(MeResponse {
         display_name: identity.display_name().to_string(),
         subject: identity.subject,
@@ -132,6 +142,8 @@ pub async fn me(req: HttpRequest) -> AppResult<HttpResponse> {
         name: identity.name,
         kind,
         scopes,
+        roles,
+        capabilities,
         token_created_by: identity.token_created_by,
     }))
 }
@@ -147,7 +159,7 @@ pub async fn sign_out(req: HttpRequest, state: web::Data<AppState>) -> AppResult
         .ok_or_else(|| AppError::Internal("missing identity".to_string()))?;
 
     if let IdentityKind::ApiToken { token_id } = identity.kind {
-        api_tokens::delete_by_id(&state.pool, &token_id).await?;
+        api_tokens::delete_owned(&state.pool, &token_id, &identity.subject, false).await?;
     }
 
     Ok(HttpResponse::NoContent().finish())

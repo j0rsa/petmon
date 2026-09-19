@@ -1,3 +1,4 @@
+import { useResourceTime } from '../context/useResourceTime';
 import { useMemo, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import {
@@ -8,7 +9,7 @@ import { eliminationApi } from '../api/elimination';
 import { NoPetSelected } from '../components/NoPetSelected';
 import { StatCard } from '../components/StatCard';
 import { useSelectedPet } from '../context/SelectedPetContext';
-import { localToday, shiftDate } from '../lib/dates';
+import { shiftDate } from '../lib/dates';
 import { AlertIcon, ClockIcon, TrendUpIcon } from '../lib/metricIcons';
 import { linReg } from '../lib/linReg';
 
@@ -93,7 +94,7 @@ export default function EliminationAnalyticsPage() {
   const [period, setPeriod] = useState<PeriodLabel>('30d');
   const [soloEventType, setSoloEventType] = useState<EventType | null>(null);
 
-  const today = localToday();
+  const { today } = useResourceTime();
   const days = PERIODS.find((p) => p.label === period)!.days;
   const dateFrom = shiftDate(today, -(days - 1));
 

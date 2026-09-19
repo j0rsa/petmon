@@ -8,6 +8,10 @@ pub struct NutritionRecord {
     pub id: String,
     pub pet_id: Uuid,
     pub occurred_at: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub occurred_at_utc: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub source_timezone: Option<String>,
     pub local_date: String,
     pub category: NutritionCategory,
     pub amount: f64,
@@ -16,6 +20,12 @@ pub struct NutritionRecord {
     pub source_type: String,
     #[serde(skip_serializing)]
     pub telegram_message_id: Option<i64>,
+    #[serde(skip)]
+    pub telegram_chat_id: Option<String>,
+    #[serde(skip)]
+    pub telegram_thread_id: Option<String>,
+    #[serde(skip)]
+    pub telegram_bot_id: Option<String>,
     pub created_at: String,
     pub updated_at: String,
 }
@@ -98,21 +108,22 @@ impl std::str::FromStr for NutritionCategory {
 }
 
 impl NutritionRecord {
-    pub fn new(req: CreateNutritionRecord, timezone: Tz) -> Self {
+    pub fn new(req: CreateNutritionRecord, timezone: Tz) -> crate::error::AppResult<Self> {
         let now = Utc::now().to_rfc3339();
-        let occurred_at = req.occurred_at.unwrap_or_else(|| {
-            Utc::now()
-                .with_timezone(&timezone)
-                .format("%Y-%m-%dT%H:%M:%S")
-                .to_string()
-        });
-        let local_date = req
-            .local_date
-            .unwrap_or_else(|| occurred_at.split('T').next().unwrap_or("").to_string());
-        NutritionRecord {
+        let time = crate::record_time::resolve(
+            req.occurred_at.as_deref(),
+            req.local_date.as_deref(),
+            timezone,
+            Utc::now(),
+        )?;
+        let occurred_at = time.civil;
+        let local_date = time.local_date;
+        Ok(NutritionRecord {
             id: Uuid::new_v4().to_string(),
             pet_id: req.pet_id,
             occurred_at,
+            occurred_at_utc: Some(time.utc),
+            source_timezone: Some(time.timezone),
             local_date,
             category: req.category,
             amount: req.amount,
@@ -120,8 +131,11 @@ impl NutritionRecord {
             note: req.note,
             source_type: req.source_type.unwrap_or_else(|| "manual".to_string()),
             telegram_message_id: None,
+            telegram_chat_id: None,
+            telegram_thread_id: None,
+            telegram_bot_id: None,
             created_at: now.clone(),
             updated_at: now,
-        }
+        })
     }
 }

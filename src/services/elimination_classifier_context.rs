@@ -67,7 +67,7 @@ fn std_dev(values: &[f64], mean: f64) -> f64 {
     var.sqrt()
 }
 
-pub async fn compute_baselines(
+pub(crate) async fn compute_baselines(
     pool: &SqlitePool,
     pet_id: Uuid,
     as_of: NaiveDate,
@@ -196,7 +196,7 @@ fn build_from_prior(
     }
 }
 
-pub async fn build_feature_context(
+pub(crate) async fn build_feature_context(
     pool: &SqlitePool,
     pet_id: Uuid,
     occurred_at: &str,
@@ -225,7 +225,7 @@ pub async fn build_feature_context(
 }
 
 /// Build context for a training row using only records that occurred strictly before it.
-pub async fn build_feature_context_for_training(
+pub(crate) async fn build_feature_context_for_training(
     pool: &SqlitePool,
     pet_id: Uuid,
     occurred_at: &str,

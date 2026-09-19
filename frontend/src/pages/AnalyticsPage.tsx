@@ -1,3 +1,4 @@
+import { useResourceTime } from '../context/useResourceTime';
 import { useMemo, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import {
@@ -10,7 +11,7 @@ import { NoPetSelected } from '../components/NoPetSelected';
 import { StatCard } from '../components/StatCard';
 import { LiquidsIcon, TotalFluidIcon, TrendUpIcon, WetFoodIcon } from '../lib/metricIcons';
 import { useSelectedPet } from '../context/SelectedPetContext';
-import { localToday, shiftDate } from '../lib/dates';
+import { shiftDate } from '../lib/dates';
 import { WET_FOOD_FLUID_RATIO } from '../lib/cumulativeFluid';
 
 const PERIODS = [
@@ -33,7 +34,7 @@ export default function AnalyticsPage() {
   const [period, setPeriod] = useState<PeriodLabel>('30d');
   const [soloCategory, setSoloCategory] = useState<typeof ANALYTICS_CATEGORIES[number] | null>(null);
 
-  const today = localToday();
+  const { today } = useResourceTime();
   const days = PERIODS.find(p => p.label === period)!.days;
   const dateFrom = shiftDate(today, -(days - 1));
 
@@ -280,4 +281,3 @@ export default function AnalyticsPage() {
     </div>
   );
 }
-

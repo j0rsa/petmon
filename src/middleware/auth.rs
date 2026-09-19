@@ -75,7 +75,7 @@ where
 
             // No auth method configured → refuse to serve
             let has_active_tokens = api_tokens::has_active_tokens(&state.pool).await;
-            let oidc_enabled = state.oidc.is_some();
+            let oidc_enabled = state.oidc.is_some() || state.identity_adapter.is_some();
 
             if !oidc_enabled && !has_active_tokens {
                 let resp = HttpResponse::ServiceUnavailable().json(serde_json::json!({
@@ -93,6 +93,34 @@ where
                 .and_then(|v| v.to_str().ok())
                 .and_then(|v| v.strip_prefix("Bearer "))
                 .map(str::to_owned);
+
+            if let Some(adapter) = &state.identity_adapter {
+                if !bearer
+                    .as_deref()
+                    .is_some_and(|token| token.starts_with("pm_api_"))
+                {
+                    match adapter
+                        .authenticate_request(
+                            &state.pool,
+                            req.method().as_str(),
+                            req.path(),
+                            req.headers(),
+                        )
+                        .await
+                    {
+                        Ok(identity) => {
+                            req.extensions_mut().insert(identity);
+                            return Ok(service.call(req).await?.map_into_left_body());
+                        }
+                        Err(error) => {
+                            tracing::debug!(%error, "identity adapter denied authentication");
+                            return Ok(req
+                                .into_response(HttpResponse::Unauthorized().finish())
+                                .map_into_right_body());
+                        }
+                    }
+                }
+            }
 
             let Some(token) = bearer else {
                 let resp = HttpResponse::Unauthorized().json(serde_json::json!({
@@ -121,7 +149,7 @@ where
                             .or_else(|| api_token.created_by.clone())
                             .unwrap_or_else(|| api_token.id.clone());
                         let scopes = api_token.scopes_vec().into_iter().collect();
-                        let identity = Identity {
+                        let mut identity = Identity {
                             subject: owner_subject.clone(),
                             email: None,
                             name: Some(display),
@@ -132,6 +160,23 @@ where
                             token_created_by: api_token.created_by.clone(),
                             owner_subject: Some(owner_subject),
                         };
+                        if let Some(adapter) = &state.identity_adapter {
+                            match adapter
+                                .resolve_api_token_owner(&state.pool, &identity.subject)
+                                .await
+                            {
+                                Ok(actor) if !actor.subject.is_empty() => {
+                                    identity.subject = actor.subject.clone();
+                                    identity.owner_subject = Some(actor.subject);
+                                    identity.email = actor.email;
+                                }
+                                _ => {
+                                    return Ok(req
+                                        .into_response(HttpResponse::Unauthorized().finish())
+                                        .map_into_right_body())
+                                }
+                            }
+                        }
                         req.extensions_mut().insert(identity);
                         let res = service.call(req).await?;
                         return Ok(res.map_into_left_body());

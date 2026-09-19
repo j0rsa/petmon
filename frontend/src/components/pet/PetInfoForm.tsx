@@ -30,6 +30,9 @@ interface PetInfoFormProps {
   submitLabel: string;
   onCancel?: () => void;
   loading?: boolean;
+  canWriteProfile?: boolean;
+  canManageIntegrations?: boolean;
+  canChangeStatus?: boolean;
 }
 
 // eslint-disable-next-line react-refresh/only-export-components
@@ -95,6 +98,9 @@ export function PetInfoForm({
   submitLabel,
   onCancel,
   loading = false,
+  canWriteProfile = true,
+  canManageIntegrations = true,
+  canChangeStatus = true,
 }: PetInfoFormProps) {
   return (
     <form
@@ -106,7 +112,7 @@ export function PetInfoForm({
     >
       <div className="pet-info-form-avatar">
         <PetAvatar species={form.species} name={form.name || 'Pet'} color={form.color} photoUrl={photoUrl} size={144} />
-        <div className="pet-photo-actions">
+        <fieldset className="pet-photo-actions" disabled={!canWriteProfile} style={{ border: 0, padding: 0, margin: 0 }}>
           <label className="button button-secondary button-compact" htmlFor="pet-photo-upload">
             Upload photo
           </label>
@@ -127,17 +133,17 @@ export function PetInfoForm({
             </button>
           )}
           <p className="muted-text">Photos are stored locally in your browser.</p>
-        </div>
+        </fieldset>
       </div>
 
       <div className="form-grid">
         <div className="form-row">
           <label htmlFor="pet-info-name">Name</label>
-          <input id="pet-info-name" value={form.name} onChange={(event) => setForm((current) => ({ ...current, name: event.target.value }))} required />
+          <input disabled={!canWriteProfile} id="pet-info-name" value={form.name} onChange={(event) => setForm((current) => ({ ...current, name: event.target.value }))} required />
         </div>
         <div className="form-row">
           <label htmlFor="pet-info-species">Species</label>
-          <select id="pet-info-species" value={form.species} onChange={(event) => setForm((current) => ({ ...current, species: event.target.value as PetSpecies }))}>
+          <select disabled={!canWriteProfile} id="pet-info-species" value={form.species} onChange={(event) => setForm((current) => ({ ...current, species: event.target.value as PetSpecies }))}>
             {PET_SPECIES.map((species) => (
               <option key={species} value={species}>
                 {PET_SPECIES_LABELS[species]}
@@ -147,28 +153,29 @@ export function PetInfoForm({
         </div>
         <div className="form-row">
           <label htmlFor="pet-info-breed">Breed</label>
-          <input id="pet-info-breed" placeholder="e.g. British Shorthair" value={form.breed} onChange={(event) => setForm((current) => ({ ...current, breed: event.target.value }))} />
+          <input disabled={!canWriteProfile} id="pet-info-breed" placeholder="e.g. British Shorthair" value={form.breed} onChange={(event) => setForm((current) => ({ ...current, breed: event.target.value }))} />
         </div>
         <div className="form-row">
           <label htmlFor="pet-info-birth-date">Birth date</label>
-          <input id="pet-info-birth-date" type="date" value={form.birth_date} onChange={(event) => setForm((current) => ({ ...current, birth_date: event.target.value }))} />
+          <input disabled={!canWriteProfile} id="pet-info-birth-date" type="date" value={form.birth_date} onChange={(event) => setForm((current) => ({ ...current, birth_date: event.target.value }))} />
         </div>
         <div className="form-row">
           <label htmlFor="pet-info-color">Color</label>
           <ColorPickerField
+            disabled={!canWriteProfile}
             id="pet-info-color"
             value={form.color}
             placeholder="#c4a882"
-            onChange={(value) => setForm((current) => ({ ...current, color: value }))}
+            onChange={(value) => { if (canWriteProfile) setForm((current) => ({ ...current, color: value })); }}
           />
         </div>
         <div className="form-row">
           <label htmlFor="pet-info-blood-type">Blood type</label>
-          <input id="pet-info-blood-type" placeholder="Optional" value={form.blood_type} onChange={(event) => setForm((current) => ({ ...current, blood_type: event.target.value }))} />
+          <input disabled={!canWriteProfile} id="pet-info-blood-type" placeholder="Optional" value={form.blood_type} onChange={(event) => setForm((current) => ({ ...current, blood_type: event.target.value }))} />
         </div>
         <div className="form-row">
           <label htmlFor="pet-info-status">Status</label>
-          <select id="pet-info-status" value={form.status} onChange={(event) => setForm((current) => ({ ...current, status: event.target.value as PetStatus }))}>
+          <select disabled={!canChangeStatus} id="pet-info-status" value={form.status} onChange={(event) => setForm((current) => ({ ...current, status: event.target.value as PetStatus }))}>
             {PET_STATUSES.map((status) => (
               <option key={status} value={status}>
                 {PET_STATUS_LABELS[status]}
@@ -178,7 +185,7 @@ export function PetInfoForm({
         </div>
         <div className="form-row form-row-full">
           <label htmlFor="pet-info-notes">Feeding notes</label>
-          <textarea id="pet-info-notes" rows={4} value={form.feeding_notes} onChange={(event) => setForm((current) => ({ ...current, feeding_notes: event.target.value }))} />
+          <textarea disabled={!canWriteProfile} id="pet-info-notes" rows={4} value={form.feeding_notes} onChange={(event) => setForm((current) => ({ ...current, feeding_notes: event.target.value }))} />
         </div>
         <div className="form-row form-row-full">
           <span className="eyebrow">Nutrition Telegram notifications</span>
@@ -189,11 +196,11 @@ export function PetInfoForm({
         </div>
         <div className="form-row">
           <label htmlFor="pet-info-tg-chat">Chat ID</label>
-          <input id="pet-info-tg-chat" placeholder="-100123456789" value={form.telegram_nutrition_chat_id} onChange={(event) => setForm((current) => ({ ...current, telegram_nutrition_chat_id: event.target.value }))} />
+          <input disabled={!canManageIntegrations} id="pet-info-tg-chat" placeholder="-100123456789" value={form.telegram_nutrition_chat_id} onChange={(event) => setForm((current) => ({ ...current, telegram_nutrition_chat_id: event.target.value }))} />
         </div>
         <div className="form-row">
           <label htmlFor="pet-info-tg-thread">Thread ID <span style={{ fontWeight: 400, color: 'var(--text-subtle)' }}>(optional)</span></label>
-          <input id="pet-info-tg-thread" placeholder="e.g. 42" value={form.telegram_nutrition_thread_id} onChange={(event) => setForm((current) => ({ ...current, telegram_nutrition_thread_id: event.target.value }))} />
+          <input disabled={!canManageIntegrations} id="pet-info-tg-thread" placeholder="e.g. 42" value={form.telegram_nutrition_thread_id} onChange={(event) => setForm((current) => ({ ...current, telegram_nutrition_thread_id: event.target.value }))} />
         </div>
         <div className="form-row form-row-full">
           <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', flexWrap: 'wrap' }}>
@@ -201,6 +208,7 @@ export function PetInfoForm({
             <button
               className="button button-secondary button-compact"
               type="button"
+              disabled={!canManageIntegrations}
               onClick={() => setForm((current) => ({
                 ...current,
                 telegram_meds_chat_id: current.telegram_nutrition_chat_id,
@@ -216,11 +224,11 @@ export function PetInfoForm({
         </div>
         <div className="form-row">
           <label htmlFor="pet-info-tg-meds-chat">Chat ID</label>
-          <input id="pet-info-tg-meds-chat" placeholder="-100123456789" value={form.telegram_meds_chat_id} onChange={(event) => setForm((current) => ({ ...current, telegram_meds_chat_id: event.target.value }))} />
+          <input disabled={!canManageIntegrations} id="pet-info-tg-meds-chat" placeholder="-100123456789" value={form.telegram_meds_chat_id} onChange={(event) => setForm((current) => ({ ...current, telegram_meds_chat_id: event.target.value }))} />
         </div>
         <div className="form-row">
           <label htmlFor="pet-info-tg-meds-thread">Thread ID <span style={{ fontWeight: 400, color: 'var(--text-subtle)' }}>(optional)</span></label>
-          <input id="pet-info-tg-meds-thread" placeholder="e.g. 42" value={form.telegram_meds_thread_id} onChange={(event) => setForm((current) => ({ ...current, telegram_meds_thread_id: event.target.value }))} />
+          <input disabled={!canManageIntegrations} id="pet-info-tg-meds-thread" placeholder="e.g. 42" value={form.telegram_meds_thread_id} onChange={(event) => setForm((current) => ({ ...current, telegram_meds_thread_id: event.target.value }))} />
         </div>
         <div className="form-row form-row-full">
           <span className="eyebrow">Toileting auto-tag</span>
@@ -231,7 +239,7 @@ export function PetInfoForm({
         <div className="form-row form-row-full">
           <label className="checkbox-row" htmlFor="pet-info-auto-tag">
             <input
-              id="pet-info-auto-tag"
+              disabled={!canWriteProfile} id="pet-info-auto-tag"
               type="checkbox"
               checked={form.elimination_auto_categorize_by_duration}
               onChange={(event) => setForm((current) => ({

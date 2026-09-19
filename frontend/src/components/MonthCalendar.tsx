@@ -1,6 +1,7 @@
+import { useResourceTime } from '../context/useResourceTime';
 import type React from 'react';
 import { useUserWidgetSettings } from '../api/userSettings';
-import { calendarCells, formatMonthHeading, localToday, shiftMonth } from '../lib/dates';
+import { calendarCells, formatMonthHeading, shiftMonth } from '../lib/dates';
 import { formatDayHint, formatDayHintCompact } from '../lib/nutritionMetrics';
 import { nutritionCalendarToDisplayConfig, weekStartFromSettings } from '../lib/widgetSettings';
 import type { DayNutritionHighlight } from '../types/pillars';
@@ -58,7 +59,7 @@ export function MonthCalendar({
   const calendarConfig = nutritionCalendarToDisplayConfig(settings);
   const cells = calendarCells(month, weekStart);
   const weekdays = weekStart === 'monday' ? WEEKDAYS_MON : WEEKDAYS_SUN;
-  const today = localToday();
+  const { today } = useResourceTime();
   const isOnToday = selectedDate === today;
   const displayMonthLong = formatMonthHeading(month, 'long');
   const displayMonthShort = formatMonthHeading(month, 'short');
@@ -123,7 +124,7 @@ export function MonthCalendar({
           }
 
           const isSelected = cell.date === selectedDate;
-          const isToday = cell.date === localToday();
+          const isToday = cell.date === today;
 
           let hasData: boolean;
           let hintNodes: React.ReactNode;

@@ -5,9 +5,10 @@ interface ColorPickerFieldProps {
   value: string;
   onChange: (value: string) => void;
   placeholder?: string;
+  disabled?: boolean;
 }
 
-export function ColorPickerField({ id, value, onChange, placeholder }: ColorPickerFieldProps) {
+export function ColorPickerField({ id, value, onChange, placeholder, disabled = false }: ColorPickerFieldProps) {
   const pickerRef = useRef<HTMLInputElement>(null);
 
   const isValidHex = /^#[0-9a-fA-F]{3,6}$/.test(value);
@@ -17,6 +18,7 @@ export function ColorPickerField({ id, value, onChange, placeholder }: ColorPick
     <div className="color-picker-field">
       <button
         type="button"
+        disabled={disabled}
         className="color-swatch"
         style={{ background: swatchColor }}
         title="Pick colour"
@@ -26,6 +28,7 @@ export function ColorPickerField({ id, value, onChange, placeholder }: ColorPick
       <input
         ref={pickerRef}
         type="color"
+        disabled={disabled}
         className="color-input-native"
         value={isValidHex ? value : '#94a3b8'}
         onChange={(e) => onChange(e.target.value)}
@@ -35,6 +38,7 @@ export function ColorPickerField({ id, value, onChange, placeholder }: ColorPick
       <input
         id={id}
         type="text"
+        disabled={disabled}
         className="color-input-text"
         value={value}
         placeholder={placeholder}

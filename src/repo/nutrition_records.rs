@@ -5,12 +5,20 @@ use crate::error::{AppError, AppResult};
 use chrono::Utc;
 use sqlx::SqlitePool;
 
-const RECORD_SELECT: &str = "SELECT id, pet_id, occurred_at, local_date, category, amount, unit, note, source_type, telegram_message_id, created_at, updated_at FROM nutrition_records";
+const RECORD_SELECT: &str = "SELECT id, pet_id, occurred_at, occurred_at_utc, source_timezone, local_date, category, amount, unit, note, source_type, telegram_message_id, telegram_chat_id, telegram_thread_id, telegram_bot_id, created_at, updated_at FROM nutrition_records";
 
 #[tracing::instrument(skip(pool, filters))]
 pub async fn list_records(
     pool: &SqlitePool,
     filters: &NutritionRecordFilters,
+) -> AppResult<Vec<NutritionRecord>> {
+    list_records_scoped(pool, filters, &crate::embedding::PetVisibility::All).await
+}
+
+pub async fn list_records_scoped(
+    pool: &SqlitePool,
+    filters: &NutritionRecordFilters,
+    visibility: &crate::embedding::PetVisibility,
 ) -> AppResult<Vec<NutritionRecord>> {
     let mut query = format!("{RECORD_SELECT} WHERE 1=1");
 
@@ -29,6 +37,7 @@ pub async fn list_records(
     if filters.category.is_some() {
         query.push_str(" AND category = ?");
     }
+    query.push_str(&format!(" AND {}", visibility.predicate("pet_id")));
     query.push_str(" ORDER BY occurred_at ASC");
     if let Some(limit) = filters.limit {
         query.push_str(&format!(" LIMIT {}", limit.max(0)));
@@ -73,11 +82,13 @@ pub async fn create_record(
     record: NutritionRecord,
 ) -> AppResult<NutritionRecord> {
     sqlx::query(
-        "INSERT INTO nutrition_records (id, pet_id, occurred_at, local_date, category, amount, unit, note, source_type, telegram_message_id, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+        "INSERT INTO nutrition_records (id, pet_id, occurred_at, occurred_at_utc, source_timezone, local_date, category, amount, unit, note, source_type, telegram_message_id, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
     )
     .bind(&record.id)
     .bind(record.pet_id)
     .bind(&record.occurred_at)
+    .bind(&record.occurred_at_utc)
+    .bind(&record.source_timezone)
     .bind(&record.local_date)
     .bind(record.category)
     .bind(record.amount)
@@ -97,11 +108,20 @@ pub async fn update_record(
     pool: &SqlitePool,
     id: &str,
     req: UpdateNutritionRecord,
+    timezone: chrono_tz::Tz,
 ) -> AppResult<NutritionRecord> {
     let mut record = get_record(pool, id).await?;
     let now = Utc::now().to_rfc3339();
     if let Some(occurred_at) = req.occurred_at {
-        record.occurred_at = occurred_at;
+        let time = crate::record_time::resolve(
+            Some(&occurred_at),
+            req.local_date.as_deref(),
+            timezone,
+            Utc::now(),
+        )?;
+        record.occurred_at = time.civil;
+        record.occurred_at_utc = Some(time.utc);
+        record.source_timezone = Some(time.timezone);
     }
     if let Some(local_date) = req.local_date {
         record.local_date = local_date;
@@ -120,9 +140,11 @@ pub async fn update_record(
     }
     record.updated_at = now;
     sqlx::query(
-        "UPDATE nutrition_records SET occurred_at=?, local_date=?, category=?, amount=?, unit=?, note=?, updated_at=? WHERE id=?",
+        "UPDATE nutrition_records SET occurred_at=?, occurred_at_utc=?, source_timezone=?, local_date=?, category=?, amount=?, unit=?, note=?, updated_at=? WHERE id=?",
     )
     .bind(&record.occurred_at)
+    .bind(&record.occurred_at_utc)
+    .bind(&record.source_timezone)
     .bind(&record.local_date)
     .bind(record.category)
     .bind(record.amount)
@@ -136,15 +158,21 @@ pub async fn update_record(
 }
 
 #[tracing::instrument(skip(pool))]
-pub async fn set_telegram_message_id(
+pub async fn set_telegram_delivery(
     pool: &SqlitePool,
     id: &str,
     message_id: i64,
+    chat_id: &str,
+    thread_id: Option<&str>,
+    bot_id: &str,
 ) -> AppResult<()> {
     let now = Utc::now().to_rfc3339();
     let rows =
-        sqlx::query("UPDATE nutrition_records SET telegram_message_id=?, updated_at=? WHERE id=?")
+        sqlx::query("UPDATE nutrition_records SET telegram_message_id=?, telegram_chat_id=?, telegram_thread_id=?, telegram_bot_id=?, updated_at=? WHERE id=?")
             .bind(message_id)
+            .bind(chat_id)
+            .bind(thread_id)
+            .bind(bot_id)
             .bind(&now)
             .bind(id)
             .execute(pool)
@@ -181,11 +209,13 @@ pub async fn create_records_batch(
     let mut tx = pool.begin().await?;
     for record in &records {
         sqlx::query(
-            "INSERT INTO nutrition_records (id, pet_id, occurred_at, local_date, category, amount, unit, note, source_type, telegram_message_id, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+            "INSERT INTO nutrition_records (id, pet_id, occurred_at, occurred_at_utc, source_timezone, local_date, category, amount, unit, note, source_type, telegram_message_id, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
         )
         .bind(&record.id)
         .bind(record.pet_id)
         .bind(&record.occurred_at)
+    .bind(&record.occurred_at_utc)
+    .bind(&record.source_timezone)
         .bind(&record.local_date)
         .bind(record.category)
         .bind(record.amount)

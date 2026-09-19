@@ -27,6 +27,113 @@ pub async fn list(pool: &SqlitePool) -> AppResult<Vec<ApiToken>> {
     .await?)
 }
 
+pub async fn list_owned(pool: &SqlitePool, owner: &str) -> AppResult<Vec<ApiToken>> {
+    Ok(sqlx::query_as::<_, ApiToken>(
+        "SELECT * FROM api_tokens WHERE owner_subject = ? ORDER BY created_at DESC",
+    )
+    .bind(owner)
+    .fetch_all(pool)
+    .await?)
+}
+
+pub async fn get_owned(pool: &SqlitePool, id: &str, owner: &str) -> AppResult<ApiToken> {
+    sqlx::query_as::<_, ApiToken>("SELECT * FROM api_tokens WHERE id = ? AND owner_subject = ?")
+        .bind(id)
+        .bind(owner)
+        .fetch_optional(pool)
+        .await?
+        .ok_or_else(|| AppError::NotFound("API token not found".into()))
+}
+
+pub async fn set_active_owned(
+    pool: &SqlitePool,
+    id: &str,
+    owner: &str,
+    active: bool,
+) -> AppResult<()> {
+    let rows = sqlx::query("UPDATE api_tokens SET active = ? WHERE id = ? AND owner_subject = ?")
+        .bind(active)
+        .bind(id)
+        .bind(owner)
+        .execute(pool)
+        .await?
+        .rows_affected();
+    if rows == 0 {
+        return Err(AppError::NotFound("API token not found".into()));
+    }
+    Ok(())
+}
+
+/// Compare the authorized scope snapshot in the write to prevent activation
+/// racing a concurrent scope update from enabling a stronger credential.
+pub async fn activate_owned(
+    pool: &SqlitePool,
+    id: &str,
+    owner: &str,
+    authorized_scopes: &str,
+) -> AppResult<()> {
+    let rows = sqlx::query(
+        "UPDATE api_tokens SET active = 1 WHERE id = ? AND owner_subject = ? AND scopes = ?",
+    )
+    .bind(id)
+    .bind(owner)
+    .bind(authorized_scopes)
+    .execute(pool)
+    .await?
+    .rows_affected();
+    if rows == 0 {
+        return Err(AppError::BadRequest(
+            "API token changed or was removed; retry activation".into(),
+        ));
+    }
+    Ok(())
+}
+
+pub async fn delete_owned(
+    pool: &SqlitePool,
+    id: &str,
+    owner: &str,
+    require_inactive: bool,
+) -> AppResult<()> {
+    if require_inactive && get_owned(pool, id, owner).await?.active {
+        return Err(AppError::BadRequest(
+            "API token is still active — deactivate it first".into(),
+        ));
+    }
+    let rows = sqlx::query(
+        "DELETE FROM api_tokens WHERE id = ? AND owner_subject = ? AND (? = 0 OR active = 0)",
+    )
+    .bind(id)
+    .bind(owner)
+    .bind(require_inactive)
+    .execute(pool)
+    .await?
+    .rows_affected();
+    if rows == 0 {
+        return Err(AppError::NotFound(
+            "API token not found or still active".into(),
+        ));
+    }
+    Ok(())
+}
+
+pub async fn update_scopes_owned(
+    pool: &SqlitePool,
+    id: &str,
+    owner: &str,
+    scopes: &[String],
+) -> AppResult<ApiToken> {
+    sqlx::query_as::<_, ApiToken>(
+        "UPDATE api_tokens SET scopes = ? WHERE id = ? AND owner_subject = ? RETURNING *",
+    )
+    .bind(scopes.join(","))
+    .bind(id)
+    .bind(owner)
+    .fetch_optional(pool)
+    .await?
+    .ok_or_else(|| AppError::NotFound("API token not found".into()))
+}
+
 pub async fn create(
     pool: &SqlitePool,
     req: CreateApiToken,

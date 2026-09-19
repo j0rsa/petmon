@@ -24,7 +24,8 @@ pub async fn get_day(
     date: web::Path<String>,
     query: web::Query<DayQuery>,
 ) -> AppResult<HttpResponse> {
-    let summary = day_service::get_day_summary(&state.pool, &date, query.pet_id).await?;
+    let context = state.request_context(&_scope_req)?;
+    let summary = day_service::get_day_summary(&context, &date, query.pet_id).await?;
     Ok(HttpResponse::Ok().json(summary))
 }
 
@@ -35,7 +36,8 @@ pub async fn update_day_note(
     date: web::Path<String>,
     body: web::Json<UpdateNoteBody>,
 ) -> AppResult<HttpResponse> {
-    day_service::update_day_note(&state.pool, &date, body.pet_id, &body.note).await?;
+    let context = state.request_context(&_scope_req)?;
+    day_service::update_day_note(&context, &date, body.pet_id, &body.note).await?;
     Ok(HttpResponse::Ok().finish())
 }
 

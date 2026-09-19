@@ -5,18 +5,19 @@ use crate::domain::medication::{
     MedIntakeRecordFilters, Medication, ReviseMedAssignment, UpdateMedBundle, UpdateMedication,
 };
 use crate::domain::user_settings::UserDisplaySettings;
+use crate::embedding::{ResourceAction, ServiceContext};
 use crate::error::{AppError, AppResult};
 use crate::repo::{med_assignments, med_bundles, med_intake_records, medications, pets};
 use crate::services::telegram;
-use chrono::Utc;
 use chrono_tz::Tz;
-use sqlx::SqlitePool;
 use std::collections::HashSet;
 use tracing::Instrument;
 use uuid::Uuid;
 
 #[tracing::instrument(skip(pool))]
-pub async fn list_medications(pool: &SqlitePool, pet_id: Uuid) -> AppResult<Vec<Medication>> {
+pub async fn list_medications(pool: &ServiceContext, pet_id: Uuid) -> AppResult<Vec<Medication>> {
+    pool.check(Some(pet_id), ResourceAction::View).await?;
+
     pets::get_pet(pool, pet_id)
         .await
         .map_err(|_| AppError::BadRequest(format!("Pet {pet_id} not found")))?;
@@ -24,12 +25,21 @@ pub async fn list_medications(pool: &SqlitePool, pet_id: Uuid) -> AppResult<Vec<
 }
 
 #[tracing::instrument(skip(pool))]
-pub async fn get_medication(pool: &SqlitePool, id: &str) -> AppResult<Medication> {
+pub async fn get_medication(pool: &ServiceContext, id: &str) -> AppResult<Medication> {
+    let owner = medications::get(pool, id).await?;
+    pool.check(Some(owner.pet_id), ResourceAction::View).await?;
+
     medications::get(pool, id).await
 }
 
 #[tracing::instrument(skip(pool))]
-pub async fn create_medication(pool: &SqlitePool, req: CreateMedication) -> AppResult<Medication> {
+pub async fn create_medication(
+    pool: &ServiceContext,
+    req: CreateMedication,
+) -> AppResult<Medication> {
+    pool.check_str(&req.pet_id, ResourceAction::WriteRecords)
+        .await?;
+
     let pet_id = Uuid::parse_str(&req.pet_id)
         .map_err(|_| AppError::BadRequest(format!("invalid pet_id: {}", req.pet_id)))?;
     pets::get_pet(pool, pet_id)
@@ -40,65 +50,110 @@ pub async fn create_medication(pool: &SqlitePool, req: CreateMedication) -> AppR
 
 #[tracing::instrument(skip(pool))]
 pub async fn update_medication(
-    pool: &SqlitePool,
+    pool: &ServiceContext,
     id: &str,
     req: UpdateMedication,
 ) -> AppResult<Medication> {
+    let owner = medications::get(pool, id).await?;
+    pool.check(Some(owner.pet_id), ResourceAction::WriteRecords)
+        .await?;
+
     medications::update(pool, id, req).await
 }
 
 #[tracing::instrument(skip(pool))]
-pub async fn delete_medication(pool: &SqlitePool, id: &str) -> AppResult<()> {
+pub async fn delete_medication(pool: &ServiceContext, id: &str) -> AppResult<()> {
+    let owner = medications::get(pool, id).await?;
+    pool.check(Some(owner.pet_id), ResourceAction::WriteRecords)
+        .await?;
+
     med_bundles::delete_containing_medication(pool, id).await?;
     medications::delete(pool, id).await
 }
 
 #[tracing::instrument(skip(pool))]
 pub async fn list_assignments(
-    pool: &SqlitePool,
+    pool: &ServiceContext,
     filters: MedAssignmentFilters,
 ) -> AppResult<Vec<MedAssignment>> {
-    med_assignments::list(pool, &filters).await
+    med_assignments::list_scoped(
+        pool,
+        &filters,
+        &pool.visibility_str(filters.pet_id.as_deref()).await?,
+    )
+    .await
 }
 
 #[tracing::instrument(skip(pool))]
 pub async fn create_assignment(
-    pool: &SqlitePool,
+    pool: &ServiceContext,
     req: CreateMedAssignment,
 ) -> AppResult<MedAssignment> {
+    let owner = medications::get(pool, &req.medication_id).await?;
+    pool.check(Some(owner.pet_id), ResourceAction::WriteRecords)
+        .await?;
+    validate_formulation_reference(pool, &req.medication_id, req.formulation_id.as_deref()).await?;
+
     medications::get(pool, &req.medication_id).await?;
     med_assignments::create(pool, req).await
 }
 
 #[tracing::instrument(skip(pool))]
 pub async fn revise_assignment(
-    pool: &SqlitePool,
+    pool: &ServiceContext,
     id: &str,
     req: ReviseMedAssignment,
 ) -> AppResult<MedAssignment> {
+    let owner = med_assignments::get(pool, id).await?;
+    pool.check(Some(owner.pet_id), ResourceAction::WriteRecords)
+        .await?;
+    validate_formulation_reference(pool, &owner.medication_id, req.formulation_id.as_deref())
+        .await?;
+
     med_assignments::revise(pool, id, req).await
 }
 
 #[tracing::instrument(skip(pool))]
 pub async fn end_assignment(
-    pool: &SqlitePool,
+    pool: &ServiceContext,
     id: &str,
     req: EndMedAssignment,
-    timezone: Tz,
+    _timezone: Tz,
 ) -> AppResult<MedAssignment> {
-    med_assignments::end(pool, id, req, timezone).await
+    let owner = med_assignments::get(pool, id).await?;
+    pool.check(Some(owner.pet_id), ResourceAction::WriteRecords)
+        .await?;
+    let timezone = pool.timezone(owner.pet_id).await?;
+
+    let today = pool
+        .runtime
+        .now()
+        .with_timezone(&timezone)
+        .date_naive()
+        .to_string();
+    med_assignments::end_on(pool, id, req, &today).await
 }
 
 pub async fn edit_assignment(
-    pool: &SqlitePool,
+    pool: &ServiceContext,
     id: &str,
     req: EditMedAssignment,
 ) -> AppResult<MedAssignment> {
+    let owner = med_assignments::get(pool, id).await?;
+    pool.check(Some(owner.pet_id), ResourceAction::WriteRecords)
+        .await?;
+    validate_formulation_reference(pool, &owner.medication_id, req.formulation_id.as_deref())
+        .await?;
+
     med_assignments::update_in_place(pool, id, req).await
 }
 
 #[tracing::instrument(skip(pool))]
-pub async fn delete_assignment(pool: &SqlitePool, id: &str, cascade: bool) -> AppResult<()> {
+pub async fn delete_assignment(pool: &ServiceContext, id: &str, cascade: bool) -> AppResult<()> {
+    let owner = med_assignments::get(pool, id).await?;
+    pool.check(Some(owner.pet_id), ResourceAction::WriteRecords)
+        .await?;
+
     let intakes = med_intake_records::list_for_assignment(pool, id).await?;
     if !intakes.is_empty() && !cascade {
         return Err(AppError::BadRequest(
@@ -129,19 +184,24 @@ pub async fn delete_assignment(pool: &SqlitePool, id: &str, cascade: bool) -> Ap
 
 #[tracing::instrument(skip(pool))]
 pub async fn list_formulations(
-    pool: &SqlitePool,
+    pool: &ServiceContext,
     medication_id: &str,
 ) -> AppResult<Vec<crate::domain::medication::MedFormulation>> {
+    let owner = medications::get(pool, medication_id).await?;
+    pool.check(Some(owner.pet_id), ResourceAction::View).await?;
+
     medications::get(pool, medication_id).await?;
     crate::repo::med_formulations::list_for_medication(pool, medication_id).await
 }
 
 #[tracing::instrument(skip(pool))]
 pub async fn daily_assignments(
-    pool: &SqlitePool,
+    pool: &ServiceContext,
     pet_id: Uuid,
     date: &str,
 ) -> AppResult<Vec<DailyMedAssignment>> {
+    pool.check(Some(pet_id), ResourceAction::View).await?;
+
     pets::get_pet(pool, pet_id)
         .await
         .map_err(|_| AppError::BadRequest(format!("Pet {pet_id} not found")))?;
@@ -185,20 +245,52 @@ pub async fn daily_assignments(
 
 #[tracing::instrument(skip(pool))]
 pub async fn list_intake(
-    pool: &SqlitePool,
+    pool: &ServiceContext,
     filters: MedIntakeRecordFilters,
 ) -> AppResult<Vec<MedIntakeRecord>> {
-    med_intake_records::list(pool, &filters).await
+    med_intake_records::list_scoped(
+        pool,
+        &filters,
+        &pool.visibility_str(filters.pet_id.as_deref()).await?,
+    )
+    .await
 }
 
 #[tracing::instrument(skip(pool))]
 pub async fn create_intake(
-    pool: &SqlitePool,
+    pool: &ServiceContext,
     req: CreateMedIntakeRecord,
-    timezone: Tz,
+    _timezone: Tz,
     display_settings: UserDisplaySettings,
 ) -> AppResult<MedIntakeRecord> {
+    let authorized_pet = pool
+        .check_str(&req.pet_id, ResourceAction::WriteRecords)
+        .await?;
+    let medication = medications::get(pool, &req.medication_id).await?;
+    pool.check(Some(medication.pet_id), ResourceAction::WriteRecords)
+        .await?;
+    if medication.pet_id != authorized_pet {
+        return Err(AppError::BadRequest(
+            "medication does not belong to the given pet".into(),
+        ));
+    }
+    if let Some(assignment_id) = &req.assignment_id {
+        let assignment = med_assignments::get(pool, assignment_id).await?;
+        pool.check(Some(assignment.pet_id), ResourceAction::WriteRecords)
+            .await?;
+        if assignment.pet_id != authorized_pet || assignment.medication_id != medication.id {
+            return Err(AppError::BadRequest(
+                "assignment does not belong to this medication and pet".into(),
+            ));
+        }
+    }
+    let timezone = pool.timezone(authorized_pet).await?;
+
     let delayed = intake_is_delayed(&req.occurred_at, &req.local_date);
+    let mut req = req;
+    if req.occurred_at.is_none() {
+        req.occurred_at = Some(pool.local_timestamp(timezone, req.local_date.as_deref()));
+    }
     pets::get_pet(
         pool,
         Uuid::parse_str(&req.pet_id)
@@ -219,7 +311,11 @@ pub async fn create_intake(
 }
 
 #[tracing::instrument(skip(pool))]
-pub async fn delete_intake(pool: &SqlitePool, id: &str) -> AppResult<()> {
+pub async fn delete_intake(pool: &ServiceContext, id: &str) -> AppResult<()> {
+    let owner = med_intake_records::get(pool, id).await?;
+    pool.check(Some(owner.pet_id), ResourceAction::WriteRecords)
+        .await?;
+
     let record = med_intake_records::get(pool, id).await?;
     med_intake_records::delete(pool, id).await?;
     if record.telegram_message_id.is_some() {
@@ -238,7 +334,9 @@ fn intake_is_delayed(occurred_at: &Option<String>, local_date: &Option<String>) 
 }
 
 #[tracing::instrument(skip(pool))]
-pub async fn list_bundles(pool: &SqlitePool, pet_id: Uuid) -> AppResult<Vec<MedBundle>> {
+pub async fn list_bundles(pool: &ServiceContext, pet_id: Uuid) -> AppResult<Vec<MedBundle>> {
+    pool.check(Some(pet_id), ResourceAction::View).await?;
+
     pets::get_pet(pool, pet_id)
         .await
         .map_err(|_| AppError::BadRequest(format!("Pet {pet_id} not found")))?;
@@ -246,7 +344,10 @@ pub async fn list_bundles(pool: &SqlitePool, pet_id: Uuid) -> AppResult<Vec<MedB
 }
 
 #[tracing::instrument(skip(pool))]
-pub async fn create_bundle(pool: &SqlitePool, req: CreateMedBundle) -> AppResult<MedBundle> {
+pub async fn create_bundle(pool: &ServiceContext, req: CreateMedBundle) -> AppResult<MedBundle> {
+    pool.check_str(&req.pet_id, ResourceAction::WriteRecords)
+        .await?;
+
     let pet_id = Uuid::parse_str(&req.pet_id)
         .map_err(|_| AppError::BadRequest(format!("invalid pet_id: {}", req.pet_id)))?;
     pets::get_pet(pool, pet_id)
@@ -267,6 +368,8 @@ pub async fn create_bundle(pool: &SqlitePool, req: CreateMedBundle) -> AppResult
             ));
         }
         let assignment = med_assignments::get(pool, assignment_id).await?;
+        pool.check(Some(assignment.pet_id), ResourceAction::WriteRecords)
+            .await?;
         if assignment.pet_id != pet_id {
             return Err(AppError::BadRequest(
                 "assignments must belong to the given pet".into(),
@@ -300,12 +403,36 @@ pub async fn create_bundle(pool: &SqlitePool, req: CreateMedBundle) -> AppResult
     med_bundles::create(pool, pet_id, name, &members).await
 }
 
+async fn validate_formulation_reference(
+    context: &ServiceContext,
+    medication_id: &str,
+    formulation_id: Option<&str>,
+) -> AppResult<()> {
+    if let Some(id) = formulation_id {
+        let formulation = crate::repo::med_formulations::get(context, id).await?;
+        let medication = medications::get(context, &formulation.medication_id).await?;
+        context
+            .check(Some(medication.pet_id), ResourceAction::WriteRecords)
+            .await?;
+        if formulation.medication_id != medication_id {
+            return Err(AppError::BadRequest(
+                "formulation does not belong to this medication".into(),
+            ));
+        }
+    }
+    Ok(())
+}
+
 #[tracing::instrument(skip(pool))]
 pub async fn update_bundle(
-    pool: &SqlitePool,
+    pool: &ServiceContext,
     id: &str,
     req: UpdateMedBundle,
 ) -> AppResult<MedBundle> {
+    let owner = med_bundles::get(pool, id).await?;
+    pool.check(Some(owner.pet_id), ResourceAction::WriteRecords)
+        .await?;
+
     let name = req
         .name
         .as_deref()
@@ -316,39 +443,37 @@ pub async fn update_bundle(
 }
 
 #[tracing::instrument(skip(pool))]
-pub async fn delete_bundle(pool: &SqlitePool, id: &str) -> AppResult<()> {
+pub async fn delete_bundle(pool: &ServiceContext, id: &str) -> AppResult<()> {
+    let owner = med_bundles::get(pool, id).await?;
+    pool.check(Some(owner.pet_id), ResourceAction::WriteRecords)
+        .await?;
+
     med_bundles::delete(pool, id).await
 }
 
 #[tracing::instrument(skip(pool))]
 pub async fn create_bundle_intake(
-    pool: &SqlitePool,
+    pool: &ServiceContext,
     id: &str,
     req: CreateMedBundleIntake,
-    timezone: Tz,
+    _timezone: Tz,
     display_settings: UserDisplaySettings,
 ) -> AppResult<Vec<MedIntakeRecord>> {
+    let owner = med_bundles::get(pool, id).await?;
+    pool.check(Some(owner.pet_id), ResourceAction::WriteRecords)
+        .await?;
+    let timezone = pool.timezone(owner.pet_id).await?;
+
     let delayed = intake_is_delayed(&req.occurred_at, &req.local_date);
     let bundle = med_bundles::get(pool, id).await?;
-    let occurred_at = req
-        .occurred_at
-        .as_deref()
-        .map(str::trim)
-        .filter(|value| !value.is_empty())
-        .map(ToOwned::to_owned)
-        .unwrap_or_else(|| {
-            Utc::now()
-                .with_timezone(&timezone)
-                .format("%Y-%m-%dT%H:%M:%S")
-                .to_string()
-        });
-    let local_date = req
-        .local_date
-        .as_deref()
-        .map(str::trim)
-        .filter(|value| !value.is_empty())
-        .map(ToOwned::to_owned)
-        .unwrap_or_else(|| occurred_at.split('T').next().unwrap_or("").to_string());
+    let time = crate::record_time::resolve(
+        req.occurred_at.as_deref(),
+        req.local_date.as_deref(),
+        timezone,
+        pool.runtime.now(),
+    )?;
+    let occurred_at = time.utc;
+    let local_date = time.local_date;
     let mut records = Vec::with_capacity(bundle.items.len());
     for item in &bundle.items {
         match med_intake_records::create(
@@ -388,4 +513,28 @@ pub async fn create_bundle_intake(
         .instrument(tracing::Span::current()),
     );
     Ok(records)
+}
+
+/// Adapter for device requests that carry both pet and bundle IDs.
+pub async fn create_bundle_intake_for_pet(
+    context: &ServiceContext,
+    pet_id: Uuid,
+    bundle_id: &str,
+    req: CreateMedBundleIntake,
+    timezone: Tz,
+    display_settings: UserDisplaySettings,
+) -> AppResult<Vec<MedIntakeRecord>> {
+    context
+        .check(Some(pet_id), ResourceAction::WriteRecords)
+        .await?;
+    let bundle = med_bundles::get(context, bundle_id).await?;
+    context
+        .check(Some(bundle.pet_id), ResourceAction::WriteRecords)
+        .await?;
+    if bundle.pet_id != pet_id {
+        return Err(AppError::BadRequest(
+            "bundle does not belong to the given pet".into(),
+        ));
+    }
+    create_bundle_intake(context, bundle_id, req, timezone, display_settings).await
 }

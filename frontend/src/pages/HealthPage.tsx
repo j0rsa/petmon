@@ -1,3 +1,4 @@
+import { useResourceTime } from '../context/useResourceTime';
 import { useState } from 'react';
 import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { weightApi } from '../api/weight';
@@ -11,19 +12,13 @@ import { WeightHistoryChart } from '../components/health/WeightHistoryChart';
 import { WeightRecordList } from '../components/health/WeightRecordList';
 import { WeightRecordTagFilter } from '../components/health/WeightRecordTagFilter';
 import { useSelectedPet } from '../context/SelectedPetContext';
-import { localToday, shiftDate } from '../lib/dates';
+import { shiftDate } from '../lib/dates';
 import { usePermissions } from '../context/usePermissions';
 import { useFormatDate, useFormatTime } from '../context/useDisplaySettings';
 import { useScrollToHash } from '../hooks/useScrollToHash';
 import { hasActiveAssignmentOn } from '../lib/medications';
 import { WEIGHT_CHART_PERIODS, type WeightPeriodLabel } from '../lib/weightChart';
 import { weightNoteHasAnyTag } from '../lib/weightNote';
-
-function nowLocalDateTimeString(): string {
-  const now = new Date();
-  const pad = (n: number) => String(n).padStart(2, '0');
-  return `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}T${pad(now.getHours())}:${pad(now.getMinutes())}`;
-}
 
 export default function HealthPage() {
   const { selectedPetId, selectedPet, petsLoading } = useSelectedPet();
@@ -38,7 +33,7 @@ export default function HealthPage() {
     selected: [],
   });
   const selectedTags = tagFilter.petId === selectedPetId ? tagFilter.selected : [];
-  const today = localToday();
+  const { today, nowLocalDateTimeString } = useResourceTime();
   const { days: periodDays, granularity } = WEIGHT_CHART_PERIODS.find((p) => p.label === period)!;
   const dateFrom = periodDays != null ? shiftDate(today, -(periodDays - 1)) : undefined;
   const filterKey = [...selectedTags].sort((a, b) => a.localeCompare(b)).join(',');

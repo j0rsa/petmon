@@ -1,6 +1,7 @@
 import { forwardRef, useImperativeHandle, useRef, useState } from 'react';
 import { TimeInput } from './TimeInput';
-import { nowTimeString, isoFromDateAndTime } from '../lib/time';
+import { isoFromDateAndTime } from '../lib/time';
+import { useResourceTime } from '../context/useResourceTime';
 import { parseAmountExpression, parseWetFoodLiquidPair } from '../lib/numbers';
 import { CATEGORIES, CATEGORY_LABELS } from '../types';
 import type { CreateNutritionRecord } from '../types';
@@ -34,6 +35,7 @@ interface NutritionAddFormProps {
 
 export const NutritionAddForm = forwardRef<NutritionAddFormHandle, NutritionAddFormProps>(
   function NutritionAddForm({ date, petId, onSave, saving, isPaused }, ref) {
+    const { nowTimeString } = useResourceTime(petId);
     const [time, setTime] = useState(nowTimeString);
     const [category, setCategory] = useState<string>(ENTRY_WET_FOOD_PLUS_LIQUID);
     const [amount, setAmount] = useState('');

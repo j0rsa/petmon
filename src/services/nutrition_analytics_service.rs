@@ -1,31 +1,46 @@
 use crate::domain::analytics::{BestFluidDay, NutritionDailyTotal, NutritionRangeSummary};
+use crate::embedding::ServiceContext;
 use crate::error::AppResult;
 use crate::repo::nutrition_analytics;
-use sqlx::SqlitePool;
 use std::collections::HashMap;
 use uuid::Uuid;
 
 #[tracing::instrument(skip(pool))]
 pub async fn daily_totals(
-    pool: &SqlitePool,
+    pool: &ServiceContext,
     date_from: &str,
     date_to: &str,
     pet_id: Option<Uuid>,
     category: Option<&str>,
 ) -> AppResult<Vec<NutritionDailyTotal>> {
-    nutrition_analytics::daily_totals(pool, date_from, date_to, pet_id, category).await
+    nutrition_analytics::daily_totals_scoped(
+        pool,
+        date_from,
+        date_to,
+        pet_id,
+        category,
+        &pool.visibility(pet_id).await?,
+    )
+    .await
 }
 
 #[tracing::instrument(skip(pool))]
 pub async fn range_summary(
-    pool: &SqlitePool,
+    pool: &ServiceContext,
     date_from: &str,
     date_to: &str,
     pet_id: Option<Uuid>,
     category: Option<&str>,
 ) -> AppResult<NutritionRangeSummary> {
-    let daily_totals =
-        nutrition_analytics::daily_totals(pool, date_from, date_to, pet_id, category).await?;
+    let daily_totals = nutrition_analytics::daily_totals_scoped(
+        pool,
+        date_from,
+        date_to,
+        pet_id,
+        category,
+        &pool.visibility(pet_id).await?,
+    )
+    .await?;
     let mut category_sums: HashMap<String, (f64, usize)> = HashMap::new();
     for total in &daily_totals {
         let entry = category_sums
@@ -49,9 +64,15 @@ pub async fn range_summary(
 
 #[tracing::instrument(skip(pool))]
 pub async fn best_fluid_day(
-    pool: &SqlitePool,
+    pool: &ServiceContext,
     pet_id: Option<Uuid>,
     exclude_date: &str,
 ) -> AppResult<Option<BestFluidDay>> {
-    nutrition_analytics::best_fluid_day(pool, pet_id, exclude_date).await
+    nutrition_analytics::best_fluid_day_scoped(
+        pool,
+        pet_id,
+        exclude_date,
+        &pool.visibility(pet_id).await?,
+    )
+    .await
 }

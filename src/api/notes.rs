@@ -1,6 +1,6 @@
 use crate::auth::AppState;
 use crate::error::AppResult;
-use crate::repo::day_notes;
+use crate::services::day_service;
 use actix_web::{get, patch, web, HttpResponse};
 use petmon_macros::require_scope;
 use serde::Deserialize;
@@ -23,7 +23,8 @@ pub async fn get_note(
     date: web::Path<String>,
     query: web::Query<NoteQuery>,
 ) -> AppResult<HttpResponse> {
-    let note = day_notes::get_day_note(&state.pool, &date, query.pet_id).await?;
+    let context = state.request_context(&_scope_req)?;
+    let note = day_service::get_note(&context, &date, query.pet_id).await?;
     Ok(HttpResponse::Ok().json(note))
 }
 
@@ -35,7 +36,8 @@ pub async fn update_note(
     query: web::Query<NoteQuery>,
     body: web::Json<UpdateNoteBody>,
 ) -> AppResult<HttpResponse> {
-    let note = day_notes::upsert_day_note(&state.pool, &date, query.pet_id, &body.note).await?;
+    let context = state.request_context(&_scope_req)?;
+    let note = day_service::write_note(&context, &date, query.pet_id, &body.note).await?;
     Ok(HttpResponse::Ok().json(note))
 }
 

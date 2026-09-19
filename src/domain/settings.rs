@@ -157,7 +157,7 @@ pub enum WeekStart {
 
 // ── API tokens ────────────────────────────────────────────────────────────────
 
-pub const ALL_SCOPES: &[&str] = &["all", "api_read", "api_write", "mcp"];
+pub const ALL_SCOPES: &[&str] = &["all", "api_read", "api_write", "mcp", "instance_admin"];
 
 /// Validates a scope string — must be one of the known scope values.
 pub fn is_valid_scope(s: &str) -> bool {
@@ -210,6 +210,14 @@ pub struct ApiTokenPublic {
     pub last_used_at: Option<String>,
 }
 
+/// Instance administration adds ownership, never credential hashes or secrets.
+#[derive(Debug, Serialize)]
+pub struct ApiTokenAdminPublic {
+    #[serde(flatten)]
+    pub token: ApiTokenPublic,
+    pub owner_subject: Option<String>,
+}
+
 /// Returned once at creation — includes the raw token
 #[derive(Debug, Serialize)]
 pub struct ApiTokenCreated {
@@ -223,7 +231,7 @@ pub struct ApiTokenCreated {
 #[derive(Debug, Deserialize)]
 pub struct CreateApiToken {
     pub alias: Option<String>,
-    /// Defaults to ["all"] when omitted.
+    /// Defaults to ordinary ["all"] when omitted, subject to caller attenuation.
     pub scopes: Option<Vec<String>>,
     /// Set by the server from the caller's Identity — not accepted from the request body.
     #[serde(skip_deserializing)]

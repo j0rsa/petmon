@@ -1,7 +1,11 @@
 import type { Meta, StoryObj } from '@storybook/react-vite';
-import { expect, userEvent, within } from 'storybook/test';
+import { expect, userEvent, waitFor, within } from 'storybook/test';
 import { withPetInfoPage } from '../stories/decorators';
 import PetInfoPage from './PetInfoPage';
+import { asNarrowStory } from '../stories/viewport';
+import { Link } from 'react-router-dom';
+import { mockPets } from '../stories/fixtures';
+import { clearStoredPetId, readStoredPetId, writeStoredPetId } from '../lib/selectedPetStorage';
 
 const meta = {
   title: 'Pages/PetInfoPage',
@@ -72,3 +76,29 @@ export const AutoTagEditMode: Story = {
     await expect(canvas.getByRole('button', { name: 'Retrain now' })).toBeInTheDocument();
   },
 };
+
+export const WithWeightHistoryNarrow = asNarrowStory(WithWeightHistory);
+export const NoWeightDataNarrow = asNarrowStory(NoWeightData);
+export const AutoTagEnabledNarrow = asNarrowStory(AutoTagEnabled);
+export const AutoTagEnabledMobileNarrow = asNarrowStory(AutoTagEnabledMobile);
+export const AutoTagEditModeNarrow = asNarrowStory(AutoTagEditMode);
+
+export const DirectLinkClearsDraft: Story = {
+  beforeEach: () => {
+    const previous = readStoredPetId();
+    return () => { if (previous) writeStoredPetId(previous); else clearStoredPetId(); };
+  },
+  decorators: [withPetInfoPage()],
+  render: () => <><Link to={`/pets/${mockPets[1].id}`}>Another pet</Link><PetInfoPage /></>,
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    await userEvent.click(canvas.getByRole('button', { name: 'Edit profile' }));
+    await userEvent.clear(canvas.getByLabelText('Name'));
+    await userEvent.type(canvas.getByLabelText('Name'), 'Private old draft');
+    await userEvent.click(canvas.getByRole('link', { name: 'Another pet' }));
+    await waitFor(() => expect(canvas.getByRole('heading', { name: mockPets[1].name })).toBeInTheDocument());
+    await expect(canvas.queryByDisplayValue('Private old draft')).not.toBeInTheDocument();
+    await expect(canvas.getByRole('button', { name: 'Edit profile' })).toBeInTheDocument();
+  },
+};
+export const DirectLinkClearsDraftNarrow = asNarrowStory(DirectLinkClearsDraft);

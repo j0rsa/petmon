@@ -4,6 +4,7 @@ pub mod elimination_analytics;
 pub mod elimination_classifiers;
 pub mod elimination_records;
 pub mod health_state_records;
+pub mod instance_admins;
 pub mod med_assignments;
 pub mod med_bundles;
 pub mod med_formulations;

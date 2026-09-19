@@ -14,7 +14,8 @@ pub async fn list_records(
     state: web::Data<AppState>,
     query: web::Query<WeightRecordFilters>,
 ) -> AppResult<HttpResponse> {
-    let records = weight_service::list(&state.pool, query.into_inner()).await?;
+    let context = state.request_context(&_scope_req)?;
+    let records = weight_service::list(&context, query.into_inner()).await?;
     Ok(HttpResponse::Ok().json(records))
 }
 
@@ -24,7 +25,8 @@ pub async fn create_record(
     state: web::Data<AppState>,
     body: web::Json<CreateWeightRecord>,
 ) -> AppResult<HttpResponse> {
-    let record = weight_service::create(&state.pool, body.into_inner(), state.timezone).await?;
+    let context = state.request_context(&_scope_req)?;
+    let record = weight_service::create(&context, body.into_inner(), state.timezone).await?;
     Ok(HttpResponse::Created().json(record))
 }
 
@@ -35,7 +37,8 @@ pub async fn update_record(
     id: web::Path<String>,
     body: web::Json<UpdateWeightRecord>,
 ) -> AppResult<HttpResponse> {
-    let record = weight_service::update(&state.pool, &id, body.into_inner()).await?;
+    let context = state.request_context(&_scope_req)?;
+    let record = weight_service::update(&context, &id, body.into_inner()).await?;
     Ok(HttpResponse::Ok().json(record))
 }
 
@@ -45,7 +48,8 @@ pub async fn delete_record(
     state: web::Data<AppState>,
     id: web::Path<String>,
 ) -> AppResult<HttpResponse> {
-    weight_service::delete(&state.pool, &id).await?;
+    let context = state.request_context(&_scope_req)?;
+    weight_service::delete(&context, &id).await?;
     Ok(HttpResponse::NoContent().finish())
 }
 
@@ -62,11 +66,12 @@ pub async fn stats(
     state: web::Data<AppState>,
     query: web::Query<StatsQuery>,
 ) -> AppResult<HttpResponse> {
+    let context = state.request_context(&_scope_req)?;
     if query.pet_id.is_empty() {
         return Err(AppError::BadRequest("pet_id required".to_string()));
     }
     let s =
-        weight_service::stats(&state.pool, &query.pet_id, &query.date_from, &query.date_to).await?;
+        weight_service::stats(&context, &query.pet_id, &query.date_from, &query.date_to).await?;
     Ok(HttpResponse::Ok().json(s))
 }
 
@@ -85,13 +90,14 @@ pub async fn summary(
     state: web::Data<AppState>,
     query: web::Query<SummaryQuery>,
 ) -> AppResult<HttpResponse> {
+    let context = state.request_context(&_scope_req)?;
     if query.pet_id.is_empty() {
         return Err(AppError::BadRequest("pet_id required".to_string()));
     }
     let granularity = query.granularity.clone().unwrap_or_default();
     let group_by = query.group_by.clone().unwrap_or_default();
     let buckets = weight_service::summary(
-        &state.pool,
+        &context,
         &query.pet_id,
         query.date_from.as_deref(),
         &query.date_to,
@@ -113,10 +119,11 @@ pub async fn list_tags(
     state: web::Data<AppState>,
     query: web::Query<TagsQuery>,
 ) -> AppResult<HttpResponse> {
+    let context = state.request_context(&_scope_req)?;
     if query.pet_id.is_empty() {
         return Err(AppError::BadRequest("pet_id required".to_string()));
     }
-    let tags = weight_service::list_tags(&state.pool, &query.pet_id).await?;
+    let tags = weight_service::list_tags(&context, &query.pet_id).await?;
     Ok(HttpResponse::Ok().json(tags))
 }
 

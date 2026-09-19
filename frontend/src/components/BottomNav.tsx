@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { Link, useMatch, useNavigate } from 'react-router-dom';
 import { LayoutDashboard, Utensils, PawPrint, HeartPulse, Settings, ChevronRight } from 'lucide-react';
 import { useSelectedPet } from '../context/SelectedPetContext';
+import { useApplicationExtensions } from '../context/ApplicationExtensions';
 import {
   useNotificationActions,
   useNotificationList,
@@ -14,6 +15,7 @@ import { AppVersionFooter } from './AppVersionFooter';
 import { BottomNavLink } from './BottomNavLink';
 
 export function BottomNav() {
+  const extensions = useApplicationExtensions();
   const [petSheetOpen, setPetSheetOpen] = useState(false);
   const { pets, petsLoading, selectedPetId, selectedPet, setSelectedPetId } = useSelectedPet();
   const navigate = useNavigate();
@@ -107,6 +109,7 @@ export function BottomNav() {
             </>
           )}
 
+          {extensions?.navigation?.map((link) => <Link key={link.to} to={link.to} className="bottom-nav-sheet-pet bottom-nav-sheet-footer-link" onClick={() => setPetSheetOpen(false)}>{link.label}</Link>)}
           <div className="bottom-nav-sheet-divider" aria-hidden="true" />
 
           <div className="bottom-nav-sheet-section-header">

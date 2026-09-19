@@ -1,5 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { eliminationApi, type EliminationDurationDist } from '../../api/elimination';
+import { usePermissions } from '../../context/usePermissions';
 
 function fmtDuration(sec: number): string {
   const m = Math.floor(sec / 60);
@@ -18,6 +19,7 @@ interface PetEliminationAutoTagBucketsProps {
 
 /** Classifier status and baselines shown when auto-tag is enabled for a pet. */
 export function PetEliminationAutoTagBuckets({ petId }: PetEliminationAutoTagBucketsProps) {
+  const { canWriteProfile } = usePermissions(petId);
   const queryClient = useQueryClient();
   const statusQuery = useQuery({
     queryKey: ['elimination-classifier-status', petId],
@@ -57,7 +59,7 @@ export function PetEliminationAutoTagBuckets({ petId }: PetEliminationAutoTagBuc
       <button
         type="button"
         className="button button-secondary pet-elimination-auto-tag__retrain"
-        disabled={retrainMutation.isPending}
+        disabled={!canWriteProfile || retrainMutation.isPending}
         onClick={() => retrainMutation.mutate()}
       >
         {retrainMutation.isPending ? 'Retraining…' : 'Retrain now'}

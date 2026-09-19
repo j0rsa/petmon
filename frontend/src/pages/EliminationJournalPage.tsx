@@ -1,3 +1,4 @@
+import { useResourceTime } from '../context/useResourceTime';
 import { useEffect, useMemo, useState, useSyncExternalStore } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
@@ -6,7 +7,7 @@ import { MonthCalendar } from '../components/MonthCalendar';
 import { NoPetSelected } from '../components/NoPetSelected';
 import { EliminationDayPanel } from '../components/EliminationDayPanel';
 import { useSelectedPet } from '../context/SelectedPetContext';
-import { localToday, monthBounds, monthKey } from '../lib/dates';
+import { monthBounds, monthKey } from '../lib/dates';
 import type { DayEliminationHighlight } from '../types/pillars';
 
 const mq = window.matchMedia('(max-width: 768px)');
@@ -20,7 +21,8 @@ export default function EliminationJournalPage() {
     () => mq.matches,
     () => false,
   );
-  const selectedDate = routeDate && /^\d{4}-\d{2}-\d{2}$/.test(routeDate) ? routeDate : localToday();
+  const { today } = useResourceTime();
+  const selectedDate = routeDate && /^\d{4}-\d{2}-\d{2}$/.test(routeDate) ? routeDate : today;
   const [month, setMonth] = useState(monthKey(selectedDate));
 
   useEffect(() => {
@@ -50,7 +52,7 @@ export default function EliminationJournalPage() {
   }, [calendarQuery.data]);
 
   function selectDate(date: string) {
-    navigate(date === localToday() ? '/elimination' : `/elimination/${date}`);
+    navigate(date === today ? '/elimination' : `/elimination/${date}`);
   }
 
   function renderDayHints(date: string) {
@@ -94,7 +96,7 @@ export default function EliminationJournalPage() {
         renderDayHints={renderDayHints}
         onMonthChange={setMonth}
         onSelectDate={selectDate}
-        onGoToToday={() => selectDate(localToday())}
+        onGoToToday={() => selectDate(today)}
         compact={isMobile}
         showSettings={false}
         footnote="Visits exclude vomit and nothing. Blue dot = poop, filled red = vomit, ring = nothing. Select a day to open its log."

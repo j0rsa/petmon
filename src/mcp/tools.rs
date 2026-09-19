@@ -16,16 +16,15 @@ use crate::domain::pet::{CreatePet, UpdatePet};
 use crate::domain::weight::{
     CreateWeightRecord, UpdateWeightRecord, WeightGroupBy, WeightRecordFilters,
 };
+use crate::embedding::ServiceContext;
 use crate::error::{AppError, AppResult};
 use crate::services::{
     day_service, elimination_analytics_service, elimination_record_service, health_state_service,
     medication_service, nutrition_analytics_service, nutrition_record_service,
     nutrition_schedule_service, nutrition_status_service, pet_service, weight_service,
 };
-use chrono::Utc;
 use chrono_tz::Tz;
 use serde_json::{json, Value};
-use sqlx::SqlitePool;
 use uuid::Uuid;
 
 fn require_uuid(params: &Value, key: &str) -> AppResult<Uuid> {
@@ -54,7 +53,7 @@ fn optional_uuid(params: &Value, key: &str) -> AppResult<Option<Uuid>> {
 }
 
 /// All tools available via MCP, used to respond to `tools/list`.
-fn tool_list() -> Value {
+pub(crate) fn tool_list() -> Value {
     json!({
         "tools": [
             // ── Pets ─────────────────────────────────────────────────────────
@@ -904,7 +903,7 @@ fn tool_list() -> Value {
 }
 
 pub async fn dispatch(
-    pool: &SqlitePool,
+    pool: &ServiceContext,
     method: &str,
     params: Option<Value>,
     timezone: Tz,
@@ -1023,16 +1022,27 @@ pub async fn dispatch(
         // ── Nutrition context ─────────────────────────────────────────────────
         "pets.nutrition-context" => {
             let pet_id = require_uuid(&params, "pet_id")?;
+            pool.check(Some(pet_id), crate::embedding::ResourceAction::View)
+                .await?;
+            let timezone = pool.timezone(pet_id).await?;
             let today = params["today"]
                 .as_str()
                 .map(str::to_owned)
-                .unwrap_or_else(|| Utc::now().with_timezone(&timezone).date_naive().to_string());
+                .unwrap_or_else(|| {
+                    pool.runtime
+                        .now()
+                        .with_timezone(&timezone)
+                        .date_naive()
+                        .to_string()
+                });
             let week_from = {
                 let d = chrono::NaiveDate::parse_from_str(&today, "%Y-%m-%d")
                     .map_err(|_| AppError::BadRequest("invalid today date".to_string()))?;
                 (d - chrono::Duration::days(6)).to_string()
             };
-            let now_time = Utc::now()
+            let now_time = pool
+                .runtime
+                .now()
                 .with_timezone(&timezone)
                 .format("%H:%M:%S")
                 .to_string();
@@ -1201,10 +1211,19 @@ pub async fn dispatch(
         // ── Elimination context ───────────────────────────────────────────────
         "pets.elimination-context" => {
             let pet_id = require_uuid(&params, "pet_id")?;
+            pool.check(Some(pet_id), crate::embedding::ResourceAction::View)
+                .await?;
+            let timezone = pool.timezone(pet_id).await?;
             let today = params["today"]
                 .as_str()
                 .map(str::to_owned)
-                .unwrap_or_else(|| Utc::now().date_naive().to_string());
+                .unwrap_or_else(|| {
+                    pool.runtime
+                        .now()
+                        .with_timezone(&timezone)
+                        .date_naive()
+                        .to_string()
+                });
             let week_from = {
                 let d = chrono::NaiveDate::parse_from_str(&today, "%Y-%m-%d")
                     .map_err(|_| AppError::BadRequest("invalid today date".to_string()))?;
@@ -1288,7 +1307,9 @@ pub async fn dispatch(
                 }
             }
             let req = UpdateApiTokenScopes { scopes };
-            let token = crate::repo::api_tokens::update_scopes(pool, id, req).await?;
+            let token =
+                crate::auth::admin::update_owned_token_scopes(pool, &pool.actor, id, req.scopes)
+                    .await?;
             let scopes = token.scopes_vec();
             Ok(json!({
                 "id": token.id,
@@ -1540,10 +1561,19 @@ pub async fn dispatch(
         // ── Health context ────────────────────────────────────────────────────
         "pets.health-context" => {
             let pet_id = require_uuid(&params, "pet_id")?;
+            pool.check(Some(pet_id), crate::embedding::ResourceAction::View)
+                .await?;
+            let timezone = pool.timezone(pet_id).await?;
             let pet_id_str = pet_id.to_string();
-            let today = Utc::now().date_naive().to_string();
-            let thirty_days_ago =
-                (Utc::now().date_naive() - chrono::Duration::days(29)).to_string();
+            let today = pool
+                .runtime
+                .now()
+                .with_timezone(&timezone)
+                .date_naive()
+                .to_string();
+            let thirty_days_ago = (pool.runtime.now().with_timezone(&timezone).date_naive()
+                - chrono::Duration::days(29))
+            .to_string();
 
             let (pet, recent_weights, stats, recent_state_checks) = tokio::try_join!(
                 pet_service::get(pool, pet_id),

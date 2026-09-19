@@ -14,7 +14,8 @@ pub async fn list_records(
     state: web::Data<AppState>,
     query: web::Query<EliminationRecordFilters>,
 ) -> AppResult<HttpResponse> {
-    let records = elimination_record_service::list(&state.pool, query.into_inner()).await?;
+    let context = state.request_context(&_scope_req)?;
+    let records = elimination_record_service::list(&context, query.into_inner()).await?;
     Ok(HttpResponse::Ok().json(records))
 }
 
@@ -24,8 +25,9 @@ pub async fn create_record(
     state: web::Data<AppState>,
     body: web::Json<CreateEliminationRecord>,
 ) -> AppResult<HttpResponse> {
+    let context = state.request_context(&_scope_req)?;
     let record =
-        elimination_record_service::create(&state.pool, body.into_inner(), state.timezone).await?;
+        elimination_record_service::create(&context, body.into_inner(), state.timezone).await?;
     Ok(HttpResponse::Created().json(record))
 }
 
@@ -35,7 +37,8 @@ pub async fn get_record(
     state: web::Data<AppState>,
     id: web::Path<String>,
 ) -> AppResult<HttpResponse> {
-    let record = elimination_record_service::get(&state.pool, &id).await?;
+    let context = state.request_context(&_scope_req)?;
+    let record = elimination_record_service::get(&context, &id).await?;
     Ok(HttpResponse::Ok().json(record))
 }
 
@@ -46,7 +49,8 @@ pub async fn update_record(
     id: web::Path<String>,
     body: web::Json<UpdateEliminationRecord>,
 ) -> AppResult<HttpResponse> {
-    let record = elimination_record_service::update(&state.pool, &id, body.into_inner()).await?;
+    let context = state.request_context(&_scope_req)?;
+    let record = elimination_record_service::update(&context, &id, body.into_inner()).await?;
     Ok(HttpResponse::Ok().json(record))
 }
 
@@ -56,7 +60,8 @@ pub async fn delete_record(
     state: web::Data<AppState>,
     id: web::Path<String>,
 ) -> AppResult<HttpResponse> {
-    elimination_record_service::delete(&state.pool, &id).await?;
+    let context = state.request_context(&_scope_req)?;
+    elimination_record_service::delete(&context, &id).await?;
     Ok(HttpResponse::NoContent().finish())
 }
 
@@ -66,12 +71,10 @@ pub async fn create_record_with_weight(
     state: web::Data<AppState>,
     body: web::Json<CreateEliminationWithWeight>,
 ) -> AppResult<HttpResponse> {
-    let result = elimination_record_service::create_with_weight(
-        &state.pool,
-        body.into_inner(),
-        state.timezone,
-    )
-    .await?;
+    let context = state.request_context(&_scope_req)?;
+    let result =
+        elimination_record_service::create_with_weight(&context, body.into_inner(), state.timezone)
+            .await?;
     Ok(HttpResponse::Created().json(result))
 }
 

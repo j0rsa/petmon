@@ -45,6 +45,7 @@ function decorator({
         },
       });
       client.setQueryData(['pets'], mockPets);
+      client.setQueryData(['me'], { subject: 'dev', email: null, name: 'Dev', display_name: 'Dev', kind: 'dev', scopes: [], roles: ['instance_admin'], capabilities: ['api_read', 'api_write', 'mcp', 'instance_admin'] });
       client.setQueryData(['medications', mockPetId], medications);
       client.setQueryData(['med-assignments', mockPetId], assignments);
       client.setQueryData(['med-bundles', mockPetId], bundles);

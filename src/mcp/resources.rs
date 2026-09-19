@@ -1,5 +1,5 @@
+use crate::embedding::ServiceContext;
 use serde_json::{json, Value};
-use sqlx::SqlitePool;
 use uuid::Uuid;
 
 use crate::error::{AppError, AppResult};
@@ -47,9 +47,9 @@ pub fn resource_list() -> Value {
 
 /// Resolve a `petmon://` URI to its content.
 pub async fn read_resource(
-    pool: &SqlitePool,
+    pool: &ServiceContext,
     uri: &str,
-    timezone: chrono_tz::Tz,
+    _timezone: chrono_tz::Tz,
 ) -> AppResult<Value> {
     // petmon://pets
     if uri == "petmon://pets" {
@@ -73,6 +73,9 @@ pub async fn read_resource(
 
     let pet_id = Uuid::parse_str(id_str)
         .map_err(|_| AppError::BadRequest(format!("Invalid pet UUID in URI: {uri}")))?;
+    pool.check(Some(pet_id), crate::embedding::ResourceAction::View)
+        .await?;
+    let timezone = pool.timezone(pet_id).await?;
 
     match suffix {
         None => {
@@ -84,7 +87,9 @@ pub async fn read_resource(
             }))
         }
         Some("today") => {
-            let today = chrono::Utc::now()
+            let today = pool
+                .runtime
+                .now()
                 .with_timezone(&timezone)
                 .date_naive()
                 .to_string();

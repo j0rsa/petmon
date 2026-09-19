@@ -7,7 +7,17 @@ use uuid::Uuid;
 const PET_COLUMNS: &str = "id, name, species, status, breed, birth_date, blood_type, color, weight_kg, feeding_notes, telegram_nutrition_chat_id, telegram_nutrition_thread_id, telegram_meds_chat_id, telegram_meds_thread_id, elimination_auto_categorize_by_duration, created_at, updated_at";
 
 pub async fn list_pets(pool: &SqlitePool) -> AppResult<Vec<Pet>> {
-    let query = format!("SELECT {PET_COLUMNS} FROM pets ORDER BY name");
+    list_pets_scoped(pool, &crate::embedding::PetVisibility::All).await
+}
+
+pub async fn list_pets_scoped(
+    pool: &SqlitePool,
+    visibility: &crate::embedding::PetVisibility,
+) -> AppResult<Vec<Pet>> {
+    let query = format!(
+        "SELECT {PET_COLUMNS} FROM pets WHERE {} ORDER BY name",
+        visibility.predicate("id")
+    );
     Ok(sqlx::query_as::<_, Pet>(sqlx::AssertSqlSafe(query))
         .fetch_all(pool)
         .await?)
@@ -23,6 +33,16 @@ pub async fn get_pet(pool: &SqlitePool, id: Uuid) -> AppResult<Pet> {
 }
 
 pub async fn create_pet(pool: &SqlitePool, pet: Pet) -> AppResult<Pet> {
+    let mut tx = pool.begin().await?;
+    let pet = create_pet_on_connection(&mut tx, pet).await?;
+    tx.commit().await?;
+    Ok(pet)
+}
+
+pub async fn create_pet_on_connection(
+    connection: &mut sqlx::SqliteConnection,
+    pet: Pet,
+) -> AppResult<Pet> {
     sqlx::query(
         "INSERT INTO pets (id, name, species, status, breed, birth_date, blood_type, color, weight_kg, feeding_notes, telegram_nutrition_chat_id, telegram_nutrition_thread_id, telegram_meds_chat_id, telegram_meds_thread_id, elimination_auto_categorize_by_duration, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
     )
@@ -43,9 +63,9 @@ pub async fn create_pet(pool: &SqlitePool, pet: Pet) -> AppResult<Pet> {
     .bind(pet.elimination_auto_categorize_by_duration)
     .bind(&pet.created_at)
     .bind(&pet.updated_at)
-    .execute(pool)
+    .execute(&mut *connection)
     .await?;
-    get_pet(pool, pet.id).await
+    Ok(pet)
 }
 
 pub async fn update_pet(pool: &SqlitePool, id: Uuid, req: UpdatePet) -> AppResult<Pet> {
@@ -127,9 +147,19 @@ pub async fn update_weight(pool: &SqlitePool, pet_id: &str, weight_kg: f64) -> A
 }
 
 pub async fn delete_pet(pool: &SqlitePool, id: Uuid) -> AppResult<()> {
+    let mut tx = pool.begin().await?;
+    delete_pet_on_connection(&mut tx, id).await?;
+    tx.commit().await?;
+    Ok(())
+}
+
+pub async fn delete_pet_on_connection(
+    connection: &mut sqlx::SqliteConnection,
+    id: Uuid,
+) -> AppResult<()> {
     let rows = sqlx::query("DELETE FROM pets WHERE id=?")
         .bind(id)
-        .execute(pool)
+        .execute(&mut *connection)
         .await?
         .rows_affected();
     if rows == 0 {

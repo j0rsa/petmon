@@ -28,14 +28,16 @@ pub async fn upsert(
     let id = Uuid::new_v4().to_string();
     let now = Utc::now().to_rfc3339();
 
-    sqlx::query(
+    let result = sqlx::query(
         "INSERT INTO push_subscriptions (id, endpoint, p256dh, auth, reader_key, user_agent, created_at) \
          VALUES (?, ?, ?, ?, ?, ?, ?) \
          ON CONFLICT(endpoint) DO UPDATE SET \
            p256dh = excluded.p256dh, \
            auth = excluded.auth, \
            reader_key = excluded.reader_key, \
-           user_agent = excluded.user_agent",
+           user_agent = excluded.user_agent \
+         WHERE push_subscriptions.reader_key = excluded.reader_key \
+            OR (push_subscriptions.p256dh = excluded.p256dh AND push_subscriptions.auth = excluded.auth)",
     )
     .bind(&id)
     .bind(&req.endpoint)
@@ -46,6 +48,10 @@ pub async fn upsert(
     .bind(&now)
     .execute(pool)
     .await?;
+
+    if result.rows_affected() == 0 {
+        return Err(AppError::Forbidden("subscription belongs to another user; original subscription keys are required to reconnect this browser".into()));
+    }
 
     get_by_endpoint(pool, &req.endpoint).await
 }
@@ -60,6 +66,34 @@ pub async fn get_by_endpoint(pool: &SqlitePool, endpoint: &str) -> AppResult<Pus
     .fetch_optional(pool)
     .await?
     .ok_or_else(|| AppError::NotFound("Push subscription not found".to_string()))
+}
+
+pub async fn get_owned(
+    pool: &SqlitePool,
+    endpoint: &str,
+    reader_key: &str,
+) -> AppResult<PushSubscriptionRow> {
+    sqlx::query_as::<_, PushSubscriptionRow>(
+        "SELECT * FROM push_subscriptions WHERE endpoint = ? AND reader_key = ?",
+    )
+    .bind(endpoint)
+    .bind(reader_key)
+    .fetch_optional(pool)
+    .await?
+    .ok_or_else(|| AppError::NotFound("Push subscription not found".into()))
+}
+
+pub async fn delete_owned(pool: &SqlitePool, endpoint: &str, reader_key: &str) -> AppResult<()> {
+    let rows = sqlx::query("DELETE FROM push_subscriptions WHERE endpoint = ? AND reader_key = ?")
+        .bind(endpoint)
+        .bind(reader_key)
+        .execute(pool)
+        .await?
+        .rows_affected();
+    if rows == 0 {
+        return Err(AppError::NotFound("Push subscription not found".into()));
+    }
+    Ok(())
 }
 
 #[tracing::instrument(skip(pool))]
