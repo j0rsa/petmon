@@ -148,7 +148,7 @@ pub(crate) fn tool_list() -> Value {
                     "required": ["pet_id", "category", "amount"],
                     "properties": {
                         "pet_id":      { "type": "string", "format": "uuid" },
-                        "occurred_at": { "type": "string", "description": "Naive local datetime YYYY-MM-DDTHH:MM:SS. Defaults to now." },
+                        "occurred_at": { "type": "string", "format": "date-time", "description": "RFC3339 instant with explicit offset or Z. Defaults to now." },
                         "local_date":  { "type": "string", "format": "date" },
                         "category":    { "type": "string", "enum": ["wet_food", "dry_food", "water", "liquids"] },
                         "amount":      { "type": "number" },
@@ -172,7 +172,7 @@ pub(crate) fn tool_list() -> Value {
                                 "required": ["pet_id", "category", "amount"],
                                 "properties": {
                                     "pet_id":      { "type": "string", "format": "uuid" },
-                                    "occurred_at": { "type": "string" },
+                                    "occurred_at": { "type": "string", "format": "date-time", "description": "RFC3339 instant with explicit offset or Z." },
                                     "local_date":  { "type": "string", "format": "date" },
                                     "category":    { "type": "string" },
                                     "amount":      { "type": "number" },
@@ -193,7 +193,7 @@ pub(crate) fn tool_list() -> Value {
                     "required": ["id"],
                     "properties": {
                         "id":          { "type": "string" },
-                        "occurred_at": { "type": "string" },
+                        "occurred_at": { "type": "string", "format": "date-time", "description": "RFC3339 instant with explicit offset or Z." },
                         "local_date":  { "type": "string", "format": "date" },
                         "category":    { "type": "string" },
                         "amount":      { "type": "number" },
@@ -314,7 +314,7 @@ pub(crate) fn tool_list() -> Value {
                     "required": ["pet_id"],
                     "properties": {
                         "pet_id": { "type": "string", "format": "uuid" },
-                        "ts":     { "type": "string", "description": "As-of timestamp (RFC3339 or YYYY-MM-DDTHH:MM:SS). Defaults to now." }
+                        "ts":     { "type": "string", "description": "As-of RFC3339 instant with explicit offset or Z. Defaults to now." }
                     }
                 }
             },
@@ -326,7 +326,7 @@ pub(crate) fn tool_list() -> Value {
                     "required": ["pet_id"],
                     "properties": {
                         "pet_id": { "type": "string", "format": "uuid" },
-                        "ts":     { "type": "string", "description": "As-of timestamp (RFC3339 or YYYY-MM-DDTHH:MM:SS). Defaults to now." }
+                        "ts":     { "type": "string", "description": "As-of RFC3339 instant with explicit offset or Z. Defaults to now." }
                     }
                 }
             },
@@ -417,8 +417,8 @@ pub(crate) fn tool_list() -> Value {
                         "event_type":       { "type": "string", "enum": ["general", "urination", "defecation", "vomit", "no_output"] },
                         "subtype":          { "type": "string" },
                         "duration_seconds": { "type": "integer" },
-                        "occurred_at":      { "type": "string", "format": "date-time", "description": "Naive local datetime YYYY-MM-DDTHH:MM:SS. Omit for now." },
-                        "local_date":       { "type": "string", "format": "date", "description": "Journal day YYYY-MM-DD. Defaults to the date of occurred_at (or today)." },
+                        "occurred_at":      { "type": "string", "format": "date-time", "description": "RFC3339 instant with explicit offset or Z. Omit for now." },
+                        "local_date":       { "type": "string", "format": "date", "description": "Journal day YYYY-MM-DD. Defaults to the resource-local date of occurred_at (or today)." },
                         "note":             { "type": "string" }
                     }
                 }
@@ -434,7 +434,7 @@ pub(crate) fn tool_list() -> Value {
                         "event_type":       { "type": "string", "enum": ["general", "urination", "defecation", "vomit", "no_output"] },
                         "subtype":          { "type": ["string", "null"] },
                         "duration_seconds": { "type": ["integer", "null"] },
-                        "occurred_at":      { "type": "string" },
+                        "occurred_at":      { "type": "string", "format": "date-time", "description": "RFC3339 instant with explicit offset or Z." },
                         "note":             { "type": ["string", "null"] }
                     }
                 }
@@ -526,7 +526,7 @@ pub(crate) fn tool_list() -> Value {
                     "properties": {
                         "pet_id":      { "type": "string", "format": "uuid" },
                         "weight_kg":   { "type": "number" },
-                        "measured_at": { "type": "string", "format": "date-time" },
+                        "measured_at": { "type": "string", "format": "date-time", "description": "RFC3339 instant with explicit offset or Z." },
                         "note":        { "type": "string", "description": "Free-text note. Must include a #tag; #manual is added when missing." }
                     }
                 }
@@ -592,7 +592,7 @@ pub(crate) fn tool_list() -> Value {
                     "properties": {
                         "pet_id":      { "type": "string", "format": "uuid" },
                         "level":       { "type": "string", "enum": ["terrible", "poor", "ok", "good", "amazing"] },
-                        "occurred_at": { "type": "string", "description": "Naive local datetime YYYY-MM-DDTHH:MM:SS. Defaults to now." },
+                        "occurred_at": { "type": "string", "format": "date-time", "description": "RFC3339 instant with explicit offset or Z. Defaults to now." },
                         "local_date":  { "type": "string", "format": "date" },
                         "note":        { "type": "string", "description": "Optional caregiver note (energy, appetite, mood, etc.)" },
                         "source_type": { "type": "string" }
@@ -807,7 +807,7 @@ pub(crate) fn tool_list() -> Value {
                         "dose_fraction_override": { "type": "string", "enum": ["whole", "half", "third", "quarter", "three_quarter", "eighth", "sixteenth"] },
                         "liquid_dose_ml_override": { "type": "number" },
                         "taken": { "type": "boolean", "default": true },
-                        "occurred_at": { "type": "string" },
+                        "occurred_at": { "type": "string", "format": "date-time", "description": "RFC3339 instant with explicit offset or Z." },
                         "local_date": { "type": "string", "format": "date" },
                         "note": { "type": "string" }
                     }
@@ -879,7 +879,7 @@ pub(crate) fn tool_list() -> Value {
                     "required": ["id"],
                     "properties": {
                         "id": { "type": "string" },
-                        "occurred_at": { "type": "string" },
+                        "occurred_at": { "type": "string", "format": "date-time", "description": "RFC3339 instant with explicit offset or Z." },
                         "local_date": { "type": "string", "format": "date" },
                         "note": { "type": "string" }
                     }
@@ -1040,13 +1040,7 @@ pub async fn dispatch(
                     .map_err(|_| AppError::BadRequest("invalid today date".to_string()))?;
                 (d - chrono::Duration::days(6)).to_string()
             };
-            let now_time = pool
-                .runtime
-                .now()
-                .with_timezone(&timezone)
-                .format("%H:%M:%S")
-                .to_string();
-            let status_ts = format!("{today}T{now_time}");
+            let status_ts = pool.record_timestamp(timezone, Some(&today))?;
 
             let (pet, today_summary, schedules, trend, status) = tokio::try_join!(
                 pet_service::get(pool, pet_id),

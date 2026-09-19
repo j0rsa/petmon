@@ -130,6 +130,7 @@ fn record(
     amount: f64,
     occurred_at: &str,
 ) -> petmon::domain::nutrition_record::CreateNutritionRecord {
+    let occurred_at = format!("{occurred_at}Z"); // These fixture wall times explicitly represent UTC.
     serde_json::from_value(
         json!({"pet_id":pet,"category":"water","amount":amount,"occurred_at":occurred_at}),
     )
@@ -411,6 +412,35 @@ impl RuntimeResolver for FixedRuntime {
         "2026-01-01T00:30:00Z".parse().unwrap()
     }
 }
+
+struct TokyoRuntime;
+impl RuntimeResolver for TokyoRuntime {
+    fn timezone<'a>(&'a self, _: &'a SqlitePool, _: Uuid, _: Tz) -> BoxFuture<'a, AppResult<Tz>> {
+        Box::pin(async { Ok(chrono_tz::Asia::Tokyo) })
+    }
+}
+#[actix_web::test]
+async fn best_day_projects_utc_instants_into_each_pets_effective_timezone() {
+    let (base, visible, hidden) = setup().await;
+    let mut context = restricted(&base, vec![visible]);
+    context.runtime = Arc::new(TokyoRuntime);
+    for (pet, amount) in [(visible, 42), (hidden, 999)] {
+        let req=serde_json::from_value(json!({"pet_id":pet,"category":"water","amount":amount,"occurred_at":"2026-01-01T16:00:00Z","local_date":"2026-01-02"})).unwrap();
+        nutrition_record_service::create(&base, req, chrono_tz::UTC)
+            .await
+            .unwrap();
+    }
+    let best =
+        petmon::services::nutrition_analytics_service::best_fluid_day(&context, None, "2026-01-03")
+            .await
+            .unwrap()
+            .unwrap();
+    assert_eq!(best.local_date, "2026-01-02");
+    assert_eq!(best.total_fluid_ml, 42.0);
+    assert_eq!(best.curve.len(), 1);
+    assert_eq!(best.curve[0].time, "01:00");
+    assert_eq!(best.curve[0].cumulative_fluid_ml, 42.0);
+}
 #[actix_web::test]
 async fn realtime_and_resource_today_use_resource_timezone_and_injected_clock() {
     let (base, visible, _) = setup().await;
@@ -422,7 +452,7 @@ async fn realtime_and_resource_today_use_resource_timezone_and_injected_clock() 
         .await
         .unwrap();
     assert_eq!(record.local_date, "2025-12-31");
-    assert_eq!(record.occurred_at, "2025-12-31T16:30:00");
+    assert_eq!(record.occurred_at, "2026-01-01T00:30:00.000000000Z");
     let resource = petmon::mcp::resources::read_resource(
         &ctx,
         &format!("petmon://pets/{visible}/today"),
@@ -433,6 +463,28 @@ async fn realtime_and_resource_today_use_resource_timezone_and_injected_clock() 
     let summary: Value = serde_json::from_str(resource["text"].as_str().unwrap()).unwrap();
     assert_eq!(summary["local_date"], "2025-12-31");
     assert_eq!(summary["records"].as_array().unwrap().len(), 1);
+    for params in [
+        json!({"pet_id": visible}),
+        json!({"pet_id": visible, "today": "2025-12-31"}),
+    ] {
+        let context = petmon::mcp::tools::dispatch(
+            &ctx,
+            "pets.nutrition-context",
+            Some(params),
+            chrono_tz::UTC,
+        )
+        .await
+        .unwrap();
+        assert_eq!(context["today"], "2025-12-31");
+        assert_eq!(context["status"]["local_date"], "2025-12-31");
+        let as_of = context["status"]["as_of"]
+            .as_str()
+            .unwrap()
+            .parse::<DateTime<Utc>>()
+            .unwrap();
+        assert_eq!(as_of, ctx.runtime.now());
+        assert_eq!(context["status"]["intake"]["water_ml"], 42.0);
+    }
 }
 
 struct AccountAdapter {

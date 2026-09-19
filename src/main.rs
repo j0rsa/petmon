@@ -28,7 +28,11 @@ async fn main() -> anyhow::Result<()> {
     );
 
     let pool = db::create_pool(&config).await?;
-    db::run_migrations(&pool).await?;
+    db::run_schema_migrations(&pool).await?;
+    if petmon::record_time::run_cli(&pool, &std::env::args().skip(1).collect::<Vec<_>>()).await? {
+        return Ok(());
+    }
+    petmon::record_time::ensure_canonical(&pool).await?;
     if auth::admin::run_cli(&pool, std::env::args().skip(1).collect()).await? {
         return Ok(());
     }

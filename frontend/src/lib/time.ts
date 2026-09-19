@@ -1,3 +1,5 @@
+import { civilToInstant, instantToCivil } from './resourceTime';
+
 export function nowTimeString(): string {
   const now = new Date();
   return `${now.getHours().toString().padStart(2, '0')}:${now.getMinutes().toString().padStart(2, '0')}`;
@@ -6,18 +8,17 @@ export function nowTimeString(): string {
 export function nowLocalDateTime(): { local_date: string; occurred_at: string } {
   const now = new Date();
   const local_date = `${now.getFullYear()}-${(now.getMonth() + 1).toString().padStart(2, '0')}-${now.getDate().toString().padStart(2, '0')}`;
-  const time = `${now.getHours().toString().padStart(2, '0')}:${now.getMinutes().toString().padStart(2, '0')}:${now.getSeconds().toString().padStart(2, '0')}`;
-  return { local_date, occurred_at: `${local_date}T${time}` };
+  return { local_date, occurred_at: now.toISOString() };
 }
 
-/** Combine a YYYY-MM-DD date and HH:MM time into a naive local ISO datetime. */
-export function isoFromDateAndTime(date: string, time: string): string {
-  return `${date}T${time}:00`;
+/** Resolve a resource-local clock explicitly; ambiguous/nonexistent times reject. */
+export function isoFromDateAndTime(date: string, time: string, timeZone = Intl.DateTimeFormat().resolvedOptions().timeZone): string {
+  return civilToInstant(`${date}T${time}`, timeZone);
 }
 
-/** Extract HH:MM from a naive ISO datetime string. */
-export function timeFromIso(iso: string): string {
-  return iso.slice(11, 16);
+/** Resource-local HH:MM from an offset/UTC instant. */
+export function timeFromIso(iso: string, timeZone?: string): string {
+  return instantToCivil(iso, timeZone).slice(11, 16);
 }
 
 /** Feeding windows and the reminder worker share this 10-minute grid. */

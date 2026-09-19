@@ -132,7 +132,7 @@ export default defineConfig({
           browser: {
             enabled: true,
             headless: true,
-            provider: playwright({}),
+            provider: playwright({ contextOptions: { timezoneId: 'UTC' } }),
             instances: [{ browser: 'chromium' }],
           },
         },

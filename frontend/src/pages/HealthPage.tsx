@@ -1,4 +1,5 @@
 import { useResourceTime } from '../context/useResourceTime';
+import { useRecordTimestamp } from '../hooks/useRecordTimestamp';
 import { useState } from 'react';
 import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { weightApi } from '../api/weight';
@@ -21,6 +22,15 @@ import { WEIGHT_CHART_PERIODS, type WeightPeriodLabel } from '../lib/weightChart
 import { weightNoteHasAnyTag } from '../lib/weightNote';
 
 export default function HealthPage() {
+  const { selectedPetId, petsLoading } = useSelectedPet();
+  if (petsLoading) return <div className="loading-state">Loading…</div>;
+  if (!selectedPetId) return <NoPetSelected />;
+  // Resource-local form defaults must be initialized only after selection is
+  // ready, and drafts must never move to a different pet on a selector change.
+  return <HealthPageContent key={selectedPetId} />;
+}
+
+function HealthPageContent() {
   const { selectedPetId, selectedPet, petsLoading } = useSelectedPet();
   const queryClient = useQueryClient();
   const { canWrite } = usePermissions();
@@ -82,6 +92,7 @@ export default function HealthPage() {
   const [weightInput, setWeightInput] = useState('');
   const [noteInput, setNoteInput] = useState('');
   const [measuredAt, setMeasuredAt] = useState(() => nowLocalDateTimeString());
+  const timestamp = useRecordTimestamp(measuredAt);
 
   function invalidateWeightQueries() {
     queryClient.invalidateQueries({ queryKey: ['weight-records', selectedPetId] });
@@ -131,12 +142,12 @@ export default function HealthPage() {
 
   function handleAdd() {
     const kg = parseDecimal(weightInput);
-    if (isNaN(kg) || kg <= 0 || !selectedPetId) return;
+    if (isNaN(kg) || kg <= 0 || !selectedPetId || !timestamp.valid) return;
     addMutation.mutate({
       pet_id: selectedPetId,
       weight_kg: kg,
       note: noteInput.trim() || undefined,
-      measured_at: measuredAt ? measuredAt + ':00' : undefined,
+      measured_at: timestamp.utc,
     });
   }
 
@@ -199,6 +210,7 @@ export default function HealthPage() {
               onChange={(e) => setMeasuredAt(e.target.value)}
               style={{ width: '13rem' }}
             />
+            {timestamp.feedback}
           </div>
           <div className="form-row" style={{ flex: '0 0 auto' }}>
             <label style={{ fontSize: '0.82rem' }}>Weight (kg)</label>

@@ -1,5 +1,5 @@
-//! Live instance authority and credential attenuation. Neither `all` nor legacy
-//! empty scopes grant API tokens administrative authority.
+//! Live administrator roles and credential attenuation. API-token administration
+//! additionally requires the literal `all` scope, never an equivalent scope set.
 use sqlx::SqlitePool;
 
 use crate::{
@@ -16,31 +16,22 @@ pub async fn is_instance_admin(pool: &SqlitePool, identity: &Identity) -> AppRes
     instance_admins::contains(pool, &identity.subject).await
 }
 
-pub async fn effective_capabilities(
-    pool: &SqlitePool,
-    identity: &Identity,
-) -> AppResult<Vec<String>> {
-    let mut capabilities = identity.ordinary_capabilities();
-    if identity.has_scope("instance_admin") && is_instance_admin(pool, identity).await? {
-        capabilities.push("instance_admin".into());
-    }
-    Ok(capabilities)
-}
-
 pub async fn require_instance_admin(pool: &SqlitePool, identity: &Identity) -> AppResult<()> {
-    if identity.has_scope("instance_admin") && is_instance_admin(pool, identity).await? {
+    let credential_allowed =
+        !matches!(identity.kind, IdentityKind::ApiToken { .. }) || identity.scopes.contains("all");
+    if credential_allowed && is_instance_admin(pool, identity).await? {
         Ok(())
     } else {
         Err(AppError::Forbidden(
-            "instance administrator capability required".into(),
+            "instance administrator role required; API tokens must have the all scope".into(),
         ))
     }
 }
 
-/// Missing input retains the existing ordinary `all` default, but only when
+/// Missing input retains the existing `all` default, but only when
 /// that default is within the caller's authority. Empty input is always invalid.
 pub async fn attenuate_scopes(
-    pool: &SqlitePool,
+    _pool: &SqlitePool,
     identity: &Identity,
     requested: Option<Vec<String>>,
 ) -> AppResult<Vec<String>> {
@@ -50,17 +41,21 @@ pub async fn attenuate_scopes(
             "at least one scope is required".into(),
         ));
     }
-    let available = effective_capabilities(pool, identity).await?;
     for scope in &scopes {
         if !is_valid_scope(scope) {
             return Err(AppError::BadRequest(format!("unknown scope '{scope}'")));
         }
         let permitted = if scope == "all" {
-            ["api_read", "api_write", "mcp"]
-                .iter()
-                .all(|s| available.iter().any(|a| a == s))
+            match identity.kind {
+                // `all` can admit administration after an owner role grant.
+                // Ordinary scopes cannot be combined into that authority.
+                IdentityKind::ApiToken { .. } => identity.scopes.contains("all"),
+                IdentityKind::Oidc | IdentityKind::Dev => ["api_read", "api_write", "mcp"]
+                    .iter()
+                    .all(|s| identity.has_scope(s)),
+            }
         } else {
-            available.contains(scope)
+            identity.has_scope(scope)
         };
         if !permitted {
             return Err(AppError::Forbidden(format!(

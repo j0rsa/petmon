@@ -4,7 +4,7 @@ import { buildMedIntakeCurl, buildMedIntakePayload } from './medIntakeCurl';
 
 const timing = {
   local_date: '2026-08-21',
-  occurred_at: '2026-08-21T08:30:00',
+  occurred_at: '2026-08-21T08:30:00Z',
 };
 
 describe('buildMedIntakePayload', () => {
@@ -18,7 +18,7 @@ describe('buildMedIntakePayload', () => {
       assignment_id: item.assignment.id,
       taken: true,
       local_date: '2026-08-21',
-      occurred_at: '2026-08-21T08:30:00',
+      occurred_at: '2026-08-21T08:30:00Z',
     });
   });
 
@@ -52,7 +52,7 @@ describe('buildMedIntakeCurl', () => {
     expect(curl).toContain(`"assignment_id":"${item.assignment.id}"`);
     expect(curl).toContain('"taken":true');
     expect(curl).toContain('"local_date":"2026-08-21"');
-    expect(curl).toContain('"occurred_at":"2026-08-21T08:30:00"');
+    expect(curl).toContain('"occurred_at":"2026-08-21T08:30:00Z"');
     expect(curl).not.toContain('Authorization');
   });
 });

@@ -43,6 +43,7 @@ export const OidcUser: Story = {
         name: 'Alice',
         display_name: 'Alice',
         kind: 'oidc',
+        roles: [],
         scopes: [],
       }}
     />
@@ -59,6 +60,7 @@ export const ApiTokenUser: Story = {
         name: 'iPhone (iOS 18.7)',
         display_name: 'iPhone (iOS 18.7)',
         kind: 'api_token',
+        roles: [],
         scopes: ['api_read'],
         token_created_by: 'Alice',
       }}
@@ -76,6 +78,7 @@ export const DevUser: Story = {
         name: 'Dev',
         display_name: 'Dev',
         kind: 'dev',
+        roles: ['instance_admin'],
         scopes: [],
       }}
     />

@@ -13,6 +13,8 @@ pub struct AppInfo {
     pub features: Vec<String>,
     pub git_sha: &'static str,
     pub demo_mode: bool,
+    /// Standalone effective timezone; embedded resources use their runtime resolver.
+    pub timezone: String,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub med_intake_shortcut_icloud_url: Option<String>,
 }
@@ -26,6 +28,7 @@ pub async fn info(state: web::Data<AppState>) -> HttpResponse {
         features: state.features.clone(),
         git_sha: GIT_SHA,
         demo_mode: state.demo_mode,
+        timezone: state.timezone.to_string(),
         med_intake_shortcut_icloud_url: state.med_intake_shortcut_icloud_url.clone(),
     })
 }

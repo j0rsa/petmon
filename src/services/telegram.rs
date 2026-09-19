@@ -5,6 +5,7 @@ use crate::domain::nutrition_record::NutritionRecord;
 use crate::domain::pet::Pet;
 use crate::domain::settings::{DateFormat, TelegramConfig, TimeFormat};
 use crate::domain::user_settings::UserDisplaySettings;
+use crate::embedding::ServiceContext;
 use crate::repo::{nutrition_records, pets, settings};
 
 /// Format a nutrition record as a Telegram log line.
@@ -24,7 +25,7 @@ fn format_record_line(record: &NutritionRecord) -> String {
 /// Fire-and-forget: send a medication intake to the configured medication chat.
 #[tracing::instrument(skip(pool, record), fields(record_id = %record.id))]
 pub async fn notify_medication_intake(
-    pool: &SqlitePool,
+    pool: &ServiceContext,
     record: &MedIntakeRecord,
     delayed: bool,
     display_settings: UserDisplaySettings,
@@ -39,13 +40,16 @@ pub async fn notify_medication_intake(
             return;
         }
     };
+    let Some(local_time) = medication_display_time(pool, record).await else {
+        return;
+    };
     let mut payload = serde_json::json!({
         "chat_id": ctx.chat_id,
         "text": format_medication_intake_line(
             &medication.name,
             medication.emoji.as_deref(),
             &record.dose_label,
-            &record.occurred_at,
+            &local_time,
             delayed,
             display_settings.date_format,
             display_settings.time_format,
@@ -80,7 +84,7 @@ pub async fn notify_medication_intake(
 /// Fire-and-forget: send one Telegram message covering every intake in a bundle.
 #[tracing::instrument(skip(pool, records), fields(count = records.len()))]
 pub async fn notify_medication_bundle_intake(
-    pool: &SqlitePool,
+    pool: &ServiceContext,
     records: &[MedIntakeRecord],
     delayed: bool,
     display_settings: UserDisplaySettings,
@@ -134,7 +138,7 @@ pub async fn notify_medication_bundle_intake(
 /// Fire-and-forget: delete or edit the Telegram message for a removed medication intake.
 /// Bundle intakes share one message — remaining lines are edited in place.
 #[tracing::instrument(skip(pool, record), fields(record_id = %record.id))]
-pub async fn notify_medication_intake_delete(pool: &SqlitePool, record: &MedIntakeRecord) {
+pub async fn notify_medication_intake_delete(pool: &ServiceContext, record: &MedIntakeRecord) {
     let Some(message_id) = record.telegram_message_id else {
         tracing::debug!(record_id = %record.id, "no telegram_message_id, skipping medication delete notification");
         return;
@@ -197,7 +201,7 @@ pub async fn notify_medication_intake_delete(pool: &SqlitePool, record: &MedInta
 }
 
 async fn format_records_as_medication_text(
-    pool: &SqlitePool,
+    pool: &ServiceContext,
     records: &[MedIntakeRecord],
     delayed: bool,
     display_settings: &UserDisplaySettings,
@@ -211,17 +215,37 @@ async fn format_records_as_medication_text(
                 return None;
             }
         };
+        let local_time = medication_display_time(pool, record).await?;
         lines.push(format_medication_intake_line(
             &medication.name,
             medication.emoji.as_deref(),
             &record.dose_label,
-            &record.occurred_at,
+            &local_time,
             delayed,
             display_settings.date_format.clone(),
             display_settings.time_format.clone(),
         ));
     }
     Some(lines.join("\n"))
+}
+
+async fn medication_display_time(
+    context: &ServiceContext,
+    record: &MedIntakeRecord,
+) -> Option<String> {
+    let result = async {
+        let timezone = context.timezone(record.pet_id).await?;
+        crate::record_time::local_datetime(&record.occurred_at, timezone)
+            .map(|time| time.format("%Y-%m-%dT%H:%M:%S").to_string())
+    }
+    .await;
+    match result {
+        Ok(time) => Some(time),
+        Err(error) => {
+            tracing::warn!(%error, record_id = %record.id, "failed to resolve medication display time");
+            None
+        }
+    }
 }
 
 fn format_medication_intake_line(
@@ -635,7 +659,30 @@ mod tests {
         .await
         .unwrap();
         let assignment = crate::repo::med_assignments::create(pool, serde_json::from_value(serde_json::json!({"medication_id":med.id,"tablet_strength_mg":10,"pill_shape":"round","dose_fraction":"whole","date_from":"2026-01-01"})).unwrap()).await.unwrap();
-        crate::repo::med_intake_records::create(pool, serde_json::from_value(serde_json::json!({"pet_id":pet_id,"medication_id":med.id,"assignment_id":assignment.id,"occurred_at":"2026-09-19T10:00:00","local_date":"2026-09-19"})).unwrap(), chrono_tz::UTC).await.unwrap()
+        crate::repo::med_intake_records::create(pool, serde_json::from_value(serde_json::json!({"pet_id":pet_id,"medication_id":med.id,"assignment_id":assignment.id,"occurred_at":"2026-09-19T10:00:00Z","local_date":"2026-09-19"})).unwrap(), chrono_tz::UTC).await.unwrap()
+    }
+
+    #[tokio::test]
+    async fn delayed_intake_displays_the_resource_timezone() {
+        let pool = pool().await;
+        let pet = pet(&pool).await;
+        let record = intake(&pool, pet.id).await;
+        let context = crate::embedding::ServiceContext::standalone(pool, chrono_tz::Asia::Tokyo);
+        assert_eq!(
+            super::medication_display_time(&context, &record)
+                .await
+                .as_deref(),
+            Some("2026-09-19T19:00:00")
+        );
+        let text = super::format_records_as_medication_text(
+            &context,
+            &[record],
+            true,
+            &crate::domain::user_settings::UserDisplaySettings::default(),
+        )
+        .await
+        .unwrap();
+        assert!(text.contains("19:00"), "{text}");
     }
 
     #[tokio::test]

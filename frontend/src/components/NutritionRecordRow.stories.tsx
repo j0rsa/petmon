@@ -2,21 +2,28 @@ import type { Meta, StoryObj } from '@storybook/react-vite';
 import { expect, fn, userEvent, within } from 'storybook/test';
 import { mockNutritionRecords, mockPetId } from '../stories/fixtures';
 import { NutritionRecordRow } from './NutritionDayPanel';
+import { ApplicationExtensionsProvider } from '../context/ApplicationExtensions';
 
 const noop = () => undefined;
+
+const timezonePolicy = {
+  sessionKey: 'record-timezone',
+  timezone: () => 'Asia/Tokyo',
+  permissions: async () => ({ view: false, writeRecords: false, writeProfile: false, manageIntegrations: false, create: false, delete: false, changeStatus: false }),
+};
 
 const editingRecord = {
   id: 'rec-edit',
   pet_id: mockPetId,
-  occurred_at: '2024-06-15T09:21:00',
+  occurred_at: '2024-06-15T09:21:00Z',
   local_date: '2024-06-15',
   category: 'liquids',
   amount: 10,
   unit: 'ml',
   note: 'Katovit mit Ente, col',
   source_type: 'manual',
-  created_at: '2024-06-15T09:21:00',
-  updated_at: '2024-06-15T09:21:00',
+  created_at: '2024-06-15T09:21:00Z',
+  updated_at: '2024-06-15T09:21:00Z',
 };
 
 const meta = {
@@ -176,13 +183,31 @@ export const MoveToYesterday: Story = {
     const canvas = within(canvasElement);
     await userEvent.click(canvas.getByRole('button', { name: 'Move to yesterday' }));
     await expect(args.onSave).toHaveBeenCalledWith('rec-edit', {
-      occurred_at: '2024-06-14T09:21:00',
+      occurred_at: '2024-06-15T09:21:00Z',
       local_date: '2024-06-14',
       category: 'liquids',
       amount: 10,
       unit: 'ml',
       note: 'Katovit mit Ente, col',
     });
+  },
+};
+
+export const InstantAndJournalDateStayIndependent: Story = {
+  args: {
+    record: { ...editingRecord, occurred_at: '2026-01-01T00:30:00.123456789Z', local_date: '2026-01-03' },
+    onSave: fn(),
+  },
+  decorators: [(Story) => <ApplicationExtensionsProvider value={timezonePolicy}><Story /></ApplicationExtensionsProvider>],
+  play: async ({ canvasElement, args }) => {
+    const canvas = within(canvasElement);
+    await expect(canvas.getByText('09:30')).toBeInTheDocument();
+    await userEvent.click(canvas.getByRole('button', { name: 'Edit' }));
+    await expect(canvas.getByLabelText('Time')).toHaveValue('09:30');
+    await userEvent.click(canvas.getByRole('button', { name: 'Save' }));
+    await expect(args.onSave).toHaveBeenCalledWith('rec-edit', expect.objectContaining({
+      occurred_at: '2026-01-01T00:30:00.123456789Z', local_date: '2026-01-03',
+    }));
   },
 };
 
@@ -196,7 +221,7 @@ export const MoveToTomorrow: Story = {
     const canvas = within(canvasElement);
     await userEvent.click(canvas.getByRole('button', { name: 'Move to tomorrow' }));
     await expect(args.onSave).toHaveBeenCalledWith('rec-edit', {
-      occurred_at: '2024-06-16T09:21:00',
+      occurred_at: '2024-06-15T09:21:00Z',
       local_date: '2024-06-16',
       category: 'liquids',
       amount: 10,
@@ -220,7 +245,7 @@ export const MoveToYesterdayKeepsEditedTimeAndNote: Story = {
     await userEvent.type(canvas.getByLabelText('Note'), 'Evening top-up');
     await userEvent.click(canvas.getByRole('button', { name: 'Move to yesterday' }));
     await expect(args.onSave).toHaveBeenCalledWith('rec-edit', {
-      occurred_at: '2024-06-14T14:05:00',
+      occurred_at: '2024-06-15T14:05:00.000Z',
       local_date: '2024-06-14',
       category: 'liquids',
       amount: 10,
@@ -238,14 +263,14 @@ export const EditingWithDisplayBelow: Story = {
         record={{
           id: 'rec-below',
           pet_id: mockPetId,
-          occurred_at: '2024-06-15T07:39:00',
+          occurred_at: '2024-06-15T07:39:00Z',
           local_date: '2024-06-15',
           category: 'wet_food',
           amount: 13,
           unit: 'g',
           source_type: 'manual',
-          created_at: '2024-06-15T07:39:00',
-          updated_at: '2024-06-15T07:39:00',
+          created_at: '2024-06-15T07:39:00Z',
+          updated_at: '2024-06-15T07:39:00Z',
         }}
         viewDate="2024-06-15"
         onSave={noop}

@@ -61,10 +61,10 @@ export function collectWeightTags(buckets: WeightSummaryBucket[]): WeightChartTa
     }));
 }
 
-export function formatWeightBucket(bucket: string, granularity: WeightGranularity): string {
+export function formatWeightBucket(bucket: string, granularity: WeightGranularity, timeZone?: string): string {
   if (granularity === 'raw') {
     const dt = new Date(bucket);
-    return `${dt.getDate()} ${dt.toLocaleString('en', { month: 'short' })} ${String(dt.getHours()).padStart(2, '0')}:${String(dt.getMinutes()).padStart(2, '0')}`;
+    return new Intl.DateTimeFormat('en-GB', { timeZone, day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit', hourCycle: 'h23' }).format(dt).replace(',', '');
   }
   const dt = new Date(`${bucket}T00:00:00`);
   if (granularity === 'monthly') {
@@ -77,6 +77,7 @@ export function buildWeightChart(
   buckets: WeightSummaryBucket[],
   granularity: WeightGranularity,
   soloTag: string | null,
+  timeZone?: string,
 ): { points: WeightChartPoint[]; tags: WeightChartTag[]; visibleTags: WeightChartTag[]; medianKg: number | null } {
   const tags = collectWeightTags(buckets);
   const visibleTags = soloTag
@@ -98,7 +99,7 @@ export function buildWeightChart(
         : group.filter((item) => visibleTags.some((tag) => tag.tag.toLowerCase() === (item.tag || 'manual').toLowerCase()));
       const point: WeightChartPoint = {
         bucket,
-        label: formatWeightBucket(bucket, granularity),
+        label: formatWeightBucket(bucket, granularity, timeZone),
         minKg: visible.length ? Math.min(...visible.map((item) => item.min_kg)) : null,
         maxKg: visible.length ? Math.max(...visible.map((item) => item.max_kg)) : null,
         trendKg: null,

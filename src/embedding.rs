@@ -252,13 +252,7 @@ impl ServiceContext {
             .await
     }
     /// Preserve civil journal dates; callers may explicitly backdate independently of now.
-    pub fn local_timestamp(&self, timezone: Tz, local_date: Option<&str>) -> String {
-        let now = self.runtime.now().with_timezone(&timezone);
-        match local_date.filter(|date| !date.is_empty()) {
-            Some(date) if date != now.date_naive().to_string() => {
-                format!("{date}T{}", now.format("%H:%M:%S"))
-            }
-            _ => now.to_rfc3339(),
-        }
+    pub fn record_timestamp(&self, timezone: Tz, local_date: Option<&str>) -> AppResult<String> {
+        Ok(crate::record_time::resolve(None, local_date, timezone, self.runtime.now())?.utc)
     }
 }

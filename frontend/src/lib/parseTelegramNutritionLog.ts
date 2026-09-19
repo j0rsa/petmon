@@ -1,4 +1,5 @@
 import type { CreateNutritionRecord } from '../types';
+import { civilToInstant } from './resourceTime';
 
 const MONTH_MAP: Record<string, number> = {
   jan: 0,
@@ -18,6 +19,7 @@ const MONTH_MAP: Record<string, number> = {
 export interface ParsedNutritionEntry {
   local_date: string;
   time: string;
+  offset?: string;
   category: string;
   amount: number;
   unit: string;
@@ -25,7 +27,7 @@ export interface ParsedNutritionEntry {
 
 /** Parse Telegram bot nutrition logs (ported from cat-intake-tracker_8.html). */
 export function parseTelegramNutritionLog(raw: string): ParsedNutritionEntry[] {
-  const timeRe = /\[(\d+)\.\s*(\w+)\s+(\d+)\s+at\s+(\d+):(\d+):(\d+)\]/;
+  const timeRe = /\[(\d+)\.\s*(\w+)\s+(\d+)\s+at\s+(\d+):(\d+):(\d+)(?:\s*(Z|[+-]\d{2}:\d{2}))?\]/;
   const entryRe = /#cat_ate\s+#(\w+)\s+(\d+)/g;
   const blocks = raw.split(/(?=Staging Bot,)/g).filter((block) => block.trim());
   const result: ParsedNutritionEntry[] = [];
@@ -51,6 +53,7 @@ export function parseTelegramNutritionLog(raw: string): ParsedNutritionEntry[] {
       result.push({
         local_date: localDate,
         time: `${hh}:${mm}`,
+        ...(tm[7] ? { offset: tm[7] } : {}),
         category: type === 'liquids' ? 'liquids' : 'wet_food',
         amount,
         unit: type === 'liquids' ? 'ml' : 'g',
@@ -61,10 +64,12 @@ export function parseTelegramNutritionLog(raw: string): ParsedNutritionEntry[] {
   return result;
 }
 
-export function toCreateNutritionRecords(entries: ParsedNutritionEntry[], petId: string): CreateNutritionRecord[] {
+export function toCreateNutritionRecords(entries: ParsedNutritionEntry[], petId: string, timeZone = Intl.DateTimeFormat().resolvedOptions().timeZone): CreateNutritionRecord[] {
   return entries.map((entry) => ({
     pet_id: petId,
-    occurred_at: `${entry.local_date}T${entry.time}:00`,
+    occurred_at: entry.offset
+      ? new Date(`${entry.local_date}T${entry.time}:00${entry.offset}`).toISOString()
+      : civilToInstant(`${entry.local_date}T${entry.time}`, timeZone),
     local_date: entry.local_date,
     category: entry.category,
     amount: entry.amount,

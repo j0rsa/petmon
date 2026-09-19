@@ -1,4 +1,5 @@
 import { useMemo } from 'react';
+import { useResourceTime } from '../context/useResourceTime';
 import { Bar, BarChart, CartesianGrid, Legend, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
 import { timeLabelFromOccurredAt } from '../lib/cumulativeFluid';
 import type { NutritionRecord } from '../types';
@@ -22,13 +23,14 @@ interface IntakeBarsChartProps {
 }
 
 export function IntakeBarsChart({ records }: IntakeBarsChartProps) {
+  const { timeZone } = useResourceTime(records[0]?.pet_id);
   const { chartData, presentCategories } = useMemo(() => {
     const relevant = records.filter((r) =>
       (CHART_CATEGORIES as readonly string[]).includes(r.category),
     );
     const grouped = new Map<string, Record<string, number | string>>();
     for (const record of relevant) {
-      const label = timeLabelFromOccurredAt(record.occurred_at);
+      const label = timeLabelFromOccurredAt(record.occurred_at, timeZone);
       const point = grouped.get(label) ?? { label };
       const current = typeof point[record.category] === 'number' ? (point[record.category] as number) : 0;
       point[record.category] = current + record.amount;
@@ -40,7 +42,7 @@ export function IntakeBarsChart({ records }: IntakeBarsChartProps) {
 
     const present = CHART_CATEGORIES.filter((cat) => data.some((point) => point[cat] != null));
     return { chartData: data, presentCategories: present };
-  }, [records]);
+  }, [records, timeZone]);
 
   if (chartData.length === 0) {
     return <div className="empty-state compact-empty">No fluid records for this day.</div>;

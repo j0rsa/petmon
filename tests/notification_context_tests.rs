@@ -191,21 +191,18 @@ async fn workers_use_each_pets_local_day_and_injected_notification_backend() {
     feeding_nudge_service::run_feeding_nudge_check_at(&context, now)
         .await
         .unwrap();
-    let events = backend.events.lock().unwrap();
-    assert_eq!(
-        events.len(),
-        2,
-        "each local slot is emitted once, including repeated worker checks"
-    );
-    assert!(events
-        .iter()
-        .any(|e| e.pet_id == Some(east.id)
+    {
+        let events = backend.events.lock().unwrap();
+        assert_eq!(
+            events.len(),
+            2,
+            "each local slot is emitted once, including repeated worker checks"
+        );
+        assert!(events.iter().any(|e| e.pet_id == Some(east.id)
             && e.source_id.as_ref().unwrap().contains("2026-09-20:08:00")));
-    assert!(events
-        .iter()
-        .any(|e| e.pet_id == Some(west.id)
+        assert!(events.iter().any(|e| e.pet_id == Some(west.id)
             && e.source_id.as_ref().unwrap().contains("2026-09-19:16:00")));
-    drop(events);
+    }
     let (count,): (i64,) = sqlx::query_as("SELECT COUNT(*) FROM notifications")
         .fetch_one(&pool)
         .await

@@ -52,7 +52,7 @@ pub async fn create(
     pets::get_pet(pool, req.pet_id).await?;
     let mut req = req;
     if req.occurred_at.is_none() {
-        req.occurred_at = Some(pool.local_timestamp(timezone, req.local_date.as_deref()));
+        req.occurred_at = Some(pool.record_timestamp(timezone, req.local_date.as_deref())?);
     }
     let record = NutritionRecord::new(req, timezone)?;
     let record = nutrition_records::create_record(pool, record).await?;
@@ -101,7 +101,7 @@ pub async fn batch_create(
     for mut req in records {
         let timezone = pool.timezone(req.pet_id).await?;
         if req.occurred_at.is_none() {
-            req.occurred_at = Some(pool.local_timestamp(timezone, req.local_date.as_deref()));
+            req.occurred_at = Some(pool.record_timestamp(timezone, req.local_date.as_deref())?);
         }
         created.push(NutritionRecord::new(req, timezone)?);
     }

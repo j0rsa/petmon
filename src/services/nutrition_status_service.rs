@@ -7,7 +7,7 @@ use crate::domain::nutrition_status::{
 use crate::embedding::{ResourceAction, ServiceContext};
 use crate::error::{AppError, AppResult};
 use crate::repo::{nutrition_records, nutrition_schedules, pets};
-use chrono::{DateTime, NaiveDateTime, TimeZone, Timelike, Utc};
+use chrono::{DateTime, Timelike, Utc};
 use chrono_tz::Tz;
 use uuid::Uuid;
 
@@ -43,7 +43,7 @@ pub async fn get_status(
     let records = nutrition_records::list_records(pool, &filters).await?;
     let schedules = nutrition_schedules::list_schedules(pool, Some(pet_id)).await?;
 
-    let intake = accumulate_intake(&records, &as_of, as_of_utc)?;
+    let intake = accumulate_intake(&records, as_of_utc)?;
     let schedule = build_schedule_status(&schedules, at_minutes, intake.direct_liquid_ml);
     let on_track = schedule.as_ref().map(|s| s.delta_ml >= 0.0);
 
@@ -62,31 +62,17 @@ fn resolve_as_of(ts: Option<&str>, timezone: Tz) -> AppResult<(String, i32, Date
         None => Utc::now().with_timezone(&timezone),
         Some(value) => parse_ts(value, timezone)?,
     };
-    let as_of = dt.format("%Y-%m-%dT%H:%M:%S").to_string();
+    let as_of = dt.to_rfc3339();
     let at_minutes = dt.hour() as i32 * 60 + dt.minute() as i32;
     Ok((as_of, at_minutes, dt.with_timezone(&Utc)))
 }
 
 fn parse_ts(value: &str, timezone: Tz) -> AppResult<DateTime<Tz>> {
-    if let Ok(parsed) = DateTime::parse_from_rfc3339(value) {
-        return Ok(parsed.with_timezone(&timezone));
-    }
-
-    let naive = NaiveDateTime::parse_from_str(value, "%Y-%m-%dT%H:%M:%S").map_err(|_| {
-        AppError::BadRequest(format!(
-            "invalid ts: expected RFC3339 or YYYY-MM-DDTHH:MM:SS, got {value}"
-        ))
-    })?;
-
-    timezone
-        .from_local_datetime(&naive)
-        .single()
-        .ok_or_else(|| AppError::BadRequest(format!("ambiguous local timestamp: {value}")))
+    crate::record_time::local_datetime(value, timezone)
 }
 
 pub(crate) fn accumulate_intake(
     records: &[crate::domain::nutrition_record::NutritionRecord],
-    as_of: &str,
     as_of_utc: DateTime<Utc>,
 ) -> AppResult<NutritionStatusIntake> {
     let mut liquids_ml = 0.0;
@@ -95,21 +81,7 @@ pub(crate) fn accumulate_intake(
     let mut dry_food_g = 0.0;
 
     for record in records {
-        let after_cutoff = match record.occurred_at_utc.as_deref() {
-            Some(value) => {
-                DateTime::parse_from_rfc3339(value)
-                    .map_err(|_| {
-                        AppError::Internal(format!(
-                            "invalid canonical timestamp for nutrition record {}",
-                            record.id
-                        ))
-                    })?
-                    .with_timezone(&Utc)
-                    > as_of_utc
-            }
-            // An unknown legacy instant cannot be inferred from today's zone.
-            None => record.occurred_at.as_str() > as_of,
-        };
+        let after_cutoff = crate::record_time::parse_instant(&record.occurred_at)? > as_of_utc;
         if after_cutoff {
             continue;
         }

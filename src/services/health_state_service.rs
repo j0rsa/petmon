@@ -32,7 +32,7 @@ pub async fn create(
     let timezone = pool.timezone(authorized_pet).await?;
     let mut req = req;
     if req.occurred_at.is_none() {
-        req.occurred_at = Some(pool.local_timestamp(timezone, req.local_date.as_deref()));
+        req.occurred_at = Some(pool.record_timestamp(timezone, req.local_date.as_deref())?);
     }
 
     let pet_id = Uuid::parse_str(&req.pet_id)

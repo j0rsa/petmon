@@ -9,10 +9,6 @@ pub struct WeightRecord {
     pub id: String,
     pub pet_id: Uuid,
     pub measured_at: String,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub measured_at_utc: Option<String>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub source_timezone: Option<String>,
     pub local_date: String,
     pub weight_kg: f64,
     pub note: Option<String>,
@@ -434,8 +430,6 @@ mod tests {
         let pet_id = Uuid::nil();
         let records = vec![
             WeightRecord {
-                measured_at_utc: None,
-                source_timezone: None,
                 id: "1".into(),
                 pet_id,
                 measured_at: "2026-06-15T09:00:00".into(),
@@ -446,8 +440,6 @@ mod tests {
                 created_at: "".into(),
             },
             WeightRecord {
-                measured_at_utc: None,
-                source_timezone: None,
                 id: "2".into(),
                 pet_id,
                 measured_at: "2026-06-15T18:00:00".into(),
@@ -458,8 +450,6 @@ mod tests {
                 created_at: "".into(),
             },
             WeightRecord {
-                measured_at_utc: None,
-                source_timezone: None,
                 id: "3".into(),
                 pet_id,
                 measured_at: "2026-06-15T12:00:00".into(),
@@ -493,8 +483,6 @@ mod tests {
         let pet_id = Uuid::nil();
         let records = vec![
             WeightRecord {
-                measured_at_utc: None,
-                source_timezone: None,
                 id: "1".into(),
                 pet_id,
                 measured_at: "2026-06-02T09:00:00".into(),
@@ -505,8 +493,6 @@ mod tests {
                 created_at: "".into(),
             },
             WeightRecord {
-                measured_at_utc: None,
-                source_timezone: None,
                 id: "2".into(),
                 pet_id,
                 measured_at: "2026-06-28T18:00:00".into(),
@@ -517,8 +503,6 @@ mod tests {
                 created_at: "".into(),
             },
             WeightRecord {
-                measured_at_utc: None,
-                source_timezone: None,
                 id: "3".into(),
                 pet_id,
                 measured_at: "2026-07-03T12:00:00".into(),

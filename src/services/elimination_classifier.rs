@@ -286,7 +286,7 @@ pub(crate) async fn train_classifier(
     let (weights_arr, means_arr, stds_arr) = train_logistic(&features, &labels);
     let trained_at = Utc::now().to_rfc3339();
     let model = EliminationClassifierModel {
-        version: 1,
+        version: crate::domain::elimination_classifier::CURRENT_MODEL_VERSION,
         trained_at: trained_at.clone(),
         training_window_days: TRAINING_WINDOW_DAYS,
         sample_count: features.len() as i32,
@@ -555,41 +555,6 @@ mod tests {
             pet_median_poop_duration: Some(118.0),
             pet_std_wee_duration: Some(10.0),
             pet_std_poop_duration: Some(15.0),
-        }
-    }
-
-    fn dummy_model() -> EliminationClassifierModel {
-        EliminationClassifierModel {
-            version: 1,
-            trained_at: "2026-01-01T00:00:00Z".to_string(),
-            training_window_days: 90,
-            sample_count: 20,
-            wee_samples: 12,
-            poop_samples: 8,
-            weights: vec![0.0; FEATURE_DIM],
-            feature_means: vec![0.0; FEATURE_DIM],
-            feature_stds: vec![1.0; FEATURE_DIM],
-            wee_duration: DurationDist {
-                mean: 45.0,
-                std: 10.0,
-                median: 45.0,
-                n: 12,
-            },
-            poop_duration: DurationDist {
-                mean: 118.0,
-                std: 15.0,
-                median: 118.0,
-                n: 8,
-            },
-            baselines: ClassifierBaselines {
-                p50_wees_per_day: 4.0,
-                p90_wees_per_day: 6.0,
-                p50_poops_per_day: 1.0,
-                p90_poops_per_day: 2.0,
-                wee_duration: None,
-                poop_duration: None,
-            },
-            metrics: None,
         }
     }
 

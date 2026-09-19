@@ -40,7 +40,7 @@ pub async fn create(
     let timezone = pool.timezone(authorized_pet).await?;
     let mut req = req;
     if req.measured_at.is_none() {
-        req.measured_at = Some(pool.local_timestamp(timezone, req.local_date.as_deref()));
+        req.measured_at = Some(pool.record_timestamp(timezone, req.local_date.as_deref())?);
     }
 
     // Validate pet exists

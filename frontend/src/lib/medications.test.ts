@@ -460,8 +460,8 @@ describe('medication bundles', () => {
         },
         assignment: { ...scheduled, id: 'a', medication_id: 'med-1' },
         intakes: [
-          intake('old-a', '2026-08-23T08:00:00'),
-          intake('new-a', '2026-08-24T09:00:00'),
+          intake('old-a', '2026-08-23T08:00:00Z'),
+          intake('new-a', '2026-08-24T09:00:00Z'),
         ],
       },
       {
@@ -478,8 +478,8 @@ describe('medication bundles', () => {
         },
         assignment: { ...scheduled, id: 'b', medication_id: 'med-2' },
         intakes: [
-          intake('old-b', '2026-08-23T08:00:00'),
-          intake('new-b', '2026-08-24T09:00:00'),
+          intake('old-b', '2026-08-23T08:00:00Z'),
+          intake('new-b', '2026-08-24T09:00:00Z'),
         ],
       },
     ];

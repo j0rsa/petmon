@@ -61,7 +61,7 @@ function withMedDataCore({
         },
       });
       client.setQueryData(['pets'], mockPets);
-      client.setQueryData(['me'], { subject: 'dev', email: null, name: 'Dev', display_name: 'Dev', kind: 'dev', scopes: [], roles: ['instance_admin'], capabilities: ['api_read', 'api_write', 'mcp', 'instance_admin'] });
+      client.setQueryData(['me'], { subject: 'dev', email: null, name: 'Dev', display_name: 'Dev', kind: 'dev', scopes: [], roles: ['instance_admin'] });
       client.setQueryData(['user-settings', 'developer_mode'], {
         ...mockDeveloperModeSettings,
         enabled: developerMode,
@@ -154,12 +154,12 @@ export const WithBundleTaken: Story = {
         effective_dose_fraction: item.assignment.dose_fraction,
         effective_dose_mg: item.assignment.effective_dose_mg,
         dose_label: item.assignment.dose_label,
-        occurred_at: `${localToday()}T08:00:00`,
+        occurred_at: `${localToday()}T08:00:00Z`,
         local_date: localToday(),
         taken: true,
         note: null,
         source_type: 'manual',
-        created_at: `${localToday()}T08:00:00`,
+        created_at: `${localToday()}T08:00:00Z`,
       }],
     })),
     bundles: mockMedBundles,

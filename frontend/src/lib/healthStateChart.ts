@@ -33,9 +33,9 @@ export function median(values: number[]): number {
 
 /** Monday-based week start, matching the weight summary bucketing. */
 export function weekStart(date: string): string {
-  const value = new Date(`${date}T00:00:00`);
-  const daysSinceMonday = (value.getDay() + 6) % 7;
-  value.setDate(value.getDate() - daysSinceMonday);
+  const value = new Date(`${date}T00:00:00Z`);
+  const daysSinceMonday = (value.getUTCDay() + 6) % 7;
+  value.setUTCDate(value.getUTCDate() - daysSinceMonday);
   return value.toISOString().slice(0, 10);
 }
 

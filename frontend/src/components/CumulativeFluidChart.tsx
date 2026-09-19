@@ -70,13 +70,13 @@ interface CumulativeFluidChartProps {
 }
 
 export function CumulativeFluidChart({ records, focusDate, schedules = [], bestDayCurve, bestDayDate }: CumulativeFluidChartProps) {
-  const { minuteOfDay } = useResourceTime();
+  const { minuteOfDay, timeZone } = useResourceTime(records[0]?.pet_id);
   const { settings, update } = useUserWidgetSettings('cumulative_fluid_chart');
   const [soloSeriesKey, setSoloSeriesKey] = useState<FluidSeriesKey | null>(null);
 
   const { points, bestDayLabel } = useMemo(
-    () => buildCumulativeFluidChart(records, focusDate, schedules, bestDayCurve, bestDayDate),
-    [records, focusDate, schedules, bestDayCurve, bestDayDate],
+    () => buildCumulativeFluidChart(records, focusDate, schedules, bestDayCurve, bestDayDate, timeZone),
+    [records, focusDate, schedules, bestDayCurve, bestDayDate, timeZone],
   );
 
   const exposedSeries = useMemo(() => enabledFluidSeries(settings), [settings]);

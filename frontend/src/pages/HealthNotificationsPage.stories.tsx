@@ -15,7 +15,7 @@ function withData(nudgeData?: unknown) {
         defaultOptions: { queries: { retry: false, staleTime: Infinity, refetchOnMount: false } },
       });
       client.setQueryData(['pets'], mockPets);
-      client.setQueryData(['me'], { subject: 'dev', email: null, name: 'Dev', display_name: 'Dev', kind: 'dev', scopes: [], roles: ['instance_admin'], capabilities: ['api_read', 'api_write', 'mcp', 'instance_admin'] });
+      client.setQueryData(['me'], { subject: 'dev', email: null, name: 'Dev', display_name: 'Dev', kind: 'dev', scopes: [], roles: ['instance_admin'] });
       if (nudgeData !== undefined) {
         client.setQueryData(petSettingsQueryKey(mockPetId, 'med_nudge'), nudgeData);
       }

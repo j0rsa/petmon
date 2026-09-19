@@ -8,10 +8,6 @@ pub struct NutritionRecord {
     pub id: String,
     pub pet_id: Uuid,
     pub occurred_at: String,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub occurred_at_utc: Option<String>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub source_timezone: Option<String>,
     pub local_date: String,
     pub category: NutritionCategory,
     pub amount: f64,
@@ -116,14 +112,12 @@ impl NutritionRecord {
             timezone,
             Utc::now(),
         )?;
-        let occurred_at = time.civil;
+        let occurred_at = time.utc;
         let local_date = time.local_date;
         Ok(NutritionRecord {
             id: Uuid::new_v4().to_string(),
             pet_id: req.pet_id,
             occurred_at,
-            occurred_at_utc: Some(time.utc),
-            source_timezone: Some(time.timezone),
             local_date,
             category: req.category,
             amount: req.amount,

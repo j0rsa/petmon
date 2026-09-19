@@ -1,6 +1,6 @@
 import { forwardRef, useImperativeHandle, useRef, useState } from 'react';
 import { TimeInput } from './TimeInput';
-import { isoFromDateAndTime } from '../lib/time';
+import { useRecordTimestamp } from '../hooks/useRecordTimestamp';
 import { useResourceTime } from '../context/useResourceTime';
 import { parseAmountExpression, parseWetFoodLiquidPair } from '../lib/numbers';
 import { CATEGORIES, CATEGORY_LABELS } from '../types';
@@ -37,6 +37,7 @@ export const NutritionAddForm = forwardRef<NutritionAddFormHandle, NutritionAddF
   function NutritionAddForm({ date, petId, onSave, saving, isPaused }, ref) {
     const { nowTimeString } = useResourceTime(petId);
     const [time, setTime] = useState(nowTimeString);
+    const timestamp = useRecordTimestamp(`${date}T${time}`, petId);
     const [category, setCategory] = useState<string>(ENTRY_WET_FOOD_PLUS_LIQUID);
     const [amount, setAmount] = useState('');
     const [note, setNote] = useState('');
@@ -52,7 +53,8 @@ export const NutritionAddForm = forwardRef<NutritionAddFormHandle, NutritionAddF
     }));
 
     function handleAdd() {
-      const occurredAt = isoFromDateAndTime(date, time);
+      const occurredAt = timestamp.utc;
+      if (!occurredAt) return;
       const noteValue = note.trim() || null;
 
       if (isCombined) {
@@ -108,6 +110,7 @@ export const NutritionAddForm = forwardRef<NutritionAddFormHandle, NutritionAddF
         <div className="form-row">
           <label>Time</label>
           <TimeInput value={time} onChange={setTime} variant="form" />
+          {timestamp.feedback}
         </div>
         <div className="form-row">
           <label>Category</label>

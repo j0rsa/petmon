@@ -101,11 +101,10 @@ pub struct MeResponse {
     pub name: Option<String>,
     pub display_name: String,
     pub kind: &'static str,
-    /// Granted scopes. Empty means ordinary full access; use capabilities for
-    /// effective authority, including live administrator permission.
+    /// Granted scopes. Empty means ordinary full access. API-token administration
+    /// requires the literal `all` scope as well as the live administrator role.
     pub scopes: Vec<String>,
     pub roles: Vec<String>,
-    pub capabilities: Vec<String>,
     /// Creator display name for the API token session (api_token kind only).
     #[serde(skip_serializing_if = "Option::is_none")]
     pub token_created_by: Option<String>,
@@ -128,7 +127,6 @@ pub async fn me(req: HttpRequest, state: web::Data<AppState>) -> AppResult<HttpR
     let mut scopes: Vec<String> = identity.scopes.clone().into_iter().collect();
     scopes.sort();
 
-    let capabilities = crate::auth::admin::effective_capabilities(&state.pool, &identity).await?;
     let roles = if crate::auth::admin::is_instance_admin(&state.pool, &identity).await? {
         vec!["instance_admin".to_owned()]
     } else {
@@ -143,7 +141,6 @@ pub async fn me(req: HttpRequest, state: web::Data<AppState>) -> AppResult<HttpR
         kind,
         scopes,
         roles,
-        capabilities,
         token_created_by: identity.token_created_by,
     }))
 }

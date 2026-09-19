@@ -5,8 +5,6 @@ export interface HealthStateRecord {
   id: string;
   pet_id: string;
   occurred_at: string;
-  occurred_at_utc?: string | null;
-  source_timezone?: string | null;
   local_date: string;
   level: HealthStateLevel;
   note: string | null;

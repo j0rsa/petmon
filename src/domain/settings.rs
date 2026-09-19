@@ -157,7 +157,7 @@ pub enum WeekStart {
 
 // ── API tokens ────────────────────────────────────────────────────────────────
 
-pub const ALL_SCOPES: &[&str] = &["all", "api_read", "api_write", "mcp", "instance_admin"];
+pub const ALL_SCOPES: &[&str] = &["all", "api_read", "api_write", "mcp"];
 
 /// Validates a scope string — must be one of the known scope values.
 pub fn is_valid_scope(s: &str) -> bool {
@@ -231,7 +231,7 @@ pub struct ApiTokenCreated {
 #[derive(Debug, Deserialize)]
 pub struct CreateApiToken {
     pub alias: Option<String>,
-    /// Defaults to ordinary ["all"] when omitted, subject to caller attenuation.
+    /// Defaults to ["all"] when omitted, subject to caller attenuation.
     pub scopes: Option<Vec<String>>,
     /// Set by the server from the caller's Identity — not accepted from the request body.
     #[serde(skip_deserializing)]

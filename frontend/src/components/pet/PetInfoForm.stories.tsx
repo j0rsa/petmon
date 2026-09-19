@@ -110,7 +110,7 @@ export const AutoTagEnabled: Story = {
         },
       });
       client.setQueryData(['elimination-classifier-status', mockPets[0].id], mockEliminationClassifierStatus);
-      client.setQueryData(['me'], { subject: 'dev', email: null, name: 'Dev', display_name: 'Dev', kind: 'dev', scopes: [], roles: ['instance_admin'], capabilities: ['api_read', 'api_write', 'mcp', 'instance_admin'] });
+      client.setQueryData(['me'], { subject: 'dev', email: null, name: 'Dev', display_name: 'Dev', kind: 'dev', scopes: [], roles: ['instance_admin'] });
       return (
         <QueryClientProvider client={client}>
           <Story />

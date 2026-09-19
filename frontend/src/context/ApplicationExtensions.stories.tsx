@@ -34,7 +34,7 @@ function ExtensionHarness({ failPermissions = false }: { failPermissions?: boole
     session: {
       Guard,
       signOut: async () => {},
-      getMe: async () => ({ subject: account, email: null, name: null, display_name: account, kind: 'oidc', scopes: ['all'], capabilities: ['api_read', 'api_write', 'mcp'] }),
+      getMe: async () => ({ subject: account, email: null, name: null, display_name: account, kind: 'oidc', scopes: ['all'], roles: [] }),
     },
     pets: { key: account, list: async () => account === 'first' ? [mockPets[0]] : [], create: async () => mockPets[0] },
     permissions: async (id) => {
