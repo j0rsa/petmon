@@ -71,15 +71,9 @@ pub async fn run_feeding_nudge_check_at(
     pool: &ServiceContext,
     now: DateTime<Utc>,
 ) -> AppResult<()> {
+    let timezone = pool.timezone().await?;
     let schedules = nutrition_schedules::list_notify_enabled(pool).await?;
     for schedule in schedules {
-        let timezone = match pool.timezone(schedule.pet_id).await {
-            Ok(timezone) => timezone,
-            Err(error) => {
-                tracing::warn!(pet_id = %schedule.pet_id, %error, "feeding runtime resolution failed; pet skipped");
-                continue;
-            }
-        };
         let now_local = now.with_timezone(&timezone);
         let local_date = now_local.format("%Y-%m-%d").to_string();
         let at_minutes = now_local.hour() as i32 * 60 + now_local.minute() as i32;

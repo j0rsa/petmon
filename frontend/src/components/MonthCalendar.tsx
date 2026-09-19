@@ -1,4 +1,4 @@
-import { useResourceTime } from '../context/useResourceTime';
+import { useTime } from '../context/useTime';
 import type React from 'react';
 import { useUserWidgetSettings } from '../api/userSettings';
 import { calendarCells, formatMonthHeading, shiftMonth } from '../lib/dates';
@@ -59,7 +59,7 @@ export function MonthCalendar({
   const calendarConfig = nutritionCalendarToDisplayConfig(settings);
   const cells = calendarCells(month, weekStart);
   const weekdays = weekStart === 'monday' ? WEEKDAYS_MON : WEEKDAYS_SUN;
-  const { today } = useResourceTime();
+  const { today } = useTime();
   const isOnToday = selectedDate === today;
   const displayMonthLong = formatMonthHeading(month, 'long');
   const displayMonthShort = formatMonthHeading(month, 'short');

@@ -234,7 +234,7 @@ async fn medication_display_time(
     record: &MedIntakeRecord,
 ) -> Option<String> {
     let result = async {
-        let timezone = context.timezone(record.pet_id).await?;
+        let timezone = context.timezone().await?;
         crate::record_time::local_datetime(&record.occurred_at, timezone)
             .map(|time| time.format("%Y-%m-%dT%H:%M:%S").to_string())
     }
@@ -663,7 +663,7 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn delayed_intake_displays_the_resource_timezone() {
+    async fn delayed_intake_displays_the_actor_timezone() {
         let pool = pool().await;
         let pet = pet(&pool).await;
         let record = intake(&pool, pet.id).await;

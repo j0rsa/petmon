@@ -101,10 +101,12 @@ impl ResourcePolicy for AllowAll {
 }
 
 pub trait RuntimeResolver: Send + Sync {
+    /// Resolve the canonical actor's session timezone, independent of selected pets.
+    /// Trusted jobs carry their own actor; standalone returns the instance fallback.
     fn timezone<'a>(
         &'a self,
         pool: &'a SqlitePool,
-        pet: Uuid,
+        actor: &'a Identity,
         fallback: Tz,
     ) -> BoxFuture<'a, AppResult<Tz>>;
     fn now(&self) -> DateTime<Utc> {
@@ -116,7 +118,7 @@ impl RuntimeResolver for InstanceRuntime {
     fn timezone<'a>(
         &'a self,
         _: &'a SqlitePool,
-        _: Uuid,
+        _: &'a Identity,
         fallback: Tz,
     ) -> BoxFuture<'a, AppResult<Tz>> {
         Box::pin(async move { Ok(fallback) })
@@ -246,9 +248,9 @@ impl ServiceContext {
             .map_err(|_| AppError::BadRequest("invalid pet_id".into()))?;
         self.visibility(id).await
     }
-    pub async fn timezone(&self, pet: Uuid) -> AppResult<Tz> {
+    pub async fn timezone(&self) -> AppResult<Tz> {
         self.runtime
-            .timezone(&self.pool, pet, self.fallback_timezone)
+            .timezone(&self.pool, &self.actor, self.fallback_timezone)
             .await
     }
     /// Preserve civil journal dates; callers may explicitly backdate independently of now.

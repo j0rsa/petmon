@@ -1,4 +1,4 @@
-import { useResourceTime } from '../context/useResourceTime';
+import { useTime } from '../context/useTime';
 import { Link } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { daysApi } from '../api/days';
@@ -16,7 +16,7 @@ import { highlightFromSummary, totalKnownFluidMl } from '../lib/nutritionMetrics
 import { WET_FOOD_FLUID_RATIO } from '../lib/cumulativeFluid';
 
 export default function OverviewPage() {
-  const { today } = useResourceTime();
+  const { today } = useTime();
   const formatDate = useFormatDate();
   const { selectedPetId, selectedPet, petsLoading } = useSelectedPet();
   const { canWrite } = usePermissions();

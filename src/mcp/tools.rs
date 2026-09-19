@@ -1024,7 +1024,7 @@ pub async fn dispatch(
             let pet_id = require_uuid(&params, "pet_id")?;
             pool.check(Some(pet_id), crate::embedding::ResourceAction::View)
                 .await?;
-            let timezone = pool.timezone(pet_id).await?;
+            let timezone = pool.timezone().await?;
             let today = params["today"]
                 .as_str()
                 .map(str::to_owned)
@@ -1207,7 +1207,7 @@ pub async fn dispatch(
             let pet_id = require_uuid(&params, "pet_id")?;
             pool.check(Some(pet_id), crate::embedding::ResourceAction::View)
                 .await?;
-            let timezone = pool.timezone(pet_id).await?;
+            let timezone = pool.timezone().await?;
             let today = params["today"]
                 .as_str()
                 .map(str::to_owned)
@@ -1557,7 +1557,7 @@ pub async fn dispatch(
             let pet_id = require_uuid(&params, "pet_id")?;
             pool.check(Some(pet_id), crate::embedding::ResourceAction::View)
                 .await?;
-            let timezone = pool.timezone(pet_id).await?;
+            let timezone = pool.timezone().await?;
             let pet_id_str = pet_id.to_string();
             let today = pool
                 .runtime

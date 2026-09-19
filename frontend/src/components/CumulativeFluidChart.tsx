@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react';
-import { useResourceTime } from '../context/useResourceTime';
+import { useTime } from '../context/useTime';
 import { CartesianGrid, DefaultLegendContent, Legend, Line, LineChart, ReferenceLine, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
 import { useUserWidgetSettings } from '../api/userSettings';
 import {
@@ -70,7 +70,7 @@ interface CumulativeFluidChartProps {
 }
 
 export function CumulativeFluidChart({ records, focusDate, schedules = [], bestDayCurve, bestDayDate }: CumulativeFluidChartProps) {
-  const { minuteOfDay, timeZone } = useResourceTime(records[0]?.pet_id);
+  const { minuteOfDay, timeZone } = useTime();
   const { settings, update } = useUserWidgetSettings('cumulative_fluid_chart');
   const [soloSeriesKey, setSoloSeriesKey] = useState<FluidSeriesKey | null>(null);
 

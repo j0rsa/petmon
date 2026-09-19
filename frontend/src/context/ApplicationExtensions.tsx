@@ -16,8 +16,9 @@ export interface ApplicationExtensions {
   /** Change on account, credential, collection context, or authorization revision changes.
    * Each value owns a fresh query cache and component tree; never use a secret token as this key. */
   sessionKey: string;
-  /** Resolve a ready resource's IANA timezone. Change sessionKey when runtime policy changes. */
-  timezone?: (petId: string) => string;
+  /** Ready user/session IANA timezone, independent of pet selection.
+   * Required before rendering clock-dependent UI. Change sessionKey when it changes. */
+  timezone?: string;
   /** Optional clock injection for deterministic render/query date defaults. */
   now?: () => Date;
   session?: {

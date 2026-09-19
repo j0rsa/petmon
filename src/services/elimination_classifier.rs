@@ -227,11 +227,7 @@ pub(crate) async fn train_classifier(
     pool: &ServiceContext,
     pet_id: Uuid,
 ) -> AppResult<Option<EliminationClassifierModel>> {
-    let as_of = pool
-        .runtime
-        .now()
-        .with_timezone(&pool.timezone(pet_id).await?)
-        .date_naive();
+    let as_of = pool.runtime.now().date_naive();
     let date_from = (as_of - Duration::days(TRAINING_WINDOW_DAYS as i64)).to_string();
     let date_to = as_of.to_string();
     let baselines = compute_baselines(pool, pet_id, as_of).await?;
@@ -435,11 +431,7 @@ pub async fn get_status(
     pool.check(Some(pet_id), crate::embedding::ResourceAction::View)
         .await?;
     let pet = pets::get_pet(pool, pet_id).await?;
-    let as_of = pool
-        .runtime
-        .now()
-        .with_timezone(&pool.timezone(pet_id).await?)
-        .date_naive();
+    let as_of = pool.runtime.now().date_naive();
     let baselines = compute_baselines(pool, pet_id, as_of).await?;
     let model_row = elimination_classifiers::get(pool, pet_id).await?;
     let (model, fallback_active) = match model_row {

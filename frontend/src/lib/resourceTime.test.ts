@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { civilTimeCandidates, civilToInstant, instantToCivil, resourceDateTime } from './resourceTime';
 
-describe('resource timezone civil snapshots', () => {
+describe('timezone civil snapshots', () => {
   it('chooses different journal dates for the same instant across the date line', () => {
     const now = new Date('2026-01-01T00:30:00Z');
     expect(resourceDateTime(now, 'America/Los_Angeles')).toBe('2025-12-31T16:30:00');
@@ -14,7 +14,7 @@ describe('resource timezone civil snapshots', () => {
   it('rejects invalid configured timezones rather than guessing a journal date', () => {
     expect(() => resourceDateTime(new Date(), 'invalid/timezone')).toThrow(RangeError);
   });
-  it('resolves the resource timezone independently of browser timezone and credit date', () => {
+  it('resolves the configured timezone independently of browser timezone and credit date', () => {
     expect(civilToInstant('2026-01-01T00:30', 'Asia/Tokyo')).toBe('2025-12-31T15:30:00.000Z');
     expect(instantToCivil('2025-12-31T15:30:00Z', 'Asia/Tokyo')).toBe('2026-01-01T00:30:00');
     expect(civilToInstant('2026-01-01T00:30', 'Asia/Kathmandu')).toBe('2025-12-31T18:45:00.000Z');

@@ -10,13 +10,13 @@ function record(occurred_at: string): NutritionRecord {
 }
 
 describe('UTC record consumers', () => {
-  it('formats chart clock values in the resource timezone', () => {
+  it('formats chart clock values in the configured timezone', () => {
     expect(timeLabelFromOccurredAt('2026-01-01T00:30:00Z', 'America/Los_Angeles')).toBe('16:30');
     expect(formatWeightBucket('2026-01-01T00:30:00Z', 'raw', 'America/Los_Angeles')).toBe('31 Dec 16:30');
     const chart = buildCumulativeFluidChart([record('2026-01-01T00:30:00Z')], '2026-01-01', [], undefined, undefined, 'Asia/Tokyo');
     expect(chart.points.some((point) => point.label === '09:30')).toBe(true);
   });
-  it('imports wall-clock logs in resource timezone without converting credit dates', () => {
+  it('imports wall-clock logs in the configured timezone without converting credit dates', () => {
     const entries = parseTelegramNutritionLog('Staging Bot, [1. Jan 2026 at 00:30:00]:\n#cat_ate #liquids 10');
     expect(toCreateNutritionRecords(entries, 'p', 'Asia/Tokyo')[0]).toMatchObject({ occurred_at: '2025-12-31T15:30:00.000Z', local_date: '2026-01-01' });
   });

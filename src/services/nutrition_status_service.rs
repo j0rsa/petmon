@@ -19,7 +19,7 @@ pub async fn get_status(
     _timezone: Tz,
 ) -> AppResult<NutritionStatus> {
     pool.check(Some(pet_id), ResourceAction::View).await?;
-    let timezone = pool.timezone(pet_id).await?;
+    let timezone = pool.timezone().await?;
 
     pets::get_pet(pool, pet_id).await?;
 

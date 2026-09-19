@@ -1,4 +1,4 @@
-import { useResourceTime } from '../context/useResourceTime';
+import { useTime } from '../context/useTime';
 import { useEffect, useMemo, useState, useSyncExternalStore } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
@@ -21,7 +21,7 @@ export default function EliminationJournalPage() {
     () => mq.matches,
     () => false,
   );
-  const { today } = useResourceTime();
+  const { today } = useTime();
   const selectedDate = routeDate && /^\d{4}-\d{2}-\d{2}$/.test(routeDate) ? routeDate : today;
   const [month, setMonth] = useState(monthKey(selectedDate));
 

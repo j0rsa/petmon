@@ -11,12 +11,12 @@ export function nowLocalDateTime(): { local_date: string; occurred_at: string } 
   return { local_date, occurred_at: now.toISOString() };
 }
 
-/** Resolve a resource-local clock explicitly; ambiguous/nonexistent times reject. */
+/** Resolve a configured local clock explicitly; ambiguous/nonexistent times reject. */
 export function isoFromDateAndTime(date: string, time: string, timeZone = Intl.DateTimeFormat().resolvedOptions().timeZone): string {
   return civilToInstant(`${date}T${time}`, timeZone);
 }
 
-/** Resource-local HH:MM from an offset/UTC instant. */
+/** Local HH:MM in the supplied timezone from an offset/UTC instant. */
 export function timeFromIso(iso: string, timeZone?: string): string {
   return instantToCivil(iso, timeZone).slice(11, 16);
 }

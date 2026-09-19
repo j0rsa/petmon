@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react';
-import { useResourceTime } from '../../context/useResourceTime';
+import { useTime } from '../../context/useTime';
 import {
   CartesianGrid,
   ComposedChart,
@@ -21,7 +21,7 @@ interface WeightHistoryChartProps {
 }
 
 export function WeightHistoryChart({ buckets, granularity, isFetching = false }: WeightHistoryChartProps) {
-  const { timeZone } = useResourceTime();
+  const { timeZone } = useTime();
   const [soloTag, setSoloTag] = useState<string | null>(null);
   const { points, tags, visibleTags, medianKg } = useMemo(
     () => buildWeightChart(buckets, granularity, soloTag, timeZone),

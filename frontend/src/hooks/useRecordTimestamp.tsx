@@ -1,10 +1,10 @@
 import { useMemo, useState } from 'react';
-import { useResourceTime } from '../context/useResourceTime';
+import { useTime } from '../context/useTime';
 import { civilTimeCandidates, instantOffset, instantToCivil } from '../lib/resourceTime';
 
 /** Empty input allows the API's real-time timestamp; a nonempty input must resolve. */
-export function useRecordTimestamp(civil: string, petId?: string, originalInstant?: string) {
-  const { timeZone } = useResourceTime(petId);
+export function useRecordTimestamp(civil: string, originalInstant?: string) {
+  const { timeZone } = useTime();
   const candidates = useMemo(() => civilTimeCandidates(civil, timeZone), [civil, timeZone]);
   const [selection, setSelection] = useState({ key: '', instant: '' });
   const key = `${timeZone}|${civil}`;

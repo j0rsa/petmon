@@ -1,7 +1,8 @@
 use serde::{Deserialize, Serialize};
 
-/// Version 2 uses UTC elapsed durations and resource-local hour/day features.
-pub const CURRENT_MODEL_VERSION: u32 = 2;
+/// Shared per-pet models use UTC for elapsed durations, hours and training days.
+/// Version 3 never depends on the requesting actor's timezone.
+pub const CURRENT_MODEL_VERSION: u32 = 3;
 
 /// Snapshot of elimination context at prediction time (rolling windows, not calendar day).
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]

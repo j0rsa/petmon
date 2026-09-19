@@ -78,17 +78,9 @@ pub async fn best_fluid_day(
     else {
         return Ok(None);
     };
-    let mut timezones = HashMap::new();
+    let timezone = pool.timezone().await?;
     let mut by_time = std::collections::BTreeMap::<String, (f64, f64)>::new();
     for record in day.records {
-        let timezone = match timezones.get(&record.pet_id) {
-            Some(timezone) => *timezone,
-            None => {
-                let timezone = pool.timezone(record.pet_id).await?;
-                timezones.insert(record.pet_id, timezone);
-                timezone
-            }
-        };
         use crate::domain::nutrition_record::NutritionCategory;
         let (fluid, liquid) = match record.category {
             NutritionCategory::Water | NutritionCategory::Liquids => (record.amount, record.amount),

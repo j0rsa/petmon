@@ -7,13 +7,13 @@ import { dedupeCreateRecords, parseTelegramNutritionLog, toCreateNutritionRecord
 import { CATEGORY_LABELS } from '../types';
 import type { CreateNutritionRecord } from '../types';
 import { usePermissions } from '../context/usePermissions';
-import { useResourceTime } from '../context/useResourceTime';
+import { useTime } from '../context/useTime';
 
 export default function ImportsPage() {
   const queryClient = useQueryClient();
   const { selectedPetId, selectedPet, petsLoading } = useSelectedPet();
   const { canWrite } = usePermissions();
-  const { timeZone, toCivil } = useResourceTime();
+  const { timeZone, toCivil } = useTime();
   const [previewError, setPreviewError] = useState('');
   const [rawText, setRawText] = useState('');
   const [previewRecords, setPreviewRecords] = useState<CreateNutritionRecord[] | null>(null);

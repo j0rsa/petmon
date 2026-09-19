@@ -1,4 +1,4 @@
-import { useResourceTime } from '../context/useResourceTime';
+import { useTime } from '../context/useTime';
 import { useMemo, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import {
@@ -39,7 +39,7 @@ export default function HealthTreatmentPlanPage() {
   const queryClient = useQueryClient();
   const { selectedPetId, selectedPet, petsLoading } = useSelectedPet();
   const { canWrite } = usePermissions();
-  const { today } = useResourceTime();
+  const { today } = useTime();
 
   const [showCreateMed, setShowCreateMed] = useState(false);
   const [medName, setMedName] = useState('');

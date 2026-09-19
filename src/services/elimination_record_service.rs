@@ -49,10 +49,9 @@ pub async fn create(
     req: CreateEliminationRecord,
     _timezone: Tz,
 ) -> AppResult<EliminationRecord> {
-    let authorized_pet = pool
-        .check_str(&req.pet_id, ResourceAction::WriteRecords)
+    pool.check_str(&req.pet_id, ResourceAction::WriteRecords)
         .await?;
-    let timezone = pool.timezone(authorized_pet).await?;
+    let timezone = pool.timezone().await?;
 
     let pet_id = Uuid::parse_str(&req.pet_id)
         .map_err(|_| AppError::BadRequest(format!("invalid pet_id: {}", req.pet_id)))?;
@@ -106,10 +105,9 @@ pub async fn create_with_weight(
     req: CreateEliminationWithWeight,
     _timezone: Tz,
 ) -> AppResult<EliminationWithWeightCreated> {
-    let authorized_pet = pool
-        .check_str(&req.pet_id, ResourceAction::WriteRecords)
+    pool.check_str(&req.pet_id, ResourceAction::WriteRecords)
         .await?;
-    let timezone = pool.timezone(authorized_pet).await?;
+    let timezone = pool.timezone().await?;
 
     let pet_id = Uuid::parse_str(&req.pet_id)
         .map_err(|_| AppError::BadRequest(format!("invalid pet_id: {}", req.pet_id)))?;
@@ -168,8 +166,7 @@ pub async fn update(
     let existing = elimination_records::get(pool, id).await?;
     let event_type_changed =
         req.event_type.is_some() && req.event_type != Some(existing.event_type);
-    let record =
-        elimination_records::update(pool, id, req, pool.timezone(owner.pet_id).await?).await?;
+    let record = elimination_records::update(pool, id, req, pool.timezone().await?).await?;
     if event_type_changed {
         elimination_classifier::mark_pending_retrain(pool, record.pet_id).await?;
     }

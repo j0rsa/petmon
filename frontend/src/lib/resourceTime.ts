@@ -32,7 +32,7 @@ export function instantToCivil(instant: string, timeZone?: string): string {
   return resourceDateTime(new Date(instant), timeZone);
 }
 
-/** Find every instant matching a resource-local wall clock. Zero means a DST gap;
+/** Find every instant matching a wall clock in the configured timezone. Zero means a DST gap;
  * two means a fold. Callers must ask the user to choose, never silently normalize. */
 export function civilTimeCandidates(civil: string, timeZone: string): string[] {
   const normalized = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}$/.test(civil) ? `${civil}:00` : civil;

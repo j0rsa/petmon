@@ -6,7 +6,7 @@ export type { ApplicationExtensions, ApplicationRoute, ResourceAction, ResourceP
 export { SelectedPetProvider, useSelectedPet } from './context/SelectedPetContext';
 export { DisplaySettingsProvider } from './context/DisplaySettingsProvider';
 export { usePermissions } from './context/usePermissions';
-export { useResourceTime } from './context/useResourceTime';
+export { useTime } from './context/useTime';
 export type { Permissions } from './context/usePermissions';
 export { configureApiSession } from './api/client';
 export type { ApiSessionAdapter } from './api/client';

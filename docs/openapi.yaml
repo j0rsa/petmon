@@ -1841,7 +1841,7 @@ paths:
       summary: Pause an assignment by setting its end date
       description: >
         Sets `date_to` so the assignment is no longer active after `ended_on`.
-        Defaults to yesterday in the pet's effective timezone (not due today).
+        Defaults to yesterday in the authenticated actor's effective timezone (not due today).
       x-required-scope: api_write
       parameters:
         - name: id
@@ -2116,7 +2116,7 @@ paths:
         `medication_id`, and `assignment_id` (all from the menu choice).
 
         **Real-time only.** The dose is always stamped with the current UTC instant,
-        with its journal day resolved in the pet's timezone, exactly like Take now from the web UI, so the Telegram
+        with its journal day resolved in the authenticated actor's timezone, exactly like Take now from the web UI, so the Telegram
         `#pills` line carries no timestamp. There is no way to backdate through
         this endpoint — use `POST /health/meds/intake` for that. Unknown query
         params (including `occurred_at` / `local_date`) are rejected with `400`
@@ -2587,7 +2587,7 @@ paths:
       x-required-scope: api_read
       description: |
         Returns cumulative nutrition intake and liquid schedule expectations for a pet as of a point in time.
-        When `ts` is omitted, the server uses the current instant. The pet's effective timezone determines the journal day and schedule projection.
+        When `ts` is omitted, the server uses the current instant. The authenticated actor's effective timezone determines the journal day and schedule projection.
         Cumulative intake includes only records with that journal date whose UTC `occurred_at` instant is at or before `ts`.
         Schedule expectations use the active liquid schedule and step up at each scheduled feeding time, matching the cumulative fluid chart.
       parameters:
@@ -2601,7 +2601,7 @@ paths:
         - name: ts
           in: query
           required: false
-          description: As-of RFC3339 instant with an explicit offset or Z. Naive timestamps are rejected. Defaults to now; the pet's effective timezone determines the schedule projection and journal day.
+          description: As-of RFC3339 instant with an explicit offset or Z. Naive timestamps are rejected. Defaults to now; the authenticated actor's effective timezone determines the schedule projection and journal day.
           schema:
             $ref: '#/components/schemas/RecordTimestampInput'
       responses:
@@ -2839,7 +2839,7 @@ components:
           description: True when the server started with DEMO_MODE (demo seed + UI banner).
         timezone:
           type: string
-          description: Standalone instance IANA timezone used for forms, displays and workers. Embedded applications resolve effective resource timezones separately.
+          description: Standalone instance IANA timezone used for forms, displays and workers. Embedded applications resolve effective actor timezones separately.
           example: Europe/Berlin
         med_intake_shortcut_icloud_url:
           type: string
@@ -3259,7 +3259,7 @@ components:
         local_date:
           type: string
           format: date
-          description: Independent civil journal date; defaults to the occurrence's calendar day in the pet's effective timezone.
+          description: Independent civil journal date; defaults to the occurrence's calendar day in the authenticated actor's effective timezone.
         category:
           $ref: '#/components/schemas/NutritionCategory'
         amount:
@@ -3312,7 +3312,7 @@ components:
           type: string
           format: date
           nullable: true
-          description: Independent civil journal date, preserved if provided; otherwise derived from the instant in the pet's effective timezone.
+          description: Independent civil journal date, preserved if provided; otherwise derived from the instant in the authenticated actor's effective timezone.
         category:
           $ref: '#/components/schemas/NutritionCategory'
         amount:
@@ -3559,7 +3559,7 @@ components:
         as_of:
           type: string
           format: date-time
-          description: RFC3339 instant with an explicit offset used for cumulative intake and schedule projection. The pet's effective timezone determines local_date and schedule times.
+          description: RFC3339 instant with an explicit offset used for cumulative intake and schedule projection. The authenticated actor's effective timezone determines local_date and schedule times.
         on_track:
           type: boolean
           nullable: true
@@ -3982,7 +3982,7 @@ components:
     RecordTimestampInput:
       type: string
       format: date-time
-      description: RFC3339 instant with an explicit UTC offset or Z; naive or blank timestamps return 400. Inputs normalize to fixed-nanosecond UTC Z output without changing the instant. An explicit local_date remains an independent civil journal date; otherwise the pet's effective timezone determines it. For create requests, omitting the timestamp uses now, or the current local time of day on a supplied historical journal date; an ambiguous or nonexistent synthesized local time returns 400 and requires an explicit instant.
+      description: RFC3339 instant with an explicit UTC offset or Z; naive or blank timestamps return 400. Inputs normalize to fixed-nanosecond UTC Z output without changing the instant. An explicit local_date remains an independent civil journal date; otherwise the authenticated actor's effective timezone determines it. For create requests, omitting the timestamp uses now, or the current local time of day on a supplied historical journal date; an ambiguous or nonexistent synthesized local time returns 400 and requires an explicit instant.
       examples: ['2026-09-19T14:30:00+02:00', '2026-09-19T12:30:00.000000000Z']
 
     ApiTokenScope:
@@ -4886,7 +4886,7 @@ components:
         ended_on:
           type: string
           format: date
-          description: Last active date. Defaults to yesterday in the pet's effective timezone.
+          description: Last active date. Defaults to yesterday in the authenticated actor's effective timezone.
 
     MedIntakeShortcutMenu:
       type: object
@@ -4994,7 +4994,7 @@ components:
           format: date
           description: >
             Calendar day the intake counts toward (assignment due/active checks).
-            Defaults to the instant's calendar day in the pet's effective timezone. Explicit dates are preserved independently of the UTC date. Providing this or occurred_at
+            Defaults to the instant's calendar day in the authenticated actor's effective timezone. Explicit dates are preserved independently of the UTC date. Providing this or occurred_at
             marks a delayed Telegram entry.
         note: { type: string }
         source_type: { type: string }

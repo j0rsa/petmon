@@ -1,4 +1,4 @@
-import { useResourceTime } from '../context/useResourceTime';
+import { useTime } from '../context/useTime';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { usePermissions } from '../context/usePermissions';
@@ -63,13 +63,13 @@ interface RecordRowProps {
 }
 
 function RecordRow({ record, viewDate, onSave, onDelete, saving, savingPaused, deleting, deletingPaused, canWrite, defaultEditing = false }: RecordRowProps) {
-  const formatTime = useFormatTime(record.pet_id);
-  const { toCivil } = useResourceTime(record.pet_id);
+  const formatTime = useFormatTime();
+  const { toCivil } = useTime();
   const recordCivil = toCivil(record.occurred_at);
   const [editing, setEditing] = useState(defaultEditing);
   const [committing, setCommitting] = useState(false);
   const [time, setTime] = useState(() => (defaultEditing ? recordCivil.slice(11, 16) : ''));
-  const timestamp = useRecordTimestamp(`${recordCivil.slice(0, 10)}T${time}`, record.pet_id, record.occurred_at);
+  const timestamp = useRecordTimestamp(`${recordCivil.slice(0, 10)}T${time}`, record.occurred_at);
   const [category, setCategory] = useState(() => (defaultEditing ? record.category : ''));
   const [amount, setAmount] = useState(() => (defaultEditing ? String(record.amount) : ''));
   const [note, setNote] = useState(() => (defaultEditing ? (record.note ?? '') : ''));
@@ -246,7 +246,7 @@ interface NutritionDayPanelProps {
 export function NutritionDayPanel({ date, petId }: NutritionDayPanelProps) {
   const queryClient = useQueryClient();
   const { canWrite } = usePermissions(petId);
-  const { today, minuteOfDay } = useResourceTime(petId);
+  const { today, minuteOfDay } = useTime();
   const [noteDraft, setNoteDraft] = useState('');
   const { show_water_card } = useDisplaySettings();
   const addRowRef = useRef<NutritionAddFormHandle>(null);
@@ -491,7 +491,7 @@ function MetricIcon({ color, children }: { color: string; children: React.ReactN
 
 function ExportPanel({ records }: { records: NutritionRecord[] }) {
   const [copied, setCopied] = useState(false);
-  const { timeZone } = useResourceTime(records[0]?.pet_id);
+  const { timeZone } = useTime();
   const text = exportTelegramLog(records, timeZone);
 
   function handleCopy() {
