@@ -1,5 +1,5 @@
 import { useMemo } from 'react';
-import { useResourceTime } from '../context/useResourceTime';
+import { useTime } from '../context/useTime';
 import { Bar, BarChart, CartesianGrid, Legend, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
 import { timeLabelFromOccurredAt } from '../lib/cumulativeFluid';
 import type { NutritionRecord } from '../types';
@@ -23,7 +23,7 @@ interface IntakeBarsChartProps {
 }
 
 export function IntakeBarsChart({ records }: IntakeBarsChartProps) {
-  const { timeZone } = useResourceTime(records[0]?.pet_id);
+  const { timeZone } = useTime();
   const { chartData, presentCategories } = useMemo(() => {
     const relevant = records.filter((r) =>
       (CHART_CATEGORIES as readonly string[]).includes(r.category),

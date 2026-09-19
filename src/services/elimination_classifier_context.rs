@@ -2,7 +2,7 @@ use crate::domain::elimination::EliminationEventType;
 use crate::domain::elimination_classifier::{ClassifierBaselines, DurationDist, FeatureContext};
 use crate::embedding::ServiceContext;
 use crate::error::AppResult;
-use crate::repo::{elimination_analytics, elimination_records};
+use crate::repo::elimination_records;
 use chrono::{DateTime, Duration, NaiveDate, Timelike, Utc};
 use sqlx::SqlitePool;
 use uuid::Uuid;
@@ -75,13 +75,11 @@ pub(crate) async fn compute_baselines(
 ) -> AppResult<ClassifierBaselines> {
     let date_from = (as_of - Duration::days(TRAINING_WINDOW_DAYS)).to_string();
     let date_to = as_of.to_string();
-    let pet_id_str = pet_id.to_string();
     let summaries =
-        elimination_analytics::daily_summaries(pool, Some(&pet_id_str), &date_from, &date_to)
-            .await?;
+        elimination_records::classifier_daily_counts(pool, pet_id, &date_from, &date_to).await?;
 
-    let mut wee_counts: Vec<i64> = summaries.iter().map(|s| s.urination_count).collect();
-    let mut poop_counts: Vec<i64> = summaries.iter().map(|s| s.defecation_count).collect();
+    let mut wee_counts: Vec<i64> = summaries.iter().map(|s| s.0).collect();
+    let mut poop_counts: Vec<i64> = summaries.iter().map(|s| s.1).collect();
     wee_counts.sort_unstable();
     poop_counts.sort_unstable();
 
@@ -134,7 +132,6 @@ fn build_from_prior(
     occurred_at: DateTime<Utc>,
     prior: &[PriorRecord],
     baselines: &ClassifierBaselines,
-    timezone: chrono_tz::Tz,
 ) -> FeatureContext {
     let start_24h = window_start(occurred_at, 24);
     let start_48h = window_start(occurred_at, 48);
@@ -174,8 +171,7 @@ fn build_from_prior(
         last_any = Some(record.occurred_at);
     }
 
-    let local = occurred_at.with_timezone(&timezone);
-    let hour_of_day = local.hour() as f32 + local.minute() as f32 / 60.0;
+    let hour_of_day = occurred_at.hour() as f32 + occurred_at.minute() as f32 / 60.0;
 
     FeatureContext {
         duration_seconds: duration_seconds as f64,
@@ -206,8 +202,7 @@ pub(crate) async fn build_feature_context(
 ) -> AppResult<FeatureContext> {
     let at = parse_occurred_at(occurred_at)
         .ok_or_else(|| crate::error::AppError::BadRequest("invalid occurred_at".to_string()))?;
-    let timezone = pool.timezone(pet_id).await?;
-    let as_of = at.with_timezone(&timezone).date_naive();
+    let as_of = at.date_naive();
     let baselines = compute_baselines(pool, pet_id, as_of).await?;
 
     let before = format_occurred_at(at);
@@ -224,13 +219,7 @@ pub(crate) async fn build_feature_context(
         })
         .collect();
 
-    Ok(build_from_prior(
-        duration_seconds,
-        at,
-        &prior,
-        &baselines,
-        timezone,
-    ))
+    Ok(build_from_prior(duration_seconds, at, &prior, &baselines))
 }
 
 /// Build context for a training row using only records that occurred strictly before it.
@@ -256,13 +245,7 @@ pub(crate) async fn build_feature_context_for_training(
             })
         })
         .collect();
-    Ok(build_from_prior(
-        duration_seconds,
-        at,
-        &prior,
-        baselines,
-        pool.timezone(pet_id).await?,
-    ))
+    Ok(build_from_prior(duration_seconds, at, &prior, baselines))
 }
 
 #[cfg(test)]
@@ -303,22 +286,84 @@ mod tests {
                 occurred_at: parse_occurred_at("2026-06-02T00:30:00Z").unwrap(),
             },
         ];
-        let ctx = build_from_prior(55, at, &prior, &baselines(), chrono_tz::Asia::Tokyo);
+        let ctx = build_from_prior(55, at, &prior, &baselines());
         assert_eq!(ctx.poop_count_24h_before, 1);
         assert_eq!(ctx.wee_count_24h_before, 1);
-        assert_eq!(ctx.hour_of_day, 10.0);
+        assert_eq!(ctx.hour_of_day, 1.0);
     }
 
     #[test]
-    fn repeated_dst_hour_uses_elapsed_time_and_local_hour() {
+    fn repeated_dst_hour_uses_elapsed_time_and_utc_hour() {
         let at = parse_occurred_at("2026-10-25T02:35:00+01:00").unwrap();
         let prior = [PriorRecord {
             event_type: EliminationEventType::Urination,
             occurred_at: parse_occurred_at("2026-10-25T02:45:00+02:00").unwrap(),
         }];
-        let ctx = build_from_prior(55, at, &prior, &baselines(), chrono_tz::Europe::Berlin);
+        let ctx = build_from_prior(55, at, &prior, &baselines());
         assert_eq!(ctx.minutes_since_last_wee, Some(50.0));
         assert_eq!(ctx.wee_count_24h_before, 1);
-        assert!((ctx.hour_of_day - (2.0 + 35.0 / 60.0)).abs() < 0.001);
+        assert!((ctx.hour_of_day - (1.0 + 35.0 / 60.0)).abs() < 0.001);
+    }
+
+    #[tokio::test]
+    async fn shared_model_features_and_training_days_are_independent_of_actor_timezone() {
+        use crate::{domain::pet::Pet, repo::pets};
+        let db = sqlx::sqlite::SqlitePoolOptions::new()
+            .max_connections(1)
+            .connect("sqlite::memory:")
+            .await
+            .unwrap();
+        crate::db::run_migrations(&db).await.unwrap();
+        let pet = pets::create_pet(
+            &db,
+            Pet::new(serde_json::from_value(serde_json::json!({"name":"Shared"})).unwrap()),
+        )
+        .await
+        .unwrap();
+        // The explicit journal date must not move this sample's UTC training day.
+        elimination_records::create(
+            &db,
+            serde_json::from_value(serde_json::json!({
+                "pet_id":pet.id,"occurred_at":"2026-01-01T00:15:00Z",
+                "local_date":"2025-12-31","event_type":"urination","duration_seconds":45
+            }))
+            .unwrap(),
+            chrono_tz::UTC,
+            false,
+            None,
+        )
+        .await
+        .unwrap();
+        let mut east = ServiceContext::standalone(db.clone(), chrono_tz::Asia::Tokyo);
+        east.actor.subject = "east".into();
+        let mut west = ServiceContext::standalone(db, chrono_tz::America::Los_Angeles);
+        west.actor.subject = "west".into();
+        assert_ne!(
+            east.timezone().await.unwrap(),
+            west.timezone().await.unwrap()
+        );
+        let at = "2026-01-01T00:30:00Z";
+        let first = build_feature_context(&east, pet.id, at, 50).await.unwrap();
+        let second = build_feature_context(&west, pet.id, at, 50).await.unwrap();
+        assert_eq!(first, second);
+        assert_eq!(first.hour_of_day, 0.5);
+        assert_eq!(first.minutes_since_last_wee, Some(15.0));
+        let samples = elimination_records::labeled_training_records(
+            &east,
+            pet.id,
+            "2026-01-01",
+            "2026-01-01",
+        )
+        .await
+        .unwrap();
+        assert_eq!(samples.len(), 1);
+        let baseline = compute_baselines(&east, pet.id, "2026-01-01".parse().unwrap())
+            .await
+            .unwrap();
+        assert_eq!(baseline.p50_wees_per_day, 1.0);
+        let training = build_feature_context_for_training(&west, pet.id, at, 50, &baseline)
+            .await
+            .unwrap();
+        assert_eq!(first, training);
     }
 }

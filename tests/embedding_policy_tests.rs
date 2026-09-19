@@ -405,7 +405,12 @@ async fn mcp_schema_overrides_normalized_calls_and_resources_use_same_policy() {
 
 struct FixedRuntime;
 impl RuntimeResolver for FixedRuntime {
-    fn timezone<'a>(&'a self, _: &'a SqlitePool, _: Uuid, _: Tz) -> BoxFuture<'a, AppResult<Tz>> {
+    fn timezone<'a>(
+        &'a self,
+        _: &'a SqlitePool,
+        _: &'a Identity,
+        _: Tz,
+    ) -> BoxFuture<'a, AppResult<Tz>> {
         Box::pin(async { Ok(chrono_tz::America::Los_Angeles) })
     }
     fn now(&self) -> DateTime<Utc> {
@@ -413,17 +418,32 @@ impl RuntimeResolver for FixedRuntime {
     }
 }
 
-struct TokyoRuntime;
-impl RuntimeResolver for TokyoRuntime {
-    fn timezone<'a>(&'a self, _: &'a SqlitePool, _: Uuid, _: Tz) -> BoxFuture<'a, AppResult<Tz>> {
-        Box::pin(async { Ok(chrono_tz::Asia::Tokyo) })
+struct ActorRuntime;
+impl RuntimeResolver for ActorRuntime {
+    fn timezone<'a>(
+        &'a self,
+        _: &'a SqlitePool,
+        actor: &'a Identity,
+        _: Tz,
+    ) -> BoxFuture<'a, AppResult<Tz>> {
+        Box::pin(async move {
+            Ok(if actor.subject == "east" {
+                chrono_tz::Asia::Tokyo
+            } else {
+                chrono_tz::America::Los_Angeles
+            })
+        })
+    }
+    fn now(&self) -> DateTime<Utc> {
+        "2026-01-01T00:30:00Z".parse().unwrap()
     }
 }
 #[actix_web::test]
-async fn best_day_projects_utc_instants_into_each_pets_effective_timezone() {
+async fn best_day_projects_utc_instants_into_actor_timezone() {
     let (base, visible, hidden) = setup().await;
     let mut context = restricted(&base, vec![visible]);
-    context.runtime = Arc::new(TokyoRuntime);
+    context.runtime = Arc::new(ActorRuntime);
+    context.actor.subject = "east".into();
     for (pet, amount) in [(visible, 42), (hidden, 999)] {
         let req=serde_json::from_value(json!({"pet_id":pet,"category":"water","amount":amount,"occurred_at":"2026-01-01T16:00:00Z","local_date":"2026-01-02"})).unwrap();
         nutrition_record_service::create(&base, req, chrono_tz::UTC)
@@ -440,9 +460,43 @@ async fn best_day_projects_utc_instants_into_each_pets_effective_timezone() {
     assert_eq!(best.curve.len(), 1);
     assert_eq!(best.curve[0].time, "01:00");
     assert_eq!(best.curve[0].cumulative_fluid_ml, 42.0);
+    context.actor.subject = "west".into();
+    let best =
+        petmon::services::nutrition_analytics_service::best_fluid_day(&context, None, "2026-01-03")
+            .await
+            .unwrap()
+            .unwrap();
+    assert_eq!(best.curve[0].time, "08:00");
+}
+
+#[actix_web::test]
+async fn actor_timezone_is_stable_across_pets_and_shared_with_token_sessions() {
+    let (base, first, second) = setup().await;
+    let mut context = restricted(&base, vec![first, second]);
+    context.runtime = Arc::new(ActorRuntime);
+    for (subject, expected_date) in [("east", "2026-01-01"), ("west", "2025-12-31")] {
+        context.actor.subject = subject.into();
+        for pet in [first, second] {
+            let record = nutrition_record_service::create(
+                &context,
+                serde_json::from_value(json!({"pet_id":pet,"category":"water","amount":10}))
+                    .unwrap(),
+                chrono_tz::UTC,
+            )
+            .await
+            .unwrap();
+            assert_eq!(record.local_date, expected_date);
+            assert_eq!(record.occurred_at, "2026-01-01T00:30:00.000000000Z");
+        }
+        let session_timezone = context.timezone().await.unwrap();
+        context.actor.kind = petmon::auth::identity::IdentityKind::ApiToken {
+            token_id: "device".into(),
+        };
+        assert_eq!(context.timezone().await.unwrap(), session_timezone);
+    }
 }
 #[actix_web::test]
-async fn realtime_and_resource_today_use_resource_timezone_and_injected_clock() {
+async fn realtime_and_resource_today_use_actor_timezone_and_injected_clock() {
     let (base, visible, _) = setup().await;
     let mut ctx = restricted(&base, vec![visible]);
     ctx.runtime = Arc::new(FixedRuntime);

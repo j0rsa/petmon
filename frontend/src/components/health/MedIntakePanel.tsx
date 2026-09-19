@@ -1,4 +1,4 @@
-import { useResourceTime } from '../../context/useResourceTime';
+import { useTime } from '../../context/useTime';
 import { useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Code } from 'lucide-react';
@@ -53,16 +53,16 @@ function DailyMedRow({
   panelDate: string;
   onLogged: () => void;
 }) {
-  const formatTime = useFormatTime(petId);
+  const formatTime = useFormatTime();
   const { medication, assignment } = item;
-  const { nowTimeString } = useResourceTime(petId);
+  const { nowTimeString } = useTime();
   const expected = expectedDoseCount(assignment.frequency);
   const status = intakeStatus(item.intakes, expected);
   const [intakeMode, setIntakeMode] = useState<'record' | 'now' | null>(null);
   const [intakeDate, setIntakeDate] = useState(panelDate);
   const [intakeLocalDate, setIntakeLocalDate] = useState(panelDate);
   const [intakeTime, setIntakeTime] = useState(nowTimeString);
-  const timestamp = useRecordTimestamp(`${intakeDate}T${intakeTime}`, petId);
+  const timestamp = useRecordTimestamp(`${intakeDate}T${intakeTime}`);
   const [doseFraction, setDoseFraction] = useState<DoseFraction>('whole');
   const [liquidDoseMl, setLiquidDoseMl] = useState('');
   const [curlCopied, setCurlCopied] = useState(false);
@@ -387,13 +387,13 @@ function BundleTakeRow({
   panelDate: string;
   onLogged: () => void;
 }) {
-  const { nowTimeString } = useResourceTime(bundle.pet_id);
-  const formatTime = useFormatTime(bundle.pet_id);
+  const { nowTimeString } = useTime();
+  const formatTime = useFormatTime();
   const [intakeMode, setIntakeMode] = useState<'record' | null>(null);
   const [intakeDate, setIntakeDate] = useState(panelDate);
   const [intakeLocalDate, setIntakeLocalDate] = useState(panelDate);
   const [intakeTime, setIntakeTime] = useState(nowTimeString);
-  const timestamp = useRecordTimestamp(`${intakeDate}T${intakeTime}`, bundle.pet_id);
+  const timestamp = useRecordTimestamp(`${intakeDate}T${intakeTime}`);
 
   const takeMutation = useMutation({
     mutationFn: (payload: CreateMedBundleIntake) =>
@@ -587,7 +587,7 @@ function BundleTakeRow({
 export function MedIntakePanel({ petId }: MedIntakePanelProps) {
   const queryClient = useQueryClient();
   const { canWrite } = usePermissions(petId);
-  const { today } = useResourceTime(petId);
+  const { today } = useTime();
   const { settings: developerSettings } = useUserSettings('developer_mode');
 
   const dailyQuery = useQuery({

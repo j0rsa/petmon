@@ -158,13 +158,16 @@ async fn schedule(pool: &SqlitePool, pet_id: Uuid, from: &str) -> NutritionSched
     .unwrap()
 }
 
-struct PetTimezones {
-    east: Uuid,
-}
-impl RuntimeResolver for PetTimezones {
-    fn timezone<'a>(&'a self, _: &'a SqlitePool, pet: Uuid, _: Tz) -> BoxFuture<'a, AppResult<Tz>> {
+struct ActorTimezones;
+impl RuntimeResolver for ActorTimezones {
+    fn timezone<'a>(
+        &'a self,
+        _: &'a SqlitePool,
+        actor: &'a Identity,
+        _: Tz,
+    ) -> BoxFuture<'a, AppResult<Tz>> {
         Box::pin(async move {
-            Ok(if pet == self.east {
+            Ok(if actor.subject == "east" {
                 chrono_tz::Asia::Tokyo
             } else {
                 chrono_tz::America::Los_Angeles
@@ -174,16 +177,17 @@ impl RuntimeResolver for PetTimezones {
 }
 
 #[actix_web::test]
-async fn workers_use_each_pets_local_day_and_injected_notification_backend() {
+async fn workers_use_job_actor_timezone_and_injected_notification_backend() {
     let pool = pool().await;
     let east = pet(&pool, "East").await;
     let west = pet(&pool, "West").await;
     schedule(&pool, east.id, "08:00").await;
-    schedule(&pool, west.id, "16:00").await;
+    schedule(&pool, west.id, "08:00").await;
     let backend = Arc::new(PrivateNotifications::default());
     let mut context = ServiceContext::standalone(pool.clone(), chrono_tz::UTC);
     context.notifications = backend.clone();
-    context.runtime = Arc::new(PetTimezones { east: east.id });
+    context.runtime = Arc::new(ActorTimezones);
+    context.actor.subject = "east".into();
     let now: DateTime<Utc> = Utc.with_ymd_and_hms(2026, 9, 19, 23, 1, 0).unwrap();
     feeding_nudge_service::run_feeding_nudge_check_at(&context, now)
         .await
@@ -196,12 +200,12 @@ async fn workers_use_each_pets_local_day_and_injected_notification_backend() {
         assert_eq!(
             events.len(),
             2,
-            "each local slot is emitted once, including repeated worker checks"
+            "both pets use the job actor's local slot, including repeated worker checks"
         );
         assert!(events.iter().any(|e| e.pet_id == Some(east.id)
             && e.source_id.as_ref().unwrap().contains("2026-09-20:08:00")));
         assert!(events.iter().any(|e| e.pet_id == Some(west.id)
-            && e.source_id.as_ref().unwrap().contains("2026-09-19:16:00")));
+            && e.source_id.as_ref().unwrap().contains("2026-09-20:08:00")));
     }
     let (count,): (i64,) = sqlx::query_as("SELECT COUNT(*) FROM notifications")
         .fetch_one(&pool)
@@ -210,6 +214,19 @@ async fn workers_use_each_pets_local_day_and_injected_notification_backend() {
     assert_eq!(
         count, 0,
         "workers must not bypass the injected persistence backend"
+    );
+    context.actor.subject = "west".into();
+    assert_eq!(
+        context.timezone().await.unwrap(),
+        chrono_tz::America::Los_Angeles
+    );
+    feeding_nudge_service::run_feeding_nudge_check_at(&context, now)
+        .await
+        .unwrap();
+    assert_eq!(
+        backend.events.lock().unwrap().len(),
+        2,
+        "the west actor is not in either pet's 08:00 slot"
     );
 }
 

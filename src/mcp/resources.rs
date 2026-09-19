@@ -75,7 +75,7 @@ pub async fn read_resource(
         .map_err(|_| AppError::BadRequest(format!("Invalid pet UUID in URI: {uri}")))?;
     pool.check(Some(pet_id), crate::embedding::ResourceAction::View)
         .await?;
-    let timezone = pool.timezone(pet_id).await?;
+    let timezone = pool.timezone().await?;
 
     match suffix {
         None => {

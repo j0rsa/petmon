@@ -148,7 +148,7 @@ async fn injected_realtime_clock_keeps_exact_instant_during_dst_fold() {
         fn timezone<'a>(
             &'a self,
             _: &'a sqlx::SqlitePool,
-            _: uuid::Uuid,
+            _: &'a petmon::auth::identity::Identity,
             _: chrono_tz::Tz,
         ) -> futures::future::BoxFuture<'a, petmon::error::AppResult<chrono_tz::Tz>> {
             Box::pin(async { Ok(chrono_tz::Europe::Berlin) })
@@ -176,7 +176,8 @@ async fn injected_realtime_clock_keeps_exact_instant_during_dst_fold() {
 async fn legacy_conversion_is_explicit_and_atomic_and_startup_refuses_legacy_rows() {
     let pool = pool().await;
     let pet_id = pet(&pool).await;
-    sqlx::query("INSERT INTO elimination_classifiers (pet_id,model_version,model_json,sample_count,trained_at,pending_retrain,created_at,updated_at) VALUES (?,2,'{}',8,'old',0,'old','old')").bind(pet_id).execute(&pool).await.unwrap();
+    let current_version = petmon::domain::elimination_classifier::CURRENT_MODEL_VERSION as i64;
+    sqlx::query("INSERT INTO elimination_classifiers (pet_id,model_version,model_json,sample_count,trained_at,pending_retrain,created_at,updated_at) VALUES (?,?,'{}',8,'old',0,'old','old')").bind(pet_id).bind(current_version).execute(&pool).await.unwrap();
     for (id, civil) in [
         ("valid", "2026-09-19T10:00:00"),
         ("ambiguous", "2026-10-25T02:30:00"),
@@ -201,7 +202,7 @@ async fn legacy_conversion_is_explicit_and_atomic_and_startup_refuses_legacy_row
             .fetch_one(&pool)
             .await
             .unwrap();
-    assert_eq!(version, 2);
+    assert_eq!(version, current_version);
     assert_eq!(
         repo::nutrition_records::get_record(&pool, "valid")
             .await

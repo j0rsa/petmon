@@ -1,4 +1,4 @@
-import { useResourceTime } from '../context/useResourceTime';
+import { useTime } from '../context/useTime';
 import { forwardRef, useEffect, useImperativeHandle, useMemo, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { usePermissions } from '../context/usePermissions';
@@ -206,7 +206,7 @@ const AddRow = forwardRef<AddRowHandle, AddRowProps>(function AddRow(
   ref,
 ) {
   const [time, setTime] = useState('');
-  const timestamp = useRecordTimestamp(time ? `${date}T${time}` : '', petId);
+  const timestamp = useRecordTimestamp(time ? `${date}T${time}` : '');
   const [eventType, setEventType] = useState<EliminationEventType>('urination');
   const [subtype, setSubtype] = useState('');
   const [duration, setDuration] = useState('');
@@ -337,12 +337,12 @@ function RecordRow({
   canWrite,
   onEditingChange,
 }: RecordRowProps) {
-  const formatTime = useFormatTime(record.pet_id);
-  const { toCivil } = useResourceTime(record.pet_id);
+  const formatTime = useFormatTime();
+  const { toCivil } = useTime();
   const recordCivil = toCivil(record.occurred_at);
   const [editing, setEditing] = useState(false);
   const [time, setTime] = useState('');
-  const timestamp = useRecordTimestamp(time ? `${recordCivil.slice(0, 10)}T${time}` : '', record.pet_id, record.occurred_at);
+  const timestamp = useRecordTimestamp(time ? `${recordCivil.slice(0, 10)}T${time}` : '', record.occurred_at);
   const [eventType, setEventType] = useState<EliminationEventType>('general');
   const [subtype, setSubtype] = useState('');
   const [duration, setDuration] = useState('');
@@ -494,7 +494,7 @@ interface EliminationDayPanelProps {
 export function EliminationDayPanel({ date, petId }: EliminationDayPanelProps) {
   const queryClient = useQueryClient();
   const { canWrite } = usePermissions(petId);
-  const { today } = useResourceTime(petId);
+  const { today } = useTime();
   const [noteDraft, setNoteDraft] = useState('');
   const [editingRecordId, setEditingRecordId] = useState<string | null>(null);
   const addRowRef = useRef<AddRowHandle>(null);

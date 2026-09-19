@@ -70,7 +70,7 @@ export const NarrowMobile: Story = {
 
 const berlinExtensions: ApplicationExtensions = {
   sessionKey: 'timestamp-tests',
-  timezone: () => 'Europe/Berlin',
+  timezone: 'Europe/Berlin',
   permissions: async () => ({ view: false, writeRecords: false, writeProfile: false, manageIntegrations: false, create: false, delete: false, changeStatus: false }),
 };
 

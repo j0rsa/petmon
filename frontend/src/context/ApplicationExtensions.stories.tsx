@@ -11,8 +11,8 @@ import { StandaloneSessionBoundary } from './StandaloneSessionBoundary';
 import { clearToken, getStoredToken, storeToken } from '../lib/auth';
 import App from '../App';
 import { MemoryRouter } from 'react-router-dom';
-import { useResourceTime } from './useResourceTime';
-import { resourceDateTime } from '../lib/resourceTime';
+import { useTime } from './useTime';
+import ErrorBoundary from '../components/ErrorBoundary';
 
 const allow: ResourcePermissions = { view: true, writeRecords: true, writeProfile: true, manageIntegrations: true, create: true, delete: true, changeStatus: true };
 const deny: ResourcePermissions = { view: false, writeRecords: false, writeProfile: false, manageIntegrations: false, create: false, delete: false, changeStatus: false };
@@ -147,27 +147,73 @@ export const CustomAuthenticationWaits: Story = {
 export const CustomAuthenticationWaitsNarrow = asNarrowStory(CustomAuthenticationWaits);
 
 const dateLineInstant = new Date('2026-01-01T00:30:00Z');
-function ResourceDateProbe() {
-  const west = useResourceTime('west');
-  const east = useResourceTime('east');
+function UserDateProbe({ account }: { account: string }) {
+  const time = useTime();
+  const { selectedPet, pets, setSelectedPetId } = useSelectedPet();
+  const [initialTime] = useState(time.nowLocalDateTimeString);
+  const [draft, setDraft] = useState('');
+  const privateData = useQuery({ queryKey: ['timezone-sensitive'], queryFn: async () => `Private data for ${account}` });
   return <section className="panel">
-    <p>Browser day: {resourceDateTime(dateLineInstant).slice(0, 10)}</p>
-    <p>West journal: {west.today}</p>
-    <p>East medication day: {east.today}</p>
-    <p>West form time: {west.nowTimeString()}</p>
-    <p>East form time: {east.nowTimeString()}</p>
+    <p>Selected pet: {selectedPet?.name ?? 'Loading'}</p>
+    <button disabled={pets.length < 2} onClick={() => setSelectedPetId(pets.find((pet) => pet.id !== selectedPet?.id)!.id)}>Switch pet</button>
+    <p>User timezone: {time.timeZone}</p>
+    <p>Journal day: {time.today}</p>
+    <p>Form clock: {time.nowTimeString()}</p>
+    <label>Initial form timestamp<input readOnly value={initialTime} /></label>
+    <label>Private draft<input value={draft} onChange={(event) => setDraft(event.target.value)} /></label>
+    <p>{privateData.data}</p>
   </section>;
 }
-export const ResourceDatesAcrossTimezones: Story = {
-  render: () => <ApplicationExtensionsProvider value={{ sessionKey: 'timezone-test', timezone: (id) => id === 'west' ? 'America/Los_Angeles' : 'Asia/Tokyo', now: () => dateLineInstant, permissions: async () => allow }}><ResourceDateProbe /></ApplicationExtensionsProvider>,
+
+function UserTimezoneHarness() {
+  const [account, setAccount] = useState('west');
+  return <div className="page-stack">
+    <button onClick={() => setAccount('east')}>Switch timezone account</button>
+    <ApplicationExtensionsProvider value={{
+      sessionKey: `timezone-user:${account}`,
+      timezone: account === 'west' ? 'America/Los_Angeles' : 'Asia/Tokyo',
+      now: () => dateLineInstant,
+      permissions: async () => allow,
+      pets: { key: account, list: async () => mockPets.slice(0, 2), create: async () => mockPets[0] },
+    }}><SelectedPetProvider><UserDateProbe account={account} /></SelectedPetProvider></ApplicationExtensionsProvider>
+  </div>;
+}
+
+export const UserTimezoneIndependentOfPet: Story = {
+  render: () => <UserTimezoneHarness />,
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement);
-    await expect(canvas.getByText('West journal: 2025-12-31')).toBeInTheDocument();
-    await expect(canvas.getByText('East medication day: 2026-01-01')).toBeInTheDocument();
-    await expect(canvas.getByText('West form time: 16:30')).toBeInTheDocument();
-    await expect(canvas.getByText('East form time: 09:30')).toBeInTheDocument();
-    const browserDay = resourceDateTime(dateLineInstant).slice(0, 10);
-    expect(['2025-12-31', '2026-01-01'].some((day) => day !== browserDay)).toBe(true);
+    await waitFor(() => expect(canvas.getByText(`Selected pet: ${mockPets[0].name}`)).toBeInTheDocument());
+    await expect(canvas.getByText('Journal day: 2025-12-31')).toBeInTheDocument();
+    await expect(canvas.getByText('Form clock: 16:30')).toBeInTheDocument();
+    await userEvent.click(canvas.getByRole('button', { name: 'Switch pet' }));
+    await expect(canvas.getByText(`Selected pet: ${mockPets[1].name}`)).toBeInTheDocument();
+    await expect(canvas.getByText('User timezone: America/Los_Angeles')).toBeInTheDocument();
+    await expect(canvas.getByText('Journal day: 2025-12-31')).toBeInTheDocument();
+    await expect(canvas.getByLabelText('Initial form timestamp')).toHaveValue('2025-12-31T16:30');
+    await userEvent.type(canvas.getByLabelText('Private draft'), 'Do not carry between accounts');
+    await userEvent.click(canvas.getByRole('button', { name: 'Switch timezone account' }));
+    await waitFor(() => expect(canvas.getByText('Private data for east')).toBeInTheDocument());
+    await expect(canvas.queryByText('Private data for west')).not.toBeInTheDocument();
+    await expect(canvas.getByText('Journal day: 2026-01-01')).toBeInTheDocument();
+    await expect(canvas.getByText('Form clock: 09:30')).toBeInTheDocument();
+    await expect(canvas.getByLabelText('Initial form timestamp')).toHaveValue('2026-01-01T09:30');
+    await expect(canvas.getByLabelText('Private draft')).toHaveValue('');
   },
 };
-export const ResourceDatesAcrossTimezonesNarrow = asNarrowStory(ResourceDatesAcrossTimezones);
+export const UserTimezoneIndependentOfPetNarrow = asNarrowStory(UserTimezoneIndependentOfPet);
+
+function MissingTimezoneProbe() {
+  const { nowLocalDateTimeString } = useTime();
+  return <input aria-label="Unsafe timestamp form" value={nowLocalDateTimeString()} readOnly />;
+}
+
+export const MissingUserTimezoneFailsClosed: Story = {
+  render: () => <ErrorBoundary><ApplicationExtensionsProvider value={{ sessionKey: 'missing-user-zone', permissions: async () => allow }}><MissingTimezoneProbe /></ApplicationExtensionsProvider></ErrorBoundary>,
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    await expect(canvas.getByRole('heading', { name: 'Something went wrong' })).toBeInTheDocument();
+    await expect(canvas.queryByLabelText('Unsafe timestamp form')).not.toBeInTheDocument();
+  },
+};
+export const MissingUserTimezoneFailsClosedNarrow = asNarrowStory(MissingUserTimezoneFailsClosed);

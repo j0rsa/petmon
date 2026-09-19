@@ -8,7 +8,7 @@ const noop = () => undefined;
 
 const timezonePolicy = {
   sessionKey: 'record-timezone',
-  timezone: () => 'Asia/Tokyo',
+  timezone: 'Asia/Tokyo',
   permissions: async () => ({ view: false, writeRecords: false, writeProfile: false, manageIntegrations: false, create: false, delete: false, changeStatus: false }),
 };
 

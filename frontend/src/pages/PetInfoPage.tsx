@@ -1,4 +1,4 @@
-import { useResourceTime } from '../context/useResourceTime';
+import { useTime } from '../context/useTime';
 import { useEffect, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { usePermissions } from '../context/usePermissions';
@@ -64,7 +64,7 @@ function PetInfoEditor({ id }: { id: string }) {
     },
   });
 
-  const { today } = useResourceTime(id);
+  const { today } = useTime();
   const weightDateFrom = shiftDate(today, -29);
   const weightDateTo = today;
 

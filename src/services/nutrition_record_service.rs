@@ -46,7 +46,7 @@ pub async fn create(
 ) -> AppResult<NutritionRecord> {
     pool.check(Some(req.pet_id), ResourceAction::WriteRecords)
         .await?;
-    let timezone = pool.timezone(req.pet_id).await?;
+    let timezone = pool.timezone().await?;
 
     validate_create(&req)?;
     pets::get_pet(pool, req.pet_id).await?;
@@ -99,7 +99,7 @@ pub async fn batch_create(
 
     let mut created = Vec::with_capacity(records.len());
     for mut req in records {
-        let timezone = pool.timezone(req.pet_id).await?;
+        let timezone = pool.timezone().await?;
         if req.occurred_at.is_none() {
             req.occurred_at = Some(pool.record_timestamp(timezone, req.local_date.as_deref())?);
         }
@@ -126,7 +126,7 @@ pub async fn update(
             });
         }
     }
-    nutrition_records::update_record(pool, id, req, pool.timezone(owner.pet_id).await?).await?;
+    nutrition_records::update_record(pool, id, req, pool.timezone().await?).await?;
     let record = nutrition_records::get_record(pool, id).await?;
 
     let pool2 = pool.clone();

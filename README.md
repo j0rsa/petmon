@@ -281,7 +281,7 @@ Interactive administrator sessions use their live administrator role. Administra
 
 ### Record timestamp upgrade (0.26)
 
-Record `occurred_at` / `measured_at` fields now contain a single UTC RFC3339 instant. API inputs require an explicit offset (`Z` or `±HH:MM`); timezone-less timestamps are rejected. The frontend renders these instants in the pet's effective timezone. Journal `local_date` remains an independent date, not a UTC date.
+Record `occurred_at` / `measured_at` fields now contain a single UTC RFC3339 instant. API inputs require an explicit offset (`Z` or `±HH:MM`); timezone-less timestamps are rejected. The frontend renders these instants in the authenticated actor's effective timezone. Journal `local_date` remains an independent date, not a UTC date.
 
 Back up an existing database and stop writers before upgrading. Startup refuses legacy record timestamps until an operator explicitly converts them using the timezone in which they were originally recorded:
 

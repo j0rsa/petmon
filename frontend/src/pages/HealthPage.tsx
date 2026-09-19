@@ -1,4 +1,4 @@
-import { useResourceTime } from '../context/useResourceTime';
+import { useTime } from '../context/useTime';
 import { useRecordTimestamp } from '../hooks/useRecordTimestamp';
 import { useState } from 'react';
 import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
@@ -25,8 +25,8 @@ export default function HealthPage() {
   const { selectedPetId, petsLoading } = useSelectedPet();
   if (petsLoading) return <div className="loading-state">Loading…</div>;
   if (!selectedPetId) return <NoPetSelected />;
-  // Resource-local form defaults must be initialized only after selection is
-  // ready, and drafts must never move to a different pet on a selector change.
+  // Wait for a ready selection, and never move care drafts to a different pet.
+  // Clock defaults themselves belong to the user/session, not the selected pet.
   return <HealthPageContent key={selectedPetId} />;
 }
 
@@ -43,7 +43,7 @@ function HealthPageContent() {
     selected: [],
   });
   const selectedTags = tagFilter.petId === selectedPetId ? tagFilter.selected : [];
-  const { today, nowLocalDateTimeString } = useResourceTime();
+  const { today, nowLocalDateTimeString } = useTime();
   const { days: periodDays, granularity } = WEIGHT_CHART_PERIODS.find((p) => p.label === period)!;
   const dateFrom = periodDays != null ? shiftDate(today, -(periodDays - 1)) : undefined;
   const filterKey = [...selectedTags].sort((a, b) => a.localeCompare(b)).join(',');

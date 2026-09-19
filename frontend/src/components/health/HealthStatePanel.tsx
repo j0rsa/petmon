@@ -1,4 +1,4 @@
-import { useResourceTime } from '../../context/useResourceTime';
+import { useTime } from '../../context/useTime';
 import { useRecordTimestamp } from '../../hooks/useRecordTimestamp';
 import { useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
@@ -30,10 +30,10 @@ export function HealthStatePanel({ petId }: HealthStatePanelProps) {
   const queryClient = useQueryClient();
   const { canWrite } = usePermissions(petId);
   const formatDate = useFormatDate();
-  const formatTime = useFormatTime(petId);
+  const formatTime = useFormatTime();
 
   const [period, setPeriod] = useState<PeriodLabel>('30d');
-  const { today, nowLocalDateTimeString } = useResourceTime(petId);
+  const { today, nowLocalDateTimeString } = useTime();
   const { days: periodDays, granularity } = HEALTH_STATE_PERIODS.find((p) => p.label === period)!;
   const dateFrom = periodDays != null ? shiftDate(today, -(periodDays - 1)) : undefined;
 
@@ -57,7 +57,7 @@ export function HealthStatePanel({ petId }: HealthStatePanelProps) {
   const [level, setLevel] = useState<HealthStateLevel | null>(null);
   const [noteInput, setNoteInput] = useState('');
   const [occurredAt, setOccurredAt] = useState(() => nowLocalDateTimeString());
-  const timestamp = useRecordTimestamp(occurredAt, petId);
+  const timestamp = useRecordTimestamp(occurredAt);
 
   const addMutation = useMutation({
     mutationFn: (payload: CreateHealthStateRecord) => healthStateApi.create(payload),

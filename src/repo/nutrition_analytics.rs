@@ -68,7 +68,7 @@ pub struct BestFluidDayRecords {
 }
 
 /// Select the winning journal day and its visible records. Presentation in each
-/// resource's timezone belongs to the service, not UTC-string slicing in SQL.
+/// actor's timezone belongs to the service, not UTC-string slicing in SQL.
 pub async fn best_fluid_day_records_scoped(
     pool: &SqlitePool,
     pet_id: Option<Uuid>,

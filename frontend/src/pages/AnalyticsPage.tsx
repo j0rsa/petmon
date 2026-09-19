@@ -1,4 +1,4 @@
-import { useResourceTime } from '../context/useResourceTime';
+import { useTime } from '../context/useTime';
 import { useMemo, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import {
@@ -34,7 +34,7 @@ export default function AnalyticsPage() {
   const [period, setPeriod] = useState<PeriodLabel>('30d');
   const [soloCategory, setSoloCategory] = useState<typeof ANALYTICS_CATEGORIES[number] | null>(null);
 
-  const { today } = useResourceTime();
+  const { today } = useTime();
   const days = PERIODS.find(p => p.label === period)!.days;
   const dateFrom = shiftDate(today, -(days - 1));
 

@@ -34,10 +34,9 @@ pub async fn create(
     req: CreateWeightRecord,
     _timezone: Tz,
 ) -> AppResult<WeightRecord> {
-    let authorized_pet = pool
-        .check_str(&req.pet_id, ResourceAction::WriteRecords)
+    pool.check_str(&req.pet_id, ResourceAction::WriteRecords)
         .await?;
-    let timezone = pool.timezone(authorized_pet).await?;
+    let timezone = pool.timezone().await?;
     let mut req = req;
     if req.measured_at.is_none() {
         req.measured_at = Some(pool.record_timestamp(timezone, req.local_date.as_deref())?);

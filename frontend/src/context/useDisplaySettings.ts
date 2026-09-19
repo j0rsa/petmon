@@ -1,14 +1,14 @@
 import { useContext } from 'react';
 import { DisplaySettingsContext } from './DisplaySettingsContext.ts';
-import { useResourceTime } from './useResourceTime';
+import { useTime } from './useTime';
 
 export function useDisplaySettings() {
   return useContext(DisplaySettingsContext);
 }
 
-export function useFormatTime(petId?: string) {
+export function useFormatTime() {
   const { time_format } = useDisplaySettings();
-  const { toCivil } = useResourceTime(petId);
+  const { toCivil } = useTime();
   return (iso: string) => {
     const hhmm = toCivil(iso).slice(11, 16);
     if (time_format === 'h12') {

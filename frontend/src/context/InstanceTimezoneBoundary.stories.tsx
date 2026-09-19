@@ -4,7 +4,7 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { expect, userEvent, waitFor, within } from 'storybook/test';
 import { InstanceTimezoneBoundary } from './InstanceTimezoneBoundary';
 import { ApplicationExtensionsProvider } from './ApplicationExtensions';
-import { useResourceTime } from './useResourceTime';
+import { useTime } from './useTime';
 import { mockAppInfo } from '../stories/fixtures';
 import { asNarrowStory } from '../stories/viewport';
 
@@ -12,9 +12,9 @@ let resolveInfo: (response: Response) => void = () => {};
 let infoRequests = 0;
 
 function ClockForm() {
-  const { toCivil } = useResourceTime('resource');
+  const { toCivil } = useTime();
   const [initialClock] = useState(() => toCivil('2026-01-01T00:30:00Z'));
-  return <label>Initial resource clock<input aria-label="Initial resource clock" value={initialClock} readOnly /></label>;
+  return <label>Initial session clock<input aria-label="Initial session clock" value={initialClock} readOnly /></label>;
 }
 
 function Harness() {
@@ -55,10 +55,10 @@ export const WaitsBeforeInitializingForms: Story = {
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement);
     await expect(canvas.getByText('Loading instance timezone…')).toBeInTheDocument();
-    await expect(canvas.queryByLabelText('Initial resource clock')).not.toBeInTheDocument();
+    await expect(canvas.queryByLabelText('Initial session clock')).not.toBeInTheDocument();
     await waitFor(() => expect(infoRequests).toBe(1));
     await userEvent.click(canvas.getByRole('button', { name: 'Load server timezone' }));
-    await waitFor(() => expect(canvas.getByLabelText('Initial resource clock')).toHaveValue('2026-01-01T09:30:00'));
+    await waitFor(() => expect(canvas.getByLabelText('Initial session clock')).toHaveValue('2026-01-01T09:30:00'));
   },
 };
 export const WaitsBeforeInitializingFormsNarrow = asNarrowStory(WaitsBeforeInitializingForms);
@@ -69,22 +69,24 @@ export const InvalidTimezoneCanRetry: Story = {
     await waitFor(() => expect(infoRequests).toBe(1));
     await userEvent.click(canvas.getByRole('button', { name: 'Load invalid timezone' }));
     await waitFor(() => expect(canvas.getByRole('alert')).toHaveTextContent('valid instance timezone'));
-    await expect(canvas.queryByLabelText('Initial resource clock')).not.toBeInTheDocument();
+    await expect(canvas.queryByLabelText('Initial session clock')).not.toBeInTheDocument();
     await userEvent.click(canvas.getByRole('button', { name: 'Retry' }));
     await waitFor(() => expect(infoRequests).toBe(2));
     await userEvent.click(canvas.getByRole('button', { name: 'Load server timezone' }));
-    await waitFor(() => expect(canvas.getByLabelText('Initial resource clock')).toHaveValue('2026-01-01T09:30:00'));
+    await waitFor(() => expect(canvas.getByLabelText('Initial session clock')).toHaveValue('2026-01-01T09:30:00'));
   },
 };
+export const InvalidTimezoneCanRetryNarrow = asNarrowStory(InvalidTimezoneCanRetry);
 
-export const EmbeddedResolverDoesNotFetchInfo: Story = {
+export const EmbeddedUserTimezoneDoesNotFetchInfo: Story = {
   render: () => <ApplicationExtensionsProvider value={{
-    sessionKey: 'custom-timezone', timezone: () => 'Europe/Berlin',
+    sessionKey: 'custom-timezone', timezone: 'Europe/Berlin',
     permissions: async () => ({ view: false, writeRecords: false, writeProfile: false, manageIntegrations: false, create: false, delete: false, changeStatus: false }),
   }}><ClockForm /></ApplicationExtensionsProvider>,
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement);
-    await expect(canvas.getByLabelText('Initial resource clock')).toHaveValue('2026-01-01T01:30:00');
+    await expect(canvas.getByLabelText('Initial session clock')).toHaveValue('2026-01-01T01:30:00');
     await expect(infoRequests).toBe(0);
   },
 };
+export const EmbeddedUserTimezoneDoesNotFetchInfoNarrow = asNarrowStory(EmbeddedUserTimezoneDoesNotFetchInfo);

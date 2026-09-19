@@ -123,7 +123,7 @@ pub async fn end_assignment(
     let owner = med_assignments::get(pool, id).await?;
     pool.check(Some(owner.pet_id), ResourceAction::WriteRecords)
         .await?;
-    let timezone = pool.timezone(owner.pet_id).await?;
+    let timezone = pool.timezone().await?;
 
     let today = pool
         .runtime
@@ -284,7 +284,7 @@ pub async fn create_intake(
             ));
         }
     }
-    let timezone = pool.timezone(authorized_pet).await?;
+    let timezone = pool.timezone().await?;
 
     let delayed = intake_is_delayed(&req.occurred_at, &req.local_date);
     let mut req = req;
@@ -462,7 +462,7 @@ pub async fn create_bundle_intake(
     let owner = med_bundles::get(pool, id).await?;
     pool.check(Some(owner.pet_id), ResourceAction::WriteRecords)
         .await?;
-    let timezone = pool.timezone(owner.pet_id).await?;
+    let timezone = pool.timezone().await?;
 
     let delayed = intake_is_delayed(&req.occurred_at, &req.local_date);
     let bundle = med_bundles::get(pool, id).await?;

@@ -262,6 +262,27 @@ pub struct LabeledTrainingRecord {
     pub duration_seconds: Option<i64>,
 }
 
+/// Classifier days use UTC instants, not user-selected journal dates.
+pub async fn classifier_daily_counts(
+    pool: &SqlitePool,
+    pet_id: Uuid,
+    date_from: &str,
+    date_to: &str,
+) -> AppResult<Vec<(i64, i64)>> {
+    Ok(sqlx::query_as(
+        "SELECT SUM(CASE WHEN event_type='urination' THEN 1 ELSE 0 END),
+                SUM(CASE WHEN event_type='defecation' THEN 1 ELSE 0 END)
+         FROM elimination_records WHERE pet_id=?
+           AND substr(occurred_at,1,10)>=? AND substr(occurred_at,1,10)<=?
+         GROUP BY substr(occurred_at,1,10)",
+    )
+    .bind(pet_id)
+    .bind(date_from)
+    .bind(date_to)
+    .fetch_all(pool)
+    .await?)
+}
+
 #[tracing::instrument(skip(pool))]
 pub async fn labeled_training_records(
     pool: &SqlitePool,
@@ -273,8 +294,8 @@ pub async fn labeled_training_records(
         "SELECT occurred_at, event_type, duration_seconds
          FROM elimination_records
          WHERE pet_id = ?
-           AND local_date >= ?
-           AND local_date <= ?
+           AND substr(occurred_at,1,10) >= ?
+           AND substr(occurred_at,1,10) <= ?
            AND duration_seconds IS NOT NULL
            AND event_type IN ('urination', 'defecation')
          ORDER BY occurred_at ASC",

@@ -63,6 +63,7 @@ pub async fn run_nudge_check_at(
     now: chrono::DateTime<Utc>,
     hour_override: Option<u8>,
 ) -> AppResult<()> {
+    let timezone = pool.timezone().await?;
     let all: Vec<(String, PetNudgeSchedule)> =
         pet_settings::list_all_by_key(pool, MED_NUDGE_KEY).await?;
 
@@ -70,13 +71,6 @@ pub async fn run_nudge_check_at(
         let pet_id = match Uuid::parse_str(pet_id_str) {
             Ok(id) => id,
             Err(_) => continue,
-        };
-        let timezone = match pool.timezone(pet_id).await {
-            Ok(timezone) => timezone,
-            Err(error) => {
-                tracing::warn!(%pet_id, %error, "nudge runtime resolution failed; pet skipped");
-                continue;
-            }
         };
         let local_now = now.with_timezone(&timezone);
         let hour = hour_override.unwrap_or(local_now.hour() as u8);

@@ -1,5 +1,5 @@
 import { useMemo } from 'react';
-import { useResourceTime } from '../context/useResourceTime';
+import { useTime } from '../context/useTime';
 import { instantToCivil } from '../lib/resourceTime';
 import { Bar, BarChart, CartesianGrid, Legend, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
 import type { EliminationEventType, EliminationRecord } from '../api/elimination';
@@ -37,7 +37,7 @@ interface EliminationDayChartProps {
 }
 
 export function EliminationDayChart({ records }: EliminationDayChartProps) {
-  const { timeZone } = useResourceTime(records[0]?.pet_id);
+  const { timeZone } = useTime();
   const { chartData, presentTypes } = useMemo(() => {
     const data = [...records]
       .sort((a, b) => a.occurred_at.localeCompare(b.occurred_at))
