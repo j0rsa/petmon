@@ -19,6 +19,82 @@ async fn setup_pool() -> SqlitePool {
     pool
 }
 
+#[tokio::test]
+async fn migration_024_upgrades_the_released_schema_in_one_step() {
+    let pool = sqlx::sqlite::SqlitePoolOptions::new()
+        .max_connections(1)
+        .connect("sqlite::memory:")
+        .await
+        .unwrap();
+    sqlx::migrate!("./migrations")
+        .run_to(23, &pool)
+        .await
+        .unwrap();
+    sqlx::raw_sql(
+        "INSERT INTO pets (id, name, created_at, updated_at)
+             VALUES ('legacy', 'Legacy pet', '2026-01-01', '2026-01-01');
+         INSERT INTO nutrition_records (id, pet_id, occurred_at, local_date, category, amount, created_at, updated_at, telegram_message_id)
+             VALUES ('record', 'legacy', '2026-01-01T09:00:00', '2026-01-01', 'water', 10, '2026-01-01', '2026-01-01', 42);
+         INSERT INTO elimination_classifiers (pet_id, model_version, model_json, trained_at, created_at, updated_at)
+             VALUES ('legacy', 2, '{}', '2026-01-01', '2026-01-01', '2026-01-01');",
+    )
+    .execute(&pool)
+    .await
+    .unwrap();
+
+    petmon::db::run_schema_migrations(&pool).await.unwrap();
+    // SQLx must recognize the combined migration on subsequent starts.
+    petmon::db::run_schema_migrations(&pool).await.unwrap();
+    let applied: Vec<i64> = sqlx::query_scalar(
+        "SELECT version FROM _sqlx_migrations WHERE version > 23 ORDER BY version",
+    )
+    .fetch_all(&pool)
+    .await
+    .unwrap();
+    assert_eq!(applied, vec![24]);
+    let record: (String, String, i64, Option<String>, Option<String>, Option<String>) = sqlx::query_as(
+        "SELECT occurred_at, local_date, telegram_message_id, telegram_chat_id, telegram_thread_id, telegram_bot_id FROM nutrition_records WHERE id = 'record'",
+    ).fetch_one(&pool).await.unwrap();
+    assert_eq!(
+        record,
+        (
+            "2026-01-01T09:00:00".into(),
+            "2026-01-01".into(),
+            42,
+            None,
+            None,
+            None
+        )
+    );
+    // Historical times still require explicit conversion, not a timezone guess in SQL.
+    assert!(petmon::record_time::ensure_canonical(&pool).await.is_err());
+    assert_eq!(
+        sqlx::query_scalar::<_, i64>(
+            "SELECT pending_retrain FROM elimination_classifiers WHERE pet_id = 'legacy'"
+        )
+        .fetch_one(&pool)
+        .await
+        .unwrap(),
+        1
+    );
+    sqlx::query(
+        "SELECT telegram_chat_id, telegram_thread_id, telegram_bot_id FROM med_intake_records",
+    )
+    .fetch_all(&pool)
+    .await
+    .unwrap();
+    assert!(sqlx::query_scalar::<_, bool>("SELECT EXISTS(SELECT 1 FROM sqlite_master WHERE type = 'index' AND name = 'idx_med_intake_telegram_delivery')")
+        .fetch_one(&pool).await.unwrap());
+    assert!(
+        petmon::repo::instance_admins::bootstrap(&pool, &["operator".into()])
+            .await
+            .unwrap()
+    );
+    assert!(petmon::repo::instance_admins::contains(&pool, "operator")
+        .await
+        .unwrap());
+}
+
 /// Builds the /api/v1 slice only (used by CRUD tests).
 /// Uses the same complete API registration as production.
 macro_rules! build_app {

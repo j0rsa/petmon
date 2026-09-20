@@ -60,21 +60,19 @@ async fn failed_notification_insert_rolls_back_delivery_claim() {
 
 #[tokio::test]
 async fn migration_claims_existing_events_before_they_can_be_dismissed() {
-    let pool = pool().await;
-    notifications::create(&pool, event("existing"))
+    let pool = sqlx::sqlite::SqlitePoolOptions::new()
+        .max_connections(1)
+        .connect("sqlite::memory:")
         .await
         .unwrap();
-    // Reconstruct the pre-migration state in this isolated in-memory database.
-    sqlx::query("DROP TABLE notification_delivery_claims")
-        .execute(&pool)
+    sqlx::migrate!("./migrations")
+        .run_to(23, &pool)
         .await
         .unwrap();
-    sqlx::raw_sql(include_str!(
-        "../migrations/027_notification_delivery_claims.sql"
-    ))
-    .execute(&pool)
-    .await
-    .unwrap();
+    // Use the released schema: the current notification repository requires claims.
+    sqlx::query("INSERT INTO notifications (id, kind, title, link_path, source_kind, source_id, created_at) VALUES ('existing', 'med.nudge', 'Reminder', '/health', 'med_nudge', 'existing', '2026-01-01T00:00:00Z')")
+        .execute(&pool).await.unwrap();
+    petmon::db::run_migrations(&pool).await.unwrap();
     notifications::delete_all(&pool).await.unwrap();
     assert!(notifications::create(&pool, event("existing"))
         .await
