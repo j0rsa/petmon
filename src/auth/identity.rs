@@ -1,3 +1,4 @@
+use crate::domain::auth::Scope;
 use std::collections::HashSet;
 
 /// Authenticated caller, injected into request extensions by the auth middleware.
@@ -13,7 +14,7 @@ pub struct Identity {
     pub kind: IdentityKind,
     /// Granted scopes. Empty means ordinary full access, never administrator
     /// authority for API tokens. HashSet for O(1) lookup.
-    pub scopes: HashSet<String>,
+    pub scopes: HashSet<Scope>,
     /// Creator display name snapshot for the current API token session, if any.
     pub token_created_by: Option<String>,
     /// OIDC subject (or `dev`) recorded on the API token at mint time.
@@ -63,16 +64,13 @@ impl Identity {
     /// - OIDC and API token identities with an empty scopes set have ordinary full access.
     /// - Otherwise scopes must contain `"all"` or `required_scope`.
     /// - Roles are separate from scopes; administration uses `auth::admin`.
-    pub fn has_scope(&self, required_scope: &str) -> bool {
-        if !crate::domain::settings::is_valid_scope(required_scope) {
-            return false;
-        }
+    pub fn has_scope(&self, required_scope: Scope) -> bool {
         match self.kind {
             IdentityKind::Dev => true,
             IdentityKind::Oidc | IdentityKind::ApiToken { .. } => {
                 self.scopes.is_empty()
-                    || self.scopes.contains("all")
-                    || self.scopes.contains(required_scope)
+                    || self.scopes.contains(&Scope::All)
+                    || self.scopes.contains(&required_scope)
             }
         }
     }

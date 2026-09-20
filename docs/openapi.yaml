@@ -2924,7 +2924,8 @@ components:
           description: Raw credential scopes. Legacy empty scopes allow ordinary REST/MCP access, never administrative API-token authority. An API-token session needs literal all plus the live instance_admin role for administration.
         roles:
           type: array
-          items: { type: string }
+          items:
+            $ref: '#/components/schemas/Role'
           description: Current server-side user roles. instance_admin indicates a live administrator grant, independently of the credential's scopes. DEV_MODE's trusted development identity is an administrator.
         token_created_by:
           type: string
@@ -3985,6 +3986,11 @@ components:
       description: RFC3339 instant with an explicit UTC offset or Z; naive or blank timestamps return 400. Inputs normalize to fixed-nanosecond UTC Z output without changing the instant. An explicit local_date remains an independent civil journal date; otherwise the authenticated actor's effective timezone determines it. For create requests, omitting the timestamp uses now, or the current local time of day on a supplied historical journal date; an ambiguous or nonexistent synthesized local time returns 400 and requires an explicit instant.
       examples: ['2026-09-19T14:30:00+02:00', '2026-09-19T12:30:00.000000000Z']
 
+    Role:
+      type: string
+      enum: [instance_admin]
+      description: Server-granted user role, independent of credential scopes.
+
     ApiTokenScope:
       type: string
       enum: [all, api_read, api_write, mcp]
@@ -4085,8 +4091,7 @@ components:
         scopes:
           type: array
           items:
-            type: string
-            enum: [all, api_read, api_write, mcp]
+            $ref: '#/components/schemas/ApiTokenScope'
           minItems: 1
           description: "Requested scopes. Omitted input requests [all] only if within caller authority; otherwise 403. API-token callers require literal all to grant all. Interactive callers may grant all with all three ordinary permissions. Empty arrays and instance_admin are invalid."
 
@@ -4097,8 +4102,7 @@ components:
         scopes:
           type: array
           items:
-            type: string
-            enum: [all, api_read, api_write, mcp]
+            $ref: '#/components/schemas/ApiTokenScope'
           minItems: 1
           description: New scope set, subject to the same authority attenuation as creation. API-token callers cannot grant all without literal all in their current scopes, regardless of live roles.
 

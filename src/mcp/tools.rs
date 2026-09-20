@@ -1281,30 +1281,16 @@ pub async fn dispatch(
 
         // ── API token scopes ──────────────────────────────────────────────────
         "api-tokens.scopes.update" => {
-            use crate::domain::settings::{is_valid_scope, UpdateApiTokenScopes};
+            use crate::domain::settings::UpdateApiTokenScopes;
             let id = params["id"]
                 .as_str()
                 .ok_or_else(|| AppError::BadRequest("id required".to_string()))?;
-            let scopes: Vec<String> = params["scopes"]
-                .as_array()
-                .ok_or_else(|| AppError::BadRequest("scopes must be an array".to_string()))?
-                .iter()
-                .map(|v| {
-                    v.as_str()
-                        .ok_or_else(|| AppError::BadRequest("scope must be a string".to_string()))
-                        .map(str::to_owned)
-                })
-                .collect::<AppResult<Vec<_>>>()?;
-            for s in &scopes {
-                if !is_valid_scope(s) {
-                    return Err(AppError::BadRequest(format!("unknown scope '{s}'")));
-                }
-            }
-            let req = UpdateApiTokenScopes { scopes };
+            let req: UpdateApiTokenScopes = serde_json::from_value(params.clone())
+                .map_err(|e| AppError::BadRequest(e.to_string()))?;
             let token =
                 crate::auth::admin::update_owned_token_scopes(pool, &pool.actor, id, req.scopes)
                     .await?;
-            let scopes = token.scopes_vec();
+            let scopes = token.scopes_vec()?;
             Ok(json!({
                 "id": token.id,
                 "alias": token.alias,

@@ -598,7 +598,7 @@ async fn adapter_cookie_sessions_and_live_token_owner_resolution_preserve_creden
         &base.pool,
         petmon::domain::settings::CreateApiToken {
             alias: None,
-            scopes: Some(vec!["api_read".into()]),
+            scopes: Some(vec![petmon::domain::auth::Scope::ApiRead]),
             created_by: None,
             owner_subject: Some("ordinary-user".into()),
         },

@@ -1,4 +1,5 @@
 import { api } from './client';
+import { SCOPES, type Scope } from './authTypes';
 import { canDelegateAll, effectiveScopes, type MeResponse } from './me';
 
 export interface OidcConfigPublic {
@@ -32,12 +33,9 @@ export interface UpdateTelegramConfig {
   bot_token?: string | null;
 }
 
-export type ApiTokenScope = 'all' | 'api_read' | 'api_write' | 'mcp';
-export const API_TOKEN_SCOPES: ApiTokenScope[] = ['all', 'api_read', 'api_write', 'mcp'];
-
-export function allowedTokenScopes(me: MeResponse | undefined): ApiTokenScope[] {
+export function allowedTokenScopes(me: MeResponse | undefined): Scope[] {
   const scopes = effectiveScopes(me);
-  return API_TOKEN_SCOPES.filter((scope) => scope === 'all'
+  return SCOPES.filter((scope) => scope === 'all'
     ? canDelegateAll(me)
     : scopes.has(scope));
 }
@@ -47,7 +45,7 @@ export interface ApiTokenPublic {
   alias: string | null;
   active: boolean;
   current: boolean;
-  scopes: ApiTokenScope[];
+  scopes: Scope[];
   created_by: string | null;
   created_at: string;
   last_used_at: string | null;
@@ -57,7 +55,7 @@ export interface ApiTokenCreated {
   id: string;
   alias: string | null;
   token: string;
-  scopes: ApiTokenScope[];
+  scopes: Scope[];
   created_at: string;
 }
 
@@ -67,11 +65,11 @@ export interface ApiTokenAdminPublic extends ApiTokenPublic {
 
 export interface CreateApiToken {
   alias?: string;
-  scopes?: ApiTokenScope[];
+  scopes?: Scope[];
 }
 
 export interface UpdateApiTokenScopes {
-  scopes: ApiTokenScope[];
+  scopes: Scope[];
 }
 
 export const settingsApi = {

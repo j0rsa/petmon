@@ -2,7 +2,8 @@ import { useEffect, useRef, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { ApiError } from '../api/client';
 import { settingsApi } from '../api/settings';
-import type { ApiTokenCreated, ApiTokenPublic, ApiTokenScope, OidcConfigPublic, TelegramConfigPublic } from '../api/settings';
+import type { ApiTokenCreated, ApiTokenPublic, OidcConfigPublic, TelegramConfigPublic } from '../api/settings';
+import type { Scope } from '../api/authTypes';
 import { useUserSettings } from '../api/userSettings';
 import { allowedTokenScopes } from '../api/settings';
 import { deriveDeviceAlias, storeToken } from '../lib/auth';
@@ -594,7 +595,7 @@ function ApiTokensSection() {
   const { data: tokens, isLoading } = useQuery({ queryKey: ['api-tokens'], queryFn: settingsApi.listTokens, enabled: scopes.has('api_read') });
 
   const [alias, setAlias] = useState('');
-  const [newScopes, setNewScopes] = useState<ApiTokenScope[]>([]);
+  const [newScopes, setNewScopes] = useState<Scope[]>([]);
   const [justCreated, setJustCreated] = useState<ApiTokenCreated | null>(null);
   const [copied, setCopied] = useState(false);
   const [deviceAlias, setDeviceAlias] = useState(() => deriveDeviceAlias());
@@ -614,7 +615,7 @@ function ApiTokensSection() {
   });
 
   const updateScopesMutation = useMutation({
-    mutationFn: ({ id, scopes }: { id: string; scopes: ApiTokenScope[] }) =>
+    mutationFn: ({ id, scopes }: { id: string; scopes: Scope[] }) =>
       settingsApi.updateTokenScopes(id, { scopes }),
     onSuccess: async () => {
       await queryClient.invalidateQueries({ queryKey: ['api-tokens'] });
@@ -739,7 +740,7 @@ function ApiTokensSection() {
             <TagInput
               value={newScopes}
               options={allowedScopes}
-              onChange={(v) => setNewScopes(v as ApiTokenScope[])}
+              onChange={setNewScopes}
               placeholder="Add scope…"
             />
           </div>
@@ -810,18 +811,19 @@ function ApiTokensSection() {
 function TokenRow({ token, canWrite, allowedScopes, onActivate, activating, onDeactivate, deactivating, onDelete, deleting, onUpdateScopes, updatingScopes }: {
   token: ApiTokenPublic;
   canWrite: boolean;
-  allowedScopes: ApiTokenScope[];
+  allowedScopes: Scope[];
   onActivate: () => void;
   activating: boolean;
   onDeactivate: () => void;
   deactivating: boolean;
   onDelete: () => void;
   deleting: boolean;
-  onUpdateScopes: (scopes: ApiTokenScope[]) => void;
+  onUpdateScopes: (scopes: Scope[]) => void;
   updatingScopes: boolean;
 }) {
   const [editingScopes, setEditingScopes] = useState(false);
-  const [scopesDraft, setScopesDraft] = useState<ApiTokenScope[]>(token.scopes);
+  const [scopesDraft, setScopesDraft] = useState<Scope[]>(token.scopes);
+  const scopesToActivate: Scope[] = token.scopes.length ? token.scopes : ['all'];
 
   function startScopeEdit() {
     setScopesDraft(token.scopes.filter((scope) => allowedScopes.includes(scope)));
@@ -853,7 +855,7 @@ function TokenRow({ token, canWrite, allowedScopes, onActivate, activating, onDe
               <TagInput
                 value={scopesDraft}
                 options={allowedScopes}
-                onChange={(v) => setScopesDraft(v as ApiTokenScope[])}
+                onChange={setScopesDraft}
                 placeholder="Add scope…"
                 disabled={updatingScopes}
               />
@@ -924,7 +926,7 @@ function TokenRow({ token, canWrite, allowedScopes, onActivate, activating, onDe
                   className="button button-secondary"
                   type="button"
                   style={{ padding: '0.3rem 0.75rem', fontSize: '0.82rem' }}
-                  disabled={activating || (token.scopes.length ? token.scopes : ['all']).some((scope) => !allowedScopes.includes(scope as ApiTokenScope))}
+                  disabled={activating || scopesToActivate.some((scope) => !allowedScopes.includes(scope))}
                   title="Activation requires authority for every scope on this token"
                   onClick={onActivate}
                 >

@@ -1,3 +1,7 @@
+use crate::{
+    domain::auth::Scope,
+    error::{AppError, AppResult},
+};
 use chrono::Utc;
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
@@ -157,29 +161,22 @@ pub enum WeekStart {
 
 // ── API tokens ────────────────────────────────────────────────────────────────
 
-pub const ALL_SCOPES: &[&str] = &["all", "api_read", "api_write", "mcp"];
-
-/// Validates a scope string — must be one of the known scope values.
-pub fn is_valid_scope(s: &str) -> bool {
-    ALL_SCOPES.contains(&s)
+/// Decode the legacy CSV storage boundary. Empty retains ordinary full access;
+/// unknown values fail closed instead of being dropped into an empty scope set.
+pub fn parse_scopes(raw: &str) -> Result<Vec<Scope>, String> {
+    raw.split(',')
+        .map(str::trim)
+        .filter(|s| !s.is_empty())
+        .map(str::parse)
+        .collect()
 }
 
-/// Parse comma-separated scopes string into a vec, validating each entry.
-pub fn parse_scopes(raw: &str) -> Result<Vec<String>, String> {
-    let scopes: Vec<String> = raw
-        .split(',')
-        .map(|s| s.trim().to_string())
-        .filter(|s| !s.is_empty())
-        .collect();
-    if scopes.is_empty() {
-        return Err("at least one scope is required".to_string());
-    }
-    for s in &scopes {
-        if !is_valid_scope(s) {
-            return Err(format!("unknown scope '{s}'"));
-        }
-    }
-    Ok(scopes)
+pub fn scopes_csv(scopes: &[Scope]) -> String {
+    scopes
+        .iter()
+        .map(|scope| scope.as_str())
+        .collect::<Vec<_>>()
+        .join(",")
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, sqlx::FromRow)]
@@ -188,7 +185,11 @@ pub struct ApiToken {
     pub alias: Option<String>,
     pub token_hash: String,
     pub active: bool,
-    pub scopes: String,
+    /// Exact database representation, retained for activation's compare-and-swap.
+    /// Callers outside the crate consume only validated enums via scopes_vec().
+    #[sqlx(rename = "scopes")]
+    #[serde(rename = "scopes")]
+    pub(crate) scopes_csv: String,
     pub created_by: Option<String>,
     /// OIDC `sub` (or `dev`) of the user who minted this token — the per-user id for settings, reads, and push.
     pub owner_subject: Option<String>,
@@ -204,7 +205,7 @@ pub struct ApiTokenPublic {
     pub active: bool,
     /// True when this token is the one authenticating the current request.
     pub current: bool,
-    pub scopes: Vec<String>,
+    pub scopes: Vec<Scope>,
     pub created_by: Option<String>,
     pub created_at: String,
     pub last_used_at: Option<String>,
@@ -224,7 +225,7 @@ pub struct ApiTokenCreated {
     pub id: String,
     pub alias: Option<String>,
     pub token: String,
-    pub scopes: Vec<String>,
+    pub scopes: Vec<Scope>,
     pub created_at: String,
 }
 
@@ -232,7 +233,7 @@ pub struct ApiTokenCreated {
 pub struct CreateApiToken {
     pub alias: Option<String>,
     /// Defaults to ["all"] when omitted, subject to caller attenuation.
-    pub scopes: Option<Vec<String>>,
+    pub scopes: Option<Vec<Scope>>,
     /// Set by the server from the caller's Identity — not accepted from the request body.
     #[serde(skip_deserializing)]
     pub created_by: Option<String>,
@@ -242,7 +243,7 @@ pub struct CreateApiToken {
 
 #[derive(Debug, Deserialize)]
 pub struct UpdateApiTokenScopes {
-    pub scopes: Vec<String>,
+    pub scopes: Vec<Scope>,
 }
 
 impl ApiToken {
@@ -250,14 +251,14 @@ impl ApiToken {
         let now = Utc::now().to_rfc3339();
         let scopes = req
             .scopes
-            .map(|v| v.join(","))
+            .map(|v| scopes_csv(&v))
             .unwrap_or_else(|| "all".to_string());
         ApiToken {
             id: Uuid::new_v4().to_string(),
             alias: req.alias,
             token_hash,
             active: true,
-            scopes,
+            scopes_csv: scopes,
             created_by: req.created_by,
             owner_subject: req.owner_subject,
             created_at: now,
@@ -265,11 +266,8 @@ impl ApiToken {
         }
     }
 
-    pub fn scopes_vec(&self) -> Vec<String> {
-        self.scopes
-            .split(',')
-            .map(|s| s.trim().to_string())
-            .filter(|s| !s.is_empty())
-            .collect()
+    pub fn scopes_vec(&self) -> AppResult<Vec<Scope>> {
+        parse_scopes(&self.scopes_csv)
+            .map_err(|_| AppError::Internal("invalid stored API token scopes".into()))
     }
 }

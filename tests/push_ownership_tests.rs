@@ -24,7 +24,7 @@ async fn subscription_requires_owner_or_original_browser_keys() {
         &pool,
         CreateApiToken {
             alias: None,
-            scopes: Some(vec!["all".into()]),
+            scopes: Some(vec![petmon::domain::auth::Scope::All]),
             created_by: None,
             owner_subject: Some("bob".into()),
         },
