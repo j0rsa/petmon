@@ -70,7 +70,37 @@ export const AdministratorWithNarrowScopesNarrow = asNarrowStory(AdministratorWi
 /** Fresh install — nothing set up yet. */
 export const BlankSlate: Story = {
   decorators: [withSettings({ oidc: 'empty', telegram: 'empty', tokens: 'empty' })],
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    const alias = canvas.getByPlaceholderText('e.g. mobile-app');
+    const scopeInput = canvas.getByPlaceholderText('Add scope…');
+    const picker = scopeInput.closest('.tag-input') as HTMLElement;
+    const aliasStyle = getComputedStyle(alias);
+    const pickerStyle = getComputedStyle(picker);
+
+    await expect(Math.abs(picker.getBoundingClientRect().height - alias.getBoundingClientRect().height)).toBeLessThanOrEqual(1);
+    await expect(pickerStyle.backgroundColor).toBe(aliasStyle.backgroundColor);
+    await expect(pickerStyle.borderRadius).toBe(aliasStyle.borderRadius);
+    await expect(pickerStyle.paddingLeft).toBe(aliasStyle.paddingLeft);
+    await expect(getComputedStyle(scopeInput).fontSize).toBe(aliasStyle.fontSize);
+
+    await userEvent.click(scopeInput);
+    await expect(getComputedStyle(picker).outlineStyle).toBe('solid');
+    await userEvent.click(within(picker).getByText('api_read'));
+    await expect(within(picker).getByRole('button', { name: 'Remove api_read' })).toBeVisible();
+    await expect(Math.abs(picker.getBoundingClientRect().height - alias.getBoundingClientRect().height)).toBeLessThanOrEqual(1);
+    await userEvent.click(within(picker).getByText('api_write'));
+    await userEvent.click(within(picker).getByText('mcp'));
+    await userEvent.click(within(picker).getByText('all'));
+    await expect(picker.scrollWidth).toBeLessThanOrEqual(picker.clientWidth);
+    for (const scope of ['api_read', 'api_write', 'mcp', 'all']) {
+      await userEvent.click(within(picker).getByRole('button', { name: `Remove ${scope}` }));
+    }
+    await expect(canvas.getByPlaceholderText('Add scope…')).toBeVisible();
+    await expect(Math.abs(picker.getBoundingClientRect().height - alias.getBoundingClientRect().height)).toBeLessThanOrEqual(1);
+  },
 };
+export const BlankSlateNarrow = asNarrowStory(BlankSlate);
 
 /** OIDC configured, Telegram not, no tokens. */
 export const OidcOnlyConfigured: Story = {

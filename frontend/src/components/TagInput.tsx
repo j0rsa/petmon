@@ -44,17 +44,8 @@ export function TagInput({ value, options, onChange, placeholder = 'Add…', dis
     <div
       className="tag-input"
       style={{
-        display: 'flex',
-        flexWrap: 'wrap',
-        gap: '0.35rem',
-        alignItems: 'center',
-        padding: '0.35rem 0.55rem',
-        border: '1px solid var(--border)',
-        borderRadius: 8,
-        background: 'var(--surface)',
         cursor: disabled ? 'not-allowed' : 'text',
         opacity: disabled ? 0.6 : 1,
-        minHeight: '2.2rem',
       }}
       onClick={() => !disabled && inputRef.current?.focus()}
     >
@@ -99,14 +90,6 @@ export function TagInput({ value, options, onChange, placeholder = 'Add…', dis
             onFocus={() => setIsFocused(true)}
             onBlur={() => setIsFocused(false)}
             placeholder={value.length === 0 ? placeholder : ''}
-            style={{
-              border: 'none',
-              outline: 'none',
-              background: 'transparent',
-              fontSize: '0.82rem',
-              width: '100%',
-              padding: '0.1rem 0',
-            }}
           />
           {isFocused && filtered.length > 0 && (
             <ul
