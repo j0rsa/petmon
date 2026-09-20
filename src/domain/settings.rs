@@ -185,7 +185,7 @@ pub struct ApiToken {
     pub alias: Option<String>,
     pub token_hash: String,
     pub active: bool,
-    /// Exact database representation, retained for activation's compare-and-swap.
+    /// Exact database representation at the SQLite persistence boundary.
     /// Callers outside the crate consume only validated enums via scopes_vec().
     #[sqlx(rename = "scopes")]
     #[serde(rename = "scopes")]

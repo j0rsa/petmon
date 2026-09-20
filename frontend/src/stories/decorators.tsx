@@ -7,6 +7,7 @@ import { DisplaySettingsProvider } from '../context/DisplaySettingsProvider';
 import { localToday, shiftDate } from '../lib/dates';
 import {
   mockApiTokens,
+  mockInstanceApiTokens,
   mockAppInfo,
   mockBestFluidDay,
   mockCreatedToken,
@@ -577,7 +578,7 @@ export function withSettings({
   return function SettingsDecorator(Story) {
     const client = makeMockClient();
     client.setQueryData(['me'], { subject: 'settings-user', email: null, name: 'User', display_name: 'User', kind: usingApiToken ? 'api_token' : 'oidc', scopes, roles: admin ? ['instance_admin'] : [] });
-    client.setQueryData(['instance-api-tokens'], []);
+    client.setQueryData(['instance-api-tokens'], admin ? mockInstanceApiTokens : []);
 
     // Seed localStorage so SettingsPage's `usingApiToken` branch renders correctly.
     if (usingApiToken) {

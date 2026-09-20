@@ -26,7 +26,19 @@ type Story = StoryObj<typeof meta>;
 /** All three sections fully configured. */
 export const AllConfigured: Story = {
   decorators: [withSettings({ oidc: 'configured', telegram: 'configured', tokens: 'populated' })],
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    const heading = canvas.getByRole('heading', { name: 'Instance API tokens' });
+    const section = heading.closest('section') as HTMLElement;
+    const instance = within(section);
+    expect(instance.getAllByRole('columnheader', { name: 'Scopes' })).toHaveLength(2);
+    await expect(instance.getByText('api_read')).toBeInTheDocument();
+    await expect(instance.getByText('mcp')).toBeInTheDocument();
+    await expect(instance.getByRole('button', { name: 'Revoke all (2)' })).toBeInTheDocument();
+    await expect(instance.getByRole('button', { name: 'Activate' })).toBeInTheDocument();
+  },
 };
+export const AllConfiguredNarrow = asNarrowStory(AllConfigured);
 
 export const PersonalSettingsOnly: Story = {
   decorators: [withSettings({ admin: false })],

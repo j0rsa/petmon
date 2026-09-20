@@ -838,32 +838,6 @@ paths:
         '401':
           $ref: '#/components/responses/Unauthorized'
 
-  /api-tokens/{id}/activate:
-    post:
-      tags:
-        - API Tokens
-      summary: Activate API token
-      x-required-scope: api_write
-      description: Re-activate a token owned by the authenticated canonical actor only within the current credential's authority. An API-token caller may reactivate an all token only with literal all in its own scopes, regardless of current user roles. A legacy empty scope set has ordinary read/write/MCP authority, never administrator authority. Foreign and missing token IDs return 404; concurrent scope changes reject activation with 400.
-      parameters:
-        - name: id
-          in: path
-          required: true
-          description: API token ID
-          schema:
-            type: string
-      responses:
-        '204':
-          description: API token activated
-        '400':
-          $ref: '#/components/responses/BadRequest'
-        '403':
-          $ref: '#/components/responses/Forbidden'
-        '401':
-          $ref: '#/components/responses/Unauthorized'
-        '404':
-          $ref: '#/components/responses/NotFound'
-
   /api-tokens/{id}:
     delete:
       tags:
@@ -990,6 +964,67 @@ paths:
           $ref: '#/components/responses/Forbidden'
         '404':
           $ref: '#/components/responses/NotFound'
+
+  /admin/api-tokens/{id}/activate:
+    post:
+      tags: [API Tokens]
+      summary: Reactivate an instance API token
+      x-required-scope: api_write
+      x-required-role: instance_admin
+      x-api-token-admin-scope: all
+      description: Reactivate a credential regardless of owner. Only an instance administrator can restore a revoked token; API-token sessions additionally require literal all. The operation is audited.
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string }
+      responses:
+        '204':
+          description: Token activated
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /admin/api-tokens/revoke-owner:
+    post:
+      tags: [API Tokens]
+      summary: Revoke every active API token for a user
+      x-required-scope: api_write
+      x-required-role: instance_admin
+      x-api-token-admin-scope: all
+      description: Deactivate every active credential owned by one canonical user. Only an instance administrator can perform this batch operation; it is audited.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [owner_subject]
+              properties:
+                owner_subject:
+                  type: string
+                  description: Canonical token-owner identifier
+      responses:
+        '200':
+          description: Active tokens revoked
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [revoked]
+                properties:
+                  revoked:
+                    type: integer
+                    format: int64
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
 
   /admin/api-tokens/{id}/permanent:
     delete:
@@ -2779,7 +2814,8 @@ components:
         Administrator endpoints also require the live instance_admin user role; API-token
         sessions must additionally contain literal all. The three ordinary scopes combined,
         or a legacy empty scope set, never confer administrator authority or permission to
-        mint/update/reactivate an all token. Interactive sessions need the live role and
+        mint or update an all token. Reactivating any token additionally requires the live
+        administrator role. Interactive sessions need the live role and
         endpoint read/write scope. Resource policy applies independently of scopes and roles.
 
   responses:
@@ -4000,8 +4036,9 @@ components:
         MCP, without enabling REST credential management. all includes those ordinary
         permissions and additionally permits administration when the owner's live
         instance_admin user role is present. instance_admin is not a valid token scope.
-        Only a token with literal all may mint/update/reactivate another all token;
-        combining ordinary scopes never substitutes for literal all, even without a role.
+        Only a token with literal all may mint or update another all token. Reactivating a
+        revoked token is an instance-administrator operation; combining ordinary scopes
+        never substitutes for literal all, even without a role.
         Resource policy applies independently to every care operation.
 
     ApiTokenAdminPublic:

@@ -65,31 +65,6 @@ pub async fn set_active_owned(
     Ok(())
 }
 
-/// Compare the authorized scope snapshot in the write to prevent activation
-/// racing a concurrent scope update from enabling a stronger credential.
-pub async fn activate_owned(
-    pool: &SqlitePool,
-    id: &str,
-    owner: &str,
-    authorized_scopes: &str,
-) -> AppResult<()> {
-    let rows = sqlx::query(
-        "UPDATE api_tokens SET active = 1 WHERE id = ? AND owner_subject = ? AND scopes = ?",
-    )
-    .bind(id)
-    .bind(owner)
-    .bind(authorized_scopes)
-    .execute(pool)
-    .await?
-    .rows_affected();
-    if rows == 0 {
-        return Err(AppError::BadRequest(
-            "API token changed or was removed; retry activation".into(),
-        ));
-    }
-    Ok(())
-}
-
 pub async fn delete_owned(
     pool: &SqlitePool,
     id: &str,
@@ -191,6 +166,18 @@ pub async fn deactivate(pool: &SqlitePool, id: &str) -> AppResult<()> {
         return Err(AppError::NotFound(format!("API token '{id}' not found")));
     }
     Ok(())
+}
+
+/// Revoke every active token owned by a canonical subject. This is intentionally
+/// an administrative operation; ordinary owners can only revoke one of their own.
+pub async fn deactivate_all_owned(pool: &SqlitePool, owner: &str) -> AppResult<u64> {
+    Ok(
+        sqlx::query("UPDATE api_tokens SET active = 0 WHERE owner_subject = ? AND active = 1")
+            .bind(owner)
+            .execute(pool)
+            .await?
+            .rows_affected(),
+    )
 }
 
 pub async fn update_scopes(

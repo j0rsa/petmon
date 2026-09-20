@@ -2,7 +2,7 @@ import { localToday, shiftDate } from '../lib/dates';
 import type { BestFluidDay, Category, NutritionDaySummary, NutritionRangeSummary, NutritionRecord, NutritionSchedule, Pet } from '../types';
 import type { DayNutritionHighlight, DayEliminationHighlight } from '../types/pillars';
 import type { AppInfo } from '../api/info';
-import type { ApiTokenCreated, ApiTokenPublic, OidcConfigPublic, TelegramConfigPublic } from '../api/settings';
+import type { ApiTokenAdminPublic, ApiTokenCreated, ApiTokenPublic, OidcConfigPublic, TelegramConfigPublic } from '../api/settings';
 import { DEFAULT_CUMULATIVE_FLUID_CHART_SETTINGS, DEFAULT_DEVELOPER_MODE_SETTINGS, DEFAULT_NUTRITION_CALENDAR_SETTINGS, DEFAULT_USER_DISPLAY_SETTINGS, type DeveloperModeSettings, type UserDisplaySettings } from '../api/userSettings';
 import type { EliminationRecord, EliminationDailySummary, EliminationRangeSummary, EliminationDurationProfile, EliminationClassifierStatus } from '../api/elimination';
 import type { NotificationItem } from '../api/notifications';
@@ -321,6 +321,12 @@ export const mockApiTokens: ApiTokenPublic[] = [
     created_at: '2024-11-01T08:00:00Z',
     last_used_at: '2024-12-20T10:00:00Z',
   },
+];
+
+export const mockInstanceApiTokens: ApiTokenAdminPublic[] = [
+  { ...mockApiTokens[0], owner_subject: 'settings-user' },
+  { ...mockApiTokens[1], owner_subject: 'settings-user' },
+  { ...mockApiTokens[2], owner_subject: 'other-user', created_by: 'Other user' },
 ];
 
 export const mockCreatedToken: ApiTokenCreated = {

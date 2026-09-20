@@ -88,9 +88,13 @@ GET/POST         /api/v1/settings/oidc
 GET/POST         /api/v1/settings/telegram
 
 GET/POST         /api/v1/api-tokens
-POST             /api/v1/api-tokens/:id/activate
 DELETE           /api/v1/api-tokens/:id
 DELETE           /api/v1/api-tokens/:id/permanent
+GET              /api/v1/admin/api-tokens       # instance administrator
+POST             /api/v1/admin/api-tokens/:id/activate
+POST             /api/v1/admin/api-tokens/revoke-owner
+DELETE           /api/v1/admin/api-tokens/:id
+DELETE           /api/v1/admin/api-tokens/:id/permanent
 
 GET              /api/v1/health                  # health check (unauthenticated)
 GET              /api/v1/info                    # version + git SHA + optional shortcut iCloud URL
@@ -275,9 +279,9 @@ DATABASE_URL=sqlite:/data/petmon.db ./petmon admin revoke '<subject>'
 
 The CLI runs migrations and the requested command without starting workers or requiring a configured OIDC provider. Revoking the last administrator is refused; grant a replacement first. `INSTANCE_ADMIN_SUBJECTS` can bootstrap comma-separated subjects once. Successful bootstrap or a CLI grant consumes a durable initialization marker, so restarting with an old environment value does not restore revoked grants. Later grants use the CLI.
 
-Interactive administrator sessions use their live administrator role. Administrative API tokens require both a current administrator grant for their owner and the literal `all` scope. The combined `api_read`, `api_write`, and `mcp` scopes grant ordinary access only. Role revocation applies to subsequent requests. Global token administration lives under `/api/v1/admin/api-tokens`, and `/auth/me` reports `roles`, `scopes`, and credential `kind`.
+Interactive administrator sessions use their live administrator role. Administrative API tokens require both a current administrator grant for their owner and the literal `all` scope. The combined `api_read`, `api_write`, and `mcp` scopes grant ordinary access only. Role revocation applies to subsequent requests. Global token administration lives under `/api/v1/admin/api-tokens`: administrators can inspect all credentials, reactivate one, or revoke every active credential for a user. `/auth/me` reports `roles`, `scopes`, and credential `kind`.
 
-`mcp` enables both care reads and writes through the MCP endpoint; adding `api_read` does not make that MCP access read-only. It does not grant REST token-management access. Token creation, scope changes and reactivation cannot exceed the calling credential's authority. Only a literal `all` API token can delegate `all`; ordinary combined scopes and legacy empty scopes cannot. Empty requested scope lists are rejected.
+`mcp` enables both care reads and writes through the MCP endpoint; adding `api_read` does not make that MCP access read-only. It does not grant REST token-management access. Token creation and scope changes cannot exceed the calling credential's authority. Only a literal `all` API token can delegate `all`; ordinary combined scopes and legacy empty scopes cannot. Empty requested scope lists are rejected. Only an instance administrator can reactivate a revoked token.
 
 ### Record timestamp upgrade (0.26)
 

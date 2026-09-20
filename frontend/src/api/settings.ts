@@ -63,6 +63,10 @@ export interface ApiTokenAdminPublic extends ApiTokenPublic {
   owner_subject: string | null;
 }
 
+export interface RevokeTokensForOwnerResult {
+  revoked: number;
+}
+
 export interface CreateApiToken {
   alias?: string;
   scopes?: Scope[];
@@ -80,8 +84,10 @@ export const settingsApi = {
   listTokens: () => api.get<ApiTokenPublic[]>('/api-tokens'),
   listInstanceTokens: () => api.get<ApiTokenAdminPublic[]>('/admin/api-tokens'),
   revokeInstanceToken: (id: string) => api.delete(`/admin/api-tokens/${id}`),
+  activateInstanceToken: (id: string) => api.post<void>(`/admin/api-tokens/${id}/activate`, {}),
+  revokeInstanceTokensForOwner: (owner_subject: string) =>
+    api.post<RevokeTokensForOwnerResult>('/admin/api-tokens/revoke-owner', { owner_subject }),
   createToken: (body: CreateApiToken) => api.post<ApiTokenCreated>('/api-tokens', body),
-  activateToken: (id: string) => api.post<void>(`/api-tokens/${id}/activate`, {}),
   deactivateToken: (id: string) => api.delete(`/api-tokens/${id}`),
   deleteToken: (id: string) => api.delete(`/api-tokens/${id}/permanent`),
   updateTokenScopes: (id: string, body: UpdateApiTokenScopes) =>

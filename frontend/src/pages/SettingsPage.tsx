@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { ApiError } from '../api/client';
 import { settingsApi } from '../api/settings';
-import type { ApiTokenCreated, ApiTokenPublic, OidcConfigPublic, TelegramConfigPublic } from '../api/settings';
+import type { ApiTokenAdminPublic, ApiTokenCreated, ApiTokenPublic, OidcConfigPublic, TelegramConfigPublic } from '../api/settings';
 import type { Scope } from '../api/authTypes';
 import { useUserSettings } from '../api/userSettings';
 import { allowedTokenScopes } from '../api/settings';
@@ -571,16 +571,59 @@ function InstanceTokensSection({ canWrite }: { canWrite: boolean }) {
   const client = useQueryClient();
   const tokens = useQuery({ queryKey: ['instance-api-tokens'], queryFn: settingsApi.listInstanceTokens });
   const revoke = useMutation({ mutationFn: settingsApi.revokeInstanceToken, onSuccess: () => client.invalidateQueries({ queryKey: ['instance-api-tokens'] }) });
+  const activate = useMutation({ mutationFn: settingsApi.activateInstanceToken, onSuccess: () => client.invalidateQueries({ queryKey: ['instance-api-tokens'] }) });
+  const revokeOwner = useMutation({ mutationFn: settingsApi.revokeInstanceTokensForOwner, onSuccess: () => client.invalidateQueries({ queryKey: ['instance-api-tokens'] }) });
+  const groups = groupTokensByOwner(tokens.data ?? []);
+
   return <section className="panel">
     <h3>Instance API tokens</h3>
-    <p className="muted-text">Operational access to credentials across this instance.</p>
+    <p className="muted-text">Operational access to credentials across this instance. Re-activating revoked tokens is restricted to instance administrators.</p>
     {tokens.isPending && <p>Loading tokens…</p>}
-    {(tokens.isError || revoke.isError) && <p className="error-state">Unable to access instance tokens.</p>}
-    {tokens.data?.map((token) => <div key={token.id} className="button-row" style={{ overflowWrap: 'anywhere' }}>
-      <span>{token.alias ?? token.id} · {token.created_by ?? token.owner_subject ?? 'Unknown user'} · {token.active ? 'Active' : 'Inactive'}</span>
-      {canWrite && token.active && <button className="button button-danger" type="button" disabled={revoke.isPending} onClick={() => { if (window.confirm(`Revoke token ${token.alias ?? token.id}?`)) revoke.mutate(token.id); }}>Revoke</button>}
-    </div>)}
+    {(tokens.isError || revoke.isError || activate.isError || revokeOwner.isError) && <p className="error-state" role="alert">Unable to update instance tokens.</p>}
+    {groups.map(({ owner, tokens: ownerTokens }) => {
+      const activeCount = ownerTokens.filter((token) => token.active).length;
+      const userLabel = ownerTokens[0]?.created_by ?? owner ?? 'Unknown user';
+      return <div key={owner ?? 'unowned'} style={{ display: 'flex', flexDirection: 'column', gap: '0.65rem', paddingTop: '0.75rem' }}>
+        <div style={{ display: 'flex', gap: '0.75rem', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap' }}>
+          <p style={{ fontSize: '0.88rem', fontWeight: 600, overflowWrap: 'anywhere' }}>{userLabel} <span style={{ color: 'var(--text-muted)', fontWeight: 400 }}>· {ownerTokens.length} token{ownerTokens.length === 1 ? '' : 's'}</span></p>
+          {canWrite && owner && activeCount > 0 && <button
+            className="button button-danger"
+            type="button"
+            disabled={revokeOwner.isPending}
+            onClick={() => { if (window.confirm(`Revoke all ${activeCount} active token${activeCount === 1 ? '' : 's'} for ${userLabel}?`)) revokeOwner.mutate(owner); }}
+          >
+            {revokeOwner.isPending && revokeOwner.variables === owner ? 'Revoking…' : `Revoke all (${activeCount})`}
+          </button>}
+        </div>
+        <div style={{ overflowX: 'auto', maxWidth: '100%' }}><table>
+          <thead><tr><th>Alias</th><th>Scopes</th><th>Status</th>{canWrite && <th>Actions</th>}</tr></thead>
+          <tbody>{ownerTokens.map((token) => <tr key={token.id}>
+            <td style={{ fontFamily: 'monospace', fontSize: '0.88rem', overflowWrap: 'anywhere' }}>{token.alias ?? token.id}</td>
+            <td><ScopeBadges scopes={token.scopes} /></td>
+            <td><span className={`status-pill${token.active ? ' active' : ''}`}>{token.active ? 'Active' : 'Inactive'}</span></td>
+            {canWrite && <td><div style={{ display: 'flex', gap: '0.4rem', flexWrap: 'wrap' }}>
+              {token.active ? <button className="button button-danger" type="button" disabled={revoke.isPending} onClick={() => { if (window.confirm(`Revoke token ${token.alias ?? token.id}?`)) revoke.mutate(token.id); }}>{revoke.isPending && revoke.variables === token.id ? '…' : 'Revoke'}</button>
+                : <button className="button button-secondary" type="button" disabled={activate.isPending} onClick={() => { if (window.confirm(`Activate token ${token.alias ?? token.id}?`)) activate.mutate(token.id); }}>{activate.isPending && activate.variables === token.id ? '…' : 'Activate'}</button>}
+            </div></td>}
+          </tr>)}</tbody>
+        </table></div>
+      </div>;
+    })}
   </section>;
+}
+
+function groupTokensByOwner(tokens: ApiTokenAdminPublic[]) {
+  const groups = new Map<string | null, ApiTokenAdminPublic[]>();
+  for (const token of tokens) groups.set(token.owner_subject, [...(groups.get(token.owner_subject) ?? []), token]);
+  return [...groups.entries()]
+    .sort(([left], [right]) => (left ?? '').localeCompare(right ?? ''))
+    .map(([owner, ownerTokens]) => ({ owner, tokens: ownerTokens }));
+}
+
+function ScopeBadges({ scopes }: { scopes: Scope[] }) {
+  return <div style={{ display: 'flex', gap: '0.3rem', flexWrap: 'wrap' }}>
+    {scopes.length === 0 ? <span style={{ color: 'var(--text-muted)', fontSize: '0.82rem' }}>legacy full access</span> : scopes.map((scope) => <span key={scope} style={{ fontFamily: 'monospace', fontSize: '0.72rem', background: 'var(--surface-raised)', border: '1px solid var(--border-subtle)', borderRadius: 4, padding: '0.1rem 0.4rem' }}>{scope}</span>)}
+  </div>;
 }
 
 function ApiTokensSection() {
@@ -633,11 +676,6 @@ function ApiTokensSection() {
       queryClient.invalidateQueries({ queryKey: ['api-tokens'] });
       queryClient.invalidateQueries({ queryKey: ['me'] });
     },
-  });
-
-  const activateMutation = useMutation({
-    mutationFn: (id: string) => settingsApi.activateToken(id),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['api-tokens'] }),
   });
 
   const deactivateMutation = useMutation({
@@ -765,7 +803,7 @@ function ApiTokensSection() {
       )}
 
       <p className="muted-text">Tokens can only receive permissions available to this session. MCP enables reading and writing through MCP. Instance administration requires an explicit scope and an active administrator role.</p>
-      {(updateScopesMutation.isError || activateMutation.isError || deactivateMutation.isError || deleteMutation.isError) && <p className="error-state" role="alert">Unable to update this token. Check this session's permissions and try again.</p>}
+      {(updateScopesMutation.isError || deactivateMutation.isError || deleteMutation.isError) && <p className="error-state" role="alert">Unable to update this token. Check this session's permissions and try again.</p>}
       {/* Token list */}
       {isLoading ? (
         <div className="loading-state">Loading tokens…</div>
@@ -791,8 +829,6 @@ function ApiTokensSection() {
                 token={token}
                 canWrite={canWrite}
                 allowedScopes={allowedScopes}
-                onActivate={() => activateMutation.mutate(token.id)}
-                activating={activateMutation.isPending && activateMutation.variables === token.id}
                 onDeactivate={() => deactivateMutation.mutate(token.id)}
                 deactivating={deactivateMutation.isPending && deactivateMutation.variables === token.id}
                 onDelete={() => deleteMutation.mutate(token.id)}
@@ -808,12 +844,10 @@ function ApiTokensSection() {
   );
 }
 
-function TokenRow({ token, canWrite, allowedScopes, onActivate, activating, onDeactivate, deactivating, onDelete, deleting, onUpdateScopes, updatingScopes }: {
+function TokenRow({ token, canWrite, allowedScopes, onDeactivate, deactivating, onDelete, deleting, onUpdateScopes, updatingScopes }: {
   token: ApiTokenPublic;
   canWrite: boolean;
   allowedScopes: Scope[];
-  onActivate: () => void;
-  activating: boolean;
   onDeactivate: () => void;
   deactivating: boolean;
   onDelete: () => void;
@@ -823,7 +857,6 @@ function TokenRow({ token, canWrite, allowedScopes, onActivate, activating, onDe
 }) {
   const [editingScopes, setEditingScopes] = useState(false);
   const [scopesDraft, setScopesDraft] = useState<Scope[]>(token.scopes);
-  const scopesToActivate: Scope[] = token.scopes.length ? token.scopes : ['all'];
 
   function startScopeEdit() {
     setScopesDraft(token.scopes.filter((scope) => allowedScopes.includes(scope)));
@@ -922,16 +955,7 @@ function TokenRow({ token, canWrite, allowedScopes, onActivate, activating, onDe
             )}
             {!token.active && (
               <>
-                <button
-                  className="button button-secondary"
-                  type="button"
-                  style={{ padding: '0.3rem 0.75rem', fontSize: '0.82rem' }}
-                  disabled={activating || scopesToActivate.some((scope) => !allowedScopes.includes(scope))}
-                  title="Activation requires authority for every scope on this token"
-                  onClick={onActivate}
-                >
-                  {activating ? '…' : 'Activate'}
-                </button>
+                <span style={{ alignSelf: 'center', color: 'var(--text-muted)', fontSize: '0.78rem' }}>Instance admin can reactivate</span>
                 <button
                   className="button button-danger"
                   type="button"
