@@ -2142,6 +2142,11 @@ async fn demo_mode_seeds_empty_database_once() {
         .await
         .unwrap();
     assert_eq!(count, 4);
+    assert!(
+        petmon::repo::instance_admins::contains(&pool, petmon::demo_seed::DEMO_ADMIN_SUBJECTS,)
+            .await
+            .unwrap()
+    );
 
     petmon::services::startup::maybe_seed_demo(&pool, true).await;
     let count_again: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM pets")

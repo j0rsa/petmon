@@ -16,14 +16,17 @@ use crate::domain::species::PetSpecies;
 use crate::domain::weight::CreateWeightRecord;
 use crate::error::AppResult;
 use crate::repo::{
-    day_notes, elimination_records, med_assignments, med_bundles, med_intake_records, medications,
-    nutrition_records, nutrition_schedules, pets, weight_records,
+    day_notes, elimination_records, instance_admins, med_assignments, med_bundles,
+    med_intake_records, medications, nutrition_records, nutrition_schedules, pets, weight_records,
 };
 
 pub const MITTENS_ID: &str = "550e8400-e29b-41d4-a716-446655440000";
 pub const REX_ID: &str = "6ba7b810-9dad-11d1-80b4-00c04fd430c8";
 pub const PEPPER_ID: &str = "a1b2c3d4-e5f6-7890-abcd-ef1234567890";
 pub const CLOVER_ID: &str = "b2c3d4e5-f6a7-8901-bcde-f12345678901";
+/// Comma-separated OIDC subjects granted administrative access in the shared
+/// demo dataset. Keep this explicit fixture configuration, not an auth rule.
+pub const DEMO_ADMIN_SUBJECTS: &str = "278cedc7-2232-4eb1-9a85-fb03b7a55bdc";
 
 const DEMO_DAYS: i64 = 45;
 
@@ -50,6 +53,11 @@ pub async fn run(pool: &SqlitePool, fresh: bool) -> AppResult<SeedSummary> {
     let note_count = seed_day_notes(pool, &demo_pets).await?;
     let schedule_count = seed_schedules(pool, &demo_pets).await?;
     let medication_count = seed_medications(pool, &demo_pets).await?;
+    // Demo OIDC logins need explicit administrator grants to manage the
+    // instance settings demonstrated by preview deployments.
+    for subject in demo_admin_subjects() {
+        instance_admins::grant(pool, subject).await?;
+    }
 
     Ok(SeedSummary {
         pets: demo_pets.len(),
@@ -60,6 +68,17 @@ pub async fn run(pool: &SqlitePool, fresh: bool) -> AppResult<SeedSummary> {
         schedules: schedule_count,
         medications: medication_count,
     })
+}
+
+fn demo_admin_subjects() -> impl Iterator<Item = &'static str> {
+    parse_demo_admin_subjects(DEMO_ADMIN_SUBJECTS)
+}
+
+fn parse_demo_admin_subjects(subjects: &str) -> impl Iterator<Item = &str> {
+    subjects
+        .split(',')
+        .map(str::trim)
+        .filter(|subject| !subject.is_empty())
 }
 
 /// True when the database has no pets yet (fresh after migrations).
@@ -1183,6 +1202,15 @@ mod tests {
             .filter_map(|r| r.note.as_deref())
             .collect();
         assert!(notes.iter().any(|n| n.contains("#Petkit")));
+        assert!(
+            crate::repo::instance_admins::contains(&pool, DEMO_ADMIN_SUBJECTS)
+                .await
+                .expect("demo administrator grant")
+        );
+        assert_eq!(
+            parse_demo_admin_subjects(" alice, bob ,, carol ").collect::<Vec<_>>(),
+            vec!["alice", "bob", "carol"]
+        );
         assert!(notes.iter().any(|n| n.contains("#manual")));
         assert!(notes.iter().any(|n| n.contains("#vet")));
         assert_eq!(summary.day_notes, 4);
