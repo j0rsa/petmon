@@ -30,6 +30,10 @@ async fn main() -> anyhow::Result<()> {
     println!("Demo pet IDs (match frontend Storybook fixtures):");
     println!("  Mittens: {}", petmon::demo_seed::MITTENS_ID);
     println!("  Rex:     {}", petmon::demo_seed::REX_ID);
+    println!(
+        "  Instance admin subjects: {}",
+        petmon::demo_seed::DEMO_ADMIN_SUBJECTS
+    );
     println!();
     println!("Start the app with: make run-be");
 

@@ -328,9 +328,9 @@ Load a ready-to-explore dataset (4 pets, ~45 days of nutrition, elimination, and
 make seed-demo
 ```
 
-This clears existing rows and seeds Mittens, Rex, Pepper, and Clover. Demo pet IDs match the Storybook fixtures.
+This clears existing care rows and seeds Mittens, Rex, Pepper, and Clover. Demo pet IDs match the Storybook fixtures. It also grants instance administration to every comma-separated OIDC subject in `DEMO_ADMIN_SUBJECTS` (currently `278cedc7-2232-4eb1-9a85-fb03b7a55bdc`).
 
-Alternatively, set `DEMO_MODE=true` when running the server: if the database is empty after migrations, the same demo dataset is loaded once (append-only; existing data is never wiped). Useful for PR preview hosts with a fresh SQLite volume. The UI shows a sticky demo banner (`/api/v1/info` → `demo_mode: true`).
+Alternatively, set `DEMO_MODE=true` when running the server: if the database is empty after migrations, the same demo dataset is loaded once (append-only; existing care data is never wiped). Useful for PR preview hosts with a fresh SQLite volume. The UI shows a sticky demo banner (`/api/v1/info` → `demo_mode: true`).
 
 PR preview builds use `VITE_APP_FLAVOR=pr` for grayscale icons and a “Petmon PR” install name.
 
