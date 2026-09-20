@@ -27,7 +27,10 @@ CREATE INDEX idx_med_intake_telegram_delivery ON med_intake_records
 -- Legacy naive timestamps need an explicit historical timezone, unavailable to
 -- SQL migrations. Startup refuses legacy rows until migrate-record-times succeeds.
 -- Changed elapsed-time/hour features must not reuse models trained on civil arithmetic.
-UPDATE elimination_classifiers SET pending_retrain = 1 WHERE model_version <> 3;
+-- Keep only a lightweight pending-retrain tombstone; stale model payloads are discarded.
+UPDATE elimination_classifiers
+SET model_version = 0, model_json = '{}', sample_count = 0, trained_at = '', pending_retrain = 1
+WHERE model_version <> 3;
 
 -- Acknowledging/dismissing an event must not reset reminder deduplication.
 -- Deliberately no FK to notifications: delivery identity outlives inbox rows.
