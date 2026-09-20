@@ -90,7 +90,7 @@ GET/POST         /api/v1/settings/telegram
 GET/POST         /api/v1/api-tokens
 DELETE           /api/v1/api-tokens/:id
 DELETE           /api/v1/api-tokens/:id/permanent
-GET              /api/v1/admin/api-tokens       # instance administrator
+GET              /api/v1/admin/api-tokens       # instance administrator; ?page=&page_size=&name=
 POST             /api/v1/admin/api-tokens/:id/activate
 POST             /api/v1/admin/api-tokens/revoke-owner
 DELETE           /api/v1/admin/api-tokens/:id

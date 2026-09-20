@@ -199,13 +199,28 @@ pub async fn update_token_scopes(
 pub async fn admin_list_tokens(
     req: HttpRequest,
     state: web::Data<AppState>,
+    query: web::Query<AdminTokenListQuery>,
 ) -> AppResult<HttpResponse> {
     let caller = identity(&req)?;
     crate::auth::admin::require_instance_admin(&state.pool, &caller).await?;
-    let tokens = api_tokens::list(&state.pool).await?;
+    let query = query.into_inner();
+    let page = query.page.unwrap_or(1);
+    let page_size = query.page_size.unwrap_or(10);
+    if page == 0 || page_size == 0 || page_size > 50 {
+        return Err(AppError::BadRequest(
+            "page must be positive and page_size must be between 1 and 50".into(),
+        ));
+    }
+    let offset = i64::from(page - 1)
+        .checked_mul(i64::from(page_size))
+        .ok_or_else(|| AppError::BadRequest("page is too large".into()))?;
+    let name = query.name.unwrap_or_default().trim().to_owned();
+    let page_tokens =
+        api_tokens::list_admin_page(&state.pool, &name, i64::from(page_size), offset).await?;
     audit(&caller, "token.inspect_all", "api_tokens");
-    Ok(HttpResponse::Ok().json(
-        tokens
+    Ok(HttpResponse::Ok().json(AdminTokenListResponse {
+        items: page_tokens
+            .tokens
             .into_iter()
             .map(|t| {
                 let owner_subject = t.owner_subject.clone();
@@ -215,7 +230,26 @@ pub async fn admin_list_tokens(
                 })
             })
             .collect::<AppResult<Vec<_>>>()?,
-    ))
+        page,
+        page_size,
+        total_owners: page_tokens.total_owners,
+    }))
+}
+
+#[derive(Debug, Deserialize)]
+pub struct AdminTokenListQuery {
+    pub page: Option<u32>,
+    pub page_size: Option<u32>,
+    /// Case-insensitive substring of the user name recorded for a credential.
+    pub name: Option<String>,
+}
+
+#[derive(Debug, Serialize)]
+pub struct AdminTokenListResponse {
+    pub items: Vec<ApiTokenAdminPublic>,
+    pub page: u32,
+    pub page_size: u32,
+    pub total_owners: u64,
 }
 
 #[delete("/{id}")]

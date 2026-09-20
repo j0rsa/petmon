@@ -927,16 +927,36 @@ paths:
       x-required-scope: api_read
       x-required-role: instance_admin
       x-api-token-admin-scope: all
-      description: Requires the live instance_admin user role and the endpoint read/write scope. API-token sessions additionally require literal all in their scopes. Returns operational metadata and canonical owners, never token hashes or raw secrets. The inspection is audited.
+      description: Requires the live instance_admin user role and the endpoint read/write scope. API-token sessions additionally require literal all in their scopes. Results are paginated by owner so one user's credentials stay together. `name` performs a case-insensitive substring match against the recorded user name. Returns operational metadata and canonical owners, never token hashes or raw secrets. The inspection is audited.
+      parameters:
+        - name: page
+          in: query
+          schema: { type: integer, minimum: 1, default: 1 }
+        - name: page_size
+          in: query
+          schema: { type: integer, minimum: 1, maximum: 50, default: 10 }
+        - name: name
+          in: query
+          description: Case-insensitive substring of the recorded user name
+          schema: { type: string }
       responses:
         '200':
-          description: Instance credentials
+          description: A page of instance credentials, grouped by owner
           content:
             application/json:
               schema:
-                type: array
-                items:
-                  $ref: '#/components/schemas/ApiTokenAdminPublic'
+                type: object
+                required: [items, page, page_size, total_owners]
+                properties:
+                  items:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/ApiTokenAdminPublic'
+                  page: { type: integer }
+                  page_size: { type: integer }
+                  total_owners: { type: integer, format: int64 }
+        '400':
+          $ref: '#/components/responses/BadRequest'
         '401':
           $ref: '#/components/responses/Unauthorized'
         '403':

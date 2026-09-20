@@ -63,6 +63,19 @@ export interface ApiTokenAdminPublic extends ApiTokenPublic {
   owner_subject: string | null;
 }
 
+export interface ApiTokenAdminPage {
+  items: ApiTokenAdminPublic[];
+  page: number;
+  page_size: number;
+  total_owners: number;
+}
+
+export interface ListInstanceTokensParams {
+  page?: number;
+  pageSize?: number;
+  name?: string;
+}
+
 export interface RevokeTokensForOwnerResult {
   revoked: number;
 }
@@ -82,7 +95,11 @@ export const settingsApi = {
   getTelegram: () => api.get<TelegramConfigPublic>('/settings/telegram'),
   updateTelegram: (body: UpdateTelegramConfig) => api.post<TelegramConfigPublic>('/settings/telegram', body),
   listTokens: () => api.get<ApiTokenPublic[]>('/api-tokens'),
-  listInstanceTokens: () => api.get<ApiTokenAdminPublic[]>('/admin/api-tokens'),
+  listInstanceTokens: ({ page = 1, pageSize = 10, name }: ListInstanceTokensParams = {}) => {
+    const params = new URLSearchParams({ page: String(page), page_size: String(pageSize) });
+    if (name) params.set('name', name);
+    return api.get<ApiTokenAdminPage>(`/admin/api-tokens?${params}`);
+  },
   revokeInstanceToken: (id: string) => api.delete(`/admin/api-tokens/${id}`),
   activateInstanceToken: (id: string) => api.post<void>(`/admin/api-tokens/${id}/activate`, {}),
   revokeInstanceTokensForOwner: (owner_subject: string) =>

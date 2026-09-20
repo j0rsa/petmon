@@ -34,6 +34,7 @@ export const AllConfigured: Story = {
     expect(instance.getAllByRole('columnheader', { name: 'Scopes' })).toHaveLength(2);
     await expect(instance.getByText('api_read')).toBeInTheDocument();
     await expect(instance.getByText('mcp')).toBeInTheDocument();
+    await expect(instance.getByPlaceholderText('Filter users by name…')).toBeInTheDocument();
     await expect(instance.getByRole('button', { name: 'Revoke all (2)' })).toBeInTheDocument();
     await expect(instance.getByRole('button', { name: 'Activate' })).toBeInTheDocument();
   },

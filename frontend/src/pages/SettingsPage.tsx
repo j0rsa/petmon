@@ -569,17 +569,37 @@ function TelegramSection() {
 
 function InstanceTokensSection({ canWrite }: { canWrite: boolean }) {
   const client = useQueryClient();
-  const tokens = useQuery({ queryKey: ['instance-api-tokens'], queryFn: settingsApi.listInstanceTokens });
+  const [nameFilter, setNameFilter] = useState('');
+  const [page, setPage] = useState(1);
+  const pageSize = 10;
+  const tokens = useQuery({
+    queryKey: ['instance-api-tokens', page, nameFilter],
+    queryFn: () => settingsApi.listInstanceTokens({ page, pageSize, name: nameFilter.trim() || undefined }),
+  });
   const revoke = useMutation({ mutationFn: settingsApi.revokeInstanceToken, onSuccess: () => client.invalidateQueries({ queryKey: ['instance-api-tokens'] }) });
   const activate = useMutation({ mutationFn: settingsApi.activateInstanceToken, onSuccess: () => client.invalidateQueries({ queryKey: ['instance-api-tokens'] }) });
   const revokeOwner = useMutation({ mutationFn: settingsApi.revokeInstanceTokensForOwner, onSuccess: () => client.invalidateQueries({ queryKey: ['instance-api-tokens'] }) });
-  const groups = groupTokensByOwner(tokens.data ?? []);
+  const groups = groupTokensByOwner(tokens.data?.items ?? []);
+  const totalOwners = tokens.data?.total_owners ?? 0;
+  const totalPages = Math.max(1, Math.ceil(totalOwners / pageSize));
+  const firstOwner = totalOwners === 0 ? 0 : (page - 1) * pageSize + 1;
+  const lastOwner = Math.min(page * pageSize, totalOwners);
 
   return <section className="panel">
     <h3>Instance API tokens</h3>
     <p className="muted-text">Operational access to credentials across this instance. Re-activating revoked tokens is restricted to instance administrators.</p>
+    <label style={{ display: 'grid', gap: '0.35rem', maxWidth: '28rem' }}>
+      <span>User name</span>
+      <input
+        type="search"
+        value={nameFilter}
+        placeholder="Filter users by name…"
+        onChange={(event) => { setNameFilter(event.target.value); setPage(1); }}
+      />
+    </label>
     {tokens.isPending && <p>Loading tokens…</p>}
     {(tokens.isError || revoke.isError || activate.isError || revokeOwner.isError) && <p className="error-state" role="alert">Unable to update instance tokens.</p>}
+    {!tokens.isPending && !tokens.isError && groups.length === 0 && <p className="muted-text">No token owners match this filter.</p>}
     {groups.map(({ owner, tokens: ownerTokens }) => {
       const activeCount = ownerTokens.filter((token) => token.active).length;
       const userLabel = ownerTokens[0]?.created_by ?? owner ?? 'Unknown user';
@@ -609,6 +629,13 @@ function InstanceTokensSection({ canWrite }: { canWrite: boolean }) {
         </table></div>
       </div>;
     })}
+    {totalOwners > 0 && <div className="button-row" style={{ justifyContent: 'space-between', marginTop: '1rem' }}>
+      <span className="muted-text">Users {firstOwner}–{lastOwner} of {totalOwners}</span>
+      <div className="button-row">
+        <button className="button button-secondary" type="button" disabled={page === 1 || tokens.isFetching} onClick={() => setPage((current) => current - 1)}>Previous</button>
+        <button className="button button-secondary" type="button" disabled={page >= totalPages || tokens.isFetching} onClick={() => setPage((current) => current + 1)}>Next</button>
+      </div>
+    </div>}
   </section>;
 }
 
