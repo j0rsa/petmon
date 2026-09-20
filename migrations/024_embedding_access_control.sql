@@ -24,8 +24,43 @@ CREATE INDEX idx_med_intake_telegram_delivery ON med_intake_records
 
 -- occurred_at/measured_at now contain one canonical UTC RFC3339 instant.
 -- No duplicate civil/UTC columns: local_date remains the independent journal day.
--- Legacy naive timestamps need an explicit historical timezone, unavailable to
--- SQL migrations. Startup refuses legacy rows until migrate-record-times succeeds.
+-- This is a pre-release hard switch for the only 0.25 instance: all naïve
+-- values were entered in Berlin during CEST (UTC+2). Explicit-offset values
+-- are already instants and are normalized without shifting them.
+UPDATE nutrition_records
+SET occurred_at = strftime('%Y-%m-%dT%H:%M:%S', occurred_at, '-2 hours') || '.000000000Z'
+WHERE length(occurred_at) = 19;
+UPDATE elimination_records
+SET occurred_at = strftime('%Y-%m-%dT%H:%M:%S', occurred_at, '-2 hours') || '.000000000Z'
+WHERE length(occurred_at) = 19;
+UPDATE med_intake_records
+SET occurred_at = strftime('%Y-%m-%dT%H:%M:%S', occurred_at, '-2 hours') || '.000000000Z'
+WHERE length(occurred_at) = 19;
+UPDATE health_records
+SET occurred_at = strftime('%Y-%m-%dT%H:%M:%S', occurred_at, '-2 hours') || '.000000000Z'
+WHERE length(occurred_at) = 19;
+UPDATE weight_records
+SET measured_at = strftime('%Y-%m-%dT%H:%M:%S', measured_at, '-2 hours') || '.000000000Z'
+WHERE length(measured_at) = 19;
+
+-- SQLite normalizes an explicit offset to UTC; retain the original fractional
+-- precision rather than relying on SQLite's millisecond-only %f formatter.
+UPDATE elimination_records
+SET occurred_at = strftime('%Y-%m-%dT%H:%M:%S', occurred_at) || '.' ||
+    CASE WHEN substr(occurred_at, 20, 1) = '.' THEN
+        substr(
+            substr(occurred_at, 21,
+                CASE
+                    WHEN instr(substr(occurred_at, 21), '+') > 0 THEN instr(substr(occurred_at, 21), '+') - 1
+                    WHEN instr(substr(occurred_at, 21), '-') > 0 THEN instr(substr(occurred_at, 21), '-') - 1
+                    WHEN instr(substr(occurred_at, 21), 'Z') > 0 THEN instr(substr(occurred_at, 21), 'Z') - 1
+                    ELSE length(occurred_at) - 20
+                END
+            ) || '000000000', 1, 9
+        )
+    ELSE '000000000' END || 'Z'
+WHERE length(occurred_at) <> 19;
+
 -- Changed elapsed-time/hour features must not reuse models trained on civil arithmetic.
 -- Keep only a lightweight pending-retrain tombstone; stale model payloads are discarded.
 UPDATE elimination_classifiers

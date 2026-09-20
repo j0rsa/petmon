@@ -1177,9 +1177,6 @@ mod tests {
         db::run_migrations(&pool).await.expect("migrate");
 
         let summary = run(&pool, true).await.expect("seed");
-        crate::record_time::ensure_canonical(&pool)
-            .await
-            .expect("all demo instants are UTC");
         assert_eq!(summary.pets, 4);
         assert!(summary.nutrition_records > 100);
         assert!(summary.elimination_records > 50);

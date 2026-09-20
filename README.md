@@ -287,14 +287,7 @@ Interactive administrator sessions use their live administrator role. Administra
 
 Record `occurred_at` / `measured_at` fields now contain a single UTC RFC3339 instant. API inputs require an explicit offset (`Z` or `±HH:MM`); timezone-less timestamps are rejected. The frontend renders these instants in the authenticated actor's effective timezone. Journal `local_date` remains an independent date, not a UTC date.
 
-Back up an existing database and stop writers before upgrading. Startup refuses legacy record timestamps until an operator explicitly converts them using the timezone in which they were originally recorded:
-
-```bash
-DATABASE_URL=sqlite:/data/petmon.db ./petmon migrate-record-times --timezone Europe/Berlin
-DATABASE_URL=sqlite:/data/petmon.db ./petmon migrate-record-times --timezone Europe/Berlin --apply
-```
-
-The first command is a dry run. Ambiguous/nonexistent daylight-saving times and invalid values must be corrected before the atomic conversion can proceed; journal dates are preserved. If historical records used different timezones, resolve those rows explicitly before applying a single-zone migration. Update API clients together with this release.
+The consolidated 0.26 migration automatically converts the sole pre-release 0.25 data set: naïve timestamps from May–September 2026 are treated as Berlin CEST (UTC+2), while explicit-offset values are normalized directly. `local_date` is preserved. Back up the database and stop writers before upgrading. Update API clients together with this release.
 
 ### OIDC provider setup
 

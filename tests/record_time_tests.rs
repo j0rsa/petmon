@@ -125,7 +125,6 @@ async fn single_canonical_field_survives_note_edits_and_preserves_journal_day() 
     .unwrap();
     assert_eq!(edited.occurred_at, canonical("2026-10-24T18:00:00Z"));
     assert_eq!(edited.local_date, "2026-10-24");
-    petmon::record_time::ensure_canonical(&pool).await.unwrap();
     for (table, removed) in [
         ("nutrition_records", "occurred_at_utc"),
         ("weight_records", "measured_at_utc"),
@@ -170,118 +169,6 @@ async fn injected_realtime_clock_keeps_exact_instant_during_dst_fold() {
     .unwrap();
     assert_eq!(record.occurred_at, canonical("2026-10-25T00:30:00Z"));
     assert_eq!(record.local_date, "2026-10-25");
-}
-
-#[tokio::test]
-async fn legacy_conversion_is_explicit_and_atomic_and_startup_refuses_legacy_rows() {
-    let pool = pool().await;
-    let pet_id = pet(&pool).await;
-    let current_version = petmon::domain::elimination_classifier::CURRENT_MODEL_VERSION as i64;
-    sqlx::query("INSERT INTO elimination_classifiers (pet_id,model_version,model_json,sample_count,trained_at,pending_retrain,created_at,updated_at) VALUES (?,?,'{\"obsolete\":true}',8,'old',0,'old','old')").bind(pet_id).bind(current_version).execute(&pool).await.unwrap();
-    for (id, civil) in [
-        ("valid", "2026-09-19T10:00:00"),
-        ("ambiguous", "2026-10-25T02:30:00"),
-        ("gap", "2026-03-29T02:30:00"),
-    ] {
-        sqlx::query("INSERT INTO nutrition_records (id,pet_id,occurred_at,local_date,category,amount,created_at,updated_at) VALUES (?,?,?,'2026-09-18','wet_food',10,'old','old')").bind(id).bind(pet_id).bind(civil).execute(&pool).await.unwrap();
-    }
-    assert!(petmon::db::run_migrations(&pool).await.is_err());
-    let dry = record_time::backfill_legacy(&pool, chrono_tz::Europe::Berlin, false)
-        .await
-        .unwrap();
-    assert_eq!(dry.candidates, 3);
-    assert!(!dry.applied);
-    assert_eq!(dry.issues.len(), 2);
-    let blocked = record_time::backfill_legacy(&pool, chrono_tz::Europe::Berlin, true)
-        .await
-        .unwrap();
-    assert!(!blocked.applied);
-    let version: i64 =
-        sqlx::query_scalar("SELECT model_version FROM elimination_classifiers WHERE pet_id=?")
-            .bind(pet_id)
-            .fetch_one(&pool)
-            .await
-            .unwrap();
-    assert_eq!(version, current_version);
-    assert_eq!(
-        repo::nutrition_records::get_record(&pool, "valid")
-            .await
-            .unwrap()
-            .occurred_at,
-        "2026-09-19T10:00:00"
-    );
-    sqlx::query(
-        "UPDATE nutrition_records SET occurred_at='2026-10-25T02:30:00+02:00' WHERE id='ambiguous'",
-    )
-    .execute(&pool)
-    .await
-    .unwrap();
-    sqlx::query(
-        "UPDATE nutrition_records SET occurred_at='2026-03-29T03:30:00+02:00' WHERE id='gap'",
-    )
-    .execute(&pool)
-    .await
-    .unwrap();
-    let applied = record_time::backfill_legacy(&pool, chrono_tz::Europe::Berlin, true)
-        .await
-        .unwrap();
-    assert!(applied.applied);
-    assert!(repo::elimination_classifiers::get(&pool, pet_id)
-        .await
-        .unwrap()
-        .is_none());
-    assert_eq!(
-        repo::elimination_classifiers::pending_pet_ids(&pool, 10)
-            .await
-            .unwrap(),
-        vec![pet_id]
-    );
-    let classifier: (i64, String, i64, String, i64) = sqlx::query_as(
-        "SELECT model_version, model_json, sample_count, trained_at, pending_retrain
-         FROM elimination_classifiers WHERE pet_id = ?",
-    )
-    .bind(pet_id)
-    .fetch_one(&pool)
-    .await
-    .unwrap();
-    assert_eq!(classifier, (0, "{}".into(), 0, "".into(), 1));
-    let after = repo::nutrition_records::get_record(&pool, "valid")
-        .await
-        .unwrap();
-    assert_eq!(after.occurred_at, canonical("2026-09-19T08:00:00Z"));
-    assert_eq!(after.local_date, "2026-09-18");
-    petmon::db::run_migrations(&pool).await.unwrap();
-    assert_eq!(
-        record_time::backfill_legacy(&pool, chrono_tz::UTC, true)
-            .await
-            .unwrap()
-            .candidates,
-        0
-    );
-}
-
-#[tokio::test]
-async fn migration_cli_requires_historical_timezone_and_never_infers_empty_instants() {
-    let pool = pool().await;
-    let pet_id = pet(&pool).await;
-    assert!(
-        record_time::run_cli(&pool, &["migrate-record-times".into(), "--apply".into()])
-            .await
-            .is_err()
-    );
-    sqlx::query("INSERT INTO nutrition_records (id,pet_id,occurred_at,local_date,category,amount,created_at,updated_at) VALUES ('blank',?,'','2020-01-01','wet_food',10,'old','old')").bind(pet_id).execute(&pool).await.unwrap();
-    let report = record_time::backfill_legacy(&pool, chrono_tz::UTC, true)
-        .await
-        .unwrap();
-    assert!(!report.applied);
-    assert_eq!(report.issues.len(), 1);
-    assert_eq!(
-        repo::nutrition_records::get_record(&pool, "blank")
-            .await
-            .unwrap()
-            .occurred_at,
-        ""
-    );
 }
 
 #[tokio::test]

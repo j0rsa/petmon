@@ -32,11 +32,13 @@ async fn migration_024_upgrades_the_released_schema_in_one_step() {
         .unwrap();
     sqlx::raw_sql(
         "INSERT INTO pets (id, name, created_at, updated_at)
-             VALUES ('legacy', 'Legacy pet', '2026-01-01', '2026-01-01');
+             VALUES ('legacy', 'Legacy pet', '2026-06-01', '2026-06-01');
          INSERT INTO nutrition_records (id, pet_id, occurred_at, local_date, category, amount, created_at, updated_at, telegram_message_id)
-             VALUES ('record', 'legacy', '2026-01-01T09:00:00', '2026-01-01', 'water', 10, '2026-01-01', '2026-01-01', 42);
+             VALUES ('record', 'legacy', '2026-06-01T09:00:00', '2026-06-01', 'water', 10, '2026-06-01', '2026-06-01', 42);
+         INSERT INTO elimination_records (id, pet_id, occurred_at, local_date, event_type, created_at, updated_at)
+             VALUES ('offset-record', 'legacy', '2026-06-26 10:28:46.813212+00:00', '2026-06-26', 'pee', '2026-06-26', '2026-06-26');
          INSERT INTO elimination_classifiers (pet_id, model_version, model_json, sample_count, trained_at, created_at, updated_at)
-             VALUES ('legacy', 2, '{\"obsolete\":true}', 42, '2026-01-01', '2026-01-01', '2026-01-01');",
+             VALUES ('legacy', 2, '{\"obsolete\":true}', 42, '2026-06-01', '2026-06-01', '2026-06-01');",
     )
     .execute(&pool)
     .await
@@ -58,16 +60,21 @@ async fn migration_024_upgrades_the_released_schema_in_one_step() {
     assert_eq!(
         record,
         (
-            "2026-01-01T09:00:00".into(),
-            "2026-01-01".into(),
+            "2026-06-01T07:00:00.000000000Z".into(),
+            "2026-06-01".into(),
             42,
             None,
             None,
             None
         )
     );
-    // Historical times still require explicit conversion, not a timezone guess in SQL.
-    assert!(petmon::record_time::ensure_canonical(&pool).await.is_err());
+    let offset_timestamp: String = sqlx::query_scalar(
+        "SELECT occurred_at FROM elimination_records WHERE id = 'offset-record'",
+    )
+    .fetch_one(&pool)
+    .await
+    .unwrap();
+    assert_eq!(offset_timestamp, "2026-06-26T10:28:46.813212000Z");
     let classifier: (i64, String, i64, String, i64) = sqlx::query_as(
         "SELECT model_version, model_json, sample_count, trained_at, pending_retrain
          FROM elimination_classifiers WHERE pet_id = 'legacy'",
