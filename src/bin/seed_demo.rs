@@ -9,12 +9,8 @@ async fn main() -> anyhow::Result<()> {
 
     let pool = db::create_pool(&config).await?;
     db::run_schema_migrations(&pool).await?;
-    if !fresh {
-        petmon::record_time::ensure_canonical(&pool).await?;
-    }
 
     let summary = petmon::demo_seed::run(&pool, fresh).await?;
-    petmon::record_time::ensure_canonical(&pool).await?;
 
     println!("Demo data loaded into {}", config.database_url);
     if fresh {

@@ -18,12 +18,10 @@ pub async fn create_pool(config: &Config) -> Result<SqlitePool, AppError> {
 }
 
 pub async fn run_migrations(pool: &SqlitePool) -> Result<(), AppError> {
-    run_schema_migrations(pool).await?;
-    crate::record_time::ensure_canonical(pool).await
+    run_schema_migrations(pool).await
 }
 
-/// Offline migration tools may apply schema before explicitly converting legacy instants.
-/// Servers must call run_migrations or ensure_canonical before serving records.
+/// Schema changes include the pre-release 0.25 → 0.26 Berlin-to-UTC record conversion.
 pub async fn run_schema_migrations(pool: &SqlitePool) -> Result<(), AppError> {
     sqlx::migrate!("./migrations")
         .run(pool)
