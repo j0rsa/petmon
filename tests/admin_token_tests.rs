@@ -1,4 +1,5 @@
 use actix_web::{dev::Service, http::StatusCode, test, web, App, HttpMessage};
+use petmon::domain::auth::Scope;
 use petmon::{
     api,
     auth::{
@@ -28,7 +29,7 @@ async fn token(pool: &SqlitePool, owner: &str, scopes: &[&str]) -> (String, Stri
         pool,
         CreateApiToken {
             alias: Some("device".into()),
-            scopes: Some(scopes.iter().map(|s| s.to_string()).collect()),
+            scopes: Some(scopes.iter().map(|s| s.parse().unwrap()).collect()),
             owner_subject: Some(owner.into()),
             created_by: Some(owner.into()),
         },
@@ -120,6 +121,77 @@ async fn tokens_cannot_widen_scopes_or_assume_ownership() {
             .await
             .is_ok()
     );
+}
+
+#[actix_web::test]
+async fn invalid_scope_values_are_rejected_by_rest_mcp_and_stored_credentials() {
+    let pool = pool().await;
+    let (id, raw) = token(&pool, "alice", &["all"]).await;
+    let app = app!(pool);
+    let state = AppState::new(pool.clone(), false, None, None);
+    let context = state.context(Identity::dev());
+    for scopes in [
+        json!(["instance_admin"]),
+        json!(["unknown"]),
+        json!(["all", "unknown"]),
+        json!([1]),
+    ] {
+        let req = test::TestRequest::post()
+            .uri("/api/v1/api-tokens")
+            .insert_header(("Authorization", format!("Bearer {raw}")))
+            .set_json(json!({"scopes": scopes}))
+            .to_request();
+        assert_eq!(
+            test::call_service(&app, req).await.status(),
+            StatusCode::BAD_REQUEST
+        );
+        let req = test::TestRequest::patch()
+            .uri(&format!("/api/v1/api-tokens/{id}/scopes"))
+            .insert_header(("Authorization", format!("Bearer {raw}")))
+            .set_json(json!({"scopes": scopes}))
+            .to_request();
+        assert_eq!(
+            test::call_service(&app, req).await.status(),
+            StatusCode::BAD_REQUEST
+        );
+        for tool in ["api-tokens.scopes.update", "api-tokens/scopes/update"] {
+            let result = petmon::mcp::tools::dispatch(
+                &context,
+                tool,
+                Some(json!({"id":id,"scopes":scopes})),
+                chrono_tz::UTC,
+            )
+            .await;
+            assert!(matches!(
+                result,
+                Err(petmon::error::AppError::BadRequest(_))
+            ));
+        }
+    }
+    assert_eq!(
+        api_tokens::get_owned(&pool, &id, "alice")
+            .await
+            .unwrap()
+            .scopes_vec()
+            .unwrap(),
+        vec![Scope::All]
+    );
+    for invalid in ["unknown", "all,unknown", "instance_admin"] {
+        sqlx::query("UPDATE api_tokens SET scopes = ? WHERE id = ?")
+            .bind(invalid)
+            .bind(&id)
+            .execute(&pool)
+            .await
+            .unwrap();
+        let req = test::TestRequest::get()
+            .uri("/api/v1/auth/me")
+            .insert_header(("Authorization", format!("Bearer {raw}")))
+            .to_request();
+        assert_eq!(
+            test::call_service(&app, req).await.status(),
+            StatusCode::UNAUTHORIZED
+        );
+    }
 }
 
 #[actix_web::test]
@@ -232,21 +304,21 @@ async fn oidc_roles_respect_ordinary_scopes_and_no_scope_alias_enables_admin() {
         email: None,
         name: None,
         kind: IdentityKind::Oidc,
-        scopes: ["api_read".into()].into_iter().collect(),
+        scopes: [Scope::ApiRead].into_iter().collect(),
         token_created_by: None,
         owner_subject: None,
     };
     assert!(admin::require_instance_admin(&pool, &oidc).await.is_ok());
-    assert!(oidc.has_scope("api_read"));
-    assert!(!oidc.has_scope("api_write"));
-    assert!(!oidc.has_scope("instance_admin"));
+    assert!(oidc.has_scope(Scope::ApiRead));
+    assert!(!oidc.has_scope(Scope::ApiWrite));
+    assert!("instance_admin".parse::<Scope>().is_err());
     assert!(
-        admin::attenuate_scopes(&pool, &oidc, Some(vec!["all".into()]))
+        admin::attenuate_scopes(&pool, &oidc, Some(vec![Scope::All]))
             .await
             .is_err()
     );
     assert!(
-        admin::attenuate_scopes(&pool, &oidc, Some(vec!["api_read".into()]))
+        admin::attenuate_scopes(&pool, &oidc, Some(vec![Scope::ApiRead]))
             .await
             .is_ok()
     );
@@ -327,7 +399,7 @@ async fn activation_cannot_bypass_attenuation_or_a_concurrent_scope_change() {
         test::call_service(&app, req).await.status(),
         StatusCode::FORBIDDEN
     );
-    api_tokens::update_scopes_owned(&pool, &id, "alice", &["api_write".into()])
+    api_tokens::update_scopes_owned(&pool, &id, "alice", &[Scope::ApiWrite])
         .await
         .unwrap();
     assert!(api_tokens::activate_owned(&pool, &id, "alice", "all")
@@ -397,7 +469,7 @@ async fn ordinary_full_tokens_cannot_acquire_all_even_before_a_future_role_grant
                 kind: IdentityKind::ApiToken {
                     token_id: id.clone(),
                 },
-                scopes: scopes.iter().map(|s| s.to_string()).collect(),
+                scopes: scopes.iter().map(|s| s.parse().unwrap()).collect(),
                 token_created_by: None,
                 owner_subject: Some("alice".into()),
             };
@@ -458,7 +530,7 @@ async fn interactive_administration_requires_live_role_and_endpoint_scope() {
             email: None,
             name: None,
             kind: IdentityKind::Oidc,
-            scopes: scopes.iter().map(|s| s.to_string()).collect(),
+            scopes: scopes.iter().map(|s| s.parse().unwrap()).collect(),
             token_created_by: None,
             owner_subject: None,
         };

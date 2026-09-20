@@ -1,4 +1,5 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import type { Scope } from '../api/authTypes';
 import type { Decorator } from '@storybook/react-vite';
 import { MemoryRouter, Route, Routes } from 'react-router-dom';
 import { SelectedPetProvider } from '../context/SelectedPetContext';
@@ -553,7 +554,7 @@ const API_TOKEN_STUB = 'pm_api_storybook0000000000000000000000000000000000000000
 
 interface WithSettingsOptions {
   admin?: boolean;
-  scopes?: string[];
+  scopes?: Scope[];
   oidc?: 'empty' | 'configured';
   telegram?: 'empty' | 'configured';
   tokens?: 'empty' | 'populated';

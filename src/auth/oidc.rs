@@ -1,3 +1,4 @@
+use crate::domain::auth::Scope;
 use arc_swap::ArcSwap;
 use jsonwebtoken::{decode, decode_header, Algorithm, DecodingKey, Validation};
 use openidconnect::{core::CoreProviderMetadata, reqwest::async_http_client, IssuerUrl};
@@ -89,7 +90,7 @@ impl OidcValidator {
     }
 
     /// Resolve scopes from a group list given the configured group mappings.
-    fn resolve_scopes(&self, groups: &[String]) -> Result<HashSet<String>, String> {
+    fn resolve_scopes(&self, groups: &[String]) -> Result<HashSet<Scope>, String> {
         match &self.full_access_group {
             None => {
                 // No group restriction configured — full access for any authenticated user.
@@ -102,7 +103,7 @@ impl OidcValidator {
                 if let Some(ro_group) = &self.readonly_group {
                     if groups.contains(ro_group) {
                         let mut s = HashSet::new();
-                        s.insert("api_read".to_string());
+                        s.insert(Scope::ApiRead);
                         return Ok(s);
                     }
                 }

@@ -4,7 +4,7 @@ use sqlx::SqlitePool;
 
 use crate::{
     auth::identity::{Identity, IdentityKind},
-    domain::settings::is_valid_scope,
+    domain::auth::Scope,
     error::{AppError, AppResult},
     repo::instance_admins,
 };
@@ -17,8 +17,8 @@ pub async fn is_instance_admin(pool: &SqlitePool, identity: &Identity) -> AppRes
 }
 
 pub async fn require_instance_admin(pool: &SqlitePool, identity: &Identity) -> AppResult<()> {
-    let credential_allowed =
-        !matches!(identity.kind, IdentityKind::ApiToken { .. }) || identity.scopes.contains("all");
+    let credential_allowed = !matches!(identity.kind, IdentityKind::ApiToken { .. })
+        || identity.scopes.contains(&Scope::All);
     if credential_allowed && is_instance_admin(pool, identity).await? {
         Ok(())
     } else {
@@ -33,29 +33,26 @@ pub async fn require_instance_admin(pool: &SqlitePool, identity: &Identity) -> A
 pub async fn attenuate_scopes(
     _pool: &SqlitePool,
     identity: &Identity,
-    requested: Option<Vec<String>>,
-) -> AppResult<Vec<String>> {
-    let mut scopes = requested.unwrap_or_else(|| vec!["all".into()]);
+    requested: Option<Vec<Scope>>,
+) -> AppResult<Vec<Scope>> {
+    let mut scopes = requested.unwrap_or_else(|| vec![Scope::All]);
     if scopes.is_empty() {
         return Err(AppError::BadRequest(
             "at least one scope is required".into(),
         ));
     }
     for scope in &scopes {
-        if !is_valid_scope(scope) {
-            return Err(AppError::BadRequest(format!("unknown scope '{scope}'")));
-        }
-        let permitted = if scope == "all" {
+        let permitted = if *scope == Scope::All {
             match identity.kind {
                 // `all` can admit administration after an owner role grant.
                 // Ordinary scopes cannot be combined into that authority.
-                IdentityKind::ApiToken { .. } => identity.scopes.contains("all"),
-                IdentityKind::Oidc | IdentityKind::Dev => ["api_read", "api_write", "mcp"]
-                    .iter()
-                    .all(|s| identity.has_scope(s)),
+                IdentityKind::ApiToken { .. } => identity.scopes.contains(&Scope::All),
+                IdentityKind::Oidc | IdentityKind::Dev => {
+                    Scope::ORDINARY.iter().all(|s| identity.has_scope(*s))
+                }
             }
         } else {
-            identity.has_scope(scope)
+            identity.has_scope(*scope)
         };
         if !permitted {
             return Err(AppError::Forbidden(format!(
@@ -74,9 +71,9 @@ pub async fn update_owned_token_scopes(
     pool: &SqlitePool,
     identity: &Identity,
     token_id: &str,
-    requested: Vec<String>,
+    requested: Vec<Scope>,
 ) -> AppResult<crate::domain::settings::ApiToken> {
-    if !identity.has_scope("api_write") {
+    if !identity.has_scope(Scope::ApiWrite) {
         return Err(AppError::Forbidden(
             "api_write scope required for credential management".into(),
         ));

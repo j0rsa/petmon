@@ -357,7 +357,7 @@ async fn direct_notification_services_enforce_scopes_and_bound_page_size() {
     context.actor.kind = petmon::auth::identity::IdentityKind::ApiToken {
         token_id: "test".into(),
     };
-    context.actor.scopes = ["api_read".to_string()].into_iter().collect();
+    context.actor.scopes = [petmon::domain::auth::Scope::ApiRead].into_iter().collect();
     assert_eq!(
         notification_service::list(&context, -1, false)
             .await
@@ -376,7 +376,9 @@ async fn direct_notification_services_enforce_scopes_and_bound_page_size() {
         notification_service::mark_read(&context, "id").await,
         Err(AppError::Forbidden(_))
     ));
-    context.actor.scopes = ["api_write".to_string()].into_iter().collect();
+    context.actor.scopes = [petmon::domain::auth::Scope::ApiWrite]
+        .into_iter()
+        .collect();
     assert!(matches!(
         notification_service::list(&context, 1, false).await,
         Err(AppError::Forbidden(_))

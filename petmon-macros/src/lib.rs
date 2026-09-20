@@ -14,8 +14,8 @@ use syn::{
 /// 2. Prepends a scope check to the function body that returns
 ///    `Err(AppError::Forbidden(...))` when the caller's token lacks the scope.
 ///
-/// OIDC and Dev identities always pass. API tokens pass when their scope
-/// set contains `"all"` or the required scope.
+/// Checks the typed credential scope through Identity::has_scope. Unknown scope
+/// literals are compilation errors; server-side roles are never scope aliases.
 ///
 /// # Example
 /// ```ignore
@@ -30,6 +30,17 @@ pub fn require_scope(args: TokenStream, item: TokenStream) -> TokenStream {
     let scope_arg = parse_macro_input!(args as ScopeArg);
     let scope_lit = &scope_arg.scope;
     let scope_str = scope_lit.value();
+    let scope_variant = match scope_str.as_str() {
+        "all" => quote!(crate::domain::auth::Scope::All),
+        "api_read" => quote!(crate::domain::auth::Scope::ApiRead),
+        "api_write" => quote!(crate::domain::auth::Scope::ApiWrite),
+        "mcp" => quote!(crate::domain::auth::Scope::Mcp),
+        _ => {
+            return syn::Error::new_spanned(scope_lit, "unknown credential scope")
+                .to_compile_error()
+                .into()
+        }
+    };
 
     let mut func = parse_macro_input!(item as ItemFn);
 
@@ -83,7 +94,7 @@ pub fn require_scope(args: TokenStream, item: TokenStream) -> TokenStream {
                         "missing identity in request".to_string(),
                     ));
                 }
-                Some(_id) if !_id.has_scope(#scope_str) => {
+                Some(_id) if !_id.has_scope(#scope_variant) => {
                     return Err(crate::error::AppError::Forbidden(format!(
                         "scope '{}' required",
                         #scope_str,

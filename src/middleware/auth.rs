@@ -148,7 +148,12 @@ where
                             .clone()
                             .or_else(|| api_token.created_by.clone())
                             .unwrap_or_else(|| api_token.id.clone());
-                        let scopes = api_token.scopes_vec().into_iter().collect();
+                        let Ok(scopes) = api_token.scopes_vec() else {
+                            return Ok(req
+                                .into_response(HttpResponse::Unauthorized().finish())
+                                .map_into_right_body());
+                        };
+                        let scopes = scopes.into_iter().collect();
                         let mut identity = Identity {
                             subject: owner_subject.clone(),
                             email: None,

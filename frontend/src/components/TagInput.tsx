@@ -1,16 +1,16 @@
 import { useRef, useState } from 'react';
 
-export interface TagInputProps {
+export interface TagInputProps<T extends string = string> {
   /** Currently selected values */
-  value: string[];
+  value: T[];
   /** All available options to suggest */
-  options: string[];
-  onChange: (next: string[]) => void;
+  options: readonly T[];
+  onChange: (next: T[]) => void;
   placeholder?: string;
   disabled?: boolean;
 }
 
-export function TagInput({ value, options, onChange, placeholder = 'Add…', disabled = false }: TagInputProps) {
+export function TagInput<T extends string>({ value, options, onChange, placeholder = 'Add…', disabled = false }: TagInputProps<T>) {
   const [query, setQuery] = useState('');
   const [isFocused, setIsFocused] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
@@ -20,13 +20,13 @@ export function TagInput({ value, options, onChange, placeholder = 'Add…', dis
     ? remaining.filter((o) => o.toLowerCase().includes(query.toLowerCase()))
     : remaining;
 
-  function add(tag: string) {
+  function add(tag: T) {
     if (!value.includes(tag)) onChange([...value, tag]);
     setQuery('');
     inputRef.current?.focus();
   }
 
-  function remove(tag: string) {
+  function remove(tag: T) {
     onChange(value.filter((v) => v !== tag));
   }
 

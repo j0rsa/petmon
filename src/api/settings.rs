@@ -1,3 +1,4 @@
+use crate::domain::auth::Scope;
 use actix_web::{delete, get, patch, post, web, HttpMessage, HttpRequest, HttpResponse};
 use petmon_macros::require_scope;
 
@@ -20,10 +21,13 @@ fn identity(req: &HttpRequest) -> AppResult<Identity> {
         .ok_or_else(|| AppError::Internal("missing identity".into()))
 }
 
-fn public_token(t: crate::domain::settings::ApiToken, caller: &Identity) -> ApiTokenPublic {
+fn public_token(
+    t: crate::domain::settings::ApiToken,
+    caller: &Identity,
+) -> AppResult<ApiTokenPublic> {
     let current = matches!(&caller.kind, IdentityKind::ApiToken { token_id } if token_id == &t.id);
-    let scopes = t.scopes_vec();
-    ApiTokenPublic {
+    let scopes = t.scopes_vec()?;
+    Ok(ApiTokenPublic {
         id: t.id,
         alias: t.alias,
         active: t.active,
@@ -32,7 +36,7 @@ fn public_token(t: crate::domain::settings::ApiToken, caller: &Identity) -> ApiT
         created_by: t.created_by,
         created_at: t.created_at,
         last_used_at: t.last_used_at,
-    }
+    })
 }
 
 fn audit(caller: &Identity, action: &str, target: &str) {
@@ -110,7 +114,7 @@ pub async fn list_tokens(req: HttpRequest, state: web::Data<AppState>) -> AppRes
     let public: Vec<ApiTokenPublic> = tokens
         .into_iter()
         .map(|t| public_token(t, &caller))
-        .collect();
+        .collect::<AppResult<_>>()?;
 
     Ok(HttpResponse::Ok().json(public))
 }
@@ -152,18 +156,15 @@ pub async fn activate_token(
     let caller = identity(&req)?;
     let id = path.into_inner();
     let token = api_tokens::get_owned(&state.pool, &id, &caller.subject).await?;
-    let mut scopes = token.scopes_vec();
+    let mut scopes = token.scopes_vec()?;
     // Legacy empty scopes confer ordinary full access, not literal `all`'s
     // eligibility for administration. Compare the actual authority, while the
     // activation CAS below still checks the original stored scopes.
     if scopes.is_empty() {
-        scopes = ["api_read", "api_write", "mcp"]
-            .into_iter()
-            .map(str::to_owned)
-            .collect();
+        scopes = Scope::ORDINARY.to_vec();
     }
     crate::auth::admin::attenuate_scopes(&state.pool, &caller, Some(scopes)).await?;
-    api_tokens::activate_owned(&state.pool, &id, &caller.subject, &token.scopes).await?;
+    api_tokens::activate_owned(&state.pool, &id, &caller.subject, &token.scopes_csv).await?;
     audit(&caller, "token.activate", &id);
     Ok(HttpResponse::NoContent().finish())
 }
@@ -213,7 +214,7 @@ pub async fn update_token_scopes(
         body.into_inner().scopes,
     )
     .await?;
-    Ok(HttpResponse::Ok().json(public_token(token, &caller)))
+    Ok(HttpResponse::Ok().json(public_token(token, &caller)?))
 }
 
 #[get("")]
@@ -231,12 +232,12 @@ pub async fn admin_list_tokens(
             .into_iter()
             .map(|t| {
                 let owner_subject = t.owner_subject.clone();
-                ApiTokenAdminPublic {
-                    token: public_token(t, &caller),
+                Ok(ApiTokenAdminPublic {
+                    token: public_token(t, &caller)?,
                     owner_subject,
-                }
+                })
             })
-            .collect::<Vec<_>>(),
+            .collect::<AppResult<Vec<_>>>()?,
     ))
 }
 

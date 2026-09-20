@@ -1,8 +1,9 @@
 import { useState } from 'react';
 import type { Meta, StoryObj } from '@storybook/react-vite';
 import { TagInput } from './TagInput';
+import { SCOPES, type Scope } from '../api/authTypes';
 
-const ALL_SCOPES = ['all', 'api_read', 'api_write', 'mcp'];
+const ALL_SCOPES = [...SCOPES];
 
 const meta = {
   title: 'Components/TagInput',
@@ -27,7 +28,7 @@ const meta = {
 export default meta;
 type Story = StoryObj<typeof meta>;
 
-function Controlled({ initial }: { initial: string[] }) {
+function Controlled({ initial }: { initial: Scope[] }) {
   const [value, setValue] = useState(initial);
   return (
     <TagInput

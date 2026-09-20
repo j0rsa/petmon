@@ -1,3 +1,4 @@
+use crate::domain::{auth::Scope, settings::scopes_csv};
 use chrono::Utc;
 use sqlx::SqlitePool;
 
@@ -121,12 +122,12 @@ pub async fn update_scopes_owned(
     pool: &SqlitePool,
     id: &str,
     owner: &str,
-    scopes: &[String],
+    scopes: &[Scope],
 ) -> AppResult<ApiToken> {
     sqlx::query_as::<_, ApiToken>(
         "UPDATE api_tokens SET scopes = ? WHERE id = ? AND owner_subject = ? RETURNING *",
     )
-    .bind(scopes.join(","))
+    .bind(scopes_csv(scopes))
     .bind(id)
     .bind(owner)
     .fetch_optional(pool)
@@ -150,7 +151,7 @@ pub async fn create(
     .bind(&token.alias)
     .bind(&token.token_hash)
     .bind(token.active)
-    .bind(&token.scopes)
+    .bind(&token.scopes_csv)
     .bind(&token.created_by)
     .bind(&token.owner_subject)
     .bind(&token.created_at)
@@ -161,7 +162,7 @@ pub async fn create(
         id: token.id.clone(),
         alias: token.alias.clone(),
         token: raw,
-        scopes: token.scopes_vec(),
+        scopes: token.scopes_vec()?,
         created_at: token.created_at.clone(),
     };
 
@@ -197,7 +198,7 @@ pub async fn update_scopes(
     id: &str,
     req: UpdateApiTokenScopes,
 ) -> AppResult<ApiToken> {
-    let scopes_str = req.scopes.join(",");
+    let scopes_str = scopes_csv(&req.scopes);
     let rows = sqlx::query("UPDATE api_tokens SET scopes = ? WHERE id = ?")
         .bind(&scopes_str)
         .bind(id)

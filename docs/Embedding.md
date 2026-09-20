@@ -62,6 +62,8 @@ The caller owns transaction commit/rollback and any application-specific retry/i
 
 ## Credential scopes and instance administrator
 
+Rust integrations use `domain::auth::Scope` and `Role`, including `Identity.scopes: HashSet<Scope>` and `Identity::has_scope(Scope)`. Shared frontend integrations use the corresponding bounded `Scope` and `Role` types from `api/authTypes.ts`. JSON values remain snake-case strings. Unknown REST/MCP scope input is rejected; unknown stored token scopes deny authentication, never silently become an empty/full-access set. CSV exists only at the token persistence boundary.
+
 Scopes describe access, not a numeric ordering:
 
 | Scope | Meaning |

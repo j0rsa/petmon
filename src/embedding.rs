@@ -211,11 +211,11 @@ impl ServiceContext {
     }
     pub fn require_action_scope(&self, action: ResourceAction) -> AppResult<()> {
         let scope = if action == ResourceAction::View {
-            "api_read"
+            crate::domain::auth::Scope::ApiRead
         } else {
-            "api_write"
+            crate::domain::auth::Scope::ApiWrite
         };
-        if self.actor.has_scope(scope) || self.actor.has_scope("mcp") {
+        if self.actor.has_scope(scope) || self.actor.has_scope(crate::domain::auth::Scope::Mcp) {
             Ok(())
         } else {
             Err(AppError::Forbidden(format!("{scope} capability required")))

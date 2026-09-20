@@ -6,7 +6,10 @@ use crate::auth::{
     identity::{Identity, IdentityKind},
     AppState,
 };
-use crate::domain::settings::OidcConfig;
+use crate::domain::{
+    auth::{Role, Scope},
+    settings::OidcConfig,
+};
 use crate::error::{AppError, AppResult};
 use crate::repo::api_tokens;
 use crate::repo::settings;
@@ -103,8 +106,8 @@ pub struct MeResponse {
     pub kind: &'static str,
     /// Granted scopes. Empty means ordinary full access. API-token administration
     /// requires the literal `all` scope as well as the live administrator role.
-    pub scopes: Vec<String>,
-    pub roles: Vec<String>,
+    pub scopes: Vec<Scope>,
+    pub roles: Vec<Role>,
     /// Creator display name for the API token session (api_token kind only).
     #[serde(skip_serializing_if = "Option::is_none")]
     pub token_created_by: Option<String>,
@@ -124,11 +127,11 @@ pub async fn me(req: HttpRequest, state: web::Data<AppState>) -> AppResult<HttpR
         crate::auth::identity::IdentityKind::Dev => "dev",
     };
 
-    let mut scopes: Vec<String> = identity.scopes.clone().into_iter().collect();
+    let mut scopes: Vec<_> = identity.scopes.iter().copied().collect();
     scopes.sort();
 
     let roles = if crate::auth::admin::is_instance_admin(&state.pool, &identity).await? {
-        vec!["instance_admin".to_owned()]
+        vec![Role::InstanceAdmin]
     } else {
         vec![]
     };

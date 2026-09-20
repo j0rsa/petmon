@@ -1,4 +1,5 @@
 pub mod analytics;
+pub mod auth;
 pub mod elimination;
 pub mod elimination_classifier;
 pub mod health_state;
