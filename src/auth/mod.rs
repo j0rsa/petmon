@@ -11,7 +11,6 @@ pub mod oidc;
 
 pub struct AppState {
     pub edition: String,
-    pub features: Vec<String>,
     pub application_version: String,
     pub notifications: Arc<dyn crate::notification_runtime::NotificationBackend>,
     pub resource_policy: Arc<dyn crate::embedding::ResourcePolicy>,
@@ -75,7 +74,6 @@ impl AppState {
     ) -> Self {
         AppState {
             edition: "oss".into(),
-            features: vec![],
             application_version: env!("CARGO_PKG_VERSION").into(),
             notifications: Arc::new(crate::notification_runtime::StandaloneNotifications),
             resource_policy: Arc::new(crate::embedding::AllowAll),

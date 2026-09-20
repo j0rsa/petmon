@@ -50,6 +50,23 @@ export const OidcUser: Story = {
   ),
 };
 
+export const InstanceAdministrator: Story = {
+  name: 'Instance administrator badge',
+  render: () => (
+    <ChipWrapper
+      me={{
+        subject: 'operator-123',
+        email: 'operator@example.com',
+        name: 'Instance operator',
+        display_name: 'Instance operator',
+        kind: 'oidc',
+        roles: ['instance_admin'],
+        scopes: [],
+      }}
+    />
+  ),
+};
+
 export const ApiTokenUser: Story = {
   name: 'API token user with creator',
   render: () => (
