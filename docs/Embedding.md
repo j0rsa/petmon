@@ -16,7 +16,7 @@ The standalone application retains shared-pet behavior through an explicit defau
 - Care application services accept `ServiceContext`; repositories remain lower-level persistence primitives.
 - Production and test macros use `api::configure_full` inside the authenticated scope.
 - MCP checks `mcp` at the transport boundary. That scope intentionally enables both read and write care operations through MCP.
-- API-token creation, scope changes and activation enforce effective permission attenuation; ordinary management is owner-scoped.
+- API-token creation and scope changes enforce effective permission attenuation; revocation is owner-scoped, while reactivation is an explicit administrative operation.
 - Standalone notifications retain shared behavior through an explicit backend. Restricted embedders provide their own durable ownership, queries and audience implementation, including deleted-pet events.
 - Telegram message references include original destination and nonsecret bot identity to prevent cross-chat mixing and destination changes redirecting edits.
 - Shared frontend composition supports custom pet collection/selection/create and resource-specific effective permissions.
@@ -75,9 +75,9 @@ Scopes describe access, not a numeric ordering:
 
 `mcp` does not grant REST token-management access. `api_read` alongside `mcp` does not make MCP read-only. Resource authorization still applies to every operation. API-token administration requires literal `all` plus the owner's current `instance_admin` role; combining the three ordinary scopes or using legacy empty scopes does not qualify. Interactive sessions require the live role and the endpoint's read/write scope.
 
-Token creation, scope changes and reactivation cannot exceed the calling credential's authority. `api_write`/`all` enables creation but not stronger credentials. Only a literal `all` API token can delegate `all`; the combined ordinary scopes cannot, even when its owner is not yet an administrator. This prevents escalation through a future role grant. Omitted scopes request `all` and must pass the same checks; empty requested lists are invalid. API token owners are always set server-side. Include attempts to edit the current credential in attenuation checks.
+Token creation and scope changes cannot exceed the calling credential's authority. `api_write`/`all` enables creation but not stronger credentials. Only a literal `all` API token can delegate `all`; the combined ordinary scopes cannot, even when its owner is not yet an administrator. This prevents escalation through a future role grant. Omitted scopes request `all` and must pass the same checks; empty requested lists are invalid. API token owners are always set server-side. Include attempts to edit the current credential in attenuation checks. Reactivating a revoked token is an explicit instance-administrator operation, not an owner operation.
 
-Ordinary token list/revoke/activate/delete/update operations are owner-scoped. Admin endpoints can inspect/revoke instance credentials after role and scope checks. An `all` token follows its owner's live administrator role; regular device/MCP tokens never acquire administrative access. Revoked administrator grants take effect on subsequent requests.
+Ordinary token list/revoke/delete/update operations are owner-scoped. Admin endpoints can inspect, revoke, reactivate and batch-revoke instance credentials after role and scope checks. An `all` token follows its owner's live administrator role; regular device/MCP tokens never acquire administrative access. Revoked administrator grants take effect on subsequent requests.
 
 Shared instance-admin storage is keyed by the resolved actor, with CLI list/grant/revoke and documented bootstrap/recovery. `GET /auth/me` exposes `roles`, `scopes` and credential `kind`, without a separate capabilities model. Frontend controls check both the role and credential authority. DEV_MODE may grant admin for local development, but authorization tests must also exercise real non-admin and restricted-token identities.
 

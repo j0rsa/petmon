@@ -385,39 +385,72 @@ async fn administration_is_explicit_and_preserves_bot_secrets() {
 }
 
 #[actix_web::test]
-async fn activation_cannot_bypass_attenuation_or_a_concurrent_scope_change() {
+async fn token_reactivation_and_owner_batch_revoke_require_instance_administrator() {
     let pool = pool().await;
-    let (_, raw) = token(&pool, "alice", &["api_write"]).await;
+    let (_, ordinary) = token(&pool, "alice", &["api_write"]).await;
     let (id, _) = token(&pool, "alice", &["all"]).await;
+    let (second_id, _) = token(&pool, "alice", &["api_read"]).await;
+    let (bob_id, _) = token(&pool, "bob", &["all"]).await;
     api_tokens::deactivate(&pool, &id).await.unwrap();
     let app = app!(pool);
     let req = test::TestRequest::post()
-        .uri(&format!("/api/v1/api-tokens/{id}/activate"))
-        .insert_header(("Authorization", format!("Bearer {raw}")))
+        .uri(&format!("/api/v1/admin/api-tokens/{id}/activate"))
+        .insert_header(("Authorization", format!("Bearer {ordinary}")))
         .to_request();
     assert_eq!(
         test::call_service(&app, req).await.status(),
         StatusCode::FORBIDDEN
     );
-    api_tokens::update_scopes_owned(&pool, &id, "alice", &[Scope::ApiWrite])
-        .await
-        .unwrap();
-    assert!(api_tokens::activate_owned(&pool, &id, "alice", "all")
-        .await
-        .is_err());
+    instance_admins::grant(&pool, "admin").await.unwrap();
+    let (_, admin) = token(&pool, "admin", &["all"]).await;
+    let req = test::TestRequest::post()
+        .uri(&format!("/api/v1/admin/api-tokens/{id}/activate"))
+        .insert_header(("Authorization", format!("Bearer {admin}")))
+        .to_request();
+    assert_eq!(
+        test::call_service(&app, req).await.status(),
+        StatusCode::NO_CONTENT
+    );
+    assert!(
+        api_tokens::get_owned(&pool, &id, "alice")
+            .await
+            .unwrap()
+            .active
+    );
+
+    let req = test::TestRequest::post()
+        .uri("/api/v1/admin/api-tokens/revoke-owner")
+        .insert_header(("Authorization", format!("Bearer {ordinary}")))
+        .set_json(json!({"owner_subject":"alice"}))
+        .to_request();
+    assert_eq!(
+        test::call_service(&app, req).await.status(),
+        StatusCode::FORBIDDEN
+    );
+    let req = test::TestRequest::post()
+        .uri("/api/v1/admin/api-tokens/revoke-owner")
+        .insert_header(("Authorization", format!("Bearer {admin}")))
+        .set_json(json!({"owner_subject":"alice"}))
+        .to_request();
+    let body: serde_json::Value = test::call_and_read_body_json(&app, req).await;
+    assert_eq!(body["revoked"], 3);
     assert!(
         !api_tokens::get_owned(&pool, &id, "alice")
             .await
             .unwrap()
             .active
     );
-    let req = test::TestRequest::post()
-        .uri(&format!("/api/v1/api-tokens/{id}/activate"))
-        .insert_header(("Authorization", format!("Bearer {raw}")))
-        .to_request();
-    assert_eq!(
-        test::call_service(&app, req).await.status(),
-        StatusCode::NO_CONTENT
+    assert!(
+        !api_tokens::get_owned(&pool, &second_id, "alice")
+            .await
+            .unwrap()
+            .active
+    );
+    assert!(
+        api_tokens::get_owned(&pool, &bob_id, "bob")
+            .await
+            .unwrap()
+            .active
     );
 }
 
@@ -428,8 +461,6 @@ async fn ordinary_full_tokens_cannot_acquire_all_even_before_a_future_role_grant
     let app = app!(pool);
     for scopes in [vec!["api_read", "api_write", "mcp"], vec![]] {
         let (id, raw) = token(&pool, "alice", &scopes).await;
-        let (inactive_id, _) = token(&pool, "alice", &["all"]).await;
-        api_tokens::deactivate(&pool, &inactive_id).await.unwrap();
         for has_role in [false, true] {
             if has_role {
                 instance_admins::grant(&pool, "alice").await.unwrap();
@@ -449,14 +480,6 @@ async fn ordinary_full_tokens_cannot_acquire_all_even_before_a_future_role_grant
                 .uri(&format!("/api/v1/api-tokens/{id}/scopes"))
                 .insert_header(("Authorization", format!("Bearer {raw}")))
                 .set_json(json!({"scopes":["all"]}))
-                .to_request();
-            assert_eq!(
-                test::call_service(&app, req).await.status(),
-                StatusCode::FORBIDDEN
-            );
-            let req = test::TestRequest::post()
-                .uri(&format!("/api/v1/api-tokens/{inactive_id}/activate"))
-                .insert_header(("Authorization", format!("Bearer {raw}")))
                 .to_request();
             assert_eq!(
                 test::call_service(&app, req).await.status(),
@@ -484,18 +507,6 @@ async fn ordinary_full_tokens_cannot_acquire_all_even_before_a_future_role_grant
                 assert!(matches!(result, Err(petmon::error::AppError::Forbidden(_))));
             }
         }
-        // An empty legacy credential has only ordinary authority, so an
-        // ordinary-full caller can safely reactivate it without gaining admin.
-        let (legacy_id, _) = token(&pool, "alice", &[]).await;
-        api_tokens::deactivate(&pool, &legacy_id).await.unwrap();
-        let req = test::TestRequest::post()
-            .uri(&format!("/api/v1/api-tokens/{legacy_id}/activate"))
-            .insert_header(("Authorization", format!("Bearer {raw}")))
-            .to_request();
-        assert_eq!(
-            test::call_service(&app, req).await.status(),
-            StatusCode::NO_CONTENT
-        );
         instance_admins::grant(&pool, "recovery").await.unwrap();
         instance_admins::revoke(&pool, "alice").await.unwrap();
     }

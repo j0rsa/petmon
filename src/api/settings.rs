@@ -1,6 +1,6 @@
-use crate::domain::auth::Scope;
 use actix_web::{delete, get, patch, post, web, HttpMessage, HttpRequest, HttpResponse};
 use petmon_macros::require_scope;
+use serde::{Deserialize, Serialize};
 
 use crate::auth::{
     identity::{Identity, IdentityKind},
@@ -146,29 +146,6 @@ pub async fn create_token(
     Ok(HttpResponse::Created().json(created))
 }
 
-#[post("/{id}/activate")]
-#[require_scope("api_write")]
-pub async fn activate_token(
-    req: HttpRequest,
-    state: web::Data<AppState>,
-    path: web::Path<String>,
-) -> AppResult<HttpResponse> {
-    let caller = identity(&req)?;
-    let id = path.into_inner();
-    let token = api_tokens::get_owned(&state.pool, &id, &caller.subject).await?;
-    let mut scopes = token.scopes_vec()?;
-    // Legacy empty scopes confer ordinary full access, not literal `all`'s
-    // eligibility for administration. Compare the actual authority, while the
-    // activation CAS below still checks the original stored scopes.
-    if scopes.is_empty() {
-        scopes = Scope::ORDINARY.to_vec();
-    }
-    crate::auth::admin::attenuate_scopes(&state.pool, &caller, Some(scopes)).await?;
-    api_tokens::activate_owned(&state.pool, &id, &caller.subject, &token.scopes_csv).await?;
-    audit(&caller, "token.activate", &id);
-    Ok(HttpResponse::NoContent().finish())
-}
-
 #[delete("/{id}")]
 #[require_scope("api_write")]
 pub async fn deactivate_token(
@@ -256,6 +233,51 @@ pub async fn admin_revoke_token(
     Ok(HttpResponse::NoContent().finish())
 }
 
+#[post("/{id}/activate")]
+#[require_scope("api_write")]
+pub async fn admin_activate_token(
+    req: HttpRequest,
+    state: web::Data<AppState>,
+    path: web::Path<String>,
+) -> AppResult<HttpResponse> {
+    let caller = identity(&req)?;
+    crate::auth::admin::require_instance_admin(&state.pool, &caller).await?;
+    let id = path.into_inner();
+    api_tokens::activate(&state.pool, &id).await?;
+    audit(&caller, "token.admin_activate", &id);
+    Ok(HttpResponse::NoContent().finish())
+}
+
+#[derive(Debug, Deserialize)]
+pub struct RevokeTokensForOwner {
+    pub owner_subject: String,
+}
+
+#[derive(Debug, Serialize)]
+pub struct RevokeTokensForOwnerResult {
+    pub revoked: u64,
+}
+
+#[post("/revoke-owner")]
+#[require_scope("api_write")]
+pub async fn admin_revoke_tokens_for_owner(
+    req: HttpRequest,
+    state: web::Data<AppState>,
+    body: web::Json<RevokeTokensForOwner>,
+) -> AppResult<HttpResponse> {
+    let caller = identity(&req)?;
+    crate::auth::admin::require_instance_admin(&state.pool, &caller).await?;
+    let owner_subject = body.owner_subject.trim();
+    if owner_subject.is_empty() {
+        return Err(AppError::BadRequest(
+            "owner_subject must not be empty".into(),
+        ));
+    }
+    let revoked = api_tokens::deactivate_all_owned(&state.pool, owner_subject).await?;
+    audit(&caller, "token.admin_revoke_owner", owner_subject);
+    Ok(HttpResponse::Ok().json(RevokeTokensForOwnerResult { revoked }))
+}
+
 #[delete("/{id}/permanent")]
 #[require_scope("api_write")]
 pub async fn admin_delete_token(
@@ -285,6 +307,8 @@ pub fn configure_api_tokens(cfg: &mut web::ServiceConfig) {
     cfg.service(
         web::scope("/admin/api-tokens")
             .service(admin_list_tokens)
+            .service(admin_revoke_tokens_for_owner)
+            .service(admin_activate_token)
             .service(admin_revoke_token)
             .service(admin_delete_token),
     );
@@ -292,7 +316,6 @@ pub fn configure_api_tokens(cfg: &mut web::ServiceConfig) {
         web::scope("/api-tokens")
             .service(list_tokens)
             .service(create_token)
-            .service(activate_token)
             .service(deactivate_token)
             .service(delete_token)
             .service(update_token_scopes),
