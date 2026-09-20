@@ -1592,6 +1592,35 @@ pre {
   white-space: nowrap;
 }
 
+.sidebar-user-name-row {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  min-width: 0;
+}
+
+.sidebar-user-name-row .sidebar-user-name {
+  min-width: 0;
+}
+
+.instance-admin-badge {
+  display: inline-grid;
+  place-items: center;
+  width: 1.22rem;
+  height: 1.22rem;
+  flex: 0 0 auto;
+  clip-path: polygon(50% 0%, 61% 34%, 98% 36%, 68% 58%, 79% 95%, 50% 73%, 21% 95%, 32% 58%, 2% 36%, 39% 34%);
+  background:
+    radial-gradient(circle at 26% 22%, rgba(255, 255, 255, 0.9) 0 5%, transparent 25%),
+    linear-gradient(135deg, #d7a7ff 0%, #8f5cff 31%, #6f45d7 48%, #56e4dd 69%, #f1b7ff 100%);
+  color: #1d1039;
+  box-shadow: 0 0 0 1px rgba(247, 226, 255, 0.7) inset, 0 0 0.45rem rgba(170, 101, 255, 0.55);
+  font-size: 0.64rem;
+  font-weight: 800;
+  line-height: 1;
+  text-shadow: 0 1px rgba(255, 255, 255, 0.42);
+}
+
 .sidebar-user-token-creator {
   display: block;
   font-size: 0.7rem;

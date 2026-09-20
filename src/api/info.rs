@@ -10,7 +10,6 @@ pub struct AppInfo {
     pub version: String,
     pub base_version: &'static str,
     pub edition: String,
-    pub features: Vec<String>,
     pub git_sha: &'static str,
     pub demo_mode: bool,
     /// Standalone effective timezone; embedded sessions use their actor resolver.
@@ -25,7 +24,6 @@ pub async fn info(state: web::Data<AppState>) -> HttpResponse {
         version: state.application_version.clone(),
         base_version: VERSION,
         edition: state.edition.clone(),
-        features: state.features.clone(),
         git_sha: GIT_SHA,
         demo_mode: state.demo_mode,
         timezone: state.timezone.to_string(),

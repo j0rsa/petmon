@@ -77,7 +77,18 @@ export function SidebarUserChip() {
           background: me.kind === 'dev' ? 'var(--text-subtle)' : me.kind === 'oidc' ? 'var(--pill-active-text)' : 'var(--accent)',
         }} />
         <div style={{ minWidth: 0 }}>
-          <span className="sidebar-user-name">{me.display_name}</span>
+          <span className="sidebar-user-name-row">
+            <span className="sidebar-user-name">{me.display_name}</span>
+            {me.roles?.includes('instance_admin') && (
+              <span
+                className="instance-admin-badge"
+                aria-label="Instance administrator"
+                title="Instance administrator"
+              >
+                A
+              </span>
+            )}
+          </span>
           {me.kind === 'api_token' && me.token_created_by && (
             <span className="sidebar-user-token-creator">{me.token_created_by}</span>
           )}
