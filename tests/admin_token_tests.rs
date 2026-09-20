@@ -246,6 +246,38 @@ async fn role_and_literal_all_are_both_required_and_revocation_is_live() {
 }
 
 #[actix_web::test]
+async fn administrator_token_listing_is_paginated_by_owner_and_filterable_by_name() {
+    let pool = pool().await;
+    instance_admins::grant(&pool, "operator").await.unwrap();
+    let (_, operator) = token(&pool, "operator", &["all"]).await;
+    let (_, _) = token(&pool, "Alice Adams", &["api_read"]).await;
+    let (_, _) = token(&pool, "Alice Adams", &["api_write"]).await;
+    let (_, _) = token(&pool, "Bob Brown", &["mcp"]).await;
+    let app = app!(pool);
+
+    let req = test::TestRequest::get()
+        .uri("/api/v1/admin/api-tokens?name=alice&page=1&page_size=10")
+        .insert_header(("Authorization", format!("Bearer {operator}")))
+        .to_request();
+    let body: serde_json::Value = test::call_and_read_body_json(&app, req).await;
+    assert_eq!(body["total_owners"], 1);
+    assert_eq!(body["items"].as_array().unwrap().len(), 2);
+    assert!(body["items"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .all(|item| item["created_by"] == "Alice Adams"));
+
+    let req = test::TestRequest::get()
+        .uri("/api/v1/admin/api-tokens?page=2&page_size=1")
+        .insert_header(("Authorization", format!("Bearer {operator}")))
+        .to_request();
+    let body: serde_json::Value = test::call_and_read_body_json(&app, req).await;
+    assert_eq!(body["total_owners"], 3);
+    assert_eq!(body["items"].as_array().unwrap().len(), 1);
+}
+
+#[actix_web::test]
 async fn personal_listing_and_mcp_transport_do_not_grant_token_management() {
     let pool = pool().await;
     let (own_id, raw) = token(&pool, "alice", &["all"]).await;

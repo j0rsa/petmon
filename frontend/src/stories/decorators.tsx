@@ -578,7 +578,9 @@ export function withSettings({
   return function SettingsDecorator(Story) {
     const client = makeMockClient();
     client.setQueryData(['me'], { subject: 'settings-user', email: null, name: 'User', display_name: 'User', kind: usingApiToken ? 'api_token' : 'oidc', scopes, roles: admin ? ['instance_admin'] : [] });
-    client.setQueryData(['instance-api-tokens'], admin ? mockInstanceApiTokens : []);
+    client.setQueryData(['instance-api-tokens', 1, ''], {
+      items: admin ? mockInstanceApiTokens : [], page: 1, page_size: 10, total_owners: admin ? 2 : 0,
+    });
 
     // Seed localStorage so SettingsPage's `usingApiToken` branch renders correctly.
     if (usingApiToken) {

@@ -8,6 +8,11 @@ use crate::error::{AppError, AppResult};
 use rand::Rng;
 use sha2::{Digest, Sha256};
 
+pub struct AdminTokenPage {
+    pub tokens: Vec<ApiToken>,
+    pub total_owners: u64,
+}
+
 fn generate_token() -> String {
     let bytes: [u8; 32] = rand::thread_rng().gen();
     format!("pm_api_{}", hex::encode(bytes))
@@ -26,6 +31,57 @@ pub async fn list(pool: &SqlitePool) -> AppResult<Vec<ApiToken>> {
     )
     .fetch_all(pool)
     .await?)
+}
+
+/// Lists every token for one page of owners. Paginating owners, rather than
+/// individual tokens, keeps one user's credentials together in admin UI.
+pub async fn list_admin_page(
+    pool: &SqlitePool,
+    name: &str,
+    limit: i64,
+    offset: i64,
+) -> AppResult<AdminTokenPage> {
+    let pattern = format!("%{}%", name.to_lowercase());
+    let total_owners = sqlx::query_scalar::<_, i64>(
+        "SELECT COUNT(*) FROM (
+           SELECT owner_subject
+           FROM api_tokens
+           WHERE ? = '' OR LOWER(COALESCE(created_by, '')) LIKE ?
+           GROUP BY owner_subject
+         )",
+    )
+    .bind(name)
+    .bind(&pattern)
+    .fetch_one(pool)
+    .await?;
+
+    let tokens = sqlx::query_as::<_, ApiToken>(
+        "WITH page_owners AS (
+           SELECT owner_subject,
+                  COALESCE(NULLIF(MAX(created_by), ''), owner_subject, '') AS owner_name
+           FROM api_tokens
+           WHERE ? = '' OR LOWER(COALESCE(created_by, '')) LIKE ?
+           GROUP BY owner_subject
+           ORDER BY LOWER(owner_name), owner_subject
+           LIMIT ? OFFSET ?
+         )
+         SELECT t.id, t.alias, t.token_hash, t.active, t.scopes, t.created_by,
+                t.owner_subject, t.created_at, t.last_used_at
+         FROM api_tokens t
+         INNER JOIN page_owners p ON t.owner_subject IS p.owner_subject
+         ORDER BY LOWER(p.owner_name), p.owner_subject, t.created_at DESC",
+    )
+    .bind(name)
+    .bind(pattern)
+    .bind(limit)
+    .bind(offset)
+    .fetch_all(pool)
+    .await?;
+
+    Ok(AdminTokenPage {
+        tokens,
+        total_owners: total_owners.max(0) as u64,
+    })
 }
 
 pub async fn list_owned(pool: &SqlitePool, owner: &str) -> AppResult<Vec<ApiToken>> {
