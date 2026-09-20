@@ -177,7 +177,7 @@ async fn legacy_conversion_is_explicit_and_atomic_and_startup_refuses_legacy_row
     let pool = pool().await;
     let pet_id = pet(&pool).await;
     let current_version = petmon::domain::elimination_classifier::CURRENT_MODEL_VERSION as i64;
-    sqlx::query("INSERT INTO elimination_classifiers (pet_id,model_version,model_json,sample_count,trained_at,pending_retrain,created_at,updated_at) VALUES (?,?,'{}',8,'old',0,'old','old')").bind(pet_id).bind(current_version).execute(&pool).await.unwrap();
+    sqlx::query("INSERT INTO elimination_classifiers (pet_id,model_version,model_json,sample_count,trained_at,pending_retrain,created_at,updated_at) VALUES (?,?,'{\"obsolete\":true}',8,'old',0,'old','old')").bind(pet_id).bind(current_version).execute(&pool).await.unwrap();
     for (id, civil) in [
         ("valid", "2026-09-19T10:00:00"),
         ("ambiguous", "2026-10-25T02:30:00"),
@@ -236,6 +236,15 @@ async fn legacy_conversion_is_explicit_and_atomic_and_startup_refuses_legacy_row
             .unwrap(),
         vec![pet_id]
     );
+    let classifier: (i64, String, i64, String, i64) = sqlx::query_as(
+        "SELECT model_version, model_json, sample_count, trained_at, pending_retrain
+         FROM elimination_classifiers WHERE pet_id = ?",
+    )
+    .bind(pet_id)
+    .fetch_one(&pool)
+    .await
+    .unwrap();
+    assert_eq!(classifier, (0, "{}".into(), 0, "".into(), 1));
     let after = repo::nutrition_records::get_record(&pool, "valid")
         .await
         .unwrap();

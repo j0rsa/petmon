@@ -156,7 +156,13 @@ pub async fn backfill_legacy(
     }
     if apply && report.issues.is_empty() {
         if report.candidates > 0 {
-            sqlx::query("UPDATE elimination_classifiers SET model_version=0, pending_retrain=1")
+            // Converted timestamps change model inputs. Preserve the row only as a
+            // durable retraining tombstone; never retain the obsolete model payload.
+            sqlx::query(
+                "UPDATE elimination_classifiers
+                 SET model_version=0, model_json='{}', sample_count=0, trained_at='', pending_retrain=1, updated_at=?",
+            )
+                .bind(Utc::now().to_rfc3339())
                 .execute(&mut *tx)
                 .await?;
         }

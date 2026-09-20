@@ -35,8 +35,8 @@ async fn migration_024_upgrades_the_released_schema_in_one_step() {
              VALUES ('legacy', 'Legacy pet', '2026-01-01', '2026-01-01');
          INSERT INTO nutrition_records (id, pet_id, occurred_at, local_date, category, amount, created_at, updated_at, telegram_message_id)
              VALUES ('record', 'legacy', '2026-01-01T09:00:00', '2026-01-01', 'water', 10, '2026-01-01', '2026-01-01', 42);
-         INSERT INTO elimination_classifiers (pet_id, model_version, model_json, trained_at, created_at, updated_at)
-             VALUES ('legacy', 2, '{}', '2026-01-01', '2026-01-01', '2026-01-01');",
+         INSERT INTO elimination_classifiers (pet_id, model_version, model_json, sample_count, trained_at, created_at, updated_at)
+             VALUES ('legacy', 2, '{\"obsolete\":true}', 42, '2026-01-01', '2026-01-01', '2026-01-01');",
     )
     .execute(&pool)
     .await
@@ -68,15 +68,14 @@ async fn migration_024_upgrades_the_released_schema_in_one_step() {
     );
     // Historical times still require explicit conversion, not a timezone guess in SQL.
     assert!(petmon::record_time::ensure_canonical(&pool).await.is_err());
-    assert_eq!(
-        sqlx::query_scalar::<_, i64>(
-            "SELECT pending_retrain FROM elimination_classifiers WHERE pet_id = 'legacy'"
-        )
-        .fetch_one(&pool)
-        .await
-        .unwrap(),
-        1
-    );
+    let classifier: (i64, String, i64, String, i64) = sqlx::query_as(
+        "SELECT model_version, model_json, sample_count, trained_at, pending_retrain
+         FROM elimination_classifiers WHERE pet_id = 'legacy'",
+    )
+    .fetch_one(&pool)
+    .await
+    .unwrap();
+    assert_eq!(classifier, (0, "{}".into(), 0, "".into(), 1));
     sqlx::query(
         "SELECT telegram_chat_id, telegram_thread_id, telegram_bot_id FROM med_intake_records",
     )
