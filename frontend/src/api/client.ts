@@ -93,10 +93,25 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
   return (await parseBody()) as T;
 }
 
+async function download(path: string): Promise<Blob> {
+  const adapter = sessionAdapter;
+  const token = adapter ? adapter.getToken() : getStoredToken();
+  const res = await fetch(`${BASE}${path}`, {
+    headers: token ? { Authorization: `Bearer ${token}` } : {},
+  });
+  if (!res.ok) {
+    const contentType = res.headers.get('content-type') ?? '';
+    const body = contentType.includes('application/json') ? await res.json().catch(() => ({})) : await res.text().catch(() => '');
+    throw new ApiError(res.status, body);
+  }
+  return res.blob();
+}
+
 export const api = {
   get: <T>(path: string, signal?: AbortSignal) => request<T>(path, { signal }),
   post: <T>(path: string, body: unknown) => request<T>(path, { method: 'POST', body: JSON.stringify(body) }),
   put: <T>(path: string, body: unknown) => request<T>(path, { method: 'PUT', body: JSON.stringify(body) }),
   patch: <T>(path: string, body: unknown) => request<T>(path, { method: 'PATCH', body: JSON.stringify(body) }),
   delete: (path: string) => request<void>(path, { method: 'DELETE' }),
+  download,
 };

@@ -28,6 +28,7 @@ export const AllConfigured: Story = {
   decorators: [withSettings({ oidc: 'configured', telegram: 'configured', tokens: 'populated' })],
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement);
+    await expect(canvas.queryByRole('heading', { name: 'Move to Cloud instance' })).not.toBeInTheDocument();
     const heading = canvas.getByRole('heading', { name: 'Instance API tokens' });
     const section = heading.closest('section') as HTMLElement;
     const instance = within(section);

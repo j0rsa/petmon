@@ -39,6 +39,7 @@ export const WithPets: Story = {
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement);
     await expect(canvas.getByRole('heading', { name: 'Manage pet profiles' })).toBeInTheDocument();
+    await expect(canvas.getByRole('heading', { name: 'Move to Cloud instance' })).toBeInTheDocument();
     await expect(canvas.getByRole('heading', { name: 'Mittens' })).toBeInTheDocument();
     assertBadgesDoNotBreakName(canvasElement, 'Mittens');
     await expect(canvas.queryByRole('heading', { name: 'Create a new profile' })).not.toBeInTheDocument();

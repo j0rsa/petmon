@@ -31,7 +31,13 @@ export interface ApplicationExtensions {
   };
   routes?: ApplicationRoute[];
   navigation?: { to: string; label: string }[];
-  chrome?: { sidebar?: ReactNode; beforeContent?: ReactNode; settings?: ReactNode };
+  chrome?: {
+    sidebar?: ReactNode;
+    beforeContent?: ReactNode;
+    settings?: ReactNode;
+    /** Optional content below the shared Manage pet profiles header. */
+    petManagement?: ReactNode;
+  };
   pets?: {
     /** Collection-specific query keys retain the ['pets'] invalidation prefix. */
     key: string;

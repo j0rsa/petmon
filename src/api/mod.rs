@@ -13,6 +13,7 @@ pub mod pets;
 pub mod push;
 pub mod settings;
 pub mod shortcuts;
+pub mod transfer;
 pub mod user_settings;
 pub mod weight;
 
@@ -45,4 +46,5 @@ pub fn configure_full(cfg: &mut web::ServiceConfig) {
     settings::configure_api_tokens(cfg);
     user_settings::configure(cfg);
     shortcuts::configure(cfg);
+    transfer::configure(cfg);
 }

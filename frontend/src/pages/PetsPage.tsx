@@ -8,6 +8,7 @@ import { PET_SPECIES, PET_SPECIES_LABELS, PET_STATUSES, PET_STATUS_LABELS, type 
 import { usePermissions } from '../context/usePermissions';
 import { useSelectedPet } from '../context/SelectedPetContext';
 import { useApplicationExtensions } from '../context/ApplicationExtensions';
+import { api, ApiError } from '../api/client';
 
 interface PetFormState {
   name: string;
@@ -74,6 +75,8 @@ export default function PetsPage() {
           </div>
         )}
       </section>
+
+      {extensions?.chrome?.petManagement ?? <CloudTransferSection />}
 
       {petsLoading ? (
         <div className="loading-state">Loading pets…</div>
@@ -158,6 +161,38 @@ export default function PetsPage() {
       )}
     </div>
   );
+}
+
+function CloudTransferSection() {
+  const [error, setError] = useState<string>();
+  const [exporting, setExporting] = useState(false);
+
+  async function downloadTransfer() {
+    setError(undefined);
+    setExporting(true);
+    try {
+      const bundle = await api.download('/exports/transfer/oss');
+      const url = URL.createObjectURL(bundle);
+      const anchor = document.createElement('a');
+      anchor.href = url;
+      anchor.download = 'petmon-transfer.json';
+      anchor.click();
+      URL.revokeObjectURL(url);
+    } catch (cause) {
+      setError(cause instanceof ApiError ? ((cause.body as { message?: string })?.message ?? 'Could not create transfer bundle.') : 'Could not create transfer bundle.');
+    } finally {
+      setExporting(false);
+    }
+  }
+
+  return <section className="panel">
+    <div className="section-heading"><div><p className="eyebrow">Cloud migration</p><h3>Move to Cloud instance</h3></div></div>
+    <p className="muted-text">Download your pet care history and Telegram destinations as a transfer bundle for Petmon Pro. It excludes sign-in settings, API tokens, bot credentials, push subscriptions, and old message references.</p>
+    <button className="button button-secondary" type="button" disabled={exporting} onClick={downloadTransfer}>
+      {exporting ? 'Preparing export…' : 'Download transfer bundle'}
+    </button>
+    {error && <p className="error-state" role="alert">{error}</p>}
+  </section>;
 }
 
 function PetDeleteControl({ petId, children }: { petId: string; children: React.ReactNode }) {

@@ -1,12 +1,12 @@
 # Shared application extension and access control
 
-Implementation reference for OSS `0.26.0`, built on `0.25.0`. This document describes generic public contracts; downstream product schemas and policies belong in their own applications.
+Implementation reference for OSS `0.27.0`, built on `0.26.0`. This document describes generic public contracts; downstream product schemas and policies belong in their own applications.
 
 Petmon remains a standalone single-tenant care tracker. Its library and shared UI provide composition interfaces alongside token management, instance administration and integration safeguards. Public interfaces use generic actors, resources, actions and settings; they do not introduce a tenant product or product-specific schema.
 
 ## Release scope
 
-These prerequisites are one independently shippable feature release with one minor version bump: `0.25.0` to `0.26.0`. Follow the one-bump-per-PR rule in `CLAUDE.md` on follow-up changes. Pre-1.0 major features use minor versions.
+This release adds a portable OSS-to-Pro transfer export and a generic pet-management UI slot, with one minor version bump: `0.26.0` to `0.27.0`. Follow the one-bump-per-PR rule in `CLAUDE.md` on follow-up changes. Pre-1.0 major features use minor versions.
 
 The standalone application retains shared-pet behavior through an explicit default resource policy. Its settings tiers remain system, user and pet. Custom identity providers, resource ownership models and extension-specific UI live with their consuming application.
 
@@ -123,7 +123,7 @@ Allow embedders to report edition, features and their version plus base-library 
 
 Provide explicit, typed composition points for:
 
-- Additional routes and navigation/chrome slots.
+- Additional routes and navigation/chrome slots, including optional content below the shared Manage pet profiles header (`chrome.petManagement`).
 - Visible pet collection and controlled selection/provider integration.
 - Selection persistence strategy and account-change cleanup.
 - Pet creation action, including any embedder-required context.

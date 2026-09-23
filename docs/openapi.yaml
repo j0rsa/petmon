@@ -2875,11 +2875,11 @@ components:
         version:
           type: string
           description: Application version supplied by an embedder, or the standalone crate version.
-          example: "0.26.0"
+          example: "0.27.0"
         base_version:
           type: string
           description: Version of the underlying shared OSS crate.
-          example: "0.26.0"
+          example: "0.27.0"
         edition:
           type: string
           description: Generic application edition label supplied by the composition root.
