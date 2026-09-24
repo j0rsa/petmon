@@ -238,6 +238,71 @@ paths:
         '404':
           $ref: '#/components/responses/NotFound'
 
+  /pets/{id}/settings/{key}:
+    get:
+      tags: [Pet settings]
+      summary: Get a pet setting
+      x-required-scope: api_read
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: Pet UUID
+          schema: { type: string, format: uuid }
+        - name: key
+          in: path
+          required: true
+          description: The supported per-pet setting key.
+          schema: { type: string, enum: [med_nudge] }
+      responses:
+        '200':
+          description: Current setting value
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/PetNudgeSchedule' }
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+    post:
+      tags: [Pet settings]
+      summary: Update a pet setting
+      x-required-scope: api_write
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: Pet UUID
+          schema: { type: string, format: uuid }
+        - name: key
+          in: path
+          required: true
+          description: The supported per-pet setting key.
+          schema: { type: string, enum: [med_nudge] }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/PetNudgeSchedule' }
+      responses:
+        '200':
+          description: Saved setting value
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/PetNudgeSchedule' }
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
   /days/{date}:
     get:
       tags:
@@ -1918,6 +1983,34 @@ paths:
           $ref: '#/components/responses/BadRequest'
 
   /health/meds/assignments/{id}:
+    put:
+      tags: [Medications]
+      summary: Replace a treatment plan assignment
+      x-required-scope: api_write
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/EditMedAssignment' }
+      responses:
+        '200':
+          description: Updated assignment
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/MedAssignment' }
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
     delete:
       tags: [Medications]
       summary: Delete an assignment
@@ -2350,7 +2443,10 @@ paths:
         - Nutrition Records
       summary: Create nutrition record
       x-required-scope: api_write
-      description: Create a single nutrition record
+      description: |
+        Create a single nutrition record. `occurred_at` must be an RFC3339
+        instant with an explicit UTC offset (or `Z`). Omit it for a real-time
+        entry, or provide `local_date` to retain that civil journal date.
       requestBody:
         required: true
         content:
@@ -2370,6 +2466,41 @@ paths:
           $ref: '#/components/responses/Forbidden'
         '401':
           $ref: '#/components/responses/Unauthorized'
+
+  /exports/transfer/oss:
+    get:
+      tags:
+        - Export
+      summary: Download portable care-data transfer bundle
+      x-required-scope: api_read
+      description: |
+        Downloads the authenticated user's portable Petmon care-data bundle as
+        JSON. It contains pet-scoped care data and pet Telegram destinations,
+        but excludes accounts, credentials, push state, bot credentials, and
+        historical Telegram delivery references. Instance-wide day notes must
+        be moved to a pet or removed before an export can be created.
+      responses:
+        '200':
+          description: Portable transfer bundle. The response is an attachment named `petmon-transfer.json` and must not be cached.
+          headers:
+            Content-Disposition:
+              description: Attachment filename (`petmon-transfer.json`).
+              schema:
+                type: string
+            Cache-Control:
+              description: Always `no-store`.
+              schema:
+                type: string
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TransferBundle'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
 
   /nutrition/records/batch:
     post:
@@ -3167,6 +3298,27 @@ components:
           type: boolean
           description: Enable duration-based auto-categorization for general elimination records
 
+    PetNudgeSchedule:
+      type: object
+      description: Per-pet daily medication-intake reminder schedule. Omitted slots and fields use their disabled defaults.
+      properties:
+        morning: { $ref: '#/components/schemas/PetNudgeSlot' }
+        midday: { $ref: '#/components/schemas/PetNudgeSlot' }
+        evening: { $ref: '#/components/schemas/PetNudgeSlot' }
+
+    PetNudgeSlot:
+      type: object
+      properties:
+        enabled:
+          type: boolean
+          default: false
+        deadline_hour:
+          type: integer
+          minimum: 0
+          maximum: 23
+          default: 0
+          description: Local hour by which the medication intake should be logged.
+
     NotificationView:
       type: object
       properties:
@@ -3300,6 +3452,72 @@ components:
         - water
         - liquids
       description: Category of nutrition intake
+
+    TransferBundle:
+      type: object
+      description: Versioned, portable Petmon care-data export.
+      properties:
+        format:
+          type: string
+          const: petmon-transfer
+        version:
+          type: integer
+          const: 1
+        manifest:
+          type: object
+          properties:
+            source_version:
+              type: string
+              description: Version of the Petmon instance that produced the bundle.
+            source_schema_version:
+              type: integer
+              description: SQLite schema version of the source instance.
+            checksums:
+              type: object
+              additionalProperties:
+                type: string
+              description: SHA-256 checksums keyed by data collection name.
+          required: [source_version, source_schema_version, checksums]
+        data:
+          type: object
+          description: Care-data collections. Each row preserves its source fields for a compatible importer.
+          properties:
+            pets: { $ref: '#/components/schemas/TransferRows' }
+            nutrition_records: { $ref: '#/components/schemas/TransferRows' }
+            elimination_records: { $ref: '#/components/schemas/TransferRows' }
+            health_records: { $ref: '#/components/schemas/TransferRows' }
+            day_notes: { $ref: '#/components/schemas/TransferRows' }
+            nutrition_schedules: { $ref: '#/components/schemas/TransferRows' }
+            weight_records: { $ref: '#/components/schemas/TransferRows' }
+            medications: { $ref: '#/components/schemas/TransferRows' }
+            med_formulations: { $ref: '#/components/schemas/TransferRows' }
+            med_assignments: { $ref: '#/components/schemas/TransferRows' }
+            med_intake_records: { $ref: '#/components/schemas/TransferRows' }
+            med_bundles: { $ref: '#/components/schemas/TransferRows' }
+            med_bundle_items: { $ref: '#/components/schemas/TransferRows' }
+            pet_settings: { $ref: '#/components/schemas/TransferRows' }
+          required:
+            - pets
+            - nutrition_records
+            - elimination_records
+            - health_records
+            - day_notes
+            - nutrition_schedules
+            - weight_records
+            - medications
+            - med_formulations
+            - med_assignments
+            - med_intake_records
+            - med_bundles
+            - med_bundle_items
+            - pet_settings
+      required: [format, version, manifest, data]
+
+    TransferRows:
+      type: array
+      items:
+        type: object
+        additionalProperties: true
 
     NutritionRecord:
       type: object
@@ -4913,6 +5131,34 @@ components:
           nullable: true
           description: Minutes to wait before feeding after taking this medication.
       required: [medication_id, date_from]
+
+    EditMedAssignment:
+      type: object
+      description: Replaces the editable details of an existing assignment. The original medication remains unchanged.
+      properties:
+        formulation_id: { type: string }
+        tablet_strength_mg: { type: number }
+        pill_shape: { $ref: '#/components/schemas/PillShape' }
+        liquid_concentration_mg_per_ml: { type: number }
+        dose_fraction:
+          allOf: [{ $ref: '#/components/schemas/DoseFraction' }]
+          description: Required for scheduled pills; omitted for optional/as-needed assignments.
+        liquid_dose_ml:
+          type: number
+          description: Required for scheduled liquids; omitted for optional/as-needed assignments.
+        frequency:
+          allOf: [{ $ref: '#/components/schemas/MedFrequency' }]
+          description: Required for scheduled assignments; ignored for optional/as-needed assignments.
+        date_from: { type: string, format: date }
+        date_to: { type: string, format: date, nullable: true }
+        optional:
+          type: boolean
+          description: As-needed medication; dosage is provided for each intake and no schedule is required.
+        meal_wait_minutes:
+          type: integer
+          nullable: true
+          description: Minutes to wait before feeding after taking this medication.
+      required: [date_from]
 
     ReviseMedAssignment:
       type: object
