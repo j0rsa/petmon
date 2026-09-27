@@ -4,6 +4,8 @@ import { CartesianGrid, DefaultLegendContent, Legend, Line, LineChart, Reference
 import { useUserWidgetSettings } from '../api/userSettings';
 import {
   buildCumulativeFluidChart,
+  DAY_END_REF_MS,
+  DAY_START_REF_MS,
   enabledFluidSeries,
   formatRefMs,
   nowToRefMs,
@@ -128,7 +130,7 @@ export function CumulativeFluidChart({ records, focusDate, schedules = [], bestD
               dataKey="x"
               type="number"
               scale="time"
-              domain={['dataMin', 'dataMax']}
+              domain={[DAY_START_REF_MS, DAY_END_REF_MS]}
               stroke="var(--chart-axis)"
               tick={{ fill: 'var(--chart-axis)', fontFamily: 'DM Mono, monospace', fontSize: 11 }}
               tickFormatter={formatRefMs}

@@ -1,10 +1,11 @@
 import { describe, expect, it } from 'vitest';
 import {
+  buildCumulativeFluidChart,
   dailyScheduleMaxMl,
   expectedScheduledFluidMl,
   scheduleProjectionAt,
 } from './cumulativeFluid';
-import type { NutritionSchedule } from '../types';
+import type { NutritionRecord, NutritionSchedule } from '../types';
 
 const liquidWindowsSchedule: NutritionSchedule = {
   id: 'sched-liquid',
@@ -43,5 +44,28 @@ describe('expectedScheduledFluidMl', () => {
 
   it('returns null when there is no liquid schedule', () => {
     expect(expectedScheduledFluidMl([], '2020-01-01', '2025-06-01')).toBeNull();
+  });
+});
+
+describe('buildCumulativeFluidChart', () => {
+  it('keeps curves and the timeline anchored to the full day', () => {
+    const record: NutritionRecord = {
+      id: 'record-1',
+      pet_id: 'pet-1',
+      occurred_at: '2024-01-01T12:00:00Z',
+      local_date: '2024-01-01',
+      category: 'liquids',
+      amount: 40,
+      unit: 'ml',
+      note: null,
+      source_type: 'manual',
+      created_at: '2024-01-01T12:00:00Z',
+      updated_at: '2024-01-01T12:00:00Z',
+    };
+
+    const chart = buildCumulativeFluidChart([record], '2024-01-01', []);
+
+    expect(chart.points[0]).toMatchObject({ label: '00:00', total: 0 });
+    expect(chart.points.at(-1)).toMatchObject({ label: '23:59', total: 40 });
   });
 });

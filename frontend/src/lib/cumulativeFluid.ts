@@ -72,6 +72,9 @@ export function timeToRefMs(time: string) {
   return new Date(REF_DATE.year, REF_DATE.month, REF_DATE.day, hours, minutes).getTime();
 }
 
+export const DAY_START_REF_MS = timeToRefMs('00:00');
+export const DAY_END_REF_MS = timeToRefMs('23:59');
+
 export function nowToRefMs(currentMinute?: number) {
   const now = new Date();
   const minute = currentMinute ?? now.getHours() * 60 + now.getMinutes();
@@ -105,8 +108,7 @@ function buildStepCurve(records: NutritionRecord[], timeZone?: string) {
     return points;
   }
 
-  const leadIn = timeToRefMs(times[0]) - 20 * 60 * 1000;
-  points.push({ x: leadIn, liquids: 0, foodFluid: 0, total: 0 });
+  points.push({ x: DAY_START_REF_MS, liquids: 0, foodFluid: 0, total: 0 });
 
   for (const time of times) {
     const atTime = sorted.filter((record) => timeLabelFromOccurredAt(record.occurred_at, timeZone) === time);
@@ -124,8 +126,7 @@ function buildStepCurve(records: NutritionRecord[], timeZone?: string) {
 export function bestDayCurvesFromApi(points: FluidCurvePoint[]): Array<{ x: number; liquids: number; foodFluid: number; total: number }> {
   if (points.length === 0) return [];
   const result: Array<{ x: number; liquids: number; foodFluid: number; total: number }> = [];
-  const leadIn = timeToRefMs(points[0].time) - 20 * 60 * 1000;
-  result.push({ x: leadIn, liquids: 0, foodFluid: 0, total: 0 });
+  result.push({ x: DAY_START_REF_MS, liquids: 0, foodFluid: 0, total: 0 });
   for (const point of points) {
     const total = point.cumulative_fluid_ml;
     const liquids = point.cumulative_liquids_ml;
@@ -212,8 +213,7 @@ export function buildScheduleCurve(windows: ScheduleWindow[]) {
   let cumulative = 0;
   const points: Array<{ x: number; total: number }> = [];
 
-  const leadIn = timeToRefMs(active[0].from) - 20 * 60 * 1000;
-  points.push({ x: leadIn, total: 0 });
+  points.push({ x: DAY_START_REF_MS, total: 0 });
 
   for (const w of active) {
     cumulative += w.max;
@@ -275,7 +275,7 @@ export function buildCumulativeFluidChart(
   const scheduleWindows = liquidScheduleWindowsFromSchedules(schedules);
   const scheduleCurve = buildScheduleCurve(scheduleWindows);
 
-  const allX = [
+  const dataX = [
     ...new Set([
       ...dayCurve.map((point) => point.x),
       ...bestDayCurve.map((point) => point.x),
@@ -283,9 +283,14 @@ export function buildCumulativeFluidChart(
     ]),
   ].sort((left, right) => left - right);
 
-  if (allX.length === 0) {
+  if (dataX.length === 0) {
     return { points: [] as CumulativeFluidPoint[], bestDayLabel: null as string | null };
   }
+
+  // Keep every curve and the axis anchored to the full civil day, rather than
+  // shrinking the graph to the first and last record or schedule window.
+  const allX = [...new Set([DAY_START_REF_MS, ...dataX, DAY_END_REF_MS])]
+    .sort((left, right) => left - right);
 
   const liquids = projectSeries(dayCurve, allX, 'liquids');
   const foodFluid = projectSeries(dayCurve, allX, 'foodFluid');
