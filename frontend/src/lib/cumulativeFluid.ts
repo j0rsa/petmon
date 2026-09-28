@@ -74,6 +74,10 @@ export function timeToRefMs(time: string) {
 
 export const DAY_START_REF_MS = timeToRefMs('00:00');
 export const DAY_END_REF_MS = timeToRefMs('23:59');
+const DAY_TIMELINE_REF_MS = [
+  ...Array.from({ length: 96 }, (_, index) => DAY_START_REF_MS + index * 15 * 60 * 1000),
+  DAY_END_REF_MS,
+];
 
 export function nowToRefMs(currentMinute?: number) {
   const now = new Date();
@@ -289,7 +293,7 @@ export function buildCumulativeFluidChart(
 
   // Keep every curve and the axis anchored to the full civil day, rather than
   // shrinking the graph to the first and last record or schedule window.
-  const allX = [...new Set([DAY_START_REF_MS, ...dataX, DAY_END_REF_MS])]
+  const allX = [...new Set([...DAY_TIMELINE_REF_MS, ...dataX])]
     .sort((left, right) => left - right);
 
   const liquids = projectSeries(dayCurve, allX, 'liquids');

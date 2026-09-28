@@ -67,5 +67,6 @@ describe('buildCumulativeFluidChart', () => {
 
     expect(chart.points[0]).toMatchObject({ label: '00:00', total: 0 });
     expect(chart.points.at(-1)).toMatchObject({ label: '23:59', total: 40 });
+    expect(chart.points.map((point) => point.label)).toEqual(expect.arrayContaining(['11:00', '15:00']));
   });
 });

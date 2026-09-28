@@ -771,6 +771,13 @@ pre {
   position: relative;
 }
 
+.fluid-chart-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+  margin-left: auto;
+}
+
 .fluid-chart-best-day-label {
   margin: 0;
   font-size: 0.78rem;

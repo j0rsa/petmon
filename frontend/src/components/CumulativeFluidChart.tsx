@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react';
 import { useTime } from '../context/useTime';
-import { CartesianGrid, DefaultLegendContent, Legend, Line, LineChart, ReferenceLine, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
+import { Brush, CartesianGrid, DefaultLegendContent, Legend, Line, LineChart, ReferenceLine, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
 import { useUserWidgetSettings } from '../api/userSettings';
 import {
   buildCumulativeFluidChart,
@@ -71,10 +71,16 @@ interface CumulativeFluidChartProps {
   bestDayDate?: string;
 }
 
+interface ZoomRange {
+  start: number;
+  end: number;
+}
+
 export function CumulativeFluidChart({ records, focusDate, schedules = [], bestDayCurve, bestDayDate }: CumulativeFluidChartProps) {
   const { minuteOfDay, timeZone } = useTime();
   const { settings, update } = useUserWidgetSettings('cumulative_fluid_chart');
   const [soloSeriesKey, setSoloSeriesKey] = useState<FluidSeriesKey | null>(null);
+  const [zoomRange, setZoomRange] = useState<ZoomRange | null>(null);
 
   const { points, bestDayLabel } = useMemo(
     () => buildCumulativeFluidChart(records, focusDate, schedules, bestDayCurve, bestDayDate, timeZone),
@@ -99,6 +105,28 @@ export function CumulativeFluidChart({ records, focusDate, schedules = [], bestD
   );
 
   const nowX = nowToRefMs(minuteOfDay);
+  const isZoomed = zoomRange !== null;
+  const chartDomain: [number, number] = zoomRange
+    ? [zoomRange.start, zoomRange.end]
+    : [DAY_START_REF_MS, DAY_END_REF_MS];
+  const brushStartIndex = zoomRange
+    ? Math.max(0, points.findIndex((point) => point.x === zoomRange.start))
+    : 0;
+  const brushEndIndex = zoomRange
+    ? Math.max(0, points.findIndex((point) => point.x === zoomRange.end))
+    : points.length - 1;
+
+  function handleBrushChange({ startIndex, endIndex }: { startIndex?: number; endIndex?: number }) {
+    if (startIndex == null || endIndex == null) return;
+    const start = points[startIndex]?.x;
+    const end = points[endIndex]?.x;
+    if (start == null || end == null || start >= end) return;
+    if (start === DAY_START_REF_MS && end === DAY_END_REF_MS) {
+      setZoomRange(null);
+      return;
+    }
+    setZoomRange({ start, end });
+  }
 
   if (points.length === 0) {
     return <div className="empty-state compact-empty">No fluid records for {focusDate} in this range.</div>;
@@ -117,9 +145,19 @@ export function CumulativeFluidChart({ records, focusDate, schedules = [], bestD
     <div className="cumulative-fluid-chart">
       <div className="cumulative-fluid-chart-toolbar">
         {bestDayLabel && <p className="muted-text fluid-chart-best-day-label">{bestDayLabel}</p>}
-        <WidgetSettingsGear label="Cumulative fluid chart settings">
-          <CumulativeFluidChartSettingsFields settings={settings} onChange={update} />
-        </WidgetSettingsGear>
+        <div className="fluid-chart-actions">
+          <button
+            type="button"
+            className="button button-secondary button-compact"
+            disabled={!isZoomed}
+            onClick={() => setZoomRange(null)}
+          >
+            Reset day
+          </button>
+          <WidgetSettingsGear label="Cumulative fluid chart settings">
+            <CumulativeFluidChartSettingsFields settings={settings} onChange={update} />
+          </WidgetSettingsGear>
+        </div>
       </div>
 
       <div className="chart-wrapper chart-wrapper-fluid">
@@ -130,7 +168,7 @@ export function CumulativeFluidChart({ records, focusDate, schedules = [], bestD
               dataKey="x"
               type="number"
               scale="time"
-              domain={[DAY_START_REF_MS, DAY_END_REF_MS]}
+              domain={chartDomain}
               stroke="var(--chart-axis)"
               tick={{ fill: 'var(--chart-axis)', fontFamily: 'DM Mono, monospace', fontSize: 11 }}
               tickFormatter={formatRefMs}
@@ -142,6 +180,18 @@ export function CumulativeFluidChart({ records, focusDate, schedules = [], bestD
               unit=" ml"
             />
             <Tooltip content={<ChartTooltip />} />
+            <Brush
+              dataKey="x"
+              height={32}
+              travellerWidth={10}
+              stroke="var(--chart-axis)"
+              fill="var(--surface-raised)"
+              tickFormatter={formatRefMs}
+              alwaysShowText
+              startIndex={brushStartIndex}
+              endIndex={brushEndIndex}
+              onDragEnd={handleBrushChange}
+            />
             {exposedSeries.length > 0 && (
               <Legend
                 className="chart-legend-interactive"
